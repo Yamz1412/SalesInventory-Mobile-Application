@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="30dp"
+    android:background="#FFFFFF">
+
+    <ImageView
+        android:id="@+id/emailIcon"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/email"
+        android:layout_marginBottom="30dp"/>
+    <!-- Note: Ensure you have an 'email' icon in drawable, or use a default android one -->
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Verify your Email"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#00695C"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="We sent a verification link to your email.\nPlease click the link to continue."
+        android:gravity="center"
+        android:textSize="16sp"
+        android:textColor="#666"
+        android:layout_marginBottom="40dp"/>
+
+    <ProgressBar
+        android:id="@+id/progressBarWait"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="30dp"/>
+
+    <Button
+        android:id="@+id/btnRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="I have verified my email"
+        android:textSize="16sp"
+        android:backgroundTint="#00695C"
+        android:textColor="#FFFFFF"/>
+
+    <Button
+        android:id="@+id/btnResend"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Resend Link"
+        android:textSize="14sp"
+        android:layout_marginTop="10dp"
+        android:backgroundTint="#FFFFFF"
+        android:textColor="#00695C"
+        style="?android:attr/borderlessButtonStyle"/>
+
+</LinearLayout>

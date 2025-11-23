@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "641843176184",
+    "firebase_url": "https://sales-inventory-manageme-f2d7a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "sales-inventory-manageme-f2d7a",
+    "storage_bucket": "sales-inventory-manageme-f2d7a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:641843176184:android:7d8b2ef27e23e5b81b510d",
+        "android_client_info": {
+          "package_name": "com.app.SalesInventory"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAukJUcEKe-fb17xESw6lJYacTEPOijlRE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,2 +1,2 @@
-rootProject.name='realTimeDBTest'
+rootProject.name='SalesInventory'
 include ':app'

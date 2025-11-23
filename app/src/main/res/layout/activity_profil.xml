@@ -1,165 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".Profil">
+    android:orientation="vertical"
+    android:background="@color/backgroundColor">
 
-    <ScrollView
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="200dp"
+        android:background="@color/colorPrimary">
+
+        <ImageView
+            android:id="@+id/imgAvatar"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_centerInParent="true"
+            android:background="@drawable/avatarprofil"
+            android:scaleType="centerCrop"/>
+
+        <TextView
+            android:id="@+id/ProfilNameInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/imgAvatar"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="10dp"
+            android:text="User Name"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"/>
+    </RelativeLayout>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="20dp"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="4dp"
+        android:layout_marginTop="-30dp">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="#FFFFFF">
 
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal">
+                android:text="Full Name"
+                android:textColor="#757575"
+                android:textSize="12sp"/>
+            <TextView
+                android:id="@+id/ProfilNameT"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Loading..."
+                android:textSize="18sp"
+                android:textColor="#333"
+                android:layout_marginBottom="15dp"/>
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEE"/>
 
-                <TextView
-                    android:id="@+id/ProfilNameInfo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Name"
-                    android:textAllCaps="false"
-                    android:textSize="30sp"
-                    android:textStyle="bold" />
-
-
-                <TextView
-                    android:id="@+id/textView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=" Profil"
-                    android:textAllCaps="false"
-                    android:textSize="30sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
-
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="20dp"
-                android:orientation="horizontal">
+                android:text="Email Address"
+                android:textColor="#757575"
+                android:textSize="12sp"
+                android:layout_marginTop="15dp"/>
+            <TextView
+                android:id="@+id/ProfilEmailT"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Loading..."
+                android:textSize="18sp"
+                android:textColor="#333"
+                android:layout_marginBottom="15dp"/>
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEE"/>
 
-                <ImageView
-                    android:layout_width="150dp"
-                    android:layout_height="150dp"
-                    android:background="@drawable/avatarprofil"/>
-            </LinearLayout>
-
-            <LinearLayout
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="30dp"
-                android:orientation="horizontal">
-
-
-                <TextView
-                    android:id="@+id/ProfilNameT"
-                    android:layout_width="300dp"
-                    android:layout_height="wrap_content"
-                    android:hint="Your Name"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
+                android:text="Phone Number"
+                android:textColor="#757575"
+                android:textSize="12sp"
+                android:layout_marginTop="15dp"/>
+            <TextView
+                android:id="@+id/ProfilPhoneT"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:orientation="horizontal">
+                android:text="Loading..."
+                android:textSize="18sp"
+                android:textColor="#333"
+                android:layout_marginBottom="15dp"/>
 
-                <View
-                    android:layout_width="300dp"
-                    android:layout_height="1dp"
-                    android:background="@android:color/holo_blue_light" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="20dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/ProfilEmailT"
-                    android:layout_width="300dp"
-                    android:layout_height="wrap_content"
-                    android:hint="Your Email"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="300dp"
-                    android:layout_height="1dp"
-                    android:background="@android:color/holo_blue_light" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="20dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/ProfilPhoneT"
-                    android:layout_width="300dp"
-                    android:layout_height="wrap_content"
-                    android:hint="Your Phone"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="300dp"
-                    android:layout_height="1dp"
-                    android:background="@android:color/holo_blue_light" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_gravity="bottom|right"
-                android:layout_marginRight="10dp"
-                android:layout_marginTop="100dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/EditProfil"
-                    android:layout_width="200dp"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bgbutton"
-                    android:text="Edit Profil" />
-            </LinearLayout>
         </LinearLayout>
-    </ScrollView>
+    </androidx.cardview.widget.CardView>
+
+    <Button
+        android:id="@+id/EditProfil"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_margin="20dp"
+        android:text="Edit Profile"
+        android:textSize="16sp"
+        android:backgroundTint="@color/colorPrimary"/>
 
 </LinearLayout>

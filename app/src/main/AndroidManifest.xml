@@ -1,35 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.realtimedbtest">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.app.SalesInventory">
 
     <application
-        android:allowBackup="true"
-        android:icon="@drawable/logo"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
-        <activity android:name=".DeleteProduct"></activity>
-        <activity android:name=".sellProduct" />
-        <activity android:name=".SellList" />
-        <activity android:name=".Conditions" />
-        <activity android:name=".History" />
-        <activity android:name=".Stock" />
-        <activity android:name=".EditProfil" />
-        <activity android:name=".Profil" />
-        <activity android:name=".Register" />
-        <activity android:name=".resetPassWord" />
-        <activity android:name=".Home" />
-        <activity android:name=".Purchase" />
-        <activity android:name=".SingIn" />
-        <activity android:name=".Module" />
-        <activity android:name=".FirstActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
+    android:name=".Module"
+    android:allowBackup="true"
+    android:icon="@drawable/logo"
+    android:label="Sales &amp; Inventory"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.SalesInventory">
 
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
+    <activity
+        android:name=".FirstActivity"
+        android:windowSoftInputMode="adjustResize"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
 
+    <activity android:name=".WaitingVerification"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".SignIn"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Signup"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".resetPassWord"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Conditions"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Dashboard"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Profile"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".EditProfil"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".SellList"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".sellProduct"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Reports"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".Inventory"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".AddProduct"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".DeleteProduct"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".EditProduct"
+        android:windowSoftInputMode="adjustResize" />
+
+    <activity
+        android:name=".History"
+        android:windowSoftInputMode="adjustResize" />
+
+</application>
 </manifest>

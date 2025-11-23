@@ -1,3 +1,24 @@
 <resources>
-    <string name="app_name">EasyManage</string>
+    <string name="app_name">Sales &amp; Inventory</string>
+
+    <string name="TERMS">
+        <b>1. Acceptance of Terms</b>\n
+        By accessing and using the HanZai POS System, you agree to comply with and be bound by the following terms and conditions.\n\n
+
+        <b>2. User Responsibilities</b>\n
+        \u2022 You are responsible for maintaining the confidentiality of your account login credentials.\n
+        \u2022 You agree to record accurate and truthful sales and inventory data.\n
+        \u2022 Any misuse of the system to falsify records is strictly prohibited.\n\n
+
+        <b>3. Data Privacy &amp; Security</b>\n
+        \u2022 Your data is stored securely using Cloud Database services.\n
+        \u2022 We do not share your business data with third parties without consent.\n
+        \u2022 While we implement security measures, the developer is not liable for data loss due to user negligence (e.g., weak passwords).\n\n
+
+        <b>4. Limitation of Liability</b>\n
+        \u2022 The system is provided "as is". The developers are not liable for any financial losses, inventory discrepancies, or business interruptions arising from the use of this application.\n\n
+
+        <b>5. System Updates</b>\n
+        \u2022 We reserve the right to modify or discontinue features of the service at any time for maintenance or upgrades.
+    </string>
 </resources>

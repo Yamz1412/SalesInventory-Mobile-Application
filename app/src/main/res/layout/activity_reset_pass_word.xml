@@ -1,49 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".resetPassWord">
-    <ScrollView
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="30dp"
+    android:background="@color/backgroundColor">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reset Password"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="@color/colorPrimary"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Enter your email to receive a reset link."
+        android:textColor="#666666"
+        android:gravity="center"
+        android:layout_marginBottom="30dp"/>
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <LinearLayout
+        android:layout_height="wrap_content"
+        android:textColorHint="#757575"
+        app:hintTextColor="@color/colorPrimary"
+        app:boxStrokeColor="@color/colorPrimary"
+        android:layout_marginBottom="20dp">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/resetemail"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="wrap_content"
+            android:inputType="textEmailAddress"
+            android:textColor="#000000"
+            android:hint="Email Address"/>
+    </com.google.android.material.textfield.TextInputLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:layout_marginTop="150dp"
-                android:orientation="horizontal">
-
-                <EditText
-                    android:id="@+id/resetemail"
-                    android:layout_width="300dp"
-                    android:layout_height="wrap_content"
-                    android:hint="Your Email"
-                   />
-
-
-            </LinearLayout>
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:layout_marginTop="30dp">
-                <Button
-                    android:id="@+id/resetpassbtn"
-                    android:layout_width="150dp"
-                    android:layout_height="wrap_content"
-                    android:textAllCaps="false"
-                    android:background="@drawable/bgbutton"
-                    android:text="Reset Password"/>
-            </LinearLayout>
-        </LinearLayout>
-    </ScrollView>
-
+    <Button
+        android:id="@+id/resetpassbtn"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Send Reset Link"
+        android:textSize="16sp"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="@color/colorPrimary"/>
 
 </LinearLayout>

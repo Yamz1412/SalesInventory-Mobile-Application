@@ -1,50 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/warehouse"
-    tools:context=".FirstActivity">
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="30dp"
+    android:background="@color/backgroundColor">
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="200dp"
         android:layout_height="200dp"
-        android:layout_marginTop="88dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.496"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/logo" />
+        android:src="@drawable/logo"
+        android:layout_marginBottom="10dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sales &amp; Inventory Management"
+        android:textAlignment="center"
+        android:paddingBottom="100dp"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:textColor="@color/colorPrimary"
+        android:layout_marginBottom="10dp"/>
 
     <Button
         android:id="@+id/SignInFirstBtn"
-        android:layout_width="150dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="60dp"
-        android:text="SignIn"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Sign In"
         android:onClick="OpenSingIn"
-        android:textAllCaps="false"
         android:textSize="18sp"
-        android:background="@drawable/bgbutton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageView" />
+        android:textStyle="bold"
+        android:backgroundTint="@color/colorPrimary"
+        android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/SingUpFirstBtn"
-        android:layout_width="150dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:text="SingUp"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Create Account"
         android:onClick="OpenSingUp"
-        android:textAllCaps="false"
         android:textSize="18sp"
-        android:background="@drawable/bgbutton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/SignInFirstBtn" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:backgroundTint="#FFFFFF"
+        style="?android:attr/borderlessButtonStyle"
+        android:background="@drawable/edite_round"/>
+</LinearLayout>
