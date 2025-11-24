@@ -193,13 +193,30 @@
                 android:hint="Initial Quantity"/>
         </com.google.android.material.textfield.TextInputLayout>
 
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2"
+            android:layout_gravity="center">
+
         <Button
-            android:id="@+id/Save"
+            android:id="@+id/addBtn"
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:text="Add to Inventory"
             android:textColor="#FFFFFF"
+            android:layout_marginRight="40dp"
             android:backgroundTint="@color/colorPrimary"/>
 
+        <Button
+            android:id="@+id/canelBtn"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Cancel"
+            android:textColor="#FFFFFF"
+            android:layout_marginLeft="5dp"
+            android:backgroundTint="@color/colorPrimary"/>
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

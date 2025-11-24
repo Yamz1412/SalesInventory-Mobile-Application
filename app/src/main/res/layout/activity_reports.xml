@@ -21,7 +21,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:weightSum="2">
+        android:weightSum="4">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -37,7 +37,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="TOTAL SALES"
-                android:textColor="#2E7D32"
+                android:textColor="#FF9800"
                 android:textStyle="bold"/>
 
             <TextView
@@ -47,7 +47,87 @@
                 android:text="0.00"
                 android:textSize="22sp"
                 android:textStyle="bold"
+                android:textColor="#FF9800"/>
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="100dp"
+            android:background="#FFF"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:elevation="4dp"
+            android:layout_marginRight="5dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TOTAL PRODUCTS"
+                android:gravity="center"
+                android:textColor="#2E7D32"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/totalProductsTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textSize="22sp"
+                android:textStyle="bold"
                 android:textColor="#2E7D32"/>
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="100dp"
+            android:background="#FFF"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:elevation="4dp"
+            android:layout_marginRight="5dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="LOW STOCK"
+                android:textColor="@color/red"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/lowStockTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/errorRed"/>
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="100dp"
+            android:background="#FFF"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:elevation="4dp"
+            android:layout_marginRight="5dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TOTAL REVENUE"
+                android:gravity="center_horizontal"
+                android:textColor="#4CAF50"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/totalRevenueTV"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#4CAF50"/>
         </LinearLayout>
     </LinearLayout>
 
@@ -60,8 +140,7 @@
 
         <Button
             android:id="@+id/BtnSalesReport"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Sales Journal (SJE)"
             android:backgroundTint="#2196F3"
@@ -69,13 +148,22 @@
 
         <Button
             android:id="@+id/BtnInventoryReport"
-            android:layout_width="0dp"
+            android:layout_width="180dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Inventory"
             android:backgroundTint="#FF9800"
             android:layout_marginLeft="5dp"/>
     </LinearLayout>
+
+    <Button
+        android:id="@+id/BtnComprehensiveReports"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📊 Comprehensive Reports"
+        android:backgroundTint="#2E7D32"
+        android:layout_marginTop="10dp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="match_parent"

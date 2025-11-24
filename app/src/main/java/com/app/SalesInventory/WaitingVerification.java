@@ -3,7 +3,6 @@ package com.app.SalesInventory;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 import android.os.Handler; // Imported
@@ -67,7 +66,7 @@ public class WaitingVerification extends AppCompatActivity {
             if (user.isEmailVerified()) {
                 handler.removeCallbacks(checkTask);
 
-                Intent intent = new Intent(WaitingVerification.this, Dashboard.class);
+                Intent intent = new Intent(WaitingVerification.this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(intent);
                 finish();

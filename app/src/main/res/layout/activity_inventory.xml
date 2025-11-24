@@ -1,30 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     android:background="@color/backgroundColor">
 
-    <TextView
+    <!-- Header with Stats -->
+    <LinearLayout
+        android:id="@+id/llStats"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Inventory List"
-        android:padding="20dp"
+        android:orientation="vertical"
+        android:padding="16dp"
         android:background="@color/colorPrimary"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:gravity="center"/>
+        android:elevation="4dp">
 
-    <ListView
-        android:id="@+id/ProductList"
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Inventory Management"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Total Products"
+                    android:textSize="12sp"
+                    android:textColor="@color/white"
+                    android:alpha="0.7" />
+
+                <TextView
+                    android:id="@+id/tvTotalProducts"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Alerts"
+                    android:textSize="12sp"
+                    android:textColor="@color/white"
+                    android:alpha="0.7" />
+
+                <TextView
+                    android:id="@+id/tvLowStockWarning"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 alerts"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/warningYellow"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✓ All clear"
+                    android:textSize="16sp"
+                    android:textColor="@color/successGreen"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Action Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:spacing="8dp">
+
+        <Button
+            android:id="@+id/btnAlerts"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🔴 Alerts"
+            android:textSize="12sp"
+            android:backgroundTint="@color/errorRed"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnStockAdjustment"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⚙ Adjust"
+            android:textSize="12sp"
+            android:backgroundTint="@color/colorPrimary"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnBatchOperation"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📦 Batch"
+            android:textSize="12sp"
+            android:backgroundTint="@color/colorAccent"
+            android:layout_marginStart="4dp" />
+
+    </LinearLayout>
+
+    <!-- Loading Indicator -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="32dp"
+        android:visibility="gone" />
+
+    <!-- No Inventory Message -->
+    <TextView
+        android:id="@+id/tvNoInventory"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:divider="@null"
-        android:dividerHeight="8dp"
-        tools:listitem="@layout/productlist"
-        android:padding="10dp"
-        android:clipToPadding="false"/>
+        android:text="No inventory items found.\nAdd products to get started."
+        android:gravity="center"
+        android:textSize="18sp"
+        android:textColor="@color/textColorSecondary"
+        android:visibility="gone" />
+
+    <!-- Inventory RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewInventory"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="8dp"
+        android:clipToPadding="false"
+        tools:listitem="@layout/item_inventory"
+        tools:itemCount="3" />
 
 </LinearLayout>

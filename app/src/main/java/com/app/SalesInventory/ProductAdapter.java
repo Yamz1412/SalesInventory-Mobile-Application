@@ -1,60 +1,99 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
+import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
-public class ProductAdapter extends BaseAdapter {
-    ArrayList<Product> products;
-    Context context;
+import java.util.List;
 
-    public ProductAdapter(ArrayList<Product> products, Context context) {
-        this.products = products;
+public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ViewHolder> {
+
+    private List<Product> productList;
+    private Context context;
+
+    public ProductAdapter(List<Product> productList, Context context) {
+        this.productList = productList;
         this.context = context;
     }
 
+    /**
+     * Updates the list of products and refreshes the view.
+     * This fixes the "Cannot resolve method updateProducts" error.
+     */
+    public void updateProducts(List<Product> newProducts) {
+        this.productList = newProducts;
+        notifyDataSetChanged();
+    }
+
+    @NonNull
     @Override
-    public int getCount() {
-        return products.size();
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // Ensure your layout file is named 'item_inventory.xml'
+        View view = LayoutInflater.from(context).inflate(R.layout.item_inventory, parent, false);
+        return new ViewHolder(view);
     }
 
     @Override
-    public Product getItem(int position) {
-        return products.get(position);
-    }
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        Product product = productList.get(position);
 
-    @Override
-    public long getItemId(int position) {
-        return position;
-    }
+        holder.tvProductName.setText(product.getProductName());
+        holder.tvCategory.setText(product.getCategoryName());
+        holder.tvQuantity.setText("Stock: " + product.getQuantity());
 
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
+        // Format prices
+        holder.tvCostPrice.setText(String.format("Cost: ₱%.2f", product.getCostPrice()));
+        holder.tvSellingPrice.setText(String.format("Selling: ₱%.2f", product.getSellingPrice()));
 
-        if (convertView == null) {
-            LayoutInflater inflater = LayoutInflater.from(context);
-            convertView = inflater.inflate(R.layout.productlist, null);
-
-            TextView name = convertView.findViewById(R.id.NameTVS11);
-            TextView lot = convertView.findViewById(R.id.CodeTVS11);
-            TextView amount = convertView.findViewById(R.id.AmountTVS11);
-            TextView sellprice = convertView.findViewById(R.id.SellPriceTVS11);
-
-            name.setText(getItem(position).getName());
-            lot.setText(getItem(position).getLot());
-            amount.setText(getItem(position).getAmount());
-            sellprice.setText(getItem(position).getSellPrice());
-
-
-
-
+        // Set status indicator
+        if (product.isCriticalStock()) {
+            holder.tvStatus.setText("🔴 CRITICAL");
+            holder.tvStatus.setTextColor(android.graphics.Color.RED);
+        } else if (product.isLowStock()) {
+            holder.tvStatus.setText("🟡 LOW STOCK");
+            holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#FFA000")); // Orange/Yellow
+        } else if (product.isOverstock()) {
+            holder.tvStatus.setText("🟢 OVERSTOCK");
+            holder.tvStatus.setTextColor(android.graphics.Color.GREEN);
+        } else {
+            holder.tvStatus.setText("✓ NORMAL");
+            holder.tvStatus.setTextColor(android.graphics.Color.BLUE);
         }
-        return convertView;
+
+        // Click listener to edit product
+        holder.itemView.setOnClickListener(v -> {
+            Intent intent = new Intent(context, EditProduct.class);
+            intent.putExtra("productId", product.getProductId());
+            context.startActivity(intent);
+        });
+    }
+
+    @Override
+    public int getItemCount() {
+        return productList.size();
+    }
+
+    public class ViewHolder extends RecyclerView.ViewHolder {
+        // Make sure these IDs exist in your res/layout/item_inventory.xml
+        TextView tvProductName, tvCategory, tvQuantity, tvCostPrice, tvSellingPrice, tvStatus;
+        ImageView ivStatusIcon;
+
+        public ViewHolder(@NonNull View itemView) {
+            super(itemView);
+            tvProductName = itemView.findViewById(R.id.tvProductName);
+            tvCategory = itemView.findViewById(R.id.tvCategory);
+            tvQuantity = itemView.findViewById(R.id.tvQuantity);
+            tvCostPrice = itemView.findViewById(R.id.tvCostPrice);
+            tvSellingPrice = itemView.findViewById(R.id.tvSellingPrice);
+            tvStatus = itemView.findViewById(R.id.tvStatus);
+            ivStatusIcon = itemView.findViewById(R.id.ivStatusIcon);
+        }
     }
 }
-

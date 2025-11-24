@@ -6,7 +6,6 @@ plugins {
 android {
     namespace "com.app.SalesInventory"
     compileSdk 34
-    buildToolsVersion "29.0.3"
 
     defaultConfig {
         applicationId "com.app.SalesInventory"
@@ -57,4 +56,25 @@ dependencies {
     implementation "androidx.datastore:datastore:1.0.0"
     implementation "androidx.datastore:datastore-preferences:1.0.0"
     implementation "androidx.datastore:datastore-preferences-core:1.0.0"
+
+    // iText PDF Library for PDF generation
+    implementation 'com.itextpdf:itext-core:9.4.0'
+    implementation 'com.itextpdf:kernel:9.4.0'
+    implementation 'com.itextpdf:layout:9.4.0'
+
+    // Firebase - Firestore
+    implementation 'com.google.firebase:firebase-firestore:26.0.2'
+
+    // Firebase - Authentication
+    implementation 'com.google.firebase:firebase-auth:24.0.1'
+
+    // Firebase - Core
+    implementation 'com.google.firebase:firebase-core:21.1.1'
+
+    // Room Database (for local caching)
+    implementation 'androidx.room:room-runtime:2.8.4'
+    annotationProcessor 'androidx.room:room-compiler:2.8.4'
+
+    // LiveData
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.10.0'
 }

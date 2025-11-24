@@ -2,105 +2,164 @@ package com.app.SalesInventory;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
-import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-
-import java.text.DateFormat;
-import java.util.Calendar;
-
 public class AddProduct extends AppCompatActivity {
+    private static final String TAG = "AddProduct";
 
-    EditText name, lot, code, price, sellPrice, amount, expiryDate, minStock;
-    Spinner categorySpinner;
-    Button saveBtn;
-    DatabaseReference Productref, Historyref;
-    Product mbr;
-    String UserID;
-    FirebaseAuth fAuth;
+    // UI Components
+    private EditText productNameET, costPriceET, sellingPriceET, quantityET, unitET, minStockET;
+    private Spinner categorySpinner;
+    private Button addBtn, cancelBtn;
 
-    Calendar calendar = Calendar.getInstance();
-    String date = DateFormat.getDateInstance().format(calendar.getTime());
+    // Repositories
+    private ProductRepository productRepository;
+    private CategoryRepository categoryRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_add_product); // Note: Using activity_main layout
+        setContentView(R.layout.activity_add_product);
+        initializeRepositories();
+        initializeUI();
+        setupClickListeners();
+    }
 
-        // Init Views
-        name = findViewById(R.id.Name);
-        lot = findViewById(R.id.Lot);
-        code = findViewById(R.id.Code);
-        price = findViewById(R.id.Price);
-        sellPrice = findViewById(R.id.SellPrice);
-        amount = findViewById(R.id.Amount);
-        expiryDate = findViewById(R.id.ExpiryDate); // NEW
-        minStock = findViewById(R.id.MinStock); // NEW
-        categorySpinner = findViewById(R.id.CategorySpinner); // NEW
+    private void initializeRepositories() {
+        productRepository = SalesInventoryApplication.getProductRepository();
+        categoryRepository = SalesInventoryApplication.getCategoryRepository();
+        Log.d(TAG, "Repositories initialized");
+    }
 
-        saveBtn = findViewById(R.id.Save);
+    private void initializeUI() {
+        productNameET = findViewById(R.id.productNameET);
+        costPriceET = findViewById(R.id.costPriceET);
+        sellingPriceET = findViewById(R.id.sellingPriceET);
+        quantityET = findViewById(R.id.quantityET);
+        unitET = findViewById(R.id.unitET);
+        minStockET = findViewById(R.id.minStockET);
+        categorySpinner = findViewById(R.id.categorySpinner);
+        addBtn = findViewById(R.id.addBtn);
+        cancelBtn = findViewById(R.id.cancelBtn);
+    }
+    private void setupClickListeners() {
+        addBtn.setOnClickListener(v -> addProduct());
+        cancelBtn.setOnClickListener(v -> finish());
+    }
 
-        fAuth = FirebaseAuth.getInstance();
-        UserID = fAuth.getCurrentUser().getUid();
+    private void addProduct() {
+        if (!validateInputs()) {
+            return;
+        }
 
-        Productref = FirebaseDatabase.getInstance().getReference("Product");
-        Historyref = FirebaseDatabase.getInstance().getReference("History");
+        // Show loading indicator
+        addBtn.setEnabled(false);
+        addBtn.setText("Adding...");
 
-        String[] categories = {"Select Category", "Drinks", "Pastries", "Meals", "Ingredients", "Others"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.spinner_item, categories);
-        adapter.setDropDownViewResource(R.layout.spinner_item);
-        categorySpinner.setAdapter(adapter);
+        try {
+            // Parse numbers from Strings
+            String name = productNameET.getText().toString().trim();
+            String category = categorySpinner.getSelectedItem() != null ? categorySpinner.getSelectedItem().toString() : "Uncategorized";
+            double cost = Double.parseDouble(costPriceET.getText().toString().trim());
+            double price = Double.parseDouble(sellingPriceET.getText().toString().trim());
+            int quantity = Integer.parseInt(quantityET.getText().toString().trim());
+            String unit = unitET.getText().toString().trim();
+            int reorderLevel = Integer.parseInt(minStockET.getText().toString().trim());
 
-        saveBtn.setOnClickListener(new View.OnClickListener() {
+        // Create product object
+        Product product = new Product();
+        product.setProductName(name);
+        product.setCategoryName(category);
+        product.setCostPrice(cost);
+        product.setSellingPrice(price);
+        product.setQuantity(quantity);
+        product.setUnit(unit);
+        product.setReorderLevel(reorderLevel);
+
+        // Add product to Firestore
+        productRepository.addProduct(product, new ProductRepository.OnProductAddedListener() {
             @Override
-            public void onClick(View v) {
+            public void onProductAdded(String productId) {
+                Toast.makeText(AddProduct.this, "Product added successfully", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "Product added: " + productId);
+                clearFields();
+                finish();
+            }
 
-                String strName = name.getText().toString().trim();
-                String strLot = lot.getText().toString().trim();
-                String strCode = code.getText().toString().trim();
-                String strPrice = price.getText().toString().trim();
-                String strSellPrice = sellPrice.getText().toString().trim();
-                String strAmount = amount.getText().toString().trim();
-                String strExpiry = expiryDate.getText().toString().trim();
-                String strMinStock = minStock.getText().toString().trim();
-                String strCategory = categorySpinner.getSelectedItem().toString();
+            @Override
+            public void onError(String error) {
+                Toast.makeText(AddProduct.this, "Error: " + error, Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Error adding product: " + error);
 
-
-                if (TextUtils.isEmpty(strName)) { name.setError("Required"); return; }
-                if (TextUtils.isEmpty(strAmount)) { amount.setError("Required"); return; }
-                if (strCategory.equals("Select Category")) {
-                    Toast.makeText(AddProduct.this, "Please select a category", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                Product newProduct = new Product(
-                        strName, strLot, strCode, strPrice, strSellPrice,
-                        UserID, strAmount, date, strCategory, strMinStock, strExpiry
-                );
-
-                String key = strName + strCode;
-                Productref.child(key).setValue(newProduct);
-                Historyref.push().setValue(newProduct);
-                Toast.makeText(AddProduct.this, "Product Added!", Toast.LENGTH_LONG).show();
-
-                name.getText().clear();
-                lot.getText().clear();
-                code.getText().clear();
-                price.getText().clear();
-                sellPrice.getText().clear();
-                amount.getText().clear();
+                // Re-enable button
+                addBtn.setEnabled(true);
+                addBtn.setText("Add Product");
             }
         });
+    } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid number format", Toast.LENGTH_SHORT).show();
+            addBtn.setEnabled(true);
+            addBtn.setText("Add Product");
+        }
+    }
 
+    private boolean validateInputs() {
+        if (productNameET.getText().toString().trim().isEmpty()) {
+            Toast.makeText(this, "Product name is required", Toast.LENGTH_SHORT).show();
+            return false;
+        }
 
+        if (costPriceET.getText().toString().trim().isEmpty()) {
+            Toast.makeText(this, "Cost price is required", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        if (sellingPriceET.getText().toString().trim().isEmpty()) {
+            Toast.makeText(this, "Selling price is required", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        if (quantityET.getText().toString().trim().isEmpty()) {
+            Toast.makeText(this, "Quantity is required", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        try {
+            double costPrice = Double.parseDouble(costPriceET.getText().toString().trim());
+            double sellingPrice = Double.parseDouble(sellingPriceET.getText().toString().trim());
+            int quantity = Integer.parseInt(quantityET.getText().toString().trim());
+
+            if (costPrice < 0 || sellingPrice < 0 || quantity < 0) {
+                Toast.makeText(this, "Prices and quantity must be positive", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+
+            if (sellingPrice < costPrice) {
+                Toast.makeText(this, "Selling price must be greater than cost price", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid number format", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Clear input fields
+     */
+    private void clearFields() {
+        productNameET.setText("");
+        costPriceET.setText("");
+        sellingPriceET.setText("");
+        quantityET.setText("");
+        unitET.setText("");
+        minStockET.setText("");
     }
 }
-

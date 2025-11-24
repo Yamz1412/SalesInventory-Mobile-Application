@@ -42,7 +42,7 @@ public class SignIn extends AppCompatActivity {
 
         FirebaseUser currentUser = fAuth.getCurrentUser();
         if (currentUser != null && currentUser.isEmailVerified()) {
-            startActivity(new Intent(getApplicationContext(), Dashboard.class));
+            startActivity(new Intent(getApplicationContext(), MainActivity.class));
             finish();
         }
     }
@@ -76,7 +76,7 @@ public class SignIn extends AppCompatActivity {
                     if (user != null) {
                         if (user.isEmailVerified()) {
                             Toast.makeText(SignIn.this, "Welcome!", Toast.LENGTH_SHORT).show();
-                            startActivity(new Intent(getApplicationContext(), Dashboard.class));
+                            startActivity(new Intent(getApplicationContext(), MainActivity.class));
                             finish();
                         } else {
                             Toast.makeText(SignIn.this, "Please verify your email before logging in. Check your inbox.", Toast.LENGTH_LONG).show();

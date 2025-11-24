@@ -7,15 +7,18 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 
 public class HistoryAdapter extends BaseAdapter {
-    ArrayList<Product> products;
-    Context context;
+    private ArrayList<Product> products;
+    private Context context;
 
-    public HistoryAdapter(ArrayList<Product> products, Context context) {
-        this.products = products;
+    public HistoryAdapter(Context context, ArrayList<Product> products) {
         this.context = context;
+        this.products = products;
     }
 
     @Override
@@ -38,24 +41,28 @@ public class HistoryAdapter extends BaseAdapter {
 
         if (convertView == null) {
             LayoutInflater inflater = LayoutInflater.from(context);
-            convertView = inflater.inflate(R.layout.producthistory, null);
-
-            TextView name = convertView.findViewById(R.id.NameTVH);
-            TextView code = convertView.findViewById(R.id.CodeTVH);
-            TextView amount = convertView.findViewById(R.id.AmountTVH);
-            TextView sellprice = convertView.findViewById(R.id.SellPriceTVH);
-            TextView Pdate = convertView.findViewById(R.id.PruchaseDateTV);
-
-            name.setText(getItem(position).getName());
-            code.setText(getItem(position).getCode());
-            amount.setText(getItem(position).getAmount());
-            sellprice.setText(getItem(position).getSellPrice());
-            Pdate.setText(getItem(position).getDate());
-
-
-
-
+            convertView = inflater.inflate(R.layout.producthistory, parent, false);
         }
+
+        Product product = products.get(position);
+
+        TextView name = convertView.findViewById(R.id.NameTVH);
+        TextView code = convertView.findViewById(R.id.CodeTVH);
+        TextView amount = convertView.findViewById(R.id.AmountTVH);
+        TextView sellprice = convertView.findViewById(R.id.SellPriceTVH);
+        TextView pDate = convertView.findViewById(R.id.PruchaseDateTV);
+
+        name.setText(product.getProductName());
+        code.setText(product.getProductId());
+        amount.setText(String.valueOf(product.getQuantity()));
+        sellprice.setText(String.format(Locale.getDefault(), "₱ %.2f", product.getSellingPrice()));
+        if (product.getDateAdded() != 0) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+            pDate.setText(sdf.format(new Date(product.getDateAdded())));
+        } else {
+            pDate.setText("No Date");
+        }
+
         return convertView;
     }
 }

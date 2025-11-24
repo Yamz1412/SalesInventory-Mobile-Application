@@ -4,8 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
@@ -22,14 +22,10 @@ public class History extends AppCompatActivity {
     DatabaseReference databaseReference;
     ListView listView;
     ArrayList<Product> arrayList = new ArrayList<>();
-    ArrayAdapter<Product> arrayAdapter;
-
     private HistoryAdapter historyAdapter;
-
 
     FirebaseAuth fAuth;
     String UserId;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,42 +37,37 @@ public class History extends AppCompatActivity {
 
         fAuth = FirebaseAuth.getInstance();
 
+        if (fAuth.getCurrentUser() == null) {
+            return;
+        }
+
         UserId = fAuth.getCurrentUser().getUid();
+
+        historyAdapter = new HistoryAdapter(this, arrayList);
+        listView.setAdapter(historyAdapter);
+
         Query query = databaseReference.orderByChild("userId").equalTo(UserId);
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
+        query.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-
-                for(DataSnapshot ds : dataSnapshot.getChildren()){
-
-                    //
-                    String name=ds.getValue(Product.class).getName();
-                    String Code=ds.getValue(Product.class).getCode();
-                    String amount=ds.getValue(Product.class).getAmount();
-                    String sellPrice=ds.getValue(Product.class).getSellPrice();
-                    String Date = ds.getValue(Product.class).getDate();
-
-                    Product product =new Product(name,Code,sellPrice,amount,Date);
-
-                    //
-
-                    arrayList.add(product);
-                    historyAdapter.notifyDataSetChanged();
+                arrayList.clear();
+                for (DataSnapshot ds : dataSnapshot.getChildren()) {
+                    try {
+                        Product product = ds.getValue(Product.class);
+                        if (product != null) {
+                            arrayList.add(product);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
+                historyAdapter.notifyDataSetChanged();
             }
-
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-
+                Toast.makeText(History.this, "Error: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
-
-        historyAdapter= new HistoryAdapter(arrayList,this);
-        listView.setAdapter(historyAdapter);
-
-
     }
-
 }
-

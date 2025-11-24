@@ -3,7 +3,9 @@ package com.app.SalesInventory;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -12,146 +14,188 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Map;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 public class Reports extends AppCompatActivity {
 
-    ListView reportList;
-    TextView totalSalesTV;
-    Button btnSales, btnInventory;
+    private TextView totalProductsTV, lowStockTV, totalRevenueTV, totalSalesTV;
+    private Button btnSalesReport, btnInventoryReport, btnComprehensiveReports;
+    private ListView reportsListView;
 
-    DatabaseReference salesRef, productRef;
-    ArrayList<Map<String, String>> listData = new ArrayList<>();
-    ReportAdapter adapter;
+    private ProductRepository productRepository;
+    private SalesRepository salesRepository;
+
+    private List<Product> productList;
+    private List<Sales> salesList;
+    private ReportAdapter adapter;
+    private List<ReportItem> reportItems;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_reports);
 
-        // Init Views
-        reportList = findViewById(R.id.ReportsListView);
+        productRepository = SalesInventoryApplication.getProductRepository();
+        salesRepository = SalesInventoryApplication.getSalesRepository();
+
+        initializeUI();
+        setupListeners();
+        loadData();
+    }
+
+    private void initializeUI() {
         totalSalesTV = findViewById(R.id.TotalSalesTV);
-        btnSales = findViewById(R.id.BtnSalesReport);
-        btnInventory = findViewById(R.id.BtnInventoryReport);
+        totalProductsTV = findViewById(R.id.totalProductsTV);
+        lowStockTV = findViewById(R.id.lowStockTV);
+        totalRevenueTV = findViewById(R.id.totalRevenueTV);
 
-        // Init Firebase
-        salesRef = FirebaseDatabase.getInstance().getReference("Sales");
-        productRef = FirebaseDatabase.getInstance().getReference("Product");
+        btnSalesReport = findViewById(R.id.BtnSalesReport);
+        btnInventoryReport = findViewById(R.id.BtnInventoryReport);
+        btnComprehensiveReports = findViewById(R.id.BtnComprehensiveReports);
+        reportsListView = findViewById(R.id.ReportsListView);
 
-        // Init Adapter
-        adapter = new ReportAdapter();
-        reportList.setAdapter(adapter);
-
-        // Load Sales by default
-        loadSalesData();
-
-        // Button Listeners
-        btnSales.setOnClickListener(v -> loadSalesData());
-        btnInventory.setOnClickListener(v -> loadInventoryData());
+        reportItems = new ArrayList<>();
+        adapter = new ReportAdapter(this, reportItems);
+        reportsListView.setAdapter(adapter);
     }
 
-    private void loadSalesData() {
-        listData.clear();
-        salesRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                listData.clear();
-                double totalRevenue = 0;
+    private void setupListeners() {
+        btnSalesReport.setOnClickListener(v -> showSalesReport());
+        btnInventoryReport.setOnClickListener(v -> showInventoryReport());
+        btnComprehensiveReports.setOnClickListener(v -> Toast.makeText(this, "Comprehensive Report Generated", Toast.LENGTH_SHORT).show());
+    }
 
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    // Extract data from "Sales" node (created in sellProduct.java)
-                    String name = String.valueOf(ds.child("productName").getValue());
-                    String qty = String.valueOf(ds.child("quantity").getValue());
-                    String date = String.valueOf(ds.child("date").getValue());
-                    String total = String.valueOf(ds.child("totalPrice").getValue());
-
-                    try {
-                        totalRevenue += Double.parseDouble(total);
-                    } catch (Exception e) {}
-
-                    // Add to list
-                    java.util.Map<String, String> item = new java.util.HashMap<>();
-                    item.put("name", name);
-                    item.put("qty", qty);
-                    item.put("detail", date);
-                    item.put("value", total);
-                    listData.add(item);
-                }
-
-                Collections.reverse(listData);
-
-                totalSalesTV.setText(String.format("%.2f", totalRevenue));
-                adapter.notifyDataSetChanged();
+    private void loadData() {
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                productList = products;
+                updateProductStats();
             }
+        });
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
+        salesRepository.getAllSales().observe(this, sales -> {
+            if (sales != null) {
+                salesList = sales;
+                updateSalesStats();
+                showSalesReport();
+            }
         });
     }
 
-    private void loadInventoryData() {
-        listData.clear();
-        productRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                listData.clear();
+    private void updateProductStats() {
+        if (productList == null) return;
 
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Product p = ds.getValue(Product.class);
-                    if(p != null) {
-                        java.util.Map<String, String> item = new java.util.HashMap<>();
-                        item.put("name", p.getName());
-                        item.put("qty", p.getAmount());
-                        item.put("detail", p.getCategory());
-                        item.put("value", p.getSellPrice());
-                        listData.add(item);
-                    }
-                }
-                adapter.notifyDataSetChanged();
-                totalSalesTV.setText("-");
+        int total = productList.size();
+        int lowStock = 0;
+
+        for (Product p : productList) {
+            if (p.isLowStock()) {
+                lowStock++;
             }
+        }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
-        });
+        totalProductsTV.setText(String.valueOf(total));
+        lowStockTV.setText(String.valueOf(lowStock));
     }
 
-    class ReportAdapter extends BaseAdapter {
-        @Override
-        public int getCount() { return listData.size(); }
+    private void updateSalesStats() {
+        if (salesList == null) return;
+
+        int count = salesList.size();
+        double revenue = 0;
+
+        for (Sales s : salesList) {
+            revenue += s.getTotalPrice();
+        }
+
+        totalSalesTV.setText(String.valueOf(count));
+        totalRevenueTV.setText(String.format(Locale.getDefault(), "₱%.2f", revenue));
+    }
+
+    private void showSalesReport() {
+        reportItems.clear();
+        if (salesList != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            for (Sales s : salesList) {
+                String dateStr = sdf.format(new Date(s.getDate()));
+                reportItems.add(new ReportItem(s.getProductName(), dateStr, "x " + s.getQuantity(), String.format(Locale.getDefault(), "₱%.2f", s.getTotalPrice())));
+            }
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+    private void showInventoryReport() {
+        reportItems.clear();
+        if (productList != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            for (Product p : productList) {
+                String dateStr = sdf.format(new Date(p.getDateAdded()));
+                double totalValue = p.getQuantity() * p.getSellingPrice();
+                reportItems.add(new ReportItem(p.getProductName(), dateStr, "Stock: " + p.getQuantity(), String.format(Locale.getDefault(), "₱%.2f", totalValue)));
+            }
+        }
+        adapter.notifyDataSetChanged();
+    }
+
+    private static class ReportItem {
+        String name;
+        String date;
+        String quantity;
+        String amount;
+
+        public ReportItem(String name, String date, String quantity, String amount) {
+            this.name = name;
+            this.date = date;
+            this.quantity = quantity;
+            this.amount = amount;
+        }
+    }
+
+    private class ReportAdapter extends BaseAdapter {
+        private Context context;
+        private List<ReportItem> items;
+
+        public ReportAdapter(Context context, List<ReportItem> items) {
+            this.context = context;
+            this.items = items;
+        }
 
         @Override
-        public Object getItem(int position) { return listData.get(position); }
+        public int getCount() {
+            return items.size();
+        }
 
         @Override
-        public long getItemId(int position) { return position; }
+        public Object getItem(int position) {
+            return items.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if (convertView == null) {
-                convertView = getLayoutInflater().inflate(R.layout.item_report_row, parent, false);
+                convertView = LayoutInflater.from(context).inflate(R.layout.item_report_row, parent, false);
             }
 
-            TextView name = convertView.findViewById(R.id.RowName);
-            TextView date = convertView.findViewById(R.id.RowDate);
-            TextView qty = convertView.findViewById(R.id.RowQty);
-            TextView val = convertView.findViewById(R.id.RowTotal);
+            TextView rowName = convertView.findViewById(R.id.RowName);
+            TextView rowDate = convertView.findViewById(R.id.RowDate);
+            TextView rowQty = convertView.findViewById(R.id.RowQty);
+            TextView rowTotal = convertView.findViewById(R.id.RowTotal);
 
-            java.util.Map<String, String> item = listData.get(position);
+            ReportItem item = items.get(position);
 
-            name.setText(item.get("name"));
-            date.setText(item.get("detail"));
-            qty.setText(item.get("qty"));
-            val.setText(item.get("value"));
+            rowName.setText(item.name);
+            rowDate.setText(item.date);
+            rowQty.setText(item.quantity);
+            rowTotal.setText(item.amount);
 
             return convertView;
         }

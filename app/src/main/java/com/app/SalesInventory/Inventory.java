@@ -1,98 +1,139 @@
 package com.app.SalesInventory;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Bundle;
-import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
-import com.google.firebase.database.ValueEventListener;
-
+import android.util.Log;
+import android.widget.SearchView;
+import android.widget.TextView;
 import java.util.ArrayList;
+import java.util.List;
 
 public class Inventory extends AppCompatActivity {
+    private static final String TAG = "Inventory";
 
-    DatabaseReference databaseReference;
-    ListView listView;
-    ArrayList<Product> arrayList = new ArrayList<>();
-   ArrayAdapter<Product> arrayAdapter;
+    // UI Components
+    private RecyclerView productsRecyclerView;
+    private SearchView searchView;
+    private TextView emptyStateTV;
 
-   private ProductAdapter adapterPro;
+    // Adapter
+    private ProductAdapter productAdapter;
+    private List<Product> allProducts = new ArrayList<>();
+    private List<Product> filteredProducts = new ArrayList<>();
 
-
-    FirebaseAuth fAuth;
-    String UserId;
-
+    // Repository
+    private ProductRepository productRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_inventory);
-        databaseReference = FirebaseDatabase.getInstance().getReference("Product");
-        listView = findViewById(R.id.ProductList);
 
-        fAuth = FirebaseAuth.getInstance();
-        adapterPro=new ProductAdapter(arrayList,this);
-        listView.setAdapter(adapterPro);
-        listView.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
-                Product selectedProduct = arrayList.get(position);
+        // Initialize repository
+        productRepository = SalesInventoryApplication.getProductRepository();
 
-                android.content.Intent intent = new android.content.Intent(Inventory.this, EditProduct.class);
-                intent.putExtra("code", selectedProduct.getCode());
-                intent.putExtra("name", selectedProduct.getName());
-                intent.putExtra("code", selectedProduct.getCode());
-                intent.putExtra("price", selectedProduct.getSellPrice());
-                intent.putExtra("amount", selectedProduct.getAmount());
-                intent.putExtra("category", selectedProduct.getCategory());
-                startActivity(intent);
+        // Initialize UI
+        initializeUI();
+
+        // Set up RecyclerView
+        setupRecyclerView();
+
+        // Observe products
+        observeProducts();
+
+        // Setup search
+        setupSearch();
+    }
+
+    /**
+     * Initialize UI components
+     */
+    private void initializeUI() {
+        productsRecyclerView = findViewById(R.id.productsRecyclerView);
+        searchView = findViewById(R.id.searchView);
+        emptyStateTV = findViewById(R.id.emptyStateTV);
+    }
+
+    /**
+     * Setup RecyclerView
+     */
+    private void setupRecyclerView() {
+        productAdapter = new ProductAdapter(filteredProducts, this);
+        productsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        productsRecyclerView.setAdapter(productAdapter);
+    }
+
+    /**
+     * Observe products from Firestore
+     */
+    private void observeProducts() {
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                allProducts = new ArrayList<>(products);
+                filteredProducts = new ArrayList<>(products);
+                productAdapter.updateProducts(filteredProducts);
+
+                // Update empty state
+                updateEmptyState();
+
+                Log.d(TAG, "Products loaded: " + products.size());
             }
         });
+    }
 
-        UserId = fAuth.getCurrentUser().getUid();
-        Query query = databaseReference.orderByChild("userId").equalTo(UserId);
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
+    /**
+     * Setup search functionality
+     */
+    private void setupSearch() {
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+            public boolean onQueryTextSubmit(String query) {
+                filterProducts(query);
+                return false;
+            }
 
-                for(DataSnapshot ds : dataSnapshot.getChildren()){
-                    String amount;
-                    String AmountTest = ds.getValue(Product.class).getAmount();
-                    int myNum = Integer. parseInt(AmountTest);
-                    if (myNum == 0){
-                         amount = "Out Of Stock";}else {
-                         amount = ds.getValue(Product.class).getAmount();
-                    }
-                    String name = ds.getValue(Product.class).getName();
-                    String Lot = ds.getValue(Product.class).getLot();
-                    String sellPrice = ds.getValue(Product.class).getSellPrice();
-                    String category = ds.getValue(Product.class).getCategory();
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filterProducts(newText);
+                return false;
+            }
+        });
+    }
 
-                    Product product = new Product(name,Lot,sellPrice,amount, category);
+    /**
+     * Filter products based on search query
+     */
+    private void filterProducts(String query) {
+        filteredProducts.clear();
 
-                    arrayList.add(product);
-                    adapterPro.notifyDataSetChanged();
+        if (query.isEmpty()) {
+            filteredProducts.addAll(allProducts);
+        } else {
+            String queryLowerCase = query.toLowerCase();
+            for (Product product : allProducts) {
+                if (product.getProductName().toLowerCase().contains(queryLowerCase)
+                        || product.getCategoryName().toLowerCase().contains(queryLowerCase)) {
+                    filteredProducts.add(product);
                 }
             }
+        }
 
+        productAdapter.updateProducts(filteredProducts);
+        updateEmptyState();
+    }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-
-            }
-        });
-
-
-
+    /**
+     * Update empty state message
+     */
+    private void updateEmptyState() {
+        if (filteredProducts.isEmpty()) {
+            emptyStateTV.setText("No products found");
+            emptyStateTV.setVisibility(android.view.View.VISIBLE);
+        } else {
+            emptyStateTV.setVisibility(android.view.View.GONE);
+        }
     }
 }
