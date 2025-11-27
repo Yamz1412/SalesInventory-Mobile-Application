@@ -5,7 +5,6 @@
     android:orientation="vertical"
     android:background="@color/backgroundColor">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,7 +21,6 @@
             android:textStyle="bold"/>
     </LinearLayout>
 
-    <!-- Content -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -137,7 +135,6 @@
 
     </LinearLayout>
 
-    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

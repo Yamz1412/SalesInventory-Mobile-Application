@@ -1,99 +1,124 @@
 package com.app.SalesInventory;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
+import java.util.ArrayList;
 import java.util.List;
 
-public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.ViewHolder> {
+public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
+    private List<Product> items = new ArrayList<>();
+    private Context ctx;
+    private ProductRepository repository;
+    private AuthManager authManager;
 
-    private List<Product> productList;
-    private Context context;
-
-    public ProductAdapter(List<Product> productList, Context context) {
-        this.productList = productList;
-        this.context = context;
+    public ProductAdapter(Context ctx) {
+        this.ctx = ctx;
+        this.repository = ProductRepository.getInstance((Application) ctx.getApplicationContext());
+        this.authManager = AuthManager.getInstance();
     }
 
-    /**
-     * Updates the list of products and refreshes the view.
-     * This fixes the "Cannot resolve method updateProducts" error.
-     */
-    public void updateProducts(List<Product> newProducts) {
-        this.productList = newProducts;
+    public ProductAdapter(List<Product> initialList, Context ctx) {
+        this(ctx);
+        if (initialList != null) {
+            this.items = new ArrayList<>(initialList);
+        } else {
+            this.items = new ArrayList<>();
+        }
+    }
+
+    public void updateProducts(List<Product> list) {
+        this.items = list == null ? new ArrayList<>() : new ArrayList<>(list);
         notifyDataSetChanged();
+    }
+
+    public void update(List<Product> list) {
+        updateProducts(list);
     }
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // Ensure your layout file is named 'item_inventory.xml'
-        View view = LayoutInflater.from(context).inflate(R.layout.item_inventory, parent, false);
-        return new ViewHolder(view);
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(ctx).inflate(R.layout.item_inventory, parent, false);
+        return new VH(v);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        Product product = productList.get(position);
-
-        holder.tvProductName.setText(product.getProductName());
-        holder.tvCategory.setText(product.getCategoryName());
-        holder.tvQuantity.setText("Stock: " + product.getQuantity());
-
-        // Format prices
-        holder.tvCostPrice.setText(String.format("Cost: ₱%.2f", product.getCostPrice()));
-        holder.tvSellingPrice.setText(String.format("Selling: ₱%.2f", product.getSellingPrice()));
-
-        // Set status indicator
-        if (product.isCriticalStock()) {
-            holder.tvStatus.setText("🔴 CRITICAL");
-            holder.tvStatus.setTextColor(android.graphics.Color.RED);
-        } else if (product.isLowStock()) {
-            holder.tvStatus.setText("🟡 LOW STOCK");
-            holder.tvStatus.setTextColor(android.graphics.Color.parseColor("#FFA000")); // Orange/Yellow
-        } else if (product.isOverstock()) {
-            holder.tvStatus.setText("🟢 OVERSTOCK");
-            holder.tvStatus.setTextColor(android.graphics.Color.GREEN);
+    public void onBindViewHolder(@NonNull VH holder, int position) {
+        Product p = items.get(position);
+        holder.name.setText(p.getProductName());
+        holder.category.setText(p.getCategoryName());
+        holder.qty.setText("Stock: " + p.getQuantity());
+        holder.price.setText("Selling: ₱" + String.format("%.2f", p.getSellingPrice()));
+        holder.syncState.setText("");
+        holder.retryBtn.setVisibility(View.GONE);
+        final long localId = p.getLocalId();
+        new Thread(() -> {
+            ProductDao dao = AppDatabase.getInstance(ctx).productDao();
+            ProductEntity e = dao.getByLocalId(localId);
+            if (e != null) {
+                String state = e.syncState == null ? "" : e.syncState;
+                holder.syncState.post(() -> {
+                    switch (state) {
+                        case "PENDING":
+                            holder.syncState.setText("Pending");
+                            holder.retryBtn.setVisibility(View.GONE);
+                            break;
+                        case "DELETE_PENDING":
+                            holder.syncState.setText("Delete pending");
+                            holder.retryBtn.setVisibility(View.VISIBLE);
+                            break;
+                        case "ERROR":
+                            holder.syncState.setText("Error");
+                            holder.retryBtn.setVisibility(View.VISIBLE);
+                            break;
+                        case "SYNCED":
+                            holder.syncState.setText("Synced");
+                            holder.retryBtn.setVisibility(View.GONE);
+                            break;
+                        default:
+                            holder.syncState.setText(state);
+                            holder.retryBtn.setVisibility(View.GONE);
+                            break;
+                    }
+                });
+            }
+        }).start();
+        if (authManager.isCurrentUserAdmin()) {
+            holder.itemView.setOnClickListener(v -> {
+                Intent i = new Intent(ctx, EditProduct.class);
+                i.putExtra("productId", p.getProductId());
+                ctx.startActivity(i);
+            });
         } else {
-            holder.tvStatus.setText("✓ NORMAL");
-            holder.tvStatus.setTextColor(android.graphics.Color.BLUE);
+            holder.itemView.setOnClickListener(null);
         }
-
-        // Click listener to edit product
-        holder.itemView.setOnClickListener(v -> {
-            Intent intent = new Intent(context, EditProduct.class);
-            intent.putExtra("productId", product.getProductId());
-            context.startActivity(intent);
-        });
+        holder.retryBtn.setOnClickListener(v -> repository.retrySync(localId));
     }
 
     @Override
     public int getItemCount() {
-        return productList.size();
+        return items.size();
     }
 
-    public class ViewHolder extends RecyclerView.ViewHolder {
-        // Make sure these IDs exist in your res/layout/item_inventory.xml
-        TextView tvProductName, tvCategory, tvQuantity, tvCostPrice, tvSellingPrice, tvStatus;
-        ImageView ivStatusIcon;
-
-        public ViewHolder(@NonNull View itemView) {
+    static class VH extends RecyclerView.ViewHolder {
+        TextView name, category, qty, price, syncState;
+        ImageButton retryBtn;
+        VH(@NonNull View itemView) {
             super(itemView);
-            tvProductName = itemView.findViewById(R.id.tvProductName);
-            tvCategory = itemView.findViewById(R.id.tvCategory);
-            tvQuantity = itemView.findViewById(R.id.tvQuantity);
-            tvCostPrice = itemView.findViewById(R.id.tvCostPrice);
-            tvSellingPrice = itemView.findViewById(R.id.tvSellingPrice);
-            tvStatus = itemView.findViewById(R.id.tvStatus);
-            ivStatusIcon = itemView.findViewById(R.id.ivStatusIcon);
+            name = itemView.findViewById(R.id.tvProductName);
+            category = itemView.findViewById(R.id.tvCategory);
+            qty = itemView.findViewById(R.id.tvQuantity);
+            price = itemView.findViewById(R.id.tvSellingPrice);
+            syncState = itemView.findViewById(R.id.tvSyncState);
+            retryBtn = itemView.findViewById(R.id.btnRetrySync);
         }
     }
 }

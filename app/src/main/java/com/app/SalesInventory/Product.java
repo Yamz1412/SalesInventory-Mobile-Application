@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 public class Product {
+    private long localId;
     private String productId;
     private String productName;
     private String categoryId;
@@ -22,10 +23,8 @@ public class Product {
     public Product() {
     }
 
-    public Product(String productId, String productName, String categoryId, String categoryName,
-                   String description, double costPrice, double sellingPrice, int quantity,
-                   int reorderLevel, int criticalLevel, int ceilingLevel, String unit,
-                   String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
+    public Product(long localId, String productId, String productName, String categoryId, String categoryName, String description, double costPrice, double sellingPrice, int quantity, int reorderLevel, int criticalLevel, int ceilingLevel, String unit, String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
+        this.localId = localId;
         this.productId = productId;
         this.productName = productName;
         this.categoryId = categoryId;
@@ -45,8 +44,16 @@ public class Product {
         this.isActive = isActive;
     }
 
+    public long getLocalId() {
+        return localId;
+    }
+
+    public void setLocalId(long localId) {
+        this.localId = localId;
+    }
+
     public String getProductId() {
-        return productId;
+        return productId == null ? "" : productId;
     }
 
     public void setProductId(String productId) {
@@ -54,7 +61,7 @@ public class Product {
     }
 
     public String getProductName() {
-        return productName;
+        return productName == null ? "" : productName;
     }
 
     public void setProductName(String productName) {
@@ -62,7 +69,7 @@ public class Product {
     }
 
     public String getCategoryId() {
-        return categoryId;
+        return categoryId == null ? "" : categoryId;
     }
 
     public void setCategoryId(String categoryId) {
@@ -70,7 +77,7 @@ public class Product {
     }
 
     public String getCategoryName() {
-        return categoryName;
+        return categoryName == null ? "" : categoryName;
     }
 
     public void setCategoryName(String categoryName) {
@@ -78,7 +85,7 @@ public class Product {
     }
 
     public String getDescription() {
-        return description;
+        return description == null ? "" : description;
     }
 
     public void setDescription(String description) {
@@ -106,7 +113,7 @@ public class Product {
     }
 
     public void setQuantity(int quantity) {
-        this.quantity = quantity;
+        this.quantity = Math.max(0, quantity);
     }
 
     public int getReorderLevel() {
@@ -134,7 +141,7 @@ public class Product {
     }
 
     public String getUnit() {
-        return unit;
+        return unit == null ? "" : unit;
     }
 
     public void setUnit(String unit) {
@@ -142,7 +149,7 @@ public class Product {
     }
 
     public String getBarcode() {
-        return barcode;
+        return barcode == null ? "" : barcode;
     }
 
     public void setBarcode(String barcode) {
@@ -150,7 +157,7 @@ public class Product {
     }
 
     public String getSupplier() {
-        return supplier;
+        return supplier == null ? "" : supplier;
     }
 
     public void setSupplier(String supplier) {
@@ -166,7 +173,7 @@ public class Product {
     }
 
     public String getAddedBy() {
-        return addedBy;
+        return addedBy == null ? "" : addedBy;
     }
 
     public void setAddedBy(String addedBy) {
@@ -181,15 +188,18 @@ public class Product {
         isActive = active;
     }
 
-    public boolean isLowStock() {
-        return quantity <= reorderLevel && quantity > criticalLevel;
+    public boolean isCriticalStock() {
+        return quantity <= reorderLevel;
     }
 
-    public boolean isCriticalStock() {
-        return quantity <= criticalLevel;
+    public boolean isLowStock() {
+        return quantity > reorderLevel && quantity <= Math.max(reorderLevel * 2, reorderLevel + 1);
     }
 
     public boolean isOverstock() {
-        return quantity >= ceilingLevel;
+        if (ceilingLevel <= 0) {
+            return false;
+        }
+        return quantity > ceilingLevel;
     }
 }

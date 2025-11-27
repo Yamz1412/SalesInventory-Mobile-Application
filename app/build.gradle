@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace "com.app.SalesInventory"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.app.SalesInventory"
         minSdkVersion 23
-        targetSdkVersion 34
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
         multiDexEnabled true
@@ -72,6 +72,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-core:21.1.1'
 
     // Room Database (for local caching)
+    implementation 'androidx.work:work-runtime:2.11.0'
     implementation 'androidx.room:room-runtime:2.8.4'
     annotationProcessor 'androidx.room:room-compiler:2.8.4'
 

@@ -3,36 +3,79 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:padding="12dp"
     android:background="@color/backgroundColor">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Sales"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:padding="8dp"
+        android:textColor="@color/textColorPrimary" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/colorPrimary"
-        android:padding="20dp"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Transactions"
-            android:textColor="#B2DFDB"
-            android:textSize="14sp"/>
+        <EditText
+            android:id="@+id/etSaleProductId"
+            android:layout_width="0dp"
+            android:layout_weight="2"
+            android:layout_height="48dp"
+            android:hint="Product ID"
+            android:padding="10dp"
+            android:inputType="text" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Sales History"
-            android:textColor="#FFFFFF"
-            android:textSize="24sp"
-            android:textStyle="bold"/>
+        <EditText
+            android:id="@+id/etSaleQuantity"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:hint="Qty"
+            android:inputType="number"
+            android:layout_marginStart="8dp"
+            android:padding="10dp" />
+
+        <EditText
+            android:id="@+id/etSalePrice"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:hint="Price"
+            android:inputType="numberDecimal"
+            android:layout_marginStart="8dp"
+            android:padding="10dp" />
+
     </LinearLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/salesRecyclerView"
+    <Button
+        android:id="@+id/btnAddSale"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="8dp"
-        android:clipToPadding="false"/>
+        android:layout_height="48dp"
+        android:text="Add Sale"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="@color/white" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/lightGray"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <ListView
+        android:id="@+id/salesListView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/lightGray"
+        android:dividerHeight="1dp"
+        android:paddingBottom="8dp" />
 
 </LinearLayout>

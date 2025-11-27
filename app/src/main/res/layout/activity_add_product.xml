@@ -29,7 +29,7 @@
             app:hintTextColor="@color/colorPrimary"
             app:boxStrokeColor="@color/colorPrimary">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/Name"
+                android:id="@+id/productNameET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
@@ -49,7 +49,7 @@
             android:layout_marginBottom="15dp"
             android:padding="5dp">
             <Spinner
-                android:id="@+id/CategorySpinner"
+                android:id="@+id/categorySpinner"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>
         </LinearLayout>
@@ -71,7 +71,7 @@
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/Code"
+                    android:id="@+id/codeET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="#000000"
@@ -89,7 +89,7 @@
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/Lot"
+                    android:id="@+id/lotET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="#000000"
@@ -114,7 +114,7 @@
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/Price"
+                    android:id="@+id/costPriceET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="numberDecimal"
@@ -133,7 +133,7 @@
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/SellPrice"
+                    android:id="@+id/sellingPriceET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="numberDecimal"
@@ -151,7 +151,7 @@
             app:boxStrokeColor="@color/colorPrimary"
             android:layout_marginBottom="15dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/ExpiryDate"
+                android:id="@+id/expiryDateET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="date"
@@ -168,7 +168,7 @@
             app:boxStrokeColor="@color/colorPrimary"
             android:layout_marginBottom="15dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/MinStock"
+                android:id="@+id/minStockET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
@@ -185,12 +185,28 @@
             app:boxStrokeColor="@color/colorPrimary"
             android:layout_marginBottom="25dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/Amount"
+                android:id="@+id/quantityET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textColor="#000000"
                 android:hint="Initial Quantity"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColorHint="#757575"
+            app:hintTextColor="@color/colorPrimary"
+            app:boxStrokeColor="@color/colorPrimary"
+            android:layout_marginBottom="15dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/unitET"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#000000"
+                android:hint="Unit (e.g. pcs)"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
@@ -200,23 +216,24 @@
             android:weightSum="2"
             android:layout_gravity="center">
 
-        <Button
-            android:id="@+id/addBtn"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Add to Inventory"
-            android:textColor="#FFFFFF"
-            android:layout_marginRight="40dp"
-            android:backgroundTint="@color/colorPrimary"/>
+            <Button
+                android:id="@+id/addBtn"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="Add to Inventory"
+                android:textColor="#FFFFFF"
+                android:layout_marginRight="40dp"
+                android:backgroundTint="@color/colorPrimary"/>
 
-        <Button
-            android:id="@+id/canelBtn"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Cancel"
-            android:textColor="#FFFFFF"
-            android:layout_marginLeft="5dp"
-            android:backgroundTint="@color/colorPrimary"/>
+            <Button
+                android:id="@+id/cancelBtn"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="Cancel"
+                android:textColor="#FFFFFF"
+                android:layout_marginLeft="5dp"
+                android:backgroundTint="@color/colorPrimary"/>
+
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

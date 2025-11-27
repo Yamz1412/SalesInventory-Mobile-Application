@@ -1,8 +1,8 @@
 package com.app.SalesInventory;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.WriteBatch;
 
 public class FirestoreManager {
     private static FirestoreManager instance;
@@ -11,9 +11,11 @@ public class FirestoreManager {
     private String currentUserId;
 
     private FirestoreManager() {
-        this.db = FirebaseFirestore.getInstance();
-        this.auth = FirebaseAuth.getInstance();
-        updateCurrentUserId();
+        db = FirebaseFirestore.getInstance();
+        auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null) {
+            currentUserId = auth.getCurrentUser().getUid();
+        }
     }
 
     public static synchronized FirestoreManager getInstance() {
@@ -23,99 +25,46 @@ public class FirestoreManager {
         return instance;
     }
 
-    /**
-     * Update current user ID from Firebase Authentication
-     */
-    public void updateCurrentUserId() {
-        if (auth.getCurrentUser() != null) {
-            this.currentUserId = auth.getCurrentUser().getUid();
-        }
-    }
-
-    /**
-     * Get current user ID
-     */
-    public String getCurrentUserId() {
-        return currentUserId;
-    }
-
-    /**
-     * Check if user is authenticated
-     */
-    public boolean isUserAuthenticated() {
-        return auth.getCurrentUser() != null;
-    }
-
-    /**
-     * Get Firestore instance
-     */
     public FirebaseFirestore getDb() {
         return db;
     }
 
-    /**
-     * Get user's collection path
-     */
+    public boolean isUserAuthenticated() {
+        return auth.getCurrentUser() != null;
+    }
+
+    public void updateCurrentUserId(String uid) {
+        this.currentUserId = uid;
+    }
+
+    private String ensureCurrentUserId() {
+        if (currentUserId == null && auth.getCurrentUser() != null) {
+            currentUserId = auth.getCurrentUser().getUid();
+        }
+        return currentUserId == null ? "unknown" : currentUserId;
+    }
+
     public String getUserProductsPath() {
-        return "products/" + currentUserId;
+        return "products/" + ensureCurrentUserId() + "/items";
     }
 
     public String getUserSalesPath() {
-        return "sales/" + currentUserId;
+        return "sales/" + ensureCurrentUserId() + "/items";
     }
 
     public String getUserAdjustmentsPath() {
-        return "adjustments/" + currentUserId;
+        return "adjustments/" + ensureCurrentUserId() + "/items";
     }
 
     public String getUserAlertsPath() {
-        return "alerts/" + currentUserId;
+        return "alerts/" + ensureCurrentUserId() + "/items";
     }
 
     public String getUserCategoriesPath() {
-        return "categories/" + currentUserId;
+        return "categories/" + ensureCurrentUserId() + "/items";
     }
 
-    /**
-     * Start batch write for multiple operations
-     */
-    public WriteBatch startBatch() {
-        return db.batch();
-    }
-
-    public void enableOfflinePersistence() {
-        try {
-            db.enableNetwork().addOnCompleteListener(task -> {
-                if (task.isSuccessful()) {
-                    android.util.Log.d("Firestore", "Offline persistence enabled");
-                }
-            });
-        } catch (Exception e) {
-            android.util.Log.e("Firestore", "Error enabling offline persistence", e);
-        }
-    }
-
-    /**
-     * Get Firestore server timestamp
-     */
     public Object getServerTimestamp() {
-        return com.google.firebase.firestore.FieldValue.serverTimestamp();
-    }
-
-    /**
-     * Disconnect from Firestore
-     */
-    public void disconnect() {
-        db.terminate().addOnCompleteListener(task -> {
-            android.util.Log.d("Firestore", "Disconnected from Firestore");
-        });
-    }
-
-    /**
-     * Reset manager (for logout)
-     */
-    public void reset() {
-        currentUserId = null;
-        instance = null;
+        return FieldValue.serverTimestamp();
     }
 }

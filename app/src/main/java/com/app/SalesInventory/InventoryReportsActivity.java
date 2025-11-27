@@ -22,6 +22,9 @@ public class InventoryReportsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_inventory_reports);
 
+        TextView tv = findViewById(android.R.id.text1);
+        if (tv != null) tv.setText("Inventory Reports");
+
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Inventory Reports");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);

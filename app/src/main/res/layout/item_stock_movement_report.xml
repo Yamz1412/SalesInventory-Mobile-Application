@@ -14,7 +14,6 @@
         android:background="@color/backgroundColor"
         android:padding="16dp">
 
-        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -62,7 +61,6 @@
 
         </LinearLayout>
 
-        <!-- Stock Flow -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -101,7 +99,6 @@
 
         </LinearLayout>
 
-        <!-- Movement Details -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -128,7 +125,6 @@
 
         </LinearLayout>
 
-        <!-- Adjustments -->
         <TextView
             android:id="@+id/tvAdjusted"
             android:layout_width="match_parent"

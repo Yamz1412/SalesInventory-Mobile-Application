@@ -36,7 +36,6 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Product Selection -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -65,7 +64,6 @@
 
             </LinearLayout>
 
-            <!-- Current Stock Information -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -136,7 +134,6 @@
 
             </LinearLayout>
 
-            <!-- Adjustment Type -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -165,7 +162,6 @@
 
             </LinearLayout>
 
-            <!-- Quantity Input -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -195,7 +191,6 @@
 
             </LinearLayout>
 
-            <!-- Reason Selection -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -224,7 +219,6 @@
 
             </LinearLayout>
 
-            <!-- Remarks -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -261,7 +255,6 @@
 
     </ScrollView>
 
-    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

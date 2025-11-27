@@ -106,6 +106,7 @@
             <Spinner
                 android:id="@+id/RoleSpinner"
                 android:layout_width="match_parent"
+                tools:listitem="@layout/spinner_item"
                 android:layout_height="40dp"/>
         </LinearLayout>
 

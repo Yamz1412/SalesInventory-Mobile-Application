@@ -1,100 +1,65 @@
 package com.app.SalesInventory;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
+import android.content.res.Configuration;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Inventory extends AppCompatActivity {
-    private static final String TAG = "Inventory";
-
-    // UI Components
     private RecyclerView productsRecyclerView;
     private SearchView searchView;
     private TextView emptyStateTV;
-
-    // Adapter
     private ProductAdapter productAdapter;
     private List<Product> allProducts = new ArrayList<>();
     private List<Product> filteredProducts = new ArrayList<>();
-
-    // Repository
     private ProductRepository productRepository;
+    private AuthManager authManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_inventory);
-
-        // Initialize repository
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            setContentView(R.layout.activity_inventory_land);
+        } else {
+            setContentView(R.layout.activity_inventory);
+        }
+        authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
-
-        // Initialize UI
-        initializeUI();
-
-        // Set up RecyclerView
-        setupRecyclerView();
-
-        // Observe products
-        observeProducts();
-
-        // Setup search
-        setupSearch();
-    }
-
-    /**
-     * Initialize UI components
-     */
-    private void initializeUI() {
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
-    }
-
-    /**
-     * Setup RecyclerView
-     */
-    private void setupRecyclerView() {
         productAdapter = new ProductAdapter(filteredProducts, this);
-        productsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
         productsRecyclerView.setAdapter(productAdapter);
-    }
-
-    /**
-     * Observe products from Firestore
-     */
-    private void observeProducts() {
+        Button batchBtn = findViewById(R.id.btnBatchOperation);
+        if (batchBtn != null) {
+            if (!authManager.isCurrentUserAdmin()) {
+                batchBtn.setVisibility(View.GONE);
+            } else {
+                batchBtn.setVisibility(View.VISIBLE);
+            }
+        }
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 allProducts = new ArrayList<>(products);
                 filteredProducts = new ArrayList<>(products);
                 productAdapter.updateProducts(filteredProducts);
-
-                // Update empty state
                 updateEmptyState();
-
-                Log.d(TAG, "Products loaded: " + products.size());
             }
         });
-    }
-
-    /**
-     * Setup search functionality
-     */
-    private void setupSearch() {
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 filterProducts(query);
                 return false;
             }
-
             @Override
             public boolean onQueryTextChange(String newText) {
                 filterProducts(newText);
@@ -103,37 +68,28 @@ public class Inventory extends AppCompatActivity {
         });
     }
 
-    /**
-     * Filter products based on search query
-     */
     private void filterProducts(String query) {
         filteredProducts.clear();
-
-        if (query.isEmpty()) {
+        if (query == null || query.isEmpty()) {
             filteredProducts.addAll(allProducts);
         } else {
-            String queryLowerCase = query.toLowerCase();
-            for (Product product : allProducts) {
-                if (product.getProductName().toLowerCase().contains(queryLowerCase)
-                        || product.getCategoryName().toLowerCase().contains(queryLowerCase)) {
-                    filteredProducts.add(product);
+            String q = query.toLowerCase();
+            for (Product p : allProducts) {
+                if (p.getProductName().toLowerCase().contains(q) || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q))) {
+                    filteredProducts.add(p);
                 }
             }
         }
-
         productAdapter.updateProducts(filteredProducts);
         updateEmptyState();
     }
 
-    /**
-     * Update empty state message
-     */
     private void updateEmptyState() {
         if (filteredProducts.isEmpty()) {
             emptyStateTV.setText("No products found");
-            emptyStateTV.setVisibility(android.view.View.VISIBLE);
+            emptyStateTV.setVisibility(View.VISIBLE);
         } else {
-            emptyStateTV.setVisibility(android.view.View.GONE);
+            emptyStateTV.setVisibility(View.GONE);
         }
     }
 }

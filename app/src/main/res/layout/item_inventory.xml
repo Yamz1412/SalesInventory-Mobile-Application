@@ -14,7 +14,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Product Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -73,7 +72,6 @@
 
         </LinearLayout>
 
-        <!-- Stock Information -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -112,16 +110,44 @@
 
         </LinearLayout>
 
-        <!-- Selling Price -->
-        <TextView
-            android:id="@+id/tvSellingPrice"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Selling: ₱150.00"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/successGreen"
-            android:gravity="end" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvSellingPrice"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Selling: ₱150.00"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="@color/successGreen"
+                android:gravity="start" />
+
+            <TextView
+                android:id="@+id/tvSyncState"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="@color/textColorSecondary"
+                android:layout_marginStart="8dp"
+                android:padding="4dp" />
+
+            <ImageButton
+                android:id="@+id/btnRetrySync"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Retry"
+                android:visibility="gone" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

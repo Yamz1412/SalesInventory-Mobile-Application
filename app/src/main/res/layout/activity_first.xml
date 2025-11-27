@@ -31,6 +31,7 @@
         android:layout_height="60dp"
         android:text="Sign In"
         android:onClick="OpenSingIn"
+        android:textColor="@color/LightBlue"
         android:textSize="18sp"
         android:textStyle="bold"
         android:backgroundTint="@color/colorPrimary"

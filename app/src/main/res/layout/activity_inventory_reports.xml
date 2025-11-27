@@ -16,7 +16,6 @@
         android:textColor="@color/textColorPrimary"
         android:layout_marginBottom="20dp" />
 
-    <!-- Stock Value Report Card -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -59,7 +58,6 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- Stock Movement Report Card -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -103,7 +101,6 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- Adjustment Summary Report Card -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -147,7 +144,6 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- Export Button -->
     <Button
         android:id="@+id/btnExport"
         android:layout_width="match_parent"

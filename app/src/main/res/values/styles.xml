@@ -1,17 +1,18 @@
 <resources>
 
     <!-- Base application theme. -->
-    <style name="Theme.SalesInventory" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.SalesInventory" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="android:windowBackground">@color/backgroundColor</item>
     </style>
 
-        <style name="AppTheme" parent="Theme.MaterialComponents.Light.DarkActionBar">
-            <item name="colorPrimary">@color/colorPrimary</item>
-            <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+            <item name="android:windowBackground">@color/white</item>
+            <item name="android:statusBarColor">@color/statusBarColor</item>
             <item name="colorAccent">@color/colorAccent</item>
+
         </style>
 
         <style name="CustomTextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">

@@ -1,18 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     package="com.app.SalesInventory">
 
-    <!-- File permissions -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-
-    <!-- Network permissions for Firestore -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Support landscape orientation -->
     <uses-feature android:name="android.hardware.screen.landscape" />
 
     <application
@@ -22,7 +16,7 @@
         android:label="Sales &amp; Inventory"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SalesInventory">
+        android:theme="@style/AppTheme">
 
         <activity
             android:name=".FirstActivity"
@@ -34,89 +28,38 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".WaitingVerification"
-            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".WaitingVerificationActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SignInActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SignUpActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".resetPassWord" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".Conditions" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".MainActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".Profile" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".EditProfil" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SellList" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".sellProduct" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".InventoryReportsActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".Inventory" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".AddProductActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".DeleteProduct" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".EditProductActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".AdminManageUsersActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SettingsActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".PurchaseOrderListActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".CreatePurchaseOrderActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".PurchaseOrderDetailActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".BatchStockOperationActivity" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".SalesActivity" android:windowSoftInputMode="adjustResize" />
 
-        <activity
-            android:name=".SignIn"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Signup"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".resetPassWord"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Conditions"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".MainActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Profile"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".EditProfil"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".SellList"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".sellProduct"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Reports"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Inventory"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".AddProduct"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".DeleteProduct"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".EditProduct"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".History"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".SettingsActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".PurchaseOrderListActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".CreatePurchaseOrderActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".PurchaseOrderDetailActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".BatchStockOperationActivity"
-            android:windowSoftInputMode="adjustResize" />
-
+        <activity android:name=".Reports" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

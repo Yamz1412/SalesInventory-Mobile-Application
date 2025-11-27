@@ -57,7 +57,7 @@ public class WaitingVerification extends AppCompatActivity {
     private void checkVerification(boolean showMessage) {
         FirebaseUser user = fAuth.getCurrentUser();
         if (user == null) {
-            startActivity(new Intent(this, SignIn.class));
+            startActivity(new Intent(this, SignInActivity.class));
             finish();
             return;
         }

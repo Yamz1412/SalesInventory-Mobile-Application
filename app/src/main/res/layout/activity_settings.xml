@@ -6,7 +6,6 @@
     android:padding="16dp"
     android:background="@color/white">
 
-    <!-- Header -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,7 +15,6 @@
         android:textColor="@color/black"
         android:layout_marginBottom="24dp" />
 
-    <!-- Theme Selection -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -42,7 +40,6 @@
 
     </LinearLayout>
 
-    <!-- Color Customization -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -60,13 +57,11 @@
             android:textColor="@color/black"
             android:layout_marginBottom="12dp" />
 
-        <!-- Primary Color -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp"
-            android:spacing="8dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="0dp"
@@ -95,13 +90,11 @@
 
         </LinearLayout>
 
-        <!-- Secondary Color -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp"
-            android:spacing="8dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="0dp"
@@ -130,12 +123,10 @@
 
         </LinearLayout>
 
-        <!-- Accent Color -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:spacing="8dp">
+            android:orientation="horizontal">
 
             <TextView
                 android:layout_width="0dp"
@@ -166,14 +157,12 @@
 
     </LinearLayout>
 
-    <!-- Color Preview -->
     <LinearLayout
         android:id="@+id/colorPreviewLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:spacing="8dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="28dp">
 
         <View
             android:layout_width="0dp"
@@ -198,7 +187,6 @@
 
     </LinearLayout>
 
-    <!-- Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -210,6 +198,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginRight="5dp"
             android:text="Reset"
             android:background="@drawable/btn_secondary" />
 
@@ -218,9 +207,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginLeft="5dp"
             android:text="Apply Theme"
             android:background="@drawable/btn_primary" />
 
     </LinearLayout>
-
 </LinearLayout>

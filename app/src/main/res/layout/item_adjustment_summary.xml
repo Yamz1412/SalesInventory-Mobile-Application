@@ -13,7 +13,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Product Name and Net Change -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -45,7 +44,6 @@
 
         </LinearLayout>
 
-        <!-- Summary Stats -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -131,7 +129,6 @@
 
         </LinearLayout>
 
-        <!-- Reasons -->
         <TextView
             android:id="@+id/tvReasons"
             android:layout_width="match_parent"

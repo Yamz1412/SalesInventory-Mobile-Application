@@ -7,121 +7,99 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import java.util.List;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.FirebaseFirestoreException;
-
-import java.util.List;
-import javax.annotation.Nullable;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
-
-    private Button BtnProfil, BtnStock, BtnSelles, btnDelete, btnPurchase;
-    private TextView Welcome, criticalCountTV, totalCountTV, syncStatusTV;
-    private LinearLayout actionButtonsLayout;
-
+    private View btnSettings;
+    private Button btnProfil;
+    private Button btnStock;
+    private Button btnSelles;
+    private Button btnDelete;
+    private Button btnPurchase;
+    private Button btnAdminManage;
+    private TextView welcomeT;
+    private TextView criticalCountTV;
+    private TextView totalCountTV;
+    private TextView syncStatusTV;
     private FirebaseAuth fAuth;
     private FirebaseFirestore fStore;
     private String userID;
-
     private ProductRepository productRepository;
     private AlertRepository alertRepository;
-    private FirestoreManager firestoreManager;
     private FirestoreSyncListener syncListener;
     private ThemeManager themeManager;
+    private AuthManager authManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         themeManager = ThemeManager.getInstance(this);
-
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
             setContentView(R.layout.activity_main_land);
         } else {
             setContentView(R.layout.activity_main);
         }
-
         fAuth = FirebaseAuth.getInstance();
         fStore = FirebaseFirestore.getInstance();
-
+        authManager = AuthManager.getInstance();
         if (fAuth.getCurrentUser() == null) {
             startActivity(new Intent(this, FirstActivity.class));
             finish();
             return;
         }
         userID = fAuth.getCurrentUser().getUid();
-
-        firestoreManager = FirestoreManager.getInstance();
         syncListener = FirestoreSyncListener.getInstance();
-
-        initializeRepositories();
+        productRepository = SalesInventoryApplication.getProductRepository();
+        alertRepository = SalesInventoryApplication.getAlertRepository();
         initializeUI();
-
-        SalesInventoryApplication.BaseContext.setContext(this);
-
         loadUserInfo();
         observeProducts();
         observeAlerts();
         observeSyncStatus();
     }
 
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        Log.d(TAG, "Orientation changed");
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        Log.d(TAG, "Activity destroyed");
-    }
-
-    private void initializeRepositories() {
-        productRepository = SalesInventoryApplication.getProductRepository();
-        alertRepository = SalesInventoryApplication.getAlertRepository();
-        Log.d(TAG, "Repositories initialized");
-    }
-
     private void initializeUI() {
-        BtnProfil = findViewById(R.id.ProfilBtn);
-        BtnStock = findViewById(R.id.StockBtn);
-        BtnSelles = findViewById(R.id.SellesBtn);
-        Welcome = findViewById(R.id.welcomeT);
-        criticalCountTV = findViewById(R.id.CriticalCountTV);
-        totalCountTV = findViewById(R.id.TotalCountTV);
+        btnProfil = findViewById(R.id.ProfilBtn);
+        btnStock = findViewById(R.id.StockBtn);
+        btnSelles = findViewById(R.id.SellesBtn);
         btnDelete = findViewById(R.id.DeleteBtn);
         btnPurchase = findViewById(R.id.PruchaseBtn);
-
+        btnSettings = findViewById(R.id.btnSettings);
+        btnAdminManage = findViewById(R.id.btnAdminManage);
+        welcomeT = findViewById(R.id.welcomeT);
+        criticalCountTV = findViewById(R.id.CriticalCountTV);
+        totalCountTV = findViewById(R.id.TotalCountTV);
         try {
             syncStatusTV = findViewById(R.id.syncStatusTV);
-            if (syncStatusTV != null) {
-                syncStatusTV.setText("Syncing...");
-            }
+            if (syncStatusTV != null) syncStatusTV.setText("Syncing...");
         } catch (Exception e) {
-            Log.w(TAG, "Sync status TextView not found in layout");
+            Log.w(TAG, "Sync status view not found");
         }
-
-        applyThemeToUI();
-    }
-
-    private void applyThemeToUI() {
-        int primaryColor = themeManager.getPrimaryColor();
-
-        if (BtnProfil != null) BtnProfil.setBackgroundColor(primaryColor);
-        if (BtnStock != null) BtnStock.setBackgroundColor(primaryColor);
-        if (BtnSelles != null) BtnSelles.setBackgroundColor(primaryColor);
-
-        Log.d(TAG, "Theme colors applied to UI");
+        if (btnSettings != null) btnSettings.setOnClickListener(v -> OpenSettings(v));
+        if (btnAdminManage != null) btnAdminManage.setOnClickListener(v -> {
+            authManager.isCurrentUserAdminAsync(new AuthManager.SimpleCallback() {
+                @Override
+                public void onComplete(final boolean success) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (success) {
+                                Intent i = new Intent(MainActivity.this, AdminManageUsersActivity.class);
+                                startActivity(i);
+                            } else {
+                                Toast.makeText(MainActivity.this, "Admin access required", Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+                }
+            });
+        });
     }
 
     private void loadUserInfo() {
@@ -131,21 +109,33 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "Error loading user info", e);
                 return;
             }
-
             if (doc != null && doc.exists()) {
                 String userName = doc.getString("Name");
-                Welcome.setText(userName != null ? userName : "Welcome");
-
-                String role = doc.getString("Role");
-                if ("Employee".equals(role)) {
-                    if (btnDelete != null) btnDelete.setVisibility(View.GONE);
-                    if (btnPurchase != null) btnPurchase.setVisibility(View.GONE);
-                } else {
+                if (welcomeT != null) welcomeT.setText(userName != null ? userName : "Welcome");
+                String role = doc.getString("role");
+                if (role == null) role = doc.getString("Role");
+                if (role == null) role = "";
+                boolean isAdmin = "Admin".equalsIgnoreCase(role);
+                if (isAdmin) {
                     if (btnDelete != null) btnDelete.setVisibility(View.VISIBLE);
                     if (btnPurchase != null) btnPurchase.setVisibility(View.VISIBLE);
+                    if (btnAdminManage != null) btnAdminManage.setVisibility(View.VISIBLE);
+                    if (findViewById(R.id.HistoryBtn) != null) findViewById(R.id.HistoryBtn).setVisibility(View.VISIBLE);
+                    if (findViewById(R.id.PruchaseBtn) != null) findViewById(R.id.PruchaseBtn).setVisibility(View.VISIBLE);
+                } else {
+                    if (btnDelete != null) btnDelete.setVisibility(View.GONE);
+                    if (btnPurchase != null) btnPurchase.setVisibility(View.GONE);
+                    if (btnAdminManage != null) btnAdminManage.setVisibility(View.GONE);
+                    if (findViewById(R.id.HistoryBtn) != null) findViewById(R.id.HistoryBtn).setVisibility(View.GONE);
+                    if (findViewById(R.id.PruchaseBtn) != null) findViewById(R.id.PruchaseBtn).setVisibility(View.GONE);
                 }
             }
         });
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
     }
 
     private void observeProducts() {
@@ -170,7 +160,6 @@ public class MainActivity extends AppCompatActivity {
             if (status != null && syncStatusTV != null) {
                 String statusText = status.getStatus().toString();
                 syncStatusTV.setText(statusText);
-
                 int color;
                 if (status.isSynced()) {
                     color = getResources().getColor(android.R.color.holo_green_dark);
@@ -189,40 +178,47 @@ public class MainActivity extends AppCompatActivity {
     private void updateDashboardStats(List<Product> products) {
         int totalItems = products.size();
         int criticalItemsCount = 0;
-
         for (Product p : products) {
             int currentAmount = p.getQuantity();
             int minStock = p.getReorderLevel();
-
-            if (currentAmount <= minStock) {
-                criticalItemsCount++;
-            }
+            if (currentAmount <= minStock) criticalItemsCount++;
         }
-
         final int finalTotal = totalItems;
         final int finalCritical = criticalItemsCount;
-
         runOnUiThread(() -> {
-            totalCountTV.setText(String.valueOf(finalTotal));
-            criticalCountTV.setText(String.valueOf(finalCritical));
-
+            if (totalCountTV != null) totalCountTV.setText(String.valueOf(finalTotal));
+            if (criticalCountTV != null) criticalCountTV.setText(String.valueOf(finalCritical));
             if (syncStatusTV != null) {
                 syncStatusTV.setText("✓ Synced");
                 syncStatusTV.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
             }
         });
-
         Log.d(TAG, "Dashboard updated - Total: " + totalItems + ", Critical: " + criticalItemsCount);
     }
 
+    public void OpenManage(View view) {
+        authManager.isCurrentUserAdminAsync(new AuthManager.SimpleCallback() {
+            @Override
+            public void onComplete(final boolean success) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (success) {
+                            startActivity(new Intent(MainActivity.this, AdminManageUsersActivity.class));
+                        } else {
+                            Toast.makeText(MainActivity.this, "Admin access required", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     public void LogOut(View view) {
-        if (syncListener != null) syncListener.stopAllListeners();
-        fAuth.signOut();
+        syncListener.stopAllListeners();
+        FirebaseAuth.getInstance().signOut();
         SalesInventoryApplication.resetRepositories();
-
-        Log.d(TAG, "User logged out");
         Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
-
         Intent intent = new Intent(getApplicationContext(), FirstActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
@@ -242,7 +238,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void OpenHistory(View view) {
-        startActivity(new Intent(getApplicationContext(), InventoryReportsActivity.class));
+        try {
+            startActivity(new Intent(this, InventoryReportsActivity.class));
+        } catch (Exception ex) {
+            Toast.makeText(this, "Reports activity not available", Toast.LENGTH_LONG).show();
+            Log.e(TAG, "InventoryReportsActivity not found", ex);
+        }
     }
 
     public void OpenSell(View view) {
@@ -255,5 +256,11 @@ public class MainActivity extends AppCompatActivity {
 
     public void OpenSettings(View view) {
         startActivity(new Intent(this, SettingsActivity.class));
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        Log.d(TAG, "Orientation changed");
     }
 }

@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:background="@color/backgroundColor">
 
-    <!-- Header with Stats -->
     <LinearLayout
         android:id="@+id/llStats"
         android:layout_width="match_parent"
@@ -45,7 +44,7 @@
                     android:alpha="0.7" />
 
                 <TextView
-                    android:id="@+id/tvTotalProducts"
+                    android:id="@+id/TotalCountTV"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0"
@@ -60,6 +59,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:gravity="right"
                 android:orientation="vertical"
                 android:layout_marginStart="16dp">
 
@@ -91,53 +91,32 @@
                     android:layout_marginTop="4dp" />
 
             </LinearLayout>
-
         </LinearLayout>
 
     </LinearLayout>
 
-    <!-- Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="12dp"
-        android:spacing="8dp">
+        android:padding="12dp">
 
-        <Button
-            android:id="@+id/btnAlerts"
+        <SearchView
+            android:id="@+id/searchView"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🔴 Alerts"
-            android:textSize="12sp"
-            android:backgroundTint="@color/errorRed"
-            android:layout_marginEnd="4dp" />
-
-        <Button
-            android:id="@+id/btnStockAdjustment"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="⚙ Adjust"
-            android:textSize="12sp"
-            android:backgroundTint="@color/colorPrimary"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:queryHint="Search products..."
+            android:background="@drawable/search_background"/>
 
         <Button
             android:id="@+id/btnBatchOperation"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📦 Batch"
-            android:textSize="12sp"
-            android:backgroundTint="@color/colorAccent"
-            android:layout_marginStart="4dp" />
-
+            android:text="Batch"
+            android:layout_marginStart="8dp"/>
     </LinearLayout>
 
-    <!-- Loading Indicator -->
     <ProgressBar
         android:id="@+id/progressBar"
         android:layout_width="wrap_content"
@@ -146,20 +125,19 @@
         android:layout_marginTop="32dp"
         android:visibility="gone" />
 
-    <!-- No Inventory Message -->
     <TextView
-        android:id="@+id/tvNoInventory"
+        android:id="@+id/emptyStateTV"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="No inventory items found.\nAdd products to get started."
+        android:layout_height="wrap_content"
+        android:text="No products found"
         android:gravity="center"
         android:textSize="18sp"
         android:textColor="@color/textColorSecondary"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:padding="20dp" />
 
-    <!-- Inventory RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewInventory"
+        android:id="@+id/productsRecyclerView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="8dp"
