@@ -21,4 +21,25 @@
         <b>5. System Updates</b>\n
         \u2022 We reserve the right to modify or discontinue features of the service at any time for maintenance or upgrades.
     </string>
+
+    <string name="dashboard">Dashboard</string>
+    <string name="quick_overview">Quick Overview</string>
+    <string name="today_sales">Today\'s Sales</string>
+    <string name="inventory_value">Inventory Value</string>
+    <string name="low_stock_items">Low Stock Items</string>
+    <string name="pending_orders">Pending Orders</string>
+    <string name="monthly_revenue">Monthly Revenue</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="create_sale">Create Sale</string>
+    <string name="add_product">Add Product</string>
+    <string name="create_po">Create P.O</string>
+    <string name="view_reports">View Reports</string>
+    <string name="inventory">Inventory</string>
+    <string name="customers">Customers</string>
+    <string name="analytics">Analytics</string>
+    <string name="sales_trend">Sales Trend (7 Days)</string>
+    <string name="top_products">Top 5 Products</string>
+    <string name="inventory_status">Inventory Status</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="last_updated">Last updated: </string>
 </resources>

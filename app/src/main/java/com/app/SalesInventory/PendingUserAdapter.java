@@ -17,10 +17,10 @@ public class PendingUserAdapter extends RecyclerView.Adapter<PendingUserAdapter.
     }
 
     private List<AdminUserItem> items;
-    private OnPendingActionListener listener;
+    private final OnPendingActionListener listener;
 
     public PendingUserAdapter(List<AdminUserItem> items, OnPendingActionListener listener) {
-        this.items = items != null ? items : new ArrayList<>();
+        this.items = items != null ? new ArrayList<>(items) : new ArrayList<>();
         this.listener = listener;
     }
 
@@ -51,18 +51,20 @@ public class PendingUserAdapter extends RecyclerView.Adapter<PendingUserAdapter.
     }
 
     public void update(List<AdminUserItem> newItems) {
-        if (items == null) items = new ArrayList<>();
-        items.clear();
-        if (newItems != null) items.addAll(newItems);
+        if (newItems == null) {
+            this.items = new ArrayList<>();
+        } else {
+            this.items = new ArrayList<>(newItems);
+        }
         notifyDataSetChanged();
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name;
-        TextView email;
-        TextView status;
-        Button approve;
-        Button cancel;
+        final TextView name;
+        final TextView email;
+        final TextView status;
+        final Button approve;
+        final Button cancel;
 
         VH(@NonNull View itemView) {
             super(itemView);

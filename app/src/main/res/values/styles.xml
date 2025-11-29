@@ -1,39 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
 
     <!-- Base application theme. -->
     <style name="Theme.SalesInventory" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
-        <item name="colorAccent">@color/colorAccent</item>
-        <item name="android:windowBackground">@color/backgroundColor</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorSecondaryVariant">@color/accent_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:statusBarColor">@color/primary</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
     </style>
 
-        <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
-            <item name="android:windowBackground">@color/white</item>
-            <item name="android:statusBarColor">@color/statusBarColor</item>
-            <item name="colorAccent">@color/colorAccent</item>
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@color/primary</item>
+        <item name="colorAccent">@color/accent_primary</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorSecondaryVariant">@color/accent_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+    </style>
 
-        </style>
+    <style name="DashboardCard">
+        <item name="android:layout_margin">8dp</item>
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">4dp</item>
+    </style>
 
-        <style name="CustomTextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-            <item name="boxStrokeColor">@color/colorPrimary</item>
-            <item name="boxStrokeWidth">2dp</item>
-            <item name="boxStrokeErrorColor">@color/errorRed</item>
-            <item name="hintTextColor">@color/colorPrimary</item>
-            <item name="android:textColorHint">@color/textColorSecondary</item>
-        </style>
+    <style name="DashboardButton" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:layout_margin">6dp</item>
+        <item name="backgroundTint">@color/primary</item>
+    </style>
 
-        <style name="CustomButton" parent="Widget.MaterialComponents.Button">
-            <item name="android:textColor">@color/white</item>
-            <item name="backgroundTint">@color/colorPrimary</item>
-            <item name="cornerRadius">8dp</item>
-        </style>
+    <style name="CustomTextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/primary</item>
+        <item name="boxStrokeWidth">2dp</item>
+        <item name="boxStrokeErrorColor">@color/status_failed</item>
+        <item name="hintTextColor">@color/primary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+    </style>
 
-        <style name="CustomButtonOutlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
-            <item name="android:textColor">@color/colorPrimary</item>
-            <item name="strokeColor">@color/colorPrimary</item>
-            <item name="strokeWidth">2dp</item>
-            <item name="cornerRadius">8dp</item>
-        </style>
+    <style name="CustomButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="backgroundTint">@color/primary</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <style name="CustomButtonOutlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:textColor">@color/primary</item>
+        <item name="strokeColor">@color/primary</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
 
 </resources>

@@ -1,8 +1,8 @@
 package com.app.SalesInventory;
 
 import androidx.appcompat.app.AppCompatActivity;
-import android.content.Intent;
-import android.os.Bundle;
+import android.content. Intent;
+import android.os. Bundle;
 import android.widget.ListView;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,13 +15,18 @@ public class SellList extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        super. onCreate(savedInstanceState);
         setContentView(R.layout.activity_sell_list);
         productRepository = SalesInventoryApplication.getProductRepository();
         sellListView = findViewById(R.id.SellListD);
         productList = new ArrayList<>();
         sellAdapter = new SellAdapter(this, productList);
         sellListView.setAdapter(sellAdapter);
+        loadProducts();
+        setupListItemClick();
+    }
+
+    private void loadProducts() {
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 productList.clear();
@@ -29,10 +34,13 @@ public class SellList extends AppCompatActivity {
                 sellAdapter.notifyDataSetChanged();
             }
         });
+    }
+
+    private void setupListItemClick() {
         sellListView.setOnItemClickListener((parent, view, position, id) -> {
             Product selectedProduct = productList.get(position);
             Intent intent = new Intent(SellList.this, sellProduct.class);
-            intent.putExtra("productId", selectedProduct.getProductId());
+            intent. putExtra("productId", selectedProduct.getProductId());
             intent.putExtra("productName", selectedProduct.getProductName());
             intent.putExtra("productCode", selectedProduct.getProductId());
             intent.putExtra("productPrice", selectedProduct.getSellingPrice());

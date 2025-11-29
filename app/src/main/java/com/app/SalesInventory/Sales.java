@@ -58,7 +58,7 @@ public class Sales {
     }
 
     public void setTotalPrice(double totalPrice) {
-        this.totalPrice = totalPrice;
+        this. totalPrice = totalPrice;
     }
 
     public String getPaymentMethod() {
@@ -66,7 +66,7 @@ public class Sales {
     }
 
     public void setPaymentMethod(String paymentMethod) {
-        this.paymentMethod = paymentMethod;
+        this. paymentMethod = paymentMethod;
     }
 
     public long getDate() {

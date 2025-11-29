@@ -1,11 +1,13 @@
 package com.app.SalesInventory;
 
 import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Tasks;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GetTokenResult;
+import com.google.firebase.functions.FirebaseFunctions;
+import com.google.firebase.functions.HttpsCallableResult;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -214,13 +216,29 @@ public class AuthManager {
         });
     }
 
-    public void approveUser(String uid, final SimpleCallback callback) {
-        fStore.collection("users").document(uid).update("approved", true).addOnCompleteListener(new OnCompleteListener<Void>() {
+    public void callAdminUpdateUser(String uid, Boolean approved, String role, Boolean setAsAdmin, final SimpleCallback callback) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("uid", uid);
+        if (approved != null) data.put("approved", approved);
+        if (role != null) data.put("role", role);
+        if (setAsAdmin != null) data.put("setAsAdmin", setAsAdmin);
+        FirebaseFunctions.getInstance().getHttpsCallable("adminUpdateUser").call(data).addOnCompleteListener(new OnCompleteListener<HttpsCallableResult>() {
             @Override
-            public void onComplete(@NonNull Task<Void> task) {
-                callback.onComplete(task.isSuccessful());
+            public void onComplete(@NonNull Task<HttpsCallableResult> task) {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    callback.onComplete(true);
+                } else {
+                    callback.onComplete(false);
+                    if (task.getException() != null) {
+                        android.util.Log.e("AuthManager", "callAdminUpdateUser failed: " + task.getException().getMessage(), task.getException());
+                    }
+                }
             }
         });
+    }
+
+    public void approveUser(String uid, final SimpleCallback callback) {
+        callAdminUpdateUser(uid, true, null, null, callback);
     }
 
     public void promoteToAdmin(String uid, final SimpleCallback callback) {
@@ -236,26 +254,45 @@ public class AuthManager {
                 if (email == null) email = doc.getString("Email");
                 String name = doc.getString("name");
                 if (name == null) name = doc.getString("Name");
+                String phone = null;
+                if (doc.contains("phone")) phone = doc.getString("phone");
+                if (phone == null && doc.contains("Phone")) phone = doc.getString("Phone");
+                Long createdAt = null;
+                if (doc.contains("createdAt")) {
+                    Object c = doc.get("createdAt");
+                    if (c instanceof Number) createdAt = ((Number) c).longValue();
+                }
                 Map<String, Object> adminData = new HashMap<>();
                 adminData.put("uid", uid);
                 adminData.put("email", email != null ? email : "");
                 adminData.put("name", name != null ? name : "");
+                if (phone != null) adminData.put("phone", phone);
                 adminData.put("role", "Admin");
                 adminData.put("approved", true);
-                fStore.collection("admin").document(uid).set(adminData, SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
+                if (createdAt != null) adminData.put("createdAt", createdAt);
+                callAdminUpdateUser(uid, true, "Admin", true, new SimpleCallback() {
                     @Override
-                    public void onComplete(@NonNull Task<Void> setTask) {
-                        if (!setTask.isSuccessful()) {
+                    public void onComplete(boolean success) {
+                        if (!success) {
                             callback.onComplete(false);
                             return;
                         }
-                        Map<String, Object> updates = new HashMap<>();
-                        updates.put("role", "Admin");
-                        updates.put("approved", true);
-                        fStore.collection("users").document(uid).update(updates).addOnCompleteListener(new OnCompleteListener<Void>() {
+                        fStore.collection("admin").document(uid).set(adminData, SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
                             @Override
-                            public void onComplete(@NonNull Task<Void> upd) {
-                                callback.onComplete(upd.isSuccessful());
+                            public void onComplete(@NonNull Task<Void> setTask) {
+                                if (!setTask.isSuccessful()) {
+                                    callback.onComplete(false);
+                                    return;
+                                }
+                                Map<String, Object> updates = new HashMap<>();
+                                updates.put("role", "Admin");
+                                updates.put("approved", true);
+                                fStore.collection("users").document(uid).set(updates, SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Void> upd) {
+                                        callback.onComplete(upd.isSuccessful());
+                                    }
+                                });
                             }
                         });
                     }
@@ -265,20 +302,29 @@ public class AuthManager {
     }
 
     public void demoteAdmin(String uid, final SimpleCallback callback) {
-        fStore.collection("admin").document(uid).delete().addOnCompleteListener(new OnCompleteListener<Void>() {
+        callAdminUpdateUser(uid, true, "Staff", false, new SimpleCallback() {
             @Override
-            public void onComplete(@NonNull Task<Void> task) {
-                if (!task.isSuccessful()) {
+            public void onComplete(boolean success) {
+                if (!success) {
                     callback.onComplete(false);
                     return;
                 }
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("role", "Staff");
-                updates.put("approved", true);
-                fStore.collection("users").document(uid).update(updates).addOnCompleteListener(new OnCompleteListener<Void>() {
+                fStore.collection("admin").document(uid).delete().addOnCompleteListener(new OnCompleteListener<Void>() {
                     @Override
-                    public void onComplete(@NonNull Task<Void> upd) {
-                        callback.onComplete(upd.isSuccessful());
+                    public void onComplete(@NonNull Task<Void> task) {
+                        if (!task.isSuccessful()) {
+                            callback.onComplete(false);
+                            return;
+                        }
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("role", "Staff");
+                        updates.put("approved", true);
+                        fStore.collection("users").document(uid).update(updates).addOnCompleteListener(new OnCompleteListener<Void>() {
+                            @Override
+                            public void onComplete(@NonNull Task<Void> upd) {
+                                callback.onComplete(upd.isSuccessful());
+                            }
+                        });
                     }
                 });
             }

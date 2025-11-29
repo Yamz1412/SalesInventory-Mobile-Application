@@ -11,15 +11,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH> {
-    public interface OnPromoteClickListener {
+    public interface OnManageActionListener {
         void onPromote(String uid);
     }
 
     private List<AdminUserItem> items;
-    private OnPromoteClickListener listener;
+    private final OnManageActionListener listener;
 
-    public ManageUserAdapter(List<AdminUserItem> items, OnPromoteClickListener listener) {
-        this.items = items != null ? items : new ArrayList<>();
+    public ManageUserAdapter(List<AdminUserItem> items, OnManageActionListener listener) {
+        this.items = items != null ? new ArrayList<>(items) : new ArrayList<>();
         this.listener = listener;
     }
 
@@ -36,7 +36,6 @@ public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH
         holder.name.setText(it.getName() != null && !it.getName().isEmpty() ? it.getName() : it.getEmail());
         holder.email.setText(it.getEmail() != null ? it.getEmail() : "");
         holder.status.setText(it.isApproved() ? "Approved" : "Pending");
-        holder.promote.setVisibility(it.isApproved() ? View.VISIBLE : View.GONE);
         holder.promote.setOnClickListener(v -> {
             if (listener != null) listener.onPromote(it.getUid());
         });
@@ -48,17 +47,19 @@ public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH
     }
 
     public void update(List<AdminUserItem> newItems) {
-        if (items == null) items = new ArrayList<>();
-        items.clear();
-        if (newItems != null) items.addAll(newItems);
+        if (newItems == null) {
+            this.items = new ArrayList<>();
+        } else {
+            this.items = new ArrayList<>(newItems);
+        }
         notifyDataSetChanged();
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name;
-        TextView email;
-        TextView status;
-        Button promote;
+        final TextView name;
+        final TextView email;
+        final TextView status;
+        final Button promote;
 
         VH(@NonNull View itemView) {
             super(itemView);

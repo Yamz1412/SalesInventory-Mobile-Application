@@ -21,4 +21,19 @@
     <color name="gray">#0A6B5F</color>
     <color name="red">#D32F2F</color>
     <color name="LightBlue">#00A5FF</color>
+
+    <color name="primary">#2196F3</color>
+    <color name="primary_dark">#1976D2</color>
+    <color name="accent_primary">#FF6B6B</color>
+    <color name="success_primary">#4ECDC4</color>
+    <color name="warning_primary">#FFD93D</color>
+    <color name="info_primary">#95E1D3</color>
+    <color name="dashboard_background">#F5F5F5</color>
+    <color name="dashboard_card_background">#FFFFFF</color>
+    <color name="text_primary">#1F1F1F</color>
+    <color name="text_secondary">#757575</color>
+    <color name="status_completed">#4CAF50</color>
+    <color name="status_pending">#FF9800</color>
+    <color name="status_failed">#F44336</color>
+    <color name="warning_light">#FFF3E0</color>
 </resources>
