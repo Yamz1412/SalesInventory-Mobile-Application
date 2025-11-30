@@ -11,7 +11,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/dashboard_background"
+        android:background="?android:colorBackground"
         android:fillViewport="true">
 
         <LinearLayout
@@ -36,16 +36,16 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Dashboard"
+                        android:text="@string/dashboard"
                         android:textSize="28sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="?attr/colorOnBackground" />
 
                     <TextView
                         android:id="@+id/tv_last_updated"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Last updated: --:-- AM"
+                        android:text="@string/last_updated"
                         android:textSize="12sp"
                         android:textColor="@color/text_secondary"
                         android:layout_marginTop="4dp" />
@@ -59,7 +59,16 @@
                     android:background="@android:color/transparent"
                     android:padding="8dp"
                     android:src="@drawable/ic_settings"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
+
+                <ImageButton
+                    android:id="@+id/btn_profile"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@android:color/transparent"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_profile"
+                    app:tint="@color/text_secondary" />
 
             </LinearLayout>
 
@@ -74,10 +83,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Quick Overview"
+                android:text="@string/quick_overview"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="12dp" />
 
@@ -94,7 +103,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
                     app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/dashboard_card_background"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardElevation="4dp">
 
                     <LinearLayout
@@ -121,9 +130,9 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Today's Sales"
+                                android:text="@string/today_sales"
                                 android:textSize="12sp"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -147,7 +156,7 @@
                     android:layout_marginStart="6dp"
                     android:layout_marginEnd="6dp"
                     app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/dashboard_card_background"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardElevation="4dp">
 
                     <LinearLayout
@@ -174,9 +183,9 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Inventory Value"
+                                android:text="@string/inventory_value"
                                 android:textSize="12sp"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -201,7 +210,7 @@
                     android:layout_weight="1"
                     android:layout_marginStart="6dp"
                     app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/dashboard_card_background"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardElevation="4dp">
 
                     <LinearLayout
@@ -228,9 +237,9 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Low Stock Items"
+                                android:text="@string/low_stock_items"
                                 android:textSize="12sp"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -263,7 +272,7 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp"
                     app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/dashboard_card_background"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardElevation="4dp">
 
                     <LinearLayout
@@ -290,9 +299,9 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Pending Orders"
+                                android:text="@string/pending_orders"
                                 android:textSize="12sp"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -318,7 +327,7 @@
                     android:layout_marginStart="6dp"
                     android:layout_marginEnd="6dp"
                     app:cardCornerRadius="12dp"
-                    app:cardBackgroundColor="@color/dashboard_card_background"
+                    app:cardBackgroundColor="@android:color/white"
                     app:cardElevation="4dp">
 
                     <LinearLayout
@@ -345,9 +354,9 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Monthly Revenue"
+                                android:text="@string/monthly_revenue"
                                 android:textSize="12sp"
-                                android:textColor="@color/text_secondary"
+                                android:textColor="@color/text_primary"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -374,10 +383,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Quick Actions"
+                android:text="@string/quick_actions"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="12dp" />
 
@@ -395,7 +404,7 @@
                     android:layout_row="0"
                     android:layout_column="0"
                     android:layout_columnWeight="1"
-                    android:text="Create Sale"
+                    android:text="@string/create_sale"
                     app:icon="@drawable/ic_add_sale"
                     app:iconSize="28dp"
                     app:iconGravity="top"
@@ -408,7 +417,7 @@
                     android:layout_row="0"
                     android:layout_column="1"
                     android:layout_columnWeight="1"
-                    android:text="Add Product"
+                    android:text="@string/add_product"
                     app:icon="@drawable/ic_add_product"
                     app:iconSize="28dp"
                     app:iconGravity="top"
@@ -421,7 +430,7 @@
                     android:layout_row="0"
                     android:layout_column="2"
                     android:layout_columnWeight="1"
-                    android:text="Create P.O"
+                    android:text="@string/create_po"
                     app:icon="@drawable/ic_purchase_order"
                     app:iconSize="28dp"
                     app:iconGravity="top"
@@ -434,7 +443,7 @@
                     android:layout_row="1"
                     android:layout_column="0"
                     android:layout_columnWeight="1"
-                    android:text="View Reports"
+                    android:text="@string/view_reports"
                     app:icon="@drawable/ic_reports"
                     app:iconSize="28dp"
                     app:iconGravity="top"
@@ -447,7 +456,7 @@
                     android:layout_row="1"
                     android:layout_column="1"
                     android:layout_columnWeight="1"
-                    android:text="Inventory"
+                    android:text="@string/inventory"
                     app:icon="@drawable/ic_inventory"
                     app:iconSize="28dp"
                     app:iconGravity="top"
@@ -479,10 +488,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Analytics"
+                android:text="@string/analytics"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="12dp" />
 
@@ -491,7 +500,7 @@
                 android:layout_height="300dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="@color/dashboard_card_background"
+                app:cardBackgroundColor="?android:colorBackground"
                 app:cardElevation="4dp">
 
                 <LinearLayout
@@ -503,10 +512,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Sales Trend (7 Days)"
+                        android:text="@string/sales_trend"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="?attr/colorOnBackground" />
 
                     <com.github.mikephil.charting.charts.LineChart
                         android:id="@+id/chart_sales_trend"
@@ -524,7 +533,7 @@
                 android:layout_height="300dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="@color/dashboard_card_background"
+                app:cardBackgroundColor="?android:colorBackground"
                 app:cardElevation="4dp">
 
                 <LinearLayout
@@ -536,10 +545,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Top 5 Products"
+                        android:text="@string/top_products"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="?attr/colorOnBackground" />
 
                     <com.github.mikephil.charting.charts.BarChart
                         android:id="@+id/chart_top_products"
@@ -557,7 +566,7 @@
                 android:layout_height="300dp"
                 android:layout_marginBottom="12dp"
                 app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="@color/dashboard_card_background"
+                app:cardBackgroundColor="?android:colorBackground"
                 app:cardElevation="4dp">
 
                 <LinearLayout
@@ -569,10 +578,10 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Inventory Status"
+                        android:text="@string/inventory_status"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:textColor="?attr/colorOnBackground" />
 
                     <com.github.mikephil.charting.charts.PieChart
                         android:id="@+id/chart_inventory_status"
@@ -588,10 +597,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Recent Activity"
+                android:text="@string/recent_activity"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="@color/text_primary"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginTop="8dp"
                 android:layout_marginBottom="12dp" />
 
@@ -600,7 +609,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
                 app:cardCornerRadius="12dp"
-                app:cardBackgroundColor="@color/dashboard_card_background"
+                app:cardBackgroundColor="?android:colorBackground"
                 app:cardElevation="4dp">
 
                 <androidx.recyclerview.widget.RecyclerView

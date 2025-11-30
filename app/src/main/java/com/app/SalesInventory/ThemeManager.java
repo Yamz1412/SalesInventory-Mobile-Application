@@ -7,6 +7,8 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 public class ThemeManager {
     private static final String TAG = "ThemeManager";
     private static final String THEME_PREFS = "theme_prefs";
@@ -63,14 +65,37 @@ public class ThemeManager {
         return Theme.LIGHT;
     }
 
-    public void setTheme(Theme theme) {
+    public void setCurrentTheme(String themeName) {
+        Theme chosen = Theme.LIGHT;
+        for (Theme t : Theme.values()) {
+            if (t.name.equals(themeName)) {
+                chosen = t;
+                break;
+            }
+        }
         SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(SELECTED_THEME, theme.name);
-        editor.putInt(PRIMARY_COLOR, theme.primaryColor);
-        editor.putInt(SECONDARY_COLOR, theme.secondaryColor);
-        editor.putInt(ACCENT_COLOR, theme.accentColor);
+        editor.putString(SELECTED_THEME, chosen.name);
+        editor.putInt(PRIMARY_COLOR, chosen.primaryColor);
+        editor.putInt(SECONDARY_COLOR, chosen.secondaryColor);
+        editor.putInt(ACCENT_COLOR, chosen.accentColor);
         editor.apply();
-        android.util.Log.d(TAG, "Theme changed to: " + theme.name);
+    }
+
+    public void applyTheme(AppCompatActivity activity) {
+        Theme current = getCurrentTheme();
+        if ("dark".equalsIgnoreCase(current.name)) {
+            activity.setTheme(R.style.AppTheme_Dark);
+        } else if ("ocean".equalsIgnoreCase(current.name)) {
+            activity.setTheme(R.style.AppTheme_Ocean);
+        } else if ("forest".equalsIgnoreCase(current.name)) {
+            activity.setTheme(R.style.AppTheme_Forest);
+        } else if ("sunset".equalsIgnoreCase(current.name)) {
+            activity.setTheme(R.style.AppTheme_Sunset);
+        } else if ("purple".equalsIgnoreCase(current.name)) {
+            activity.setTheme(R.style.AppTheme_Purple);
+        } else {
+            activity.setTheme(R.style.AppTheme_Light);
+        }
     }
 
     public int getPrimaryColor() {
@@ -92,7 +117,6 @@ public class ThemeManager {
         editor.putInt(SECONDARY_COLOR, secondaryColor);
         editor.putInt(ACCENT_COLOR, accentColor);
         editor.apply();
-        android.util.Log.d(TAG, "Custom colors set");
     }
 
     public Theme[] getAvailableThemes() {

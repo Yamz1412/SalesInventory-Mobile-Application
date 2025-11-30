@@ -5,7 +5,7 @@ import android.os.Bundle;
 import android.view.View;
 import androidx.appcompat.app.AppCompatActivity;
 
-public class FirstActivity extends AppCompatActivity {
+public class FirstActivity extends BaseActivity  {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

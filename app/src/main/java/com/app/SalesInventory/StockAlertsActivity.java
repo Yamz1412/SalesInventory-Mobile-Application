@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class StockAlertsActivity extends AppCompatActivity {
+public class StockAlertsActivity extends BaseActivity  {
 
     private RecyclerView recyclerViewAlerts;
     private ProgressBar progressBar;

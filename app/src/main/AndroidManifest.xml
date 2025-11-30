@@ -3,17 +3,20 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.app.SalesInventory">
 
-    <uses-permission android:name="android.permission. WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission. INTERNET" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-feature android:name="android.hardware.screen.landscape" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:name=".SalesInventoryApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="true"
         android:icon="@drawable/logo"
         android:label="Sales &amp; Inventory"
         android:roundIcon="@mipmap/ic_launcher_foreground"
@@ -23,7 +26,7 @@
 
         <activity
             android:name=".FirstActivity"
-            android:windowSoftInputMode="adjustResize"
+            android:windowSoftInputMode="adjustResize|stateHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,94 +36,87 @@
 
         <activity
             android:name=".WaitingVerificationActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".SignInActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".SignUpActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".resetPassWord"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".Conditions"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".MainActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".Profile"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".EditProfil"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".SellList"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".sellProduct"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".InventoryReportsActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".Inventory"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".AddProductActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".DeleteProduct"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".EditProductActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".AdminManageUsersActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".SettingsActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".PurchaseOrderListActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".CreatePurchaseOrderActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".PurchaseOrderDetailActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".BatchStockOperationActivity"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
-            android:name=".SalesActivity"
-            android:windowSoftInputMode="adjustResize" />
-
-        <activity
-            android:name=".Reports" />
+            android:name=".Reports"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -128,7 +124,7 @@
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
-                android:name="android.support. FILE_PROVIDER_PATHS"
+                android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
     </application>

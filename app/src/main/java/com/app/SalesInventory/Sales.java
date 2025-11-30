@@ -8,10 +8,12 @@ public class Sales {
     private double price;
     private double totalPrice;
     private String paymentMethod;
+    private String paymentReference;
     private long date;
     private long timestamp;
 
-    public Sales() {}
+    public Sales() {
+    }
 
     public String getId() {
         return id;
@@ -58,7 +60,7 @@ public class Sales {
     }
 
     public void setTotalPrice(double totalPrice) {
-        this. totalPrice = totalPrice;
+        this.totalPrice = totalPrice;
     }
 
     public String getPaymentMethod() {
@@ -66,7 +68,15 @@ public class Sales {
     }
 
     public void setPaymentMethod(String paymentMethod) {
-        this. paymentMethod = paymentMethod;
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
     }
 
     public long getDate() {

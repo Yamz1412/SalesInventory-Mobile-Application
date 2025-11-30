@@ -10,7 +10,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeleteProduct extends AppCompatActivity implements ProductDeleteAdapter.OnProductDeleteListener {
+public class DeleteProduct extends BaseActivity  implements ProductDeleteAdapter.OnProductDeleteListener {
     private RecyclerView productsRecyclerView;
     private SearchView searchView;
     private TextView emptyStateTV;

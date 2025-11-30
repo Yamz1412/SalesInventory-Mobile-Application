@@ -12,7 +12,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
-public class WaitingVerificationActivity extends AppCompatActivity {
+public class WaitingVerificationActivity extends BaseActivity  {
     private Button btnRefresh;
     private Button btnResend;
     private FirebaseAuth auth;

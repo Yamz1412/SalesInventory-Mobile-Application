@@ -22,7 +22,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EditProfil extends AppCompatActivity {
+public class EditProfil extends BaseActivity  {
 
     public static final String TAG = "Tag";
     EditText ProfilName ,  ProfilEmail ,ProfilPhone;

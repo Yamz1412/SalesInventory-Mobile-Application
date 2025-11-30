@@ -11,7 +11,7 @@ import android.widget.TextView;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
-public class InventoryReportsActivity extends AppCompatActivity {
+public class InventoryReportsActivity extends BaseActivity  {
 
     private Button btnStockValue, btnStockMovement, btnAdjustmentSummary, btnExport;
     private LinearLayout llReportCards;

@@ -3,37 +3,68 @@ package com.app.SalesInventory;
 public class Adjustment {
     private String id;
     private String productId;
-    private int quantity;
-    private String type;
+    private String productName;
+    private int quantityChange;
     private String reason;
-    private long date;
+    private long timestamp;
 
-    public Adjustment() {}
-
-    public Adjustment(String productId, int quantity, String type, String reason, long date) {
-        this.productId = productId;
-        this.quantity = quantity;
-        this.type = type;
-        this.reason = reason;
-        this.date = date;
+    public Adjustment() {
     }
 
-    // Getters and Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public Adjustment(String id, String productId, String productName, int quantityChange, String reason, long timestamp) {
+        this.id = id;
+        this.productId = productId;
+        this.productName = productName;
+        this.quantityChange = quantityChange;
+        this.reason = reason;
+        this.timestamp = timestamp;
+    }
 
-    public String getProductId() { return productId; }
-    public void setProductId(String productId) { this.productId = productId; }
+    public String getId() {
+        return id;
+    }
 
-    public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public String getProductId() {
+        return productId;
+    }
 
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
+    public void setProductId(String productId) {
+        this.productId = productId;
+    }
 
-    public long getDate() { return date; }
-    public void setDate(long date) { this.date = date; }
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public int getQuantityChange() {
+        return quantityChange;
+    }
+
+    public void setQuantityChange(int quantityChange) {
+        this.quantityChange = quantityChange;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
 }

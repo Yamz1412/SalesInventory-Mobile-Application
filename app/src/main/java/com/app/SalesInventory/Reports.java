@@ -26,7 +26,7 @@ import java.util.Locale;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class Reports extends AppCompatActivity {
+public class Reports extends BaseActivity  {
 
     private static final int REQUEST_WRITE_STORAGE = 1001;
 

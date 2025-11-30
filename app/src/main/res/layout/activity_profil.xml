@@ -17,7 +17,7 @@
             android:layout_height="100dp"
             android:layout_centerInParent="true"
             android:background="@drawable/avatarprofil"
-            android:scaleType="centerCrop"/>
+            android:scaleType="centerCrop" />
 
         <TextView
             android:id="@+id/ProfilNameInfo"
@@ -29,16 +29,16 @@
             android:text="User Name"
             android:textColor="#FFFFFF"
             android:textSize="22sp"
-            android:textStyle="bold"/>
+            android:textStyle="bold" />
     </RelativeLayout>
 
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="20dp"
+        android:layout_marginTop="-30dp"
         app:cardCornerRadius="10dp"
-        app:cardElevation="4dp"
-        android:layout_marginTop="-30dp">
+        app:cardElevation="4dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -52,7 +52,8 @@
                 android:layout_height="wrap_content"
                 android:text="Full Name"
                 android:textColor="#757575"
-                android:textSize="12sp"/>
+                android:textSize="12sp" />
+
             <TextView
                 android:id="@+id/ProfilNameT"
                 android:layout_width="match_parent"
@@ -60,8 +61,12 @@
                 android:text="Loading..."
                 android:textSize="18sp"
                 android:textColor="#333"
-                android:layout_marginBottom="15dp"/>
-            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEE"/>
+                android:layout_marginBottom="15dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#EEE" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -69,7 +74,8 @@
                 android:text="Email Address"
                 android:textColor="#757575"
                 android:textSize="12sp"
-                android:layout_marginTop="15dp"/>
+                android:layout_marginTop="15dp" />
+
             <TextView
                 android:id="@+id/ProfilEmailT"
                 android:layout_width="match_parent"
@@ -77,8 +83,12 @@
                 android:text="Loading..."
                 android:textSize="18sp"
                 android:textColor="#333"
-                android:layout_marginBottom="15dp"/>
-            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEE"/>
+                android:layout_marginBottom="15dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#EEE" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -86,7 +96,8 @@
                 android:text="Phone Number"
                 android:textColor="#757575"
                 android:textSize="12sp"
-                android:layout_marginTop="15dp"/>
+                android:layout_marginTop="15dp" />
+
             <TextView
                 android:id="@+id/ProfilPhoneT"
                 android:layout_width="match_parent"
@@ -94,18 +105,36 @@
                 android:text="Loading..."
                 android:textSize="18sp"
                 android:textColor="#333"
-                android:layout_marginBottom="15dp"/>
+                android:layout_marginBottom="15dp" />
 
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <Button
-        android:id="@+id/EditProfil"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:layout_margin="20dp"
-        android:text="Edit Profile"
-        android:textSize="16sp"
-        android:backgroundTint="@color/colorPrimary"/>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingBottom="20dp">
 
+        <Button
+            android:id="@+id/EditProfil"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Edit Profile"
+            android:textSize="16sp"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnLogout"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Logout"
+            android:textSize="16sp"
+            android:backgroundTint="@color/red"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
 </LinearLayout>

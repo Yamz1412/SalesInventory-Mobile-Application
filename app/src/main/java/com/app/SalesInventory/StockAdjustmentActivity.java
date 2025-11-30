@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class StockAdjustmentActivity extends AppCompatActivity {
+public class StockAdjustmentActivity extends BaseActivity  {
 
     private Spinner spinnerProduct, spinnerAdjustmentType, spinnerReason;
     private EditText etQuantity, etRemarks;

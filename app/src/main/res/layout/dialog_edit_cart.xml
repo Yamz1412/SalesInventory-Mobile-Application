@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvEditTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Edit Cart"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginBottom="12dp" />
+
+        <ListView
+            android:id="@+id/editCartListView"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:divider="@color/lightGray"
+            android:dividerHeight="1dp"
+            android:background="@color/white"
+            android:padding="4dp"
+            android:clipToPadding="false" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/btnEditChangeProduct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add/Change Products" />
+
+            <Button
+                android:id="@+id/btnEditCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cancel"
+                android:layout_marginStart="8dp" />
+
+            <Button
+                android:id="@+id/btnEditSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Save"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

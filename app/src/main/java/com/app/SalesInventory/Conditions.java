@@ -6,7 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 
-public class Conditions extends AppCompatActivity {
+public class Conditions extends BaseActivity  {
 
     Button btnAgree;
 

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
     android:background="@color/backgroundColor"
     tools:context=".sellProduct">
 
@@ -21,94 +21,35 @@
             android:textStyle="bold"
             android:textColor="@color/colorPrimary"
             android:gravity="center"
-            android:layout_marginBottom="20dp"/>
+            android:layout_marginBottom="16dp" />
 
-        <androidx.cardview.widget.CardView
+        <TextView
+            android:id="@+id/tvCartTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="10dp"
-            app:cardElevation="4dp"
-            android:layout_marginBottom="20dp">
+            android:text="Selected Item"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginBottom="6dp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp"
-                android:background="#FFFFFF">
-
-                <TextView
-                    android:id="@+id/name1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Product Name"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    android:textColor="#333"
-                    android:layout_marginBottom="5dp"/>
-
-                <TextView
-                    android:id="@+id/code1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="CODE123"
-                    android:textColor="#757575"
-                    android:layout_marginBottom="15dp"/>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:weightSum="2">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Unit Price"/>
-                        <TextView
-                            android:id="@+id/SellPrice1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="150.00"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/colorPrimary"/>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="end">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Current Stock"/>
-                        <TextView
-                            android:id="@+id/Amount12"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="50"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            android:textColor="#000"/>
-                    </LinearLayout>
-                </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+        <ListView
+            android:id="@+id/cartListView"
+            android:layout_width="match_parent"
+            android:layout_height="190dp"
+            android:divider="@color/lightGray"
+            android:dividerHeight="1dp"
+            android:background="@color/white"
+            android:padding="4dp"
+            android:clipToPadding="false"
+            tools:listitem="@layout/item_cart_product" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="15dp"
-            android:textColorHint="#757575"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
             app:hintTextColor="@color/colorPrimary"
             app:boxStrokeColor="@color/colorPrimary"
             android:hint="Quantity to Sell">
@@ -116,16 +57,14 @@
                 android:id="@+id/QtyToSell"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="number"/>
+                android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="25dp"
-            android:textColorHint="#757575"
+            android:layout_marginBottom="0dp"
             app:hintTextColor="@color/colorPrimary"
             app:boxStrokeColor="@color/colorPrimary"
             android:hint="Discount (%)">
@@ -133,16 +72,16 @@
                 android:id="@+id/DiscountInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:inputType="numberDecimal"/>
+                android:inputType="numberDecimal" />
         </com.google.android.material.textfield.TextInputLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="20dp"
+            android:padding="16dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="25dp">
+            android:layout_marginBottom="1dp">
 
             <TextView
                 android:layout_width="0dp"
@@ -151,32 +90,146 @@
                 android:text="TOTAL TO PAY:"
                 android:textColor="@color/black"
                 android:textStyle="bold"
-                android:textSize="18sp"/>
+                android:textSize="18sp" />
 
             <TextView
                 android:id="@+id/TotalPriceTV"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="0.00"
+                android:text="₱0.00"
                 android:textSize="28sp"
                 android:textStyle="bold"
-                android:textColor="@color/colorPrimary"/>
+                android:textColor="@color/colorPrimary" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/BtnCalculate"
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Calculate Total"
-            android:backgroundTint="#FFAB00"
-            android:layout_marginBottom="10dp"/>
+            android:layout_height="wrap_content"
+            android:text="Payment Method"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorSecondary"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <Spinner
+            android:id="@+id/spinnerPaymentMethod"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="3dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <LinearLayout
+                    android:id="@+id/layoutCashSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Cash"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/textColorPrimary"
+                        android:layout_marginBottom="4dp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/layoutCashGiven"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Cash given">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etCashGiven"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="numberDecimal" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/tvChange"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Change: ₱0.00"
+                        android:textSize="13sp"
+                        android:textColor="@color/textColorSecondary"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutEPaymentSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="E-Payment"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/textColorPrimary"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/tvEPaymentNote"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Capture the customer’s payment receipt, then confirm the sale."
+                        android:textSize="13sp"
+                        android:textColor="@color/textColorSecondary"
+                        android:layout_marginBottom="8dp" />
+
+                    <Button
+                        android:id="@+id/btnCaptureReceipt"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Capture Receipt"
+                        android:backgroundTint="@color/colorPrimary"
+                        android:textColor="@color/white" />
+
+                    <TextView
+                        android:id="@+id/tvReceiptStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="No receipt captured"
+                        android:textSize="12sp"
+                        android:textColor="@color/textColorSecondary"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <Button
+            android:id="@+id/BtnEditCart"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Edit Cart"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"
+            android:layout_marginTop="16dp" />
 
         <Button
             android:id="@+id/BtnConfirmSale"
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:text="Confirm Sale"
-            android:backgroundTint="@color/colorPrimary"/>
-
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white"
+            android:layout_marginTop="8dp" />
     </LinearLayout>
 </ScrollView>

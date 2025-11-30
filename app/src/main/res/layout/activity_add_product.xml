@@ -18,7 +18,7 @@
             android:textSize="24sp"
             android:textStyle="bold"
             android:textColor="@color/colorPrimary"
-            android:layout_marginBottom="20dp"/>
+            android:layout_marginBottom="20dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -33,7 +33,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#000000"
-                android:hint="Product Name"/>
+                android:hint="Product Name" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
@@ -41,7 +41,7 @@
             android:layout_height="wrap_content"
             android:text="Category"
             android:textColor="#666666"
-            android:layout_marginBottom="5dp"/>
+            android:layout_marginBottom="5dp" />
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="55dp"
@@ -51,94 +51,91 @@
             <Spinner
                 android:id="@+id/categorySpinner"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"/>
+                android:layout_height="match_parent" />
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/layout_buying_unit_qty_critical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2">
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="5dp"
+                    android:textColorHint="#757575"
+                    app:hintTextColor="@color/colorPrimary"
+                    app:boxStrokeColor="@color/colorPrimary"
+                    android:layout_marginBottom="15dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/costPriceET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="#000000"
+                        android:hint="Buying Price" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:textColorHint="#757575"
+                    app:hintTextColor="@color/colorPrimary"
+                    app:boxStrokeColor="@color/colorPrimary"
+                    android:layout_marginBottom="15dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/minStockET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="#000000"
+                        android:hint="Critical Level" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="5dp"
                 android:textColorHint="#757575"
                 app:hintTextColor="@color/colorPrimary"
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/codeET"
+                    android:id="@+id/quantityET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:inputType="number"
                     android:textColor="#000000"
-                    android:hint="Code / Barcode"/>
+                    android:hint="Initial Quantity" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
                 android:textColorHint="#757575"
                 app:hintTextColor="@color/colorPrimary"
                 app:boxStrokeColor="@color/colorPrimary"
                 android:layout_marginBottom="15dp">
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/lotET"
+                    android:id="@+id/unitET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="#000000"
-                    android:hint="Lot Number"/>
-            </com.google.android.material.textfield.TextInputLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2">
-
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="5dp"
-                android:textColorHint="#757575"
-                app:hintTextColor="@color/colorPrimary"
-                app:boxStrokeColor="@color/colorPrimary"
-                android:layout_marginBottom="15dp">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/costPriceET"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"
-                    android:textColor="#000000"
-                    android:hint="Buying Price"/>
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="5dp"
-                android:textColorHint="#757575"
-                app:hintTextColor="@color/colorPrimary"
-                app:boxStrokeColor="@color/colorPrimary"
-                android:layout_marginBottom="15dp">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/sellingPriceET"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="numberDecimal"
-                    android:textColor="#000000"
-                    android:hint="Selling Price"/>
+                    android:hint="Unit (e.g. pcs)" />
             </com.google.android.material.textfield.TextInputLayout>
         </LinearLayout>
 
@@ -151,29 +148,12 @@
             app:boxStrokeColor="@color/colorPrimary"
             android:layout_marginBottom="15dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/expiryDateET"
+                android:id="@+id/sellingPriceET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="date"
+                android:inputType="numberDecimal"
                 android:textColor="#000000"
-                android:hint="Expiry Date (DD/MM/YYYY)"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            android:layout_marginBottom="15dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/minStockET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:textColor="#000000"
-                android:hint="Critical Level (Notification)"/>
+                android:hint="Selling Price" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -185,32 +165,16 @@
             app:boxStrokeColor="@color/colorPrimary"
             android:layout_marginBottom="25dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/quantityET"
+                android:id="@+id/expiryDateET"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
+                android:inputType="date"
                 android:textColor="#000000"
-                android:hint="Initial Quantity"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            android:layout_marginBottom="15dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/unitET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="#000000"
-                android:hint="Unit (e.g. pcs)"/>
+                android:hint="Expiry Date (optional, DD/MM/YYYY)" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:weightSum="2"
@@ -218,22 +182,23 @@
 
             <Button
                 android:id="@+id/addBtn"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="60dp"
                 android:text="Add to Inventory"
                 android:textColor="#FFFFFF"
-                android:layout_marginRight="40dp"
-                android:backgroundTint="@color/colorPrimary"/>
+                android:layout_marginRight="8dp"
+                android:backgroundTint="@color/colorPrimary" />
 
             <Button
                 android:id="@+id/cancelBtn"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="60dp"
                 android:text="Cancel"
                 android:textColor="#FFFFFF"
-                android:layout_marginLeft="5dp"
-                android:backgroundTint="@color/colorPrimary"/>
-
+                android:layout_marginLeft="8dp"
+                android:backgroundTint="@color/colorPrimary" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

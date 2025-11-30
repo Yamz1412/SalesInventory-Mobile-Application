@@ -24,7 +24,7 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CategoryManagementActivity extends AppCompatActivity {
+public class CategoryManagementActivity extends BaseActivity  {
 
     private RecyclerView recyclerView;
     private CategoryAdapter adapter;

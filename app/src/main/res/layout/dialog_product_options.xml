@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvOptionProductName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Product"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/tvOptionProductPrice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="₱0.00"
+            android:textSize="14sp"
+            android:textColor="@color/textColorSecondary"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Size"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginBottom="4dp" />
+
+        <RadioGroup
+            android:id="@+id/rgSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbSizeSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Small" />
+
+            <RadioButton
+                android:id="@+id/rbSizeMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Medium"
+                android:layout_marginStart="8dp" />
+
+            <RadioButton
+                android:id="@+id/rbSizeLarge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Large"
+                android:layout_marginStart="8dp" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Add-ons"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <CheckBox
+                android:id="@+id/cbAddonExtraShot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Extra Shot" />
+
+            <CheckBox
+                android:id="@+id/cbAddonWhippedCream"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Whipped Cream" />
+
+            <CheckBox
+                android:id="@+id/cbAddonSyrup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Syrup" />
+        </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layoutOptionQty"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="Quantity">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etOptionQty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/btnOptionCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cancel" />
+
+            <Button
+                android:id="@+id/btnOptionAddToCart"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add to Cart"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

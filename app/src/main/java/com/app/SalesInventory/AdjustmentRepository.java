@@ -2,10 +2,13 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 import android.util.Log;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -64,15 +67,19 @@ public class AdjustmentRepository {
         }
         Map<String, Object> adjustmentMap = convertAdjustmentToMap(adjustment);
         adjustmentMap.put("timestamp", firestoreManager.getServerTimestamp());
-        firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).add(adjustmentMap).addOnSuccessListener(documentReference -> {
-            String adjustmentId = documentReference.getId();
-            adjustment.setId(adjustmentId);
-            listener.onAdjustmentAdded(adjustmentId);
-            Log.d(TAG, "Adjustment added: " + adjustmentId);
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Error adding adjustment", e);
-            listener.onError(e.getMessage());
-        });
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserAdjustmentsPath())
+                .add(adjustmentMap)
+                .addOnSuccessListener(documentReference -> {
+                    String adjustmentId = documentReference.getId();
+                    adjustment.setId(adjustmentId);
+                    listener.onAdjustmentAdded(adjustmentId);
+                    Log.d(TAG, "Adjustment added: " + adjustmentId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error adding adjustment", e);
+                    listener.onError(e.getMessage());
+                });
     }
 
     public void updateAdjustment(Adjustment adjustment, OnAdjustmentUpdatedListener listener) {
@@ -85,13 +92,18 @@ public class AdjustmentRepository {
             return;
         }
         Map<String, Object> adjustmentMap = convertAdjustmentToMap(adjustment);
-        firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).document(adjustment.getId()).update(adjustmentMap).addOnSuccessListener(aVoid -> {
-            listener.onAdjustmentUpdated();
-            Log.d(TAG, "Adjustment updated: " + adjustment.getId());
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Error updating adjustment", e);
-            listener.onError(e.getMessage());
-        });
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserAdjustmentsPath())
+                .document(adjustment.getId())
+                .update(adjustmentMap)
+                .addOnSuccessListener(aVoid -> {
+                    listener.onAdjustmentUpdated();
+                    Log.d(TAG, "Adjustment updated: " + adjustment.getId());
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating adjustment", e);
+                    listener.onError(e.getMessage());
+                });
     }
 
     public void deleteAdjustment(String adjustmentId, OnAdjustmentDeletedListener listener) {
@@ -99,13 +111,18 @@ public class AdjustmentRepository {
             listener.onError("User not authenticated");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).document(adjustmentId).delete().addOnSuccessListener(aVoid -> {
-            listener.onAdjustmentDeleted();
-            Log.d(TAG, "Adjustment deleted: " + adjustmentId);
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Error deleting adjustment", e);
-            listener.onError(e.getMessage());
-        });
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserAdjustmentsPath())
+                .document(adjustmentId)
+                .delete()
+                .addOnSuccessListener(aVoid -> {
+                    listener.onAdjustmentDeleted();
+                    Log.d(TAG, "Adjustment deleted: " + adjustmentId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error deleting adjustment", e);
+                    listener.onError(e.getMessage());
+                });
     }
 
     public void getAdjustmentsByProduct(String productId, OnAdjustmentsFetchedListener listener) {
@@ -113,20 +130,25 @@ public class AdjustmentRepository {
             listener.onError("User not authenticated");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).whereEqualTo("productId", productId).get().addOnSuccessListener(snapshot -> {
-            List<Adjustment> adjustments = new ArrayList<>();
-            for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                Adjustment adjustment = doc.toObject(Adjustment.class);
-                if (adjustment != null) {
-                    adjustment.setId(doc.getId());
-                    adjustments.add(adjustment);
-                }
-            }
-            listener.onAdjustmentsFetched(adjustments);
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Error fetching adjustments by product", e);
-            listener.onError(e.getMessage());
-        });
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserAdjustmentsPath())
+                .whereEqualTo("productId", productId)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<Adjustment> adjustments = new ArrayList<>();
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Adjustment adjustment = doc.toObject(Adjustment.class);
+                        if (adjustment != null) {
+                            adjustment.setId(doc.getId());
+                            adjustments.add(adjustment);
+                        }
+                    }
+                    listener.onAdjustmentsFetched(adjustments);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error fetching adjustments by product", e);
+                    listener.onError(e.getMessage());
+                });
     }
 
     public void getAdjustmentsByType(String type, OnAdjustmentsFetchedListener listener) {
@@ -134,29 +156,34 @@ public class AdjustmentRepository {
             listener.onError("User not authenticated");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).whereEqualTo("type", type).get().addOnSuccessListener(snapshot -> {
-            List<Adjustment> adjustments = new ArrayList<>();
-            for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                Adjustment adjustment = doc.toObject(Adjustment.class);
-                if (adjustment != null) {
-                    adjustment.setId(doc.getId());
-                    adjustments.add(adjustment);
-                }
-            }
-            listener.onAdjustmentsFetched(adjustments);
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Error fetching adjustments by type", e);
-            listener.onError(e.getMessage());
-        });
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserAdjustmentsPath())
+                .whereEqualTo("reason", type)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<Adjustment> adjustments = new ArrayList<>();
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Adjustment adjustment = doc.toObject(Adjustment.class);
+                        if (adjustment != null) {
+                            adjustment.setId(doc.getId());
+                            adjustments.add(adjustment);
+                        }
+                    }
+                    listener.onAdjustmentsFetched(adjustments);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error fetching adjustments by type", e);
+                    listener.onError(e.getMessage());
+                });
     }
 
     private Map<String, Object> convertAdjustmentToMap(Adjustment adjustment) {
         Map<String, Object> map = new HashMap<>();
         map.put("productId", adjustment.getProductId());
-        map.put("quantity", adjustment.getQuantity());
-        map.put("type", adjustment.getType());
+        map.put("productName", adjustment.getProductName());
+        map.put("quantityChange", adjustment.getQuantityChange());
         map.put("reason", adjustment.getReason());
-        map.put("date", adjustment.getDate());
+        map.put("timestamp", adjustment.getTimestamp());
         return map;
     }
 

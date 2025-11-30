@@ -7,16 +7,18 @@ import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
+
 import androidx.cardview.widget.CardView;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
 import com.google.android.material.button.MaterialButton;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -49,6 +51,7 @@ public class MainActivity extends BaseActivity {
     private DashboardViewModel viewModel;
     private AuthManager authManager;
     private ImageButton btnSettings;
+    private ImageButton btnProfile;
     private SwipeRefreshLayout swipeRefresh;
 
     @Override
@@ -92,6 +95,7 @@ public class MainActivity extends BaseActivity {
         tvLastUpdated = findViewById(R.id.tv_last_updated);
         authManager = AuthManager.getInstance();
         btnSettings = findViewById(R.id.btn_settings);
+        btnProfile = findViewById(R.id.btn_profile);
     }
 
     private void setupViewModel() {
@@ -139,6 +143,10 @@ public class MainActivity extends BaseActivity {
         if (btnSettings != null)
             btnSettings.setOnClickListener(v ->
                     startActivity(new Intent(this, SettingsActivity.class)));
+
+        if (btnProfile != null)
+            btnProfile.setOnClickListener(v ->
+                    startActivity(new Intent(this, Profile.class)));
 
         if (btnCreateSale != null)
             btnCreateSale.setOnClickListener(v ->

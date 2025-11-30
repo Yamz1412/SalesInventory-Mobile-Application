@@ -1,25 +1,22 @@
 package com.app.SalesInventory;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
 import android.os.Bundle;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
-
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class AdjustmentHistoryActivity extends AppCompatActivity {
@@ -36,11 +33,6 @@ public class AdjustmentHistoryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_adjustment_history);
 
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Stock Adjustment History");
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        }
-
         recyclerViewHistory = findViewById(R.id.recyclerViewHistory);
         progressBar = findViewById(R.id.progressBar);
         tvNoData = findViewById(R.id.tvNoData);
@@ -52,31 +44,32 @@ public class AdjustmentHistoryActivity extends AppCompatActivity {
 
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
 
-        loadAdjustmentHistory();
+        loadAdjustments();
     }
 
-    private void loadAdjustmentHistory() {
+    private void loadAdjustments() {
         progressBar.setVisibility(View.VISIBLE);
         tvNoData.setVisibility(View.GONE);
+        recyclerViewHistory.setVisibility(View.GONE);
 
-        Query query = adjustmentRef.orderByChild("timestamp");
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
+        adjustmentRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 adjustmentList.clear();
-
-                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
-                    StockAdjustment adjustment = dataSnapshot.getValue(StockAdjustment.class);
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    StockAdjustment adjustment = ds.getValue(StockAdjustment.class);
                     if (adjustment != null) {
                         adjustmentList.add(adjustment);
                     }
                 }
-
-                // Sort by timestamp in descending order (newest first)
-                Collections.reverse(adjustmentList);
+                Collections.sort(adjustmentList, new Comparator<StockAdjustment>() {
+                    @Override
+                    public int compare(StockAdjustment o1, StockAdjustment o2) {
+                        return Long.compare(o2.getTimestamp(), o1.getTimestamp());
+                    }
+                });
 
                 progressBar.setVisibility(View.GONE);
-
                 if (adjustmentList.isEmpty()) {
                     tvNoData.setVisibility(View.VISIBLE);
                     recyclerViewHistory.setVisibility(View.GONE);
@@ -90,16 +83,8 @@ public class AdjustmentHistoryActivity extends AppCompatActivity {
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(AdjustmentHistoryActivity.this,
-                        "Error loading history: " + error.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(AdjustmentHistoryActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    @Override
-    public boolean onSupportNavigateUp() {
-        onBackPressed();
-        return true;
     }
 }

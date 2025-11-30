@@ -2,9 +2,13 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+
 import com.google.firebase.firestore.DocumentSnapshot;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +20,11 @@ public class CategoryRepository {
     private FirestoreManager firestoreManager;
     private FirestoreSyncListener syncListener;
     private MutableLiveData<List<Category>> allCategories;
+
+    public interface CategoryListCallback {
+        void onSuccess(List<Category> categories);
+        void onError(String error);
+    }
 
     private CategoryRepository(Application application) {
         this.firestoreManager = FirestoreManager.getInstance();
@@ -43,6 +52,9 @@ public class CategoryRepository {
                     Category category = document.toObject(Category.class);
                     if (category != null) {
                         category.setCategoryId(document.getId());
+                        if (category.getType() == null || category.getType().isEmpty()) {
+                            category.setType("Raw");
+                        }
                         categoryList.add(category);
                     }
                 }
@@ -56,6 +68,36 @@ public class CategoryRepository {
         return allCategories;
     }
 
+    public void getAllCategories(@NonNull CategoryListCallback callback) {
+        if (!firestoreManager.isUserAuthenticated()) {
+            callback.onError("User not authenticated");
+            return;
+        }
+        firestoreManager.getDb()
+                .collection(firestoreManager.getUserCategoriesPath())
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<Category> list = new ArrayList<>();
+                    if (snapshot != null) {
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            Category category = document.toObject(Category.class);
+                            if (category != null) {
+                                category.setCategoryId(document.getId());
+                                if (category.getType() == null || category.getType().isEmpty()) {
+                                    category.setType("Raw");
+                                }
+                                list.add(category);
+                            }
+                        }
+                    }
+                    callback.onSuccess(list);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading categories", e);
+                    callback.onError(e.getMessage() != null ? e.getMessage() : "Failed to load categories");
+                });
+    }
+
     public void addCategory(Category category, OnCategoryAddedListener listener) {
         if (!firestoreManager.isUserAuthenticated()) {
             listener.onError("User not authenticated");
@@ -66,10 +108,12 @@ public class CategoryRepository {
             return;
         }
         Map<String, Object> categoryMap = new HashMap<>();
-        categoryMap.put("name", category.getCategoryName());
+        categoryMap.put("categoryName", category.getCategoryName());
         categoryMap.put("description", category.getDescription() != null ? category.getDescription() : "");
         categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
-        categoryMap.put("createdAt", firestoreManager.getServerTimestamp());
+        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Raw");
+        categoryMap.put("active", category.isActive());
+        categoryMap.put("timestamp", firestoreManager.getServerTimestamp());
         firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath()).add(categoryMap)
                 .addOnSuccessListener(documentReference -> {
                     String categoryId = documentReference.getId();
@@ -93,9 +137,11 @@ public class CategoryRepository {
             return;
         }
         Map<String, Object> categoryMap = new HashMap<>();
-        categoryMap.put("name", category.getCategoryName());
+        categoryMap.put("categoryName", category.getCategoryName());
         categoryMap.put("description", category.getDescription() != null ? category.getDescription() : "");
         categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
+        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Raw");
+        categoryMap.put("active", category.isActive());
         firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath())
                 .document(category.getCategoryId())
                 .update(categoryMap)
@@ -140,6 +186,9 @@ public class CategoryRepository {
                         Category category = documentSnapshot.toObject(Category.class);
                         if (category != null) {
                             category.setCategoryId(documentSnapshot.getId());
+                            if (category.getType() == null || category.getType().isEmpty()) {
+                                category.setType("Raw");
+                            }
                             listener.onCategoryFetched(category);
                             return;
                         }

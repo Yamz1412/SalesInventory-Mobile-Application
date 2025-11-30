@@ -2,10 +2,12 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 import android.graphics.Color;
+
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -18,6 +20,7 @@ import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -59,20 +62,18 @@ public class DashboardViewModel extends AndroidViewModel {
 
     public void loadDashboardData() {
         isLoading.setValue(true);
-        executorService.execute(() -> {
-            try {
-                repository.getDashboardMetrics(new DashboardRepository.OnMetricsLoadedListener() {
-                    @Override
-                    public void onMetricsLoaded(DashboardMetrics metrics) {
-                        dashboardMetrics.postValue(metrics);
-                        isLoading.postValue(false);
-                    }
-                });
-            } catch (Exception e) {
-                errorMessage.postValue("Error loading dashboard: " + e.getMessage());
-                isLoading.postValue(false);
-            }
-        });
+        try {
+            repository.getDashboardMetrics(new DashboardRepository.OnMetricsLoadedListener() {
+                @Override
+                public void onMetricsLoaded(DashboardMetrics metrics) {
+                    dashboardMetrics.postValue(metrics);
+                    isLoading.postValue(false);
+                }
+            });
+        } catch (Exception e) {
+            errorMessage.postValue("Error loading dashboard: " + e.getMessage());
+            isLoading.postValue(false);
+        }
     }
 
     public void loadRecentActivities() {

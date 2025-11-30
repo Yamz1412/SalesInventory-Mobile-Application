@@ -1,7 +1,6 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -20,8 +19,10 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import java.util.HashMap;
+import java.util.Map;
 
-public class SignInActivity extends AppCompatActivity {
+public class SignInActivity extends BaseActivity  {
 
     EditText Email, Password;
     ProgressBar progressBar;
@@ -66,6 +67,7 @@ public class SignInActivity extends AppCompatActivity {
                                     Boolean approved = doc.getBoolean("approved");
                                     if (approved == null) approved = false;
                                     if (approved) {
+                                        applyRemoteTheme(doc);
                                         Intent intent = new Intent(getApplicationContext(), MainActivity.class);
                                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                         startActivity(intent);
@@ -82,6 +84,21 @@ public class SignInActivity extends AppCompatActivity {
                     }
                 }
             });
+        }
+    }
+
+    private void applyRemoteTheme(DocumentSnapshot doc) {
+        if (doc == null) return;
+        String themeName = doc.getString("themeName");
+        Long primary = doc.getLong("primaryColor");
+        Long secondary = doc.getLong("secondaryColor");
+        Long accent = doc.getLong("accentColor");
+        ThemeManager tm = ThemeManager.getInstance(this);
+        if (themeName != null && !themeName.isEmpty()) {
+            tm.setCurrentTheme(themeName);
+        }
+        if (primary != null && secondary != null && accent != null) {
+            tm.setCustomColors(primary.intValue(), secondary.intValue(), accent.intValue());
         }
     }
 
@@ -127,6 +144,7 @@ public class SignInActivity extends AppCompatActivity {
                                                     } else {
                                                         prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
                                                     }
+                                                    applyRemoteTheme(doc);
                                                     Intent intent = new Intent(getApplicationContext(), MainActivity.class);
                                                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                                     startActivity(intent);

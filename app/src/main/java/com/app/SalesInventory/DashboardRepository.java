@@ -1,8 +1,11 @@
 package com.app.SalesInventory;
 
-import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MediatorLiveData;
+
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -12,6 +15,10 @@ public class DashboardRepository {
     private ProductRepository productRepository;
     private AlertRepository alertRepository;
 
+    private final MediatorLiveData<DashboardMetrics> metricsLiveData = new MediatorLiveData<>();
+    private boolean metricsSourcesAdded = false;
+    private DashboardRepository.OnMetricsLoadedListener metricsListener;
+
     public DashboardRepository() {
         salesRepository = SalesRepository.getInstance();
         productRepository = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
@@ -19,28 +26,54 @@ public class DashboardRepository {
     }
 
     public void getDashboardMetrics(OnMetricsLoadedListener listener) {
-        salesRepository.getTotalSalesToday().observeForever(totalSales -> {
-            productRepository.getAllProducts().observeForever(products -> {
-                alertRepository.getUnreadAlerts().observeForever(lowStockAlerts -> {
-                    salesRepository.getTotalMonthlyRevenue().observeForever(revenue -> {
-                        double inventoryValue = 0;
-                        if (products != null) {
-                            for (Product p : products) {
-                                inventoryValue += (p.getQuantity() * p.getCostPrice());
-                            }
-                        }
-                        DashboardMetrics metrics = new DashboardMetrics(
-                                totalSales != null ? totalSales : 0.0,
-                                inventoryValue,
-                                lowStockAlerts != null ? lowStockAlerts.size() : 0,
-                                0,
-                                revenue != null ? revenue : 0.0
-                        );
-                        listener.onMetricsLoaded(metrics);
-                    });
-                });
+        metricsListener = listener;
+
+        LiveData<Double> totalSalesLive = salesRepository.getTotalSalesToday();
+        LiveData<List<Product>> productsLive = productRepository.getAllProducts();
+        LiveData<List<Alert>> alertsLive = alertRepository.getUnreadAlerts();
+        LiveData<Double> revenueLive = salesRepository.getTotalMonthlyRevenue();
+
+        if (!metricsSourcesAdded) {
+            metricsSourcesAdded = true;
+            metricsLiveData.addSource(totalSalesLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
+            metricsLiveData.addSource(productsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
+            metricsLiveData.addSource(alertsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
+            metricsLiveData.addSource(revenueLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
+
+            metricsLiveData.observeForever(metrics -> {
+                if (metrics != null && metricsListener != null) {
+                    metricsListener.onMetricsLoaded(metrics);
+                }
             });
-        });
+        }
+
+        recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive);
+    }
+
+    private void recomputeMetrics(LiveData<Double> totalSalesLive,
+                                  LiveData<List<Product>> productsLive,
+                                  LiveData<List<Alert>> alertsLive,
+                                  LiveData<Double> revenueLive) {
+        Double totalSales = totalSalesLive.getValue();
+        List<Product> products = productsLive.getValue();
+        List<Alert> alerts = alertsLive.getValue();
+        Double revenue = revenueLive.getValue();
+
+        double inventoryValue = 0;
+        if (products != null) {
+            for (Product p : products) {
+                inventoryValue += (p.getQuantity() * p.getCostPrice());
+            }
+        }
+
+        DashboardMetrics metrics = new DashboardMetrics(
+                totalSales != null ? totalSales : 0.0,
+                inventoryValue,
+                alerts != null ? alerts.size() : 0,
+                0,
+                revenue != null ? revenue : 0.0
+        );
+        metricsLiveData.setValue(metrics);
     }
 
     public void getRecentActivities(int limit, OnActivitiesLoadedListener listener) {

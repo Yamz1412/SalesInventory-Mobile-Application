@@ -41,7 +41,7 @@ public class SellAdapter extends ArrayAdapter<Product> {
             nameTV.setText(p.getProductName());
             codeTV.setText(p.getProductId() != null ? p.getProductId() : "");
             amountTV.setText(String.valueOf(p.getQuantity()));
-            priceTV.setText("P " + String.format("%.2f", p.getSellingPrice()));
+            priceTV.setText("₱ " + String.format("%.2f", p.getSellingPrice()));
             if (p.getBarcode() != null && !p.getBarcode().isEmpty()) {
                 lotTV.setText(p.getBarcode());
                 lotTV.setVisibility(View.VISIBLE);

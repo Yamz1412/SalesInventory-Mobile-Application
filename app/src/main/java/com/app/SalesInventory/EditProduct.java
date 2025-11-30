@@ -7,7 +7,7 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
 
-public class EditProduct extends AppCompatActivity {
+public class EditProduct extends BaseActivity  {
     private EditText productNameET, costPriceET, sellingPriceET, quantityET, unitET, minStockET;
     private Spinner categorySpinner;
     private Button updateBtn, cancelBtn;

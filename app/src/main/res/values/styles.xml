@@ -1,7 +1,157 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Base application theme. -->
+    <style name="AppTheme_Light" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@color/primary</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorSecondaryVariant">@color/accent_primary</item>
+        <item name="colorAccent">@color/accent_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:colorBackground">@color/dashboard_background</item>
+    </style>
+
+    <style name="AppTheme_Dark" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="colorPrimary">@android:color/white</item>
+        <item name="colorPrimaryVariant">@android:color/white</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorSecondaryVariant">@color/accent_primary</item>
+        <item name="colorAccent">@color/accent_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/black</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@android:color/white</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="android:colorBackground">@android:color/black</item>
+    </style>
+
+    <style name="AppTheme_Ocean" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/blue</item>
+        <item name="android:statusBarColor">@color/blue</item>
+        <item name="android:navigationBarColor">@color/blue</item>
+        <item name="colorPrimary">@color/blue</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorSecondary">@color/info_primary</item>
+        <item name="colorSecondaryVariant">@color/info_primary</item>
+        <item name="colorAccent">@color/info_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@android:color/white</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="android:colorBackground">@color/blue</item>
+    </style>
+
+    <style name="AppTheme_Forest" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/success_primary</item>
+        <item name="android:statusBarColor">@color/success_primary</item>
+        <item name="android:navigationBarColor">@color/success_primary</item>
+        <item name="colorPrimary">@color/success_primary</item>
+        <item name="colorPrimaryVariant">@color/success_primary</item>
+        <item name="colorSecondary">@color/warning_light</item>
+        <item name="colorSecondaryVariant">@color/warning_light</item>
+        <item name="colorAccent">@color/warning_light</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/black</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@android:color/white</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="android:colorBackground">@color/success_primary</item>
+    </style>
+
+    <style name="AppTheme_Sunset" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/orange</item>
+        <item name="android:statusBarColor">@color/orange</item>
+        <item name="android:navigationBarColor">@color/orange</item>
+        <item name="colorPrimary">@color/orange</item>
+        <item name="colorPrimaryVariant">@color/warning_primary</item>
+        <item name="colorSecondary">@color/warning_primary</item>
+        <item name="colorSecondaryVariant">@color/warning_primary</item>
+        <item name="colorAccent">@color/warning_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@android:color/white</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="android:colorBackground">@color/orange</item>
+    </style>
+
+    <style name="AppTheme_Purple" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowBackground">@color/purple_700</item>
+        <item name="android:statusBarColor">@color/purple_700</item>
+        <item name="android:navigationBarColor">@color/purple_700</item>
+        <item name="colorPrimary">@color/purple_700</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorSecondary">@color/accent_primary</item>
+        <item name="colorSecondaryVariant">@color/accent_primary</item>
+        <item name="colorAccent">@color/accent_primary</item>
+        <item name="colorError">@color/status_failed</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnError">@android:color/white</item>
+        <item name="colorOnBackground">@android:color/white</item>
+        <item name="colorOnSurface">@android:color/white</item>
+        <item name="android:colorBackground">@color/purple_700</item>
+    </style>
+
+    <style name="AppTheme" parent="AppTheme_Light" />
+
+    <style name="DashboardCard">
+        <item name="android:layout_margin">8dp</item>
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">4dp</item>
+        <item name="cardBackgroundColor">?android:colorBackground</item>
+    </style>
+
+    <!-- Quick Actions buttons: WHITE background, theme-primary text and icon -->
+    <style name="DashboardButton" parent="Widget.MaterialComponents.Button">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:layout_margin">6dp</item>
+        <item name="backgroundTint">@android:color/white</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+    </style>
+
+    <style name="CustomTextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">?attr/colorPrimary</item>
+        <item name="boxStrokeWidth">2dp</item>
+        <item name="boxStrokeErrorColor">@color/status_failed</item>
+        <item name="hintTextColor">?attr/colorPrimary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+    </style>
+
+    <style name="CustomButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:textColor">@android:color/white</item>
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <!-- Manage Users: outlined, readable on all themes -->
+    <style name="CustomButtonOutlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:textColor">?attr/colorOnBackground</item>
+        <item name="strokeColor">?attr/colorOnBackground</item>
+        <item name="strokeWidth">2dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+    </style>
+
     <style name="Theme.SalesInventory" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
@@ -16,57 +166,4 @@
         <item name="android:statusBarColor">@color/primary</item>
         <item name="android:navigationBarColor">@android:color/white</item>
     </style>
-
-    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="android:windowBackground">@color/white</item>
-        <item name="android:statusBarColor">@color/primary</item>
-        <item name="colorAccent">@color/accent_primary</item>
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorPrimaryVariant">@color/primary_dark</item>
-        <item name="colorSecondary">@color/accent_primary</item>
-        <item name="colorSecondaryVariant">@color/accent_primary</item>
-        <item name="colorError">@color/status_failed</item>
-        <item name="colorOnPrimary">@android:color/white</item>
-        <item name="colorOnSecondary">@android:color/white</item>
-        <item name="colorOnError">@android:color/white</item>
-        <item name="colorOnBackground">@color/text_primary</item>
-        <item name="colorOnSurface">@color/text_primary</item>
-    </style>
-
-    <style name="DashboardCard">
-        <item name="android:layout_margin">8dp</item>
-        <item name="cardCornerRadius">12dp</item>
-        <item name="cardElevation">4dp</item>
-    </style>
-
-    <style name="DashboardButton" parent="Widget.MaterialComponents.Button">
-        <item name="cornerRadius">16dp</item>
-        <item name="android:textColor">@android:color/white</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:padding">8dp</item>
-        <item name="android:layout_margin">6dp</item>
-        <item name="backgroundTint">@color/primary</item>
-    </style>
-
-    <style name="CustomTextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-        <item name="boxStrokeColor">@color/primary</item>
-        <item name="boxStrokeWidth">2dp</item>
-        <item name="boxStrokeErrorColor">@color/status_failed</item>
-        <item name="hintTextColor">@color/primary</item>
-        <item name="android:textColorHint">@color/text_secondary</item>
-    </style>
-
-    <style name="CustomButton" parent="Widget.MaterialComponents.Button">
-        <item name="android:textColor">@android:color/white</item>
-        <item name="backgroundTint">@color/primary</item>
-        <item name="cornerRadius">12dp</item>
-    </style>
-
-    <style name="CustomButtonOutlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
-        <item name="android:textColor">@color/primary</item>
-        <item name="strokeColor">@color/primary</item>
-        <item name="strokeWidth">2dp</item>
-        <item name="cornerRadius">12dp</item>
-    </style>
-
 </resources>

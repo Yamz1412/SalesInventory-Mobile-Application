@@ -21,7 +21,7 @@ import com.google.firebase.firestore.QuerySnapshot;
 import java.util.HashMap;
 import java.util.Map;
 
-public class SignUpActivity extends AppCompatActivity {
+public class SignUpActivity extends BaseActivity  {
     private static final int TERMS_REQUEST_CODE = 101;
     private TextInputEditText mName;
     private TextInputEditText mEmail;
@@ -157,6 +157,7 @@ public class SignUpActivity extends AppCompatActivity {
                 String uid = createdUser.getUid();
                 boolean autoApprove = creatingAdmin && !anyAdminExists;
                 Map<String, Object> profile = new HashMap<>();
+                profile.put("photoUrl", createdUser.getPhotoUrl() != null ? createdUser.getPhotoUrl().toString() : "");
                 profile.put("uid", uid);
                 profile.put("email", createdUser.getEmail() != null ? createdUser.getEmail() : "");
                 profile.put("name", name);

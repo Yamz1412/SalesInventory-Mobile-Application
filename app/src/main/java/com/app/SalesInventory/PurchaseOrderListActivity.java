@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class PurchaseOrderListActivity extends AppCompatActivity {
+public class PurchaseOrderListActivity extends BaseActivity  {
 
     private RecyclerView recyclerView;
     private PurchaseOrderAdapter adapter;

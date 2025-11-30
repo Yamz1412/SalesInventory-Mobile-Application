@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@color/white">
+    android:background="?android:colorBackground">
 
     <TextView
         android:layout_width="match_parent"
@@ -12,7 +12,7 @@
         android:text="Settings"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="@color/black"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="24dp" />
 
     <LinearLayout
@@ -29,7 +29,7 @@
             android:text="Select Theme"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="12dp" />
 
         <Spinner
@@ -54,7 +54,7 @@
             android:text="Customize Colors"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="12dp" />
 
         <LinearLayout
@@ -68,7 +68,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Primary Color:"
-                android:textColor="@color/colorPrimary"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="14sp"
                 android:gravity="center_vertical" />
 
@@ -165,33 +165,32 @@
         android:layout_marginBottom="28dp">
 
         <View
+            android:id="@+id/previewPrimary"
             android:layout_width="0dp"
             android:layout_height="80dp"
             android:layout_weight="1"
-            android:background="@color/colorPrimary"
-            android:id="@+id/previewPrimary" />
+            android:background="@color/colorPrimary" />
 
         <View
+            android:id="@+id/previewSecondary"
             android:layout_width="0dp"
             android:layout_height="80dp"
             android:layout_weight="1"
-            android:background="@color/textColorSecondary"
-            android:id="@+id/previewSecondary" />
+            android:background="@color/textColorSecondary" />
 
         <View
+            android:id="@+id/previewAccent"
             android:layout_width="0dp"
             android:layout_height="80dp"
             android:layout_weight="1"
-            android:background="@color/colorAccent"
-            android:id="@+id/previewAccent" />
+            android:background="@color/colorAccent" />
 
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:spacing="8dp">
+        android:orientation="horizontal">
 
         <Button
             android:id="@+id/resetThemeBtn"

@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class StockValueReportActivity extends AppCompatActivity {
+public class StockValueReportActivity extends BaseActivity  {
 
     private RecyclerView recyclerViewReport;
     private ProgressBar progressBar;

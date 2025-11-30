@@ -19,8 +19,12 @@ public class Product {
     private long dateAdded;
     private String addedBy;
     private boolean isActive;
+    private String productType;
+    private long expiryDate;
 
     public Product() {
+        this.productType = "Raw";
+        this.expiryDate = 0L;
     }
 
     public Product(long localId, String productId, String productName, String categoryId, String categoryName, String description, double costPrice, double sellingPrice, int quantity, int reorderLevel, int criticalLevel, int ceilingLevel, String unit, String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
@@ -42,6 +46,8 @@ public class Product {
         this.dateAdded = dateAdded;
         this.addedBy = addedBy;
         this.isActive = isActive;
+        this.productType = "Raw";
+        this.expiryDate = 0L;
     }
 
     public long getLocalId() {
@@ -186,6 +192,22 @@ public class Product {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public String getProductType() {
+        return productType == null || productType.isEmpty() ? "Raw" : productType;
+    }
+
+    public void setProductType(String productType) {
+        this.productType = productType;
+    }
+
+    public long getExpiryDate() {
+        return expiryDate;
+    }
+
+    public void setExpiryDate(long expiryDate) {
+        this.expiryDate = expiryDate;
     }
 
     public boolean isCriticalStock() {

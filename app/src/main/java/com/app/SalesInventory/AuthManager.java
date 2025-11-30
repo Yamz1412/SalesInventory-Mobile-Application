@@ -42,6 +42,19 @@ public class AuthManager {
         return instance;
     }
 
+    public FirebaseUser getCurrentUser() {
+        return auth.getCurrentUser();
+    }
+
+    public String getCurrentUserId() {
+        FirebaseUser u = auth.getCurrentUser();
+        return u == null ? null : u.getUid();
+    }
+
+    public FirebaseFirestore getFirestore() {
+        return fStore;
+    }
+
     public boolean isCurrentUserAdminByAdminCollection() {
         FirebaseUser u = auth.getCurrentUser();
         if (u == null) return false;

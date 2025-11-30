@@ -1,5 +1,6 @@
 package com.app.SalesInventory;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.View;
@@ -12,7 +13,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Inventory extends AppCompatActivity {
+public class Inventory extends BaseActivity  {
     private RecyclerView productsRecyclerView;
     private SearchView searchView;
     private TextView emptyStateTV;
@@ -21,24 +22,31 @@ public class Inventory extends AppCompatActivity {
     private List<Product> filteredProducts = new ArrayList<>();
     private ProductRepository productRepository;
     private AuthManager authManager;
+    private Button btnAdjustStock;
+    private Button btnAdjustmentHistory;
+    private Button btnAdjustmentSummary;
+    private Button batchBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            setContentView(R.layout.activity_inventory_land);
-        } else {
-            setContentView(R.layout.activity_inventory);
-        }
+        setContentView(R.layout.activity_inventory);
+
         authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
+
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
+        batchBtn = findViewById(R.id.btnBatchOperation);
+        btnAdjustStock = findViewById(R.id.btn_adjust_stock);
+        btnAdjustmentHistory = findViewById(R.id.btn_adjustment_history);
+        btnAdjustmentSummary = findViewById(R.id.btn_adjustment_summary);
+
         productAdapter = new ProductAdapter(filteredProducts, this);
-        productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 1));
+        productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 2));
         productsRecyclerView.setAdapter(productAdapter);
-        Button batchBtn = findViewById(R.id.btnBatchOperation);
+
         if (batchBtn != null) {
             if (!authManager.isCurrentUserAdmin()) {
                 batchBtn.setVisibility(View.GONE);
@@ -46,6 +54,19 @@ public class Inventory extends AppCompatActivity {
                 batchBtn.setVisibility(View.VISIBLE);
             }
         }
+
+        if (!authManager.isCurrentUserAdmin()) {
+            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+            if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.GONE);
+            if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.GONE);
+        } else {
+            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
+            if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.VISIBLE);
+            if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.VISIBLE);
+        }
+
+        setupAdjustmentButtons();
+
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 allProducts = new ArrayList<>(products);
@@ -54,18 +75,35 @@ public class Inventory extends AppCompatActivity {
                 updateEmptyState();
             }
         });
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
                 filterProducts(query);
                 return false;
             }
+
             @Override
             public boolean onQueryTextChange(String newText) {
                 filterProducts(newText);
                 return false;
             }
         });
+    }
+
+    private void setupAdjustmentButtons() {
+        if (btnAdjustStock != null) {
+            btnAdjustStock.setOnClickListener(v ->
+                    startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
+        }
+        if (btnAdjustmentHistory != null) {
+            btnAdjustmentHistory.setOnClickListener(v ->
+                    startActivity(new Intent(Inventory.this, AdjustmentHistoryActivity.class)));
+        }
+        if (btnAdjustmentSummary != null) {
+            btnAdjustmentSummary.setOnClickListener(v ->
+                    startActivity(new Intent(Inventory.this, AdjustmentSummaryReportActivity.class)));
+        }
     }
 
     private void filterProducts(String query) {
@@ -75,7 +113,8 @@ public class Inventory extends AppCompatActivity {
         } else {
             String q = query.toLowerCase();
             for (Product p : allProducts) {
-                if (p.getProductName().toLowerCase().contains(q) || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q))) {
+                if (p.getProductName().toLowerCase().contains(q)
+                        || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q))) {
                     filteredProducts.add(p);
                 }
             }

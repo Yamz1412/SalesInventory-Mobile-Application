@@ -3,8 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:background="@color/backgroundColor">
+    app:cardBackgroundColor="?android:colorBackground">
 
     <LinearLayout
         android:id="@+id/llStats"
@@ -107,14 +108,14 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:queryHint="Search products..."
-            android:background="@drawable/search_background"/>
+            android:background="@drawable/search_background" />
 
         <Button
             android:id="@+id/btnBatchOperation"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Batch"
-            android:layout_marginStart="8dp"/>
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
     <ProgressBar
@@ -139,10 +140,45 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/productsRecyclerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:padding="8dp"
         android:clipToPadding="false"
         tools:listitem="@layout/item_inventory"
-        tools:itemCount="3" />
+        tools:itemCount="2" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <Button
+            android:id="@+id/btn_adjust_stock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Adjust Stock"
+            android:textColor="@color/white"
+            app:cardBackgroundColor="?android:colorBackground" />
+
+        <Button
+            android:id="@+id/btn_adjustment_history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Adjustment History"
+            android:textColor="@color/white"
+            app:cardBackgroundColor="?android:colorBackground"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btn_adjustment_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Adjustment Summary Report"
+            android:textColor="@color/white"
+            app:cardBackgroundColor="?android:colorBackground"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
 
 </LinearLayout>

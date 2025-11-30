@@ -17,8 +17,18 @@ public class Category {
         this.categoryName = categoryName;
         this.description = description;
         this.timestamp = timestamp;
-        this.type = "Inventory";
+        this.type = "Raw";
         this.active = true;
+    }
+
+    public Category(String categoryId, String categoryName, String description, long timestamp, String type, boolean active, String color) {
+        this.categoryId = categoryId;
+        this.categoryName = categoryName;
+        this.description = description;
+        this.timestamp = timestamp;
+        this.type = type == null || type.isEmpty() ? "Raw" : type;
+        this.active = active;
+        this.color = color;
     }
 
     public String getCategoryId() {
@@ -30,7 +40,7 @@ public class Category {
     }
 
     public String getCategoryName() {
-        return categoryName;
+        return categoryName == null ? "" : categoryName;
     }
 
     public void setCategoryName(String categoryName) {
@@ -38,7 +48,7 @@ public class Category {
     }
 
     public String getDescription() {
-        return description;
+        return description == null ? "" : description;
     }
 
     public void setDescription(String description) {
@@ -54,7 +64,7 @@ public class Category {
     }
 
     public String getColor() {
-        return color;
+        return color == null ? "" : color;
     }
 
     public void setColor(String color) {
@@ -62,7 +72,7 @@ public class Category {
     }
 
     public String getType() {
-        return type;
+        return type == null || type.isEmpty() ? "Raw" : type;
     }
 
     public void setType(String type) {
@@ -75,5 +85,13 @@ public class Category {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public String getId() {
+        return getCategoryId();
+    }
+
+    public String getName() {
+        return getCategoryName();
     }
 }

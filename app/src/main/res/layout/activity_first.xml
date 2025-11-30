@@ -45,8 +45,8 @@
         android:onClick="OpenSingUp"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="@color/white"
-        android:backgroundTint="#FFFFFF"
+        android:textColor="?attr/colorOnPrimary"
         style="?android:attr/borderlessButtonStyle"
-        android:background="@drawable/edite_round"/>
+        android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorPrimary" />
 </LinearLayout>

@@ -163,6 +163,7 @@ public class SalesRepository {
         map.put("price", sale.getPrice());
         map. put("totalPrice", sale.getTotalPrice());
         map.put("paymentMethod", sale.getPaymentMethod() != null ? sale.getPaymentMethod() : "");
+        map.put("paymentReference", sale.getPaymentReference() != null ? sale.getPaymentReference() : "");
         map.put("date", sale.getDate() > 0 ? sale.getDate() : System.currentTimeMillis());
         map.put("timestamp", firestoreManager.getServerTimestamp());
         firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).add(map). addOnSuccessListener((DocumentReference documentReference) -> {
