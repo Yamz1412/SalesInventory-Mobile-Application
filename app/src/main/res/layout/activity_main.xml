@@ -230,7 +230,7 @@
                                 android:layout_width="24dp"
                                 android:layout_height="24dp"
                                 android:src="@drawable/ic_warning"
-                                app:tint="@android:color/white" />
+                                app:tint="@android:color/holo_red_dark" />
 
                             <TextView
                                 android:layout_width="0dp"
@@ -238,7 +238,7 @@
                                 android:layout_weight="1"
                                 android:text="@string/low_stock_items"
                                 android:textSize="12sp"
-                                android:textColor="@android:color/white"
+                                android:textColor="@android:color/darker_gray"
                                 android:layout_marginStart="8dp" />
 
                         </LinearLayout>
@@ -250,7 +250,7 @@
                             android:text="0"
                             android:textSize="28sp"
                             android:textStyle="bold"
-                            android:textColor="@android:color/white" />
+                            android:textColor="@android:color/darker_gray" />
 
                     </LinearLayout>
 

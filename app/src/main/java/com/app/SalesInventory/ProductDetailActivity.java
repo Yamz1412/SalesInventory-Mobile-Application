@@ -59,11 +59,13 @@ public class ProductDetailActivity extends BaseActivity {
         }
 
         AuthManager authManager = AuthManager.getInstance();
-        if (authManager.isCurrentUserAdmin()) {
-            layoutAdminButtons.setVisibility(View.VISIBLE);
-        } else {
-            layoutAdminButtons.setVisibility(View.GONE);
-        }
+        authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
+            if (authManager.isCurrentUserAdmin()) {
+                layoutAdminButtons.setVisibility(View.VISIBLE);
+            } else {
+                layoutAdminButtons.setVisibility(View.GONE);
+            }
+        }));
 
         btnEdit.setOnClickListener(v -> {
             if (currentProduct == null) return;

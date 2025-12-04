@@ -67,7 +67,12 @@ public class DashboardRepository {
 
         if (products != null) {
             for (Product p : products) {
+                if (p == null || !p.isActive()) continue;
+                String type = p.getProductType() == null ? "" : p.getProductType();
+                if ("Menu".equalsIgnoreCase(type)) continue;
+
                 inventoryValue += (p.getQuantity() * p.getCostPrice());
+
                 if (p.isCriticalStock() || p.isLowStock()) {
                     lowOrCriticalCount++;
                 }

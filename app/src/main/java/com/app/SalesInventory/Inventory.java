@@ -31,7 +31,6 @@ public class Inventory extends BaseActivity {
     private Button btnAdjustStock;
     private Button btnAdjustmentHistory;
     private Button btnAdjustmentSummary;
-    private Button batchBtn;
     private Spinner spinnerCategoryFilter;
     private String currentSearchQuery = "";
     private String currentCategoryFilter = "All";
@@ -39,6 +38,8 @@ public class Inventory extends BaseActivity {
     private ProductRepository.OnCriticalStockListener criticalListener;
     private boolean showLowStockOnly = false;
     private boolean showNearExpiryOnly = false;
+    private TextView tvTotalCount;
+    private TextView tvLowStockWarning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,11 +52,12 @@ public class Inventory extends BaseActivity {
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
-        batchBtn = findViewById(R.id.btnBatchOperation);
         btnAdjustStock = findViewById(R.id.btn_adjust_stock);
         btnAdjustmentHistory = findViewById(R.id.btn_adjustment_history);
         btnAdjustmentSummary = findViewById(R.id.btn_adjustment_summary);
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
+        tvTotalCount = findViewById(R.id.TotalCountTV);
+        tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
 
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
@@ -64,29 +66,25 @@ public class Inventory extends BaseActivity {
         productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
         productsRecyclerView.setAdapter(productAdapter);
 
-        if (batchBtn != null) {
-            if (!authManager.isCurrentUserAdmin()) {
-                batchBtn.setVisibility(View.GONE);
+        authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
+            boolean isAdmin = authManager.isCurrentUserAdmin();
+            if (isAdmin) {
+                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
+                if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.VISIBLE);
+                if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.VISIBLE);
             } else {
-                batchBtn.setVisibility(View.VISIBLE);
+                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+                if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.GONE);
+                if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.GONE);
             }
-        }
-
-        if (!authManager.isCurrentUserAdmin()) {
-            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
-            if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.GONE);
-            if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.GONE);
-        } else {
-            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
-            if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.VISIBLE);
-            if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.VISIBLE);
-        }
+        }));
 
         setupAdjustmentButtons();
 
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 allProducts = new ArrayList<>(products);
+                updateHeaderStats();
                 setupCategoryFilterSpinner();
                 applyFilters();
             }
@@ -194,11 +192,8 @@ public class Inventory extends BaseActivity {
             if (!matchesSearch || !matchesCategory) continue;
 
             if (showLowStockOnly) {
-                int qty = p.getQuantity();
-                int critical = p.getCriticalLevel();
-                int reorder = p.getReorderLevel();
-                boolean isCritical = critical > 0 && qty <= critical;
-                boolean isLow = !isCritical && reorder > 0 && qty <= reorder;
+                boolean isCritical = p.isCriticalStock();
+                boolean isLow = p.isLowStock();
                 if (!isCritical && !isLow) continue;
             }
 
@@ -208,8 +203,7 @@ public class Inventory extends BaseActivity {
                 long now = System.currentTimeMillis();
                 long diffMillis = expiry - now;
                 long days = diffMillis / (24L * 60L * 60L * 1000L);
-                if (diffMillis <= 0) {
-                } else if (days > 7) {
+                if (diffMillis > 0 && days > 7) {
                     continue;
                 }
             }
@@ -218,6 +212,31 @@ public class Inventory extends BaseActivity {
         }
         productAdapter.updateProducts(filteredProducts);
         updateEmptyState();
+    }
+
+    private void updateHeaderStats() {
+        int total = 0;
+        int lowOrCritical = 0;
+        for (Product p : allProducts) {
+            if (p == null || !p.isActive()) continue;
+            String type = p.getProductType() == null ? "" : p.getProductType();
+            if ("Menu".equalsIgnoreCase(type)) continue;
+            total++;
+            if (p.isCriticalStock() || p.isLowStock()) {
+                lowOrCritical++;
+            }
+        }
+        if (tvTotalCount != null) {
+            tvTotalCount.setText(String.valueOf(total));
+        }
+        if (tvLowStockWarning != null) {
+            if (lowOrCritical > 0) {
+                tvLowStockWarning.setText(lowOrCritical + " alerts");
+                tvLowStockWarning.setVisibility(View.VISIBLE);
+            } else {
+                tvLowStockWarning.setVisibility(View.GONE);
+            }
+        }
     }
 
     private void updateEmptyState() {

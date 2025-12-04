@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
@@ -30,6 +31,7 @@ public class SettingsActivity extends BaseActivity {
     private LinearLayout colorPreviewLayout;
     private TextView primaryColorTV, secondaryColorTV, accentColorTV;
     private Button btnBackup, btnRestore;
+    private View previewPrimary, previewSecondary, previewAccent;
 
     private ThemeManager themeManager;
     private int currentPrimary, currentSecondary, currentAccent;
@@ -63,6 +65,9 @@ public class SettingsActivity extends BaseActivity {
         accentColorTV = findViewById(R.id.accentColorTV);
         btnBackup = findViewById(R.id.btnBackup);
         btnRestore = findViewById(R.id.btnRestore);
+        previewPrimary = findViewById(R.id.previewPrimary);
+        previewSecondary = findViewById(R.id.previewSecondary);
+        previewAccent = findViewById(R.id.previewAccent);
         setupThemeSpinner();
     }
 
@@ -105,8 +110,32 @@ public class SettingsActivity extends BaseActivity {
                 themeNames[i] = raw.substring(0, 1).toUpperCase() + raw.substring(1);
             }
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, themeNames);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.item_theme_spinner, themeNames) {
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View v = super.getView(position, convertView, parent);
+                TextView tv = v.findViewById(R.id.tvThemeName);
+                int bg = themeManager.getPrimaryColor();
+                int textColor = getReadableTextColor(bg);
+                v.setBackgroundColor(bg);
+                tv.setTextColor(textColor);
+                return v;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
+                View v = getLayoutInflater().inflate(R.layout.item_theme_spinner_dropdown, parent, false);
+                TextView tv = v.findViewById(R.id.tvThemeName);
+                tv.setText(getItem(position));
+                int bg = themeManager.getSecondaryColor();
+                int textColor = getReadableTextColor(bg);
+                v.setBackgroundColor(bg);
+                tv.setTextColor(textColor);
+                return v;
+            }
+        };
+
         themeSpinner.setAdapter(adapter);
 
         ThemeManager.Theme currentTheme = themeManager.getCurrentTheme();
@@ -170,18 +199,28 @@ public class SettingsActivity extends BaseActivity {
 
         applyBtn.setOnClickListener(v -> applyTheme());
 
-        btnBackup.setOnClickListener(v -> {
-            backupLauncher.launch("sales_inventory_backup.db");
-        });
+        btnBackup.setOnClickListener(v -> backupLauncher.launch("sales_inventory_backup.db"));
 
-        btnRestore.setOnClickListener(v -> {
-            restoreLauncher.launch("*/*");
-        });
+        btnRestore.setOnClickListener(v -> restoreLauncher.launch("*/*"));
     }
 
     private void openColorPicker(ThemeColorPicker.OnColorSelectedListener listener) {
         ThemeColorPicker colorPicker = new ThemeColorPicker(this, listener);
         colorPicker.show();
+    }
+
+    private int getReadableTextColor(int bg) {
+        double r = android.graphics.Color.red(bg) / 255.0;
+        double g = android.graphics.Color.green(bg) / 255.0;
+        double b = android.graphics.Color.blue(bg) / 255.0;
+        double luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        return luminance > 0.5 ? android.graphics.Color.BLACK : android.graphics.Color.WHITE;
+    }
+
+    private void tintButton(Button b, int bgColor) {
+        if (b == null) return;
+        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(bgColor));
+        b.setTextColor(getReadableTextColor(bgColor));
     }
 
     private void updateColorPreview() {
@@ -191,6 +230,24 @@ public class SettingsActivity extends BaseActivity {
         primaryColorTV.setText(String.format("#%06X", currentPrimary & 0xFFFFFF));
         secondaryColorTV.setText(String.format("#%06X", currentSecondary & 0xFFFFFF));
         accentColorTV.setText(String.format("#%06X", currentAccent & 0xFFFFFF));
+        primaryColorTV.setTextColor(getReadableTextColor(currentPrimary));
+        secondaryColorTV.setTextColor(getReadableTextColor(currentSecondary));
+        accentColorTV.setTextColor(getReadableTextColor(currentAccent));
+
+        if (previewPrimary != null) previewPrimary.setBackgroundColor(currentPrimary);
+        if (previewSecondary != null) previewSecondary.setBackgroundColor(currentSecondary);
+        if (previewAccent != null) previewAccent.setBackgroundColor(currentAccent);
+
+        int btnPrimaryColor = currentPrimary;
+        int btnSecondaryColor = ContextCompat.getColor(this, R.color.colorPrimary);
+
+        tintButton(customPrimaryBtn, btnPrimaryColor);
+        tintButton(customSecondaryBtn, btnPrimaryColor);
+        tintButton(customAccentBtn, btnPrimaryColor);
+        tintButton(resetThemeBtn, btnSecondaryColor);
+        tintButton(applyBtn, btnPrimaryColor);
+        tintButton(btnBackup, btnPrimaryColor);
+        tintButton(btnRestore, btnPrimaryColor);
     }
 
     private void applyTheme() {
@@ -200,7 +257,6 @@ public class SettingsActivity extends BaseActivity {
                 selectedTheme == ThemeManager.Theme.FOREST ||
                 selectedTheme == ThemeManager.Theme.SUNSET ||
                 selectedTheme == ThemeManager.Theme.PURPLE) {
-
             themeManager.setCurrentTheme(selectedTheme.name);
         } else {
             themeManager.setCustomColors(currentPrimary, currentSecondary, currentAccent);

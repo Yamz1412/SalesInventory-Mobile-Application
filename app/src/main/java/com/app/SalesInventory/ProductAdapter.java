@@ -64,7 +64,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         if (p == null) return;
 
         holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
-        holder.category.setText(p.getCategoryName() != null ? p.getCategoryName() : "");
 
         int qty = p.getQuantity();
         holder.quantityText.setText("Stock: " + qty);
@@ -180,7 +179,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
     static class VH extends RecyclerView.ViewHolder {
         TextView name;
-        TextView category;
         TextView quantityText;
         TextView costPriceText;
         TextView stockText;
@@ -193,7 +191,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             super(itemView);
             productImage = itemView.findViewById(R.id.ivProductImage);
             name = itemView.findViewById(R.id.tvProductName);
-            category = itemView.findViewById(R.id.tvCategory);
             quantityText = itemView.findViewById(R.id.tvQuantity);
             costPriceText = itemView.findViewById(R.id.tvCostPrice);
             stockText = itemView.findViewById(R.id.tvStock);

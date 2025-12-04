@@ -7,7 +7,6 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -55,11 +54,12 @@ public class LowStockItemsActivity extends BaseActivity {
             if (products != null) {
                 for (Product p : products) {
                     if (p == null || !p.isActive()) continue;
-                    int qty = p.getQuantity();
-                    int reorder = p.getReorderLevel();
-                    int critical = p.getCriticalLevel();
-                    boolean isCritical = critical > 0 && qty <= critical;
-                    boolean isLow = !isCritical && reorder > 0 && qty <= reorder;
+                    String type = p.getProductType() == null ? "" : p.getProductType();
+                    if ("Menu".equalsIgnoreCase(type)) continue;
+
+                    boolean isCritical = p.isCriticalStock();
+                    boolean isLow = p.isLowStock();
+
                     if (isCritical || isLow) {
                         lowStockList.add(p);
                     }

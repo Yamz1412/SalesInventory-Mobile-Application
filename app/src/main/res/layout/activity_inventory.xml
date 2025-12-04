@@ -110,13 +110,6 @@
             android:queryHint="Search products..."
             android:background="@drawable/search_background" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnBatchOperation"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Batch"
-            android:layout_marginStart="8dp"
-            style="@style/CustomButtonOutlined" />
     </LinearLayout>
 
     <LinearLayout

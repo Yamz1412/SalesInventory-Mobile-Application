@@ -50,67 +50,19 @@
                 android:id="@+id/tvStockInfo"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Stock: 0 | Reorder: 0"
+                android:text="Stock: 0 | Reorder: 0 | Critical: 0"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/tvCurrentStock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/tvCurrentStock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/errorRed" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
-
-                <ImageButton
-                    android:id="@+id/btnDecreaseQty"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/bg_circle_gray"
-                    android:src="@drawable/ic_remove"
-                    app:tint="@color/text_primary" />
-
-                <TextView
-                    android:id="@+id/tvAdjustQty"
-                    android:layout_width="40dp"
-                    android:layout_height="32dp"
-                    android:gravity="center"
-                    android:text="0"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary" />
-
-                <ImageButton
-                    android:id="@+id/btnIncreaseQty"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/bg_circle_gray"
-                    android:src="@drawable/ic_add"
-                    app:tint="@color/text_primary" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/tvNewStock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="New: 0"
-                android:textSize="12sp"
-                android:textColor="@color/successGreen"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
+            android:text="0"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/errorRed" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

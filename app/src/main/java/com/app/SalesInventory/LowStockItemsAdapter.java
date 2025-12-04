@@ -1,24 +1,20 @@
 package com.app.SalesInventory;
 
-import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 
 import java.util.List;
-import java.util.Locale;
 
 public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdapter.VH> {
 
@@ -48,13 +44,12 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
 
         holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
         holder.category.setText(p.getCategoryName() != null ? p.getCategoryName() : "");
+
         int qty = p.getQuantity();
         int reorder = p.getReorderLevel();
         int critical = p.getCriticalLevel();
         holder.stockInfo.setText("Stock: " + qty + " | Reorder: " + reorder + " | Critical: " + critical);
         holder.currentStock.setText(String.valueOf(qty));
-        holder.adjustQty.setText("0");
-        holder.newStock.setText("New: " + qty);
 
         String imageUrl = p.getImageUrl();
         String imagePath = p.getImagePath();
@@ -80,71 +75,6 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
             i.putExtra("productId", p.getProductId());
             ctx.startActivity(i);
         });
-
-        holder.itemView.setOnLongClickListener(v -> {
-            if (!authManager.isCurrentUserAdmin()) return true;
-            new AlertDialog.Builder(ctx)
-                    .setTitle("Delete Product")
-                    .setMessage("Delete " + p.getProductName() + "?")
-                    .setPositiveButton("Delete", (dialog, which) -> repository.deleteProduct(p.getProductId(), new ProductRepository.OnProductDeletedListener() {
-                        @Override
-                        public void onProductDeleted() {
-                        }
-
-                        @Override
-                        public void onError(String error) {
-                        }
-                    }))
-                    .setNegativeButton("Cancel", null)
-                    .show();
-            return true;
-        });
-
-        holder.btnIncrease.setOnClickListener(v -> {
-            int adj = parseIntSafe(holder.adjustQty.getText().toString()) + 1;
-            holder.adjustQty.setText(String.valueOf(adj));
-            int newQty = qty + adj;
-            holder.newStock.setText("New: " + newQty);
-        });
-
-        holder.btnDecrease.setOnClickListener(v -> {
-            int adj = parseIntSafe(holder.adjustQty.getText().toString());
-            if (adj > 0) adj--;
-            holder.adjustQty.setText(String.valueOf(adj));
-            int newQty = qty + adj;
-            holder.newStock.setText("New: " + newQty);
-        });
-
-        holder.newStock.setOnClickListener(v -> {
-            int adj = parseIntSafe(holder.adjustQty.getText().toString());
-            int newQty = qty + adj;
-            if (adj == 0) return;
-            repository.updateProductQuantity(p.getProductId(), Math.max(0, newQty), new ProductRepository.OnProductUpdatedListener() {
-                @Override
-                public void onProductUpdated() {
-                    p.setQuantity(Math.max(0, newQty));
-                    if (ctx instanceof Activity) {
-                        ((Activity) ctx).runOnUiThread(() -> {
-                            holder.currentStock.setText(String.valueOf(p.getQuantity()));
-                            holder.adjustQty.setText("0");
-                            holder.newStock.setText("New: " + p.getQuantity());
-                        });
-                    }
-                }
-
-                @Override
-                public void onError(String error) {
-                }
-            });
-        });
-    }
-
-    private int parseIntSafe(String s) {
-        try {
-            return Integer.parseInt(s.trim());
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     @Override
@@ -158,10 +88,6 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
         TextView category;
         TextView stockInfo;
         TextView currentStock;
-        TextView adjustQty;
-        TextView newStock;
-        ImageButton btnIncrease;
-        ImageButton btnDecrease;
 
         VH(@NonNull View itemView) {
             super(itemView);
@@ -170,10 +96,6 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
             category = itemView.findViewById(R.id.tvCategory);
             stockInfo = itemView.findViewById(R.id.tvStockInfo);
             currentStock = itemView.findViewById(R.id.tvCurrentStock);
-            adjustQty = itemView.findViewById(R.id.tvAdjustQty);
-            newStock = itemView.findViewById(R.id.tvNewStock);
-            btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
-            btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
         }
     }
 }
