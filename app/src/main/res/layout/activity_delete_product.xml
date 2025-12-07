@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -8,7 +10,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Select Item to Delete"
+        android:text="Select Item to Delete / Archived Items"
         android:padding="20dp"
         android:background="#D32F2F"
         android:textColor="#FFFFFF"
@@ -47,7 +49,7 @@
         android:id="@+id/emptyStateTV"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No products found"
+        android:text="No archived items"
         android:textSize="16sp"
         android:textColor="@color/textColorSecondary"
         android:gravity="center"
@@ -60,16 +62,18 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:padding="10dp"
+        tools:listitem="@layout/item_archived_product"
+        tools:itemCount="3"
         android:clipToPadding="false"/>
 
     <Button
-        android:id="@+id/sellBtnD"
+        android:id="@+id/btn_refresh_archives"
         android:layout_width="match_parent"
         android:layout_height="60dp"
         android:layout_margin="16dp"
-        android:text="Delete Selected Item"
+        android:text="Refresh"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:backgroundTint="#D32F2F"
-        android:drawablePadding="10dp"/>
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="@android:color/white"/>
 </LinearLayout>

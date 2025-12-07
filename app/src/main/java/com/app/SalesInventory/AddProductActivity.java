@@ -17,18 +17,15 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.Toast;
-
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
-
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -44,6 +41,7 @@ public class AddProductActivity extends BaseActivity {
     private TextInputEditText quantityET;
     private TextInputEditText costPriceET;
     private TextInputEditText minStockET;
+    private TextInputEditText floorLevelET;
     private TextInputEditText unitET;
     private TextInputEditText expiryDateET;
     private Button addBtn;
@@ -57,10 +55,10 @@ public class AddProductActivity extends BaseActivity {
     private AuthManager authManager;
     private SimpleDateFormat expiryFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
     private List<Category> categoryList = new ArrayList<>();
+    private List<Category> availableCategories = new ArrayList<>();
     private DatabaseReference categoryRef;
     private String selectedImagePath;
     private Calendar expiryCalendar = Calendar.getInstance();
-
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<String> permissionLauncher;
 
@@ -68,7 +66,6 @@ public class AddProductActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_product);
-
         authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
         btnAddPhoto = findViewById(R.id.btnAddPhoto);
@@ -77,6 +74,7 @@ public class AddProductActivity extends BaseActivity {
         quantityET = findViewById(R.id.quantityET);
         costPriceET = findViewById(R.id.costPriceET);
         minStockET = findViewById(R.id.minStockET);
+        floorLevelET = findViewById(R.id.floorLevelET);
         unitET = findViewById(R.id.unitET);
         expiryDateET = findViewById(R.id.expiryDateET);
         addBtn = findViewById(R.id.addBtn);
@@ -86,21 +84,18 @@ public class AddProductActivity extends BaseActivity {
         rbInventory = findViewById(R.id.rbInventory);
         rbMenu = findViewById(R.id.rbMenu);
         layoutBuyingUnitQtyCritical = findViewById(R.id.layout_buying_unit_qty_critical);
-
         rbInventory.setChecked(true);
-
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
         setupCategorySpinner();
         setupImagePickers();
-
-        rgProductType.setOnCheckedChangeListener((group, checkedId) -> updateLayoutForSelectedType());
-
+        rgProductType.setOnCheckedChangeListener((group, checkedId) -> {
+            updateLayoutForSelectedType();
+            filterCategoriesByType();
+        });
         addBtn.setOnClickListener(v -> attemptAdd());
         cancelBtn.setOnClickListener(v -> finish());
         btnAddPhoto.setOnClickListener(v -> tryPickImage());
-
         expiryDateET.setOnClickListener(v -> showExpiryDatePicker());
-
         updateLayoutForSelectedType();
     }
 
@@ -112,27 +107,52 @@ public class AddProductActivity extends BaseActivity {
                 for (DataSnapshot child : snapshot.getChildren()) {
                     Category c = child.getValue(Category.class);
                     if (c != null && c.getCategoryName() != null && !c.getCategoryName().isEmpty() && c.isActive()) {
+                        if (c.getType() == null || c.getType().isEmpty()) {
+                            c.setType("Inventory");
+                        }
                         temp.add(c);
                     }
                 }
                 categoryList.clear();
                 categoryList.addAll(temp);
-
-                List<String> names = new ArrayList<>();
-                for (Category c : categoryList) {
-                    names.add(c.getCategoryName());
-                }
-
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(AddProductActivity.this, R.layout.spinner_item, names);
-                adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-                categorySpinner.setAdapter(adapter);
+                filterCategoriesByType();
             }
-
             @Override
             public void onCancelled(DatabaseError error) {
                 Toast.makeText(AddProductActivity.this, "Error loading categories: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void filterCategoriesByType() {
+        boolean wantMenu = rbMenu.isChecked();
+        List<String> names = new ArrayList<>();
+        availableCategories.clear();
+        for (Category c : categoryList) {
+            String type = c.getType();
+            if (type == null) type = "";
+            if (wantMenu) {
+                if ("Menu".equalsIgnoreCase(type)) {
+                    availableCategories.add(c);
+                    names.add(c.getCategoryName());
+                }
+            } else {
+                if (!"Menu".equalsIgnoreCase(type)) {
+                    availableCategories.add(c);
+                    names.add(c.getCategoryName());
+                }
+            }
+        }
+        if (names.isEmpty()) {
+            names.add("No categories");
+            categorySpinner.setEnabled(false);
+        } else {
+            categorySpinner.setEnabled(true);
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(AddProductActivity.this, R.layout.spinner_item, names);
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        categorySpinner.setAdapter(adapter);
+        categorySpinner.setSelection(0);
     }
 
     private void setupImagePickers() {
@@ -147,7 +167,6 @@ public class AddProductActivity extends BaseActivity {
                         }
                     }
                 });
-
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isGranted -> {
@@ -184,6 +203,7 @@ public class AddProductActivity extends BaseActivity {
             quantityET.setText("");
             costPriceET.setText("");
             minStockET.setText("");
+            floorLevelET.setText("");
             unitET.setText("");
         } else {
             layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
@@ -195,7 +215,6 @@ public class AddProductActivity extends BaseActivity {
         int year = now.get(Calendar.YEAR);
         int month = now.get(Calendar.MONTH);
         int day = now.get(Calendar.DAY_OF_MONTH);
-
         DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
             expiryCalendar.set(Calendar.YEAR, y);
             expiryCalendar.set(Calendar.MONTH, m);
@@ -213,44 +232,37 @@ public class AddProductActivity extends BaseActivity {
             Toast.makeText(this, "Product name is required", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!name.matches("[A-Za-z ]+")) {
-            Toast.makeText(this, "Product name must contain only letters and spaces", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         int checkedId = rgProductType.getCheckedRadioButtonId();
         if (checkedId != R.id.rbInventory && checkedId != R.id.rbMenu) {
             Toast.makeText(this, "Please select a product type", Toast.LENGTH_SHORT).show();
             return;
         }
-
+        boolean wantMenu = rbMenu.isChecked();
+        if (availableCategories.isEmpty()) {
+            Toast.makeText(this, "Please create/select a category for the chosen product type", Toast.LENGTH_SHORT).show();
+            return;
+        }
         int catIndex = categorySpinner.getSelectedItemPosition();
-        if (catIndex < 0 || catIndex >= categoryList.size()) {
+        if (catIndex < 0 || catIndex >= availableCategories.size()) {
             Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show();
             return;
         }
-        Category selectedCategory = categoryList.get(catIndex);
+        Category selectedCategory = availableCategories.get(catIndex);
         String categoryName = selectedCategory.getCategoryName();
         String categoryId = selectedCategory.getCategoryId();
-        String productType = checkedId == R.id.rbMenu ? "Menu" : "Raw";
-
+        String productType = wantMenu ? "Menu" : "Inventory";
         double sellingPrice = 0;
         double costPrice = 0;
         int qty = 0;
-        int criticalLevel = 0;
+        int criticalLevel = 1;
         int reorderLevel = 0;
+        int floorLevel = 1;
+        int ceilingLevel = 0;
         long expiryDate = 0L;
-
         try {
             sellingPrice = Double.parseDouble(sellingPriceET.getText() != null ? sellingPriceET.getText().toString() : "0");
         } catch (Exception ignored) {
         }
-
-        if ("Menu".equalsIgnoreCase(productType) && sellingPrice <= 0) {
-            Toast.makeText(this, "Selling price is required for menu items", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         String expiryStr = expiryDateET.getText() != null ? expiryDateET.getText().toString().trim() : "";
         if (!expiryStr.isEmpty()) {
             try {
@@ -263,12 +275,12 @@ public class AddProductActivity extends BaseActivity {
             } catch (ParseException ignored) {
             }
         }
-
         if ("Menu".equalsIgnoreCase(productType)) {
             costPrice = 0;
             qty = 0;
-            criticalLevel = 0;
+            criticalLevel = 1;
             reorderLevel = 0;
+            floorLevel = 0;
         } else {
             try {
                 costPrice = Double.parseDouble(costPriceET.getText() != null ? costPriceET.getText().toString() : "0");
@@ -279,19 +291,23 @@ public class AddProductActivity extends BaseActivity {
             } catch (Exception ignored) {
             }
             try {
-                criticalLevel = Integer.parseInt(minStockET.getText() != null ? minStockET.getText().toString() : "0");
+                reorderLevel = Integer.parseInt(minStockET.getText() != null ? minStockET.getText().toString() : "0");
             } catch (Exception ignored) {
             }
-            if (qty < 0) qty = 0;
-            if (criticalLevel < 0) criticalLevel = 0;
-            if (criticalLevel > 0) {
-                reorderLevel = criticalLevel;
-            } else {
-                reorderLevel = 0;
+            floorLevel = 1;
+            criticalLevel = 1;
+            try {
+                String floorStr = floorLevelET.getText() != null ? floorLevelET.getText().toString() : "";
+                if (!floorStr.isEmpty()) floorLevel = Integer.parseInt(floorStr);
+            } catch (Exception ignored) {
+                floorLevel = 1;
             }
+            if (floorLevel < 1) floorLevel = 1;
+            if (qty < 0) qty = 0;
+            if (reorderLevel < 0) reorderLevel = 0;
+            if (criticalLevel < 1) criticalLevel = 1;
             sellingPrice = 0;
         }
-
         Product p = new Product();
         p.setProductName(name);
         p.setCategoryName(categoryName);
@@ -302,7 +318,8 @@ public class AddProductActivity extends BaseActivity {
         p.setQuantity(qty);
         p.setCriticalLevel(criticalLevel);
         p.setReorderLevel(reorderLevel);
-        p.setCeilingLevel(0);
+        p.setCeilingLevel(ceilingLevel);
+        p.setFloorLevel(floorLevel);
         p.setUnit(unitET.getText() != null ? unitET.getText().toString().trim() : "");
         p.setExpiryDate(expiryDate);
         p.setSupplier("");
@@ -313,7 +330,6 @@ public class AddProductActivity extends BaseActivity {
         p.setActive(true);
         p.setBarcode("");
         p.setImagePath(selectedImagePath);
-
         productRepository.addProduct(p, selectedImagePath, new ProductRepository.OnProductAddedListener() {
             @Override
             public void onProductAdded(String productId) {
@@ -322,7 +338,6 @@ public class AddProductActivity extends BaseActivity {
                     finish();
                 });
             }
-
             @Override
             public void onError(String error) {
                 runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show());

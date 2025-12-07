@@ -1,8 +1,14 @@
 package com.app.SalesInventory;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class PurchaseOrder {
+    public static final String STATUS_PENDING = "PENDING";
+    public static final String STATUS_RECEIVED = "RECEIVED";
+    public static final String STATUS_CANCELLED = "CANCELLED";
+
     private String poId;
     private String poNumber;
     private String supplierName;
@@ -88,5 +94,30 @@ public class PurchaseOrder {
 
     public void setItems(List<POItem> items) {
         this.items = items;
+    }
+
+    public Map<String, Object> toMap() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("poId", this.poId);
+        m.put("poNumber", this.poNumber);
+        m.put("supplierName", this.supplierName);
+        m.put("supplierPhone", this.supplierPhone);
+        m.put("status", this.status);
+        m.put("orderDate", this.orderDate);
+        m.put("totalAmount", this.totalAmount);
+        m.put("items", this.items);
+        return m;
+    }
+
+    public boolean isReceived() {
+        return STATUS_RECEIVED.equalsIgnoreCase(this.status);
+    }
+
+    public boolean isPending() {
+        return STATUS_PENDING.equalsIgnoreCase(this.status);
+    }
+
+    public boolean isCancelled() {
+        return STATUS_CANCELLED.equalsIgnoreCase(this.status) || "CANCELED".equalsIgnoreCase(this.status);
     }
 }

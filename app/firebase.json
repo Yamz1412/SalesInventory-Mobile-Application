@@ -1,0 +1,8 @@
+{
+  "remoteconfig": {
+    "template": "sales-inventory-manageme-f2d7a"
+  },
+  "functions": {
+    "source": "functions"
+  }
+}

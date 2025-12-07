@@ -9,6 +9,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -71,10 +73,14 @@ public class CategoryManagementActivity extends BaseActivity  {
         EditText etCategoryName = dialogView.findViewById(R.id.etCategoryName);
         EditText etDescription = dialogView.findViewById(R.id.etDescription);
         SwitchMaterial switchActive = dialogView.findViewById(R.id.switchActive);
+        RadioGroup rgType = dialogView.findViewById(R.id.rgType);
+        RadioButton rbInventory = dialogView.findViewById(R.id.rbInventory);
+        RadioButton rbMenu = dialogView.findViewById(R.id.rbMenu);
         Button btnSave = dialogView.findViewById(R.id.btnSave);
         Button btnCancel = dialogView.findViewById(R.id.btnCancel);
         tvTitle.setText("Add Category");
         switchActive.setChecked(true);
+        rbInventory.setChecked(true);
         AlertDialog dialog = builder.create();
         btnSave.setOnClickListener(v -> {
             String name = etCategoryName.getText().toString().trim();
@@ -89,7 +95,7 @@ public class CategoryManagementActivity extends BaseActivity  {
                 return;
             }
             Category category = new Category(categoryId, name, description, System.currentTimeMillis());
-            category.setType("Inventory");
+            category.setType(rbMenu.isChecked() ? "Menu" : "Inventory");
             category.setActive(switchActive.isChecked());
             categoryRef.child(categoryId).setValue(category)
                     .addOnSuccessListener(aVoid -> {
@@ -110,6 +116,9 @@ public class CategoryManagementActivity extends BaseActivity  {
         EditText etCategoryName = dialogView.findViewById(R.id.etCategoryName);
         EditText etDescription = dialogView.findViewById(R.id.etDescription);
         SwitchMaterial switchActive = dialogView.findViewById(R.id.switchActive);
+        RadioGroup rgType = dialogView.findViewById(R.id.rgType);
+        RadioButton rbInventory = dialogView.findViewById(R.id.rbInventory);
+        RadioButton rbMenu = dialogView.findViewById(R.id.rbMenu);
         Button btnSave = dialogView.findViewById(R.id.btnSave);
         Button btnCancel = dialogView.findViewById(R.id.btnCancel);
         tvTitle.setText("Edit Category");
@@ -117,6 +126,11 @@ public class CategoryManagementActivity extends BaseActivity  {
         etDescription.setText(category.getDescription());
         switchActive.setChecked(category.isActive());
         btnSave.setText("Update");
+        if ("Menu".equalsIgnoreCase(category.getType())) {
+            rbMenu.setChecked(true);
+        } else {
+            rbInventory.setChecked(true);
+        }
         AlertDialog dialog = builder.create();
         btnSave.setOnClickListener(v -> {
             String name = etCategoryName.getText().toString().trim();
@@ -128,6 +142,7 @@ public class CategoryManagementActivity extends BaseActivity  {
             category.setCategoryName(name);
             category.setDescription(description);
             category.setActive(switchActive.isChecked());
+            category.setType(rbMenu.isChecked() ? "Menu" : "Inventory");
             categoryRef.child(category.getCategoryId()).setValue(category)
                     .addOnSuccessListener(aVoid -> {
                         Toast.makeText(CategoryManagementActivity.this, "Category updated successfully", Toast.LENGTH_SHORT).show();

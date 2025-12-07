@@ -1,5 +1,6 @@
 package com.app.SalesInventory;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -13,6 +14,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Shows stock alerts. If started with an "alertId" extra, will mark that alert as read automatically.
+ */
 public class StockAlertsActivity extends BaseActivity {
 
     private RecyclerView recyclerViewAlerts;
@@ -36,6 +40,15 @@ public class StockAlertsActivity extends BaseActivity {
         initializeViews();
         setupRecyclerView();
         loadStockAlerts();
+
+        // If launched from a notification with a specific alertId, mark it as read and optionally scroll to it
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("alertId")) {
+            String alertId = intent.getStringExtra("alertId");
+            if (alertId != null && !alertId.isEmpty()) {
+                markSingleAlertAsRead(alertId);
+            }
+        }
     }
 
     private void initializeViews() {
@@ -118,6 +131,21 @@ public class StockAlertsActivity extends BaseActivity {
                 tvLowStockCount.setText(String.valueOf(lowStockCount));
                 tvOverstockCount.setText(String.valueOf(overstockCount));
                 adapter.notifyDataSetChanged();
+            }
+        });
+    }
+
+    private void markSingleAlertAsRead(String alertId) {
+        if (alertId == null || alertId.isEmpty()) return;
+        alertRepository.markAlertAsRead(alertId, new AlertRepository.OnAlertUpdatedListener() {
+            @Override
+            public void onAlertUpdated() {
+                // nothing else required, observers will update UI and badge
+            }
+
+            @Override
+            public void onError(String error) {
+                // ignore or log
             }
         });
     }

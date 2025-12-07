@@ -100,7 +100,7 @@ public class Reports extends BaseActivity  {
 
     private void setupListeners() {
         btnSalesReport.setOnClickListener(v -> showSalesReport());
-        btnInventoryReport.setOnClickListener(v -> showInventoryReport());
+        btnInventoryReport.setOnClickListener(v -> startActivity(new Intent(Reports.this, InventoryReportsActivity.class)));
         btnComprehensiveReports.setOnClickListener(v -> {
             if (ensureWritePermission()) {
                 exportComprehensiveReports();
@@ -192,7 +192,8 @@ public class Reports extends BaseActivity  {
             for (Product p : productList) {
                 String dateStr = sdf.format(new Date(p.getDateAdded()));
                 double totalValue = p.getQuantity() * p.getSellingPrice();
-                reportItems.add(new ReportItem(p.getProductName(), dateStr, "Stock: " + p.getQuantity(), String.format(Locale.getDefault(), "₱%.2f", totalValue)));
+                String qtyStr = "Stock: " + p.getQuantity() + " | Floor: " + p.getFloorLevel();
+                reportItems.add(new ReportItem(p.getProductName(), dateStr, qtyStr, String.format(Locale.getDefault(), "₱%.2f", totalValue)));
             }
         }
         adapter.notifyDataSetChanged();
@@ -297,15 +298,16 @@ public class Reports extends BaseActivity  {
         FileWriter writer = null;
         try {
             writer = new FileWriter(file);
-            writer.append("Product Name,Category,Quantity,Selling Price,Total Value\n");
+            writer.append("Product Name,Category,Quantity,Floor Level,Selling Price,Total Value\n");
             if (productList != null) {
                 for (Product p : productList) {
                     String name = sanitizeForCsv(p.getProductName());
                     String category = sanitizeForCsv(p.getCategoryName() != null ? p.getCategoryName() : "");
                     int qty = p.getQuantity();
+                    int floor = p.getFloorLevel();
                     double price = p.getSellingPrice();
                     double total = qty * price;
-                    writer.append(String.format(Locale.getDefault(), "\"%s\",\"%s\",%d,%.2f,%.2f\n", name, category, qty, price, total));
+                    writer.append(String.format(Locale.getDefault(), "\"%s\",\"%s\",%d,%d,%.2f,%.2f\n", name, category, qty, floor, price, total));
                 }
             }
             writer.flush();
@@ -476,6 +478,7 @@ public class Reports extends BaseActivity  {
         coffee.setReorderLevel(5);
         coffee.setCeilingLevel(200);
         coffee.setCriticalLevel(5);
+        coffee.setFloorLevel(2);
         coffee.setDateAdded(now);
         coffee.setActive(true);
         productRef.child(coffee.getProductId()).setValue(coffee);
@@ -490,6 +493,7 @@ public class Reports extends BaseActivity  {
         tea.setReorderLevel(4);
         tea.setCeilingLevel(100);
         tea.setCriticalLevel(4);
+        tea.setFloorLevel(3);
         tea.setDateAdded(now);
         tea.setActive(true);
         productRef.child(tea.getProductId()).setValue(tea);
@@ -504,6 +508,7 @@ public class Reports extends BaseActivity  {
         bread.setReorderLevel(3);
         bread.setCeilingLevel(60);
         bread.setCriticalLevel(3);
+        bread.setFloorLevel(2);
         bread.setDateAdded(now);
         bread.setActive(true);
         productRef.child(bread.getProductId()).setValue(bread);

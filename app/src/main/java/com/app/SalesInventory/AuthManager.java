@@ -1,5 +1,6 @@
 package com.app.SalesInventory;
 
+
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -12,6 +13,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 import androidx.annotation.NonNull;
 
@@ -26,6 +28,7 @@ public class AuthManager {
     private FirebaseAuth auth;
     private volatile Boolean cachedIsAdmin = null;
     private volatile Boolean cachedIsApproved = null;
+    private volatile String cachedRole = null;
 
     public interface UsersCallback {
         void onComplete(List<AdminUserItem> users);
@@ -49,7 +52,7 @@ public class AuthManager {
         return instance;
     }
 
-    public FirebaseUser getCurrentUser() {
+    public com.google.firebase.auth.FirebaseUser getCurrentUser() {
         return auth.getCurrentUser();
     }
 
@@ -63,8 +66,7 @@ public class AuthManager {
     }
 
     public boolean isCurrentUserAdmin() {
-        if (cachedIsAdmin != null) return cachedIsAdmin;
-        return false;
+        return cachedRole != null && cachedRole.equalsIgnoreCase("Admin");
     }
 
     public boolean isCurrentUserApproved() {
@@ -72,11 +74,16 @@ public class AuthManager {
         return false;
     }
 
+    public String getCurrentUserRole() {
+        return cachedRole != null ? cachedRole : "Unknown";
+    }
+
     public void refreshCurrentUserStatus(@NonNull final SimpleCallback callback) {
         FirebaseUser u = auth.getCurrentUser();
         if (u == null) {
             cachedIsAdmin = false;
             cachedIsApproved = false;
+            cachedRole = "Unknown";
             callback.onComplete(false);
             return;
         }
@@ -91,6 +98,8 @@ public class AuthManager {
                 if (isAdminClaim) {
                     cachedIsAdmin = true;
                     cachedIsApproved = true;
+                    cachedRole = "Admin";
+                    FirestoreManager.getInstance().setBusinessOwnerId(u.getUid());
                     callback.onComplete(true);
                     return;
                 }
@@ -98,23 +107,34 @@ public class AuthManager {
                 fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> adminTask) {
+                        String foundRole = "Unknown";
+                        boolean resultAdmin = false;
+                        boolean adminApprovedFlag = false;
                         if (adminTask.isSuccessful() && adminTask.getResult() != null && adminTask.getResult().exists()) {
                             DocumentSnapshot adminDoc = adminTask.getResult();
                             String role = adminDoc.getString("role");
                             Boolean adminApproved = adminDoc.getBoolean("approved");
                             if (adminApproved == null) adminApproved = false;
+                            adminApprovedFlag = adminApproved;
                             if (role != null && role.equalsIgnoreCase("Admin") && adminApproved) {
-                                cachedIsAdmin = true;
-                                cachedIsApproved = true;
-                                callback.onComplete(true);
-                                return;
+                                foundRole = "Admin";
+                                resultAdmin = true;
                             }
+                        }
+                        if (resultAdmin) {
+                            cachedIsAdmin = true;
+                            cachedIsApproved = adminApprovedFlag;
+                            cachedRole = foundRole;
+                            FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                            callback.onComplete(true);
+                            return;
                         }
                         fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                             @Override
                             public void onComplete(@NonNull Task<DocumentSnapshot> userTask) {
                                 boolean result = false;
                                 boolean approvedFlag = false;
+                                String foundRole = "Unknown";
                                 if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
                                     DocumentSnapshot userDoc = userTask.getResult();
                                     String role = userDoc.getString("role");
@@ -122,12 +142,26 @@ public class AuthManager {
                                     Boolean approved = userDoc.getBoolean("approved");
                                     if (approved == null) approved = false;
                                     approvedFlag = approved;
-                                    if (role != null && "Admin".equalsIgnoreCase(role) && approved) {
-                                        result = true;
+                                    if (role != null && "Admin".equalsIgnoreCase(role)) {
+                                        foundRole = "Admin";
+                                        if (approved) result = true;
+                                    } else if (role != null && "Staff".equalsIgnoreCase(role)) {
+                                        foundRole = "Staff";
+                                    } else if (role != null) {
+                                        foundRole = role.trim();
                                     }
+                                    String ownerAdminId = userDoc.getString("ownerAdminId");
+                                    if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                                        FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
+                                    } else {
+                                        FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                                    }
+                                } else {
+                                    FirestoreManager.getInstance().setBusinessOwnerId(uid);
                                 }
                                 cachedIsAdmin = result;
                                 cachedIsApproved = approvedFlag;
+                                cachedRole = foundRole;
                                 callback.onComplete(result);
                             }
                         });
@@ -138,8 +172,8 @@ public class AuthManager {
     }
 
     public void isCurrentUserAdminAsync(@NonNull final SimpleCallback callback) {
-        if (cachedIsAdmin != null) {
-            callback.onComplete(cachedIsAdmin);
+        if (cachedRole != null && cachedRole.equalsIgnoreCase("Admin")) {
+            callback.onComplete(true);
             return;
         }
         refreshCurrentUserStatus(callback);
@@ -152,26 +186,49 @@ public class AuthManager {
             return;
         }
         final String uid = u.getUid();
-        fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+        fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
             @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if (!task.isSuccessful() || task.getResult() == null || !task.getResult().exists()) {
-                    callback.onComplete("Unknown");
-                    return;
+            public void onComplete(@NonNull Task<DocumentSnapshot> adminTask) {
+                if (adminTask.isSuccessful() && adminTask.getResult() != null && adminTask.getResult().exists()) {
+                    DocumentSnapshot adminDoc = adminTask.getResult();
+                    Boolean adminApproved = adminDoc.getBoolean("approved");
+                    String adminRole = adminDoc.getString("role");
+                    if (adminRole != null && adminRole.trim().equalsIgnoreCase("Admin") && adminApproved != null && adminApproved) {
+                        cachedRole = "Admin";
+                        FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                        callback.onComplete("Admin");
+                        return;
+                    }
                 }
-                DocumentSnapshot doc = task.getResult();
-                Boolean approved = doc.getBoolean("approved");
-                if (approved == null || !approved) {
-                    callback.onComplete("Unknown");
-                    return;
-                }
-                String role = doc.getString("role");
-                if (role == null) role = doc.getString("Role");
-                if (role == null) {
-                    callback.onComplete("Staff");
-                } else {
-                    callback.onComplete(role.trim());
-                }
+                fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<DocumentSnapshot> userTask) {
+                        String resolvedRole = "Unknown";
+                        if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
+                            DocumentSnapshot doc = userTask.getResult();
+                            Boolean approved = doc.getBoolean("approved");
+                            String role = doc.getString("role");
+                            if (role == null) role = doc.getString("Role");
+                            if (role != null && approved != null && approved) {
+                                resolvedRole = role.trim();
+                            } else if (role != null) {
+                                resolvedRole = role.trim();
+                            } else {
+                                resolvedRole = "Staff";
+                            }
+                            String ownerAdminId = doc.getString("ownerAdminId");
+                            if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                                FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
+                            } else {
+                                FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                            }
+                        } else {
+                            FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                        }
+                        cachedRole = resolvedRole;
+                        callback.onComplete(resolvedRole);
+                    }
+                });
             }
         });
     }
@@ -286,7 +343,7 @@ public class AuthManager {
                             callback.onComplete(false);
                             return;
                         }
-                        fStore.collection("admin").document(uid).set(adminData, SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
+                        fStore.collection("admin").document(uid).set(adminData, com.google.firebase.firestore.SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
                             @Override
                             public void onComplete(@NonNull Task<Void> setTask) {
                                 if (!setTask.isSuccessful()) {
@@ -296,7 +353,7 @@ public class AuthManager {
                                 Map<String, Object> updates = new HashMap<>();
                                 updates.put("role", "Admin");
                                 updates.put("approved", true);
-                                fStore.collection("users").document(uid).set(updates, SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
+                                fStore.collection("users").document(uid).set(updates, com.google.firebase.firestore.SetOptions.merge()).addOnCompleteListener(new OnCompleteListener<Void>() {
                                     @Override
                                     public void onComplete(@NonNull Task<Void> upd) {
                                         callback.onComplete(upd.isSuccessful());
@@ -336,6 +393,27 @@ public class AuthManager {
                         });
                     }
                 });
+            }
+        });
+    }
+
+    public void signOutAndCleanup(final Runnable onComplete) {
+        final String uid = getCurrentUserId();
+        final String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            String token = null;
+            if (task.isSuccessful()) token = task.getResult();
+            if (uid != null && token != null && !token.isEmpty()) {
+                fStore.collection("users").document(uid).collection("devices").document(token).delete();
+            }
+            if (owner != null && !owner.isEmpty()) {
+                FirebaseMessaging.getInstance().unsubscribeFromTopic("owner_" + owner).addOnCompleteListener(unsubTask -> {
+                    FirebaseAuth.getInstance().signOut();
+                    if (onComplete != null) onComplete.run();
+                });
+            } else {
+                FirebaseAuth.getInstance().signOut();
+                if (onComplete != null) onComplete.run();
             }
         });
     }

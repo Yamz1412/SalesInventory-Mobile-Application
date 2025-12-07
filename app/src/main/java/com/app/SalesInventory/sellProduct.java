@@ -33,6 +33,7 @@ import android.widget.Toast;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -281,6 +282,13 @@ public class sellProduct extends BaseActivity {
         finalTotal = subtotal - discountAmount;
         if (finalTotal < 0) finalTotal = 0;
         tvTotalPrice.setText("₱" + String.format(Locale.US, "%.2f", finalTotal));
+        BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
+        if (finalBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+            btnConfirmSale.setEnabled(false);
+            Toast.makeText(this, "Total exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
+        } else {
+            btnConfirmSale.setEnabled(true);
+        }
         calculateChange();
     }
 
@@ -292,23 +300,38 @@ public class sellProduct extends BaseActivity {
         }
         if (finalTotal <= 0) {
             tvChange.setText("Change: ₱0.00");
+            btnConfirmSale.setEnabled(false);
             return;
         }
         String cashStr = etCashGiven.getText() != null ? etCashGiven.getText().toString().trim() : "";
         if (cashStr.isEmpty()) {
             tvChange.setText("Change: ₱0.00");
+            btnConfirmSale.setEnabled(true);
             return;
         }
         try {
-            double cash = Double.parseDouble(cashStr);
+            BigDecimal cashBD = new BigDecimal(cashStr);
+            BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
+            if (!PaymentUtils.validatePayment(cashBD, finalBD)) {
+                tvChange.setText("Change: ₱0.00");
+                btnConfirmSale.setEnabled(false);
+                if (cashBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+                    Toast.makeText(this, "Cash exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
+                }
+                return;
+            }
+            double cash = cashBD.doubleValue();
             double change = cash - finalTotal;
             if (change < 0) {
                 tvChange.setText("Change: ₱0.00");
+                btnConfirmSale.setEnabled(false);
             } else {
                 tvChange.setText("Change: ₱" + String.format(Locale.US, "%.2f", change));
+                btnConfirmSale.setEnabled(true);
             }
         } catch (NumberFormatException e) {
             tvChange.setText("Change: ₱0.00");
+            btnConfirmSale.setEnabled(false);
         }
     }
 
@@ -603,6 +626,12 @@ public class sellProduct extends BaseActivity {
             return;
         }
 
+        BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
+        if (finalBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+            Toast.makeText(this, "Total exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         int deliveryChecked = rgDeliveryType.getCheckedRadioButtonId();
         boolean isDelivery = deliveryChecked == R.id.rbDelivery;
         String deliveryName = "";
@@ -642,15 +671,15 @@ public class sellProduct extends BaseActivity {
                 etCashGiven.setError("Enter cash amount");
                 return;
             }
-            double cash;
+            BigDecimal cashBD;
             try {
-                cash = Double.parseDouble(cashStr);
+                cashBD = new BigDecimal(cashStr);
             } catch (NumberFormatException e) {
                 etCashGiven.setError("Invalid amount");
                 return;
             }
-            if (cash < finalTotal) {
-                etCashGiven.setError("Cash is less than total");
+            if (!PaymentUtils.validatePayment(cashBD, BigDecimal.valueOf(finalTotal))) {
+                etCashGiven.setError("Invalid payment amount");
                 return;
             }
             saveSale("Cash", isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);

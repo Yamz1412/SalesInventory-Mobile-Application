@@ -7,45 +7,53 @@
     android:layout_marginBottom="8dp"
     android:background="@android:color/white">
 
+    <!-- Name -->
     <TextView
-        android:id="@+id/tvManageName"
+        android:id="@+id/tvStaffName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Full Name"
+        android:text="Staff Name"
         android:textStyle="bold"
-        android:textColor="@color/black" />
+        android:textColor="@color/black"
+        android:textSize="16sp" />
 
+    <!-- Email -->
     <TextView
-        android:id="@+id/tvManageEmail"
+        android:id="@+id/tvStaffEmail"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="email@example.com"
         android:textColor="@color/gray"
-        android:layout_marginTop="4dp" />
+        android:layout_marginTop="2dp"
+        android:textSize="14sp" />
 
+    <!-- Phone -->
+    <TextView
+        android:id="@+id/tvStaffPhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="+63 912 345 6789"
+        android:textColor="@color/gray"
+        android:layout_marginTop="2dp"
+        android:textSize="14sp" />
+
+    <!-- Optional: Role / status row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="8dp"
-        android:gravity="end">
+        android:layout_marginTop="6dp"
+        android:gravity="left">
 
         <TextView
-            android:id="@+id/tvManageStatus"
+            android:id="@+id/tvStaffRole"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Approved"
-            android:layout_marginEnd="12dp"
-            android:textColor="@color/black" />
+            android:text="Staff"
+            android:textColor="@color/black"
+            android:textStyle="italic" />
 
-        <Button
-            android:id="@+id/btnPromote"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Promote"
-            android:backgroundTint="@color/colorAccent"
-            android:textColor="@android:color/white" />
-
+        <!-- Optional: more actions later (edit, deactivate, etc.) -->
     </LinearLayout>
 
 </LinearLayout>

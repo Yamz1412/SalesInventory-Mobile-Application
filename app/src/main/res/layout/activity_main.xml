@@ -52,6 +52,38 @@
 
                 </LinearLayout>
 
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp">
+
+                    <ImageButton
+                        android:id="@+id/btn_notifications"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@android:color/transparent"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_notifications"
+                        app:tint="@color/text_secondary"
+                        android:contentDescription="notifications"
+                        android:onClick="onNotificationsClicked" />
+
+                    <TextView
+                        android:id="@+id/tv_notification_badge"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:layout_gravity="end|top"
+                        android:translationX="-5dp"
+                        android:translationY="3dp"
+                        android:visibility="visible"
+                        android:gravity="center"
+                        android:textSize="8sp"
+                        android:textColor="@android:color/white"
+                        android:background="@drawable/bg_notification_badge" />
+
+                </FrameLayout>
+
                 <ImageButton
                     android:id="@+id/btn_settings"
                     android:layout_width="40dp"
@@ -346,7 +378,7 @@
                             <ImageView
                                 android:layout_width="24dp"
                                 android:layout_height="24dp"
-                                android:src="@drawable/ic_revenue"
+                                android:src="@drawable/ic_pesos"
                                 app:tint="@color/primary" />
 
                             <TextView
@@ -441,6 +473,7 @@
                 android:layout_marginBottom="12dp" />
 
             <GridLayout
+                android:id="@+id/quick_actions_grid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:columnCount="3"
@@ -526,7 +559,6 @@
                     style="@style/DashboardButton" />
 
             </GridLayout>
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_manage_users"
                 android:layout_width="match_parent"

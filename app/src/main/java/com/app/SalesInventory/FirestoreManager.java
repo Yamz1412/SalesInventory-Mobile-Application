@@ -10,6 +10,7 @@ public class FirestoreManager {
     private final FirebaseFirestore db;
     private final FirebaseAuth auth;
     private String currentUserId;
+    private String businessOwnerId;
 
     private FirestoreManager() {
         db = FirebaseFirestore.getInstance();
@@ -49,24 +50,39 @@ public class FirestoreManager {
         return currentUserId == null ? "unknown" : currentUserId;
     }
 
+    public void setBusinessOwnerId(String ownerId) {
+        this.businessOwnerId = ownerId;
+    }
+
+    public String getBusinessOwnerId() {
+        if (businessOwnerId != null && !businessOwnerId.isEmpty()) {
+            return businessOwnerId;
+        }
+        return ensureCurrentUserId();
+    }
+
     public String getUserProductsPath() {
-        return "products/" + ensureCurrentUserId() + "/items";
+        return "products/" + getBusinessOwnerId() + "/items";
     }
 
     public String getUserSalesPath() {
-        return "sales/" + ensureCurrentUserId() + "/items";
+        return "sales/" + getBusinessOwnerId() + "/items";
     }
 
     public String getUserAdjustmentsPath() {
-        return "adjustments/" + ensureCurrentUserId() + "/items";
+        return "adjustments/" + getBusinessOwnerId() + "/items";
     }
 
     public String getUserAlertsPath() {
-        return "alerts/" + ensureCurrentUserId() + "/items";
+        return "alerts/" + getBusinessOwnerId() + "/items";
     }
 
     public String getUserCategoriesPath() {
-        return "categories/" + ensureCurrentUserId() + "/items";
+        return "categories/" + getBusinessOwnerId() + "/items";
+    }
+
+    public String getUserPurchaseOrdersPath() {
+        return "purchaseOrders/" + getBusinessOwnerId() + "/items";
     }
 
     public Object getServerTimestamp() {

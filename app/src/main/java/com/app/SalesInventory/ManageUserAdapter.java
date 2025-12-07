@@ -3,10 +3,11 @@ package com.app.SalesInventory;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,19 +27,28 @@ public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_manage_user, parent, false);
+        View v = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_staff_account, parent, false);
         return new VH(v);
     }
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         AdminUserItem it = items.get(position);
-        holder.name.setText(it.getName() != null && !it.getName().isEmpty() ? it.getName() : it.getEmail());
-        holder.email.setText(it.getEmail() != null ? it.getEmail() : "");
-        holder.status.setText(it.isApproved() ? "Approved" : "Pending");
-        holder.promote.setOnClickListener(v -> {
-            if (listener != null) listener.onPromote(it.getUid());
-        });
+        String name = it.getName() != null && !it.getName().isEmpty() ? it.getName() : it.getEmail();
+        String email = it.getEmail() != null ? it.getEmail() : "";
+        String role = it.getRole() != null ? it.getRole() : "Staff";
+
+        holder.name.setText(name);
+        holder.email.setText(email);
+        holder.role.setText(role);
+        holder.phone.setText("");
+
+        if (listener != null) {
+            holder.itemView.setOnClickListener(v -> listener.onPromote(it.getUid()));
+        } else {
+            holder.itemView.setOnClickListener(null);
+        }
     }
 
     @Override
@@ -58,15 +68,15 @@ public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH
     static class VH extends RecyclerView.ViewHolder {
         final TextView name;
         final TextView email;
-        final TextView status;
-        final Button promote;
+        final TextView phone;
+        final TextView role;
 
         VH(@NonNull View itemView) {
             super(itemView);
-            name = itemView.findViewById(R.id.tvManageName);
-            email = itemView.findViewById(R.id.tvManageEmail);
-            status = itemView.findViewById(R.id.tvManageStatus);
-            promote = itemView.findViewById(R.id.btnPromote);
+            name = itemView.findViewById(R.id.tvStaffName);
+            email = itemView.findViewById(R.id.tvStaffEmail);
+            phone = itemView.findViewById(R.id.tvStaffPhone);
+            role = itemView.findViewById(R.id.tvStaffRole);
         }
     }
 }

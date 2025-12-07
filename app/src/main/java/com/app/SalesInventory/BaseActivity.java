@@ -6,6 +6,9 @@ import android.os.Bundle;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.DocumentSnapshot;
+
 public abstract class BaseActivity extends AppCompatActivity {
 
     @Override
@@ -37,6 +40,34 @@ public abstract class BaseActivity extends AppCompatActivity {
             startActivity(intent);
             finish();
         } else {
+            String uid = authManager.getCurrentUserId();
+            FirebaseFirestore db = authManager.getFirestore();
+            db.collection("users").document(uid).get().addOnSuccessListener((DocumentSnapshot doc) -> {
+                String role = null;
+                if (doc.exists()) {
+                    if (doc.contains("role")) {
+                        role = doc.getString("role");
+                    } else if (doc.contains("Role")) {
+                        role = doc.getString("Role");
+                    }
+                }
+                String ownerAdminId = null;
+                if (doc.exists()) {
+                    if (doc.contains("ownerAdminId")) {
+                        ownerAdminId = doc.getString("ownerAdminId");
+                    }
+                }
+                String businessOwnerId;
+                if (role != null && role.equalsIgnoreCase("Admin")) {
+                    businessOwnerId = uid;
+                } else if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                    businessOwnerId = ownerAdminId;
+                } else {
+                    businessOwnerId = uid;
+                }
+                FirestoreManager.getInstance().updateCurrentUserId(uid);
+                FirestoreManager.getInstance().setBusinessOwnerId(businessOwnerId);
+            });
             ThemeManager.getInstance(this).loadUserThemeFromRemote(null);
         }
     }

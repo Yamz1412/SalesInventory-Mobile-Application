@@ -82,10 +82,9 @@ public class ProductDetailActivity extends BaseActivity {
                     .setPositiveButton("Delete", (dialog, which) -> {
                         productRepository.deleteProduct(productId, new ProductRepository.OnProductDeletedListener() {
                             @Override
-                            public void onProductDeleted() {
+                            public void onProductDeleted(String archiveFilename) {
                                 runOnUiThread(() -> finish());
                             }
-
                             @Override
                             public void onError(String error) {
                             }

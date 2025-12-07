@@ -1,12 +1,12 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -20,6 +20,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.io.OutputStream;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -69,7 +70,6 @@ public class StockValueReportActivity extends BaseActivity  {
         productRef = FirebaseDatabase.getInstance().getReference("Product");
         exportUtil = new ReportExportUtil(this);
 
-        // FIX: Wrapped initialization in try-catch block
         try {
             pdfGenerator = new PDFGenerator(this);
         } catch (Exception e) {
@@ -80,9 +80,8 @@ public class StockValueReportActivity extends BaseActivity  {
 
         csvGenerator = new CSVGenerator();
 
-        // Export button listeners
-        btnExportPDF.setOnClickListener(v -> exportToPDF());
-        btnExportCSV.setOnClickListener(v -> exportToCSV());
+        btnExportPDF.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_PDF));
+        btnExportCSV.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_CSV));
     }
 
     private void setupRecyclerView() {
@@ -115,7 +114,8 @@ public class StockValueReportActivity extends BaseActivity  {
                                 product.getSellingPrice(),
                                 product.getReorderLevel(),
                                 product.getCriticalLevel(),
-                                product.getCeilingLevel()
+                                product.getCeilingLevel(),
+                                product.getFloorLevel()
                         );
                         reportList.add(report);
 
@@ -125,7 +125,6 @@ public class StockValueReportActivity extends BaseActivity  {
                     }
                 }
 
-                // Sort by profit (highest first)
                 Collections.sort(reportList, (a, b) -> Double.compare(b.getProfit(), a.getProfit()));
 
                 progressBar.setVisibility(View.GONE);
@@ -141,7 +140,6 @@ public class StockValueReportActivity extends BaseActivity  {
                     btnExportPDF.setEnabled(true);
                     btnExportCSV.setEnabled(true);
 
-                    // Update summary
                     tvTotalCostValue.setText("₱" + String.format("%.2f", totalCostValue));
                     tvTotalInventoryValue.setText("₱" + String.format("%.2f", totalSellingValue));
                     tvTotalProfitValue.setText("₱" + String.format("%.2f", totalProfit));
@@ -160,36 +158,38 @@ public class StockValueReportActivity extends BaseActivity  {
         });
     }
 
+    private void startExport(int exportType) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+                return;
+            }
+        }
+        if (exportType == ReportExportUtil.EXPORT_PDF) exportToPDF();
+        else exportToCSV();
+    }
+
     private void exportToPDF() {
         if (!exportUtil.isStorageAvailable()) {
             exportUtil.showExportError("Storage not available");
             return;
         }
-
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    PERMISSION_REQUEST_CODE);
-            return;
-        }
-
-        // Check if generator initialized successfully
         if (pdfGenerator == null) {
             exportUtil.showExportError("PDF Generator not ready");
             return;
         }
-
         progressBar.setVisibility(View.VISIBLE);
-
         try {
-            File exportDir = exportUtil.getExportDirectory();
             String fileName = exportUtil.generateFileName("StockValue_Report", ReportExportUtil.EXPORT_PDF);
-            File outputFile = new File(exportDir, fileName);
-
-            pdfGenerator.generateStockValueReportPDF(outputFile, reportList);
-
+            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
+            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
+            try {
+                pdfGenerator.generateStockValueReportPDF(r.outputStream, reportList);
+                exportUtil.showExportSuccess(r.displayPath);
+            } finally {
+                try { r.outputStream.close(); } catch (Exception ignored) {}
+            }
             progressBar.setVisibility(View.GONE);
-            exportUtil.showExportSuccess(outputFile.getAbsolutePath());
         } catch (Exception e) {
             progressBar.setVisibility(View.GONE);
             exportUtil.showExportError(e.getMessage());
@@ -201,25 +201,18 @@ public class StockValueReportActivity extends BaseActivity  {
             exportUtil.showExportError("Storage not available");
             return;
         }
-
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                    PERMISSION_REQUEST_CODE);
-            return;
-        }
-
         progressBar.setVisibility(View.VISIBLE);
-
         try {
-            File exportDir = exportUtil.getExportDirectory();
             String fileName = exportUtil.generateFileName("StockValue_Report", ReportExportUtil.EXPORT_CSV);
-            File outputFile = new File(exportDir, fileName);
-
-            csvGenerator.generateStockValueReportCSV(outputFile, reportList);
-
+            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
+            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
+            try {
+                csvGenerator.generateStockValueReportCSV(r.outputStream, reportList);
+                exportUtil.showExportSuccess(r.displayPath);
+            } finally {
+                try { r.outputStream.close(); } catch (Exception ignored) {}
+            }
             progressBar.setVisibility(View.GONE);
-            exportUtil.showExportSuccess(outputFile.getAbsolutePath());
         } catch (Exception e) {
             progressBar.setVisibility(View.GONE);
             exportUtil.showExportError(e.getMessage());

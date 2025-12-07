@@ -17,7 +17,6 @@ import com.bumptech.glide.signature.ObjectKey;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
@@ -112,7 +111,7 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
                     .setPositiveButton("Delete", (dialog, which) -> {
                         productRepository.deleteProduct(p.getProductId(), new ProductRepository.OnProductDeletedListener() {
                             @Override
-                            public void onProductDeleted() {
+                            public void onProductDeleted(String archiveFilename) {
                             }
 
                             @Override

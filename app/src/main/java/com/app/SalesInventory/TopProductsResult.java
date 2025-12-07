@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import com.github.mikephil.charting.data.BarEntry;
+
 import java.util.List;
 
 public class TopProductsResult {

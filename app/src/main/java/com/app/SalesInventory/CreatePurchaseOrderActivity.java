@@ -10,10 +10,8 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.android.material.textfield.TextInputEditText;
@@ -26,18 +24,15 @@ import java.util.List;
 import java.util.Locale;
 
 public class CreatePurchaseOrderActivity extends BaseActivity  {
-
     private Toolbar toolbar;
     private TextInputEditText etSupplierName, etSupplierPhone, etOrderDate, etExpectedDate, etNotes;
     private RecyclerView recyclerViewItems;
     private TextView tvTotalAmount;
     private Button btnAddItem, btnCreatePO;
-
     private POItemAdapter adapter;
     private List<POItem> poItems;
     private DatabaseReference poRef;
     private Calendar calendar;
-
     private ProductRepository productRepository;
     private List<Product> availableProducts = new ArrayList<>();
     private List<String> productNames = new ArrayList<>();
@@ -110,7 +105,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         int year = now.get(Calendar.YEAR);
         int month = now.get(Calendar.MONTH);
         int day = now.get(Calendar.DAY_OF_MONTH);
-
         DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
             calendar.set(Calendar.YEAR, y);
             calendar.set(Calendar.MONTH, m);
@@ -135,18 +129,15 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         }
-
         TextInputEditText etProductName = view.findViewById(R.id.etProductName);
         TextInputEditText etQuantity = view.findViewById(R.id.etQuantity);
         TextInputEditText etUnitPrice = view.findViewById(R.id.etUnitPrice);
         Button btnAdd = view.findViewById(R.id.btnAdd);
         Button btnCancel = view.findViewById(R.id.btnCancel);
-
         btnAdd.setOnClickListener(v -> {
             String nameStr = etProductName.getText() != null ? etProductName.getText().toString().trim() : "";
             String qtyStr = etQuantity.getText() != null ? etQuantity.getText().toString().trim() : "";
             String priceStr = etUnitPrice.getText() != null ? etUnitPrice.getText().toString().trim() : "";
-
             if (nameStr.isEmpty()) {
                 Toast.makeText(this, "Please enter product name", Toast.LENGTH_SHORT).show();
                 return;
@@ -155,7 +146,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                 Toast.makeText(this, "Please fill quantity and unit price", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             try {
                 int qty = Integer.parseInt(qtyStr);
                 double price = Double.parseDouble(priceStr);
@@ -163,8 +153,21 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                     Toast.makeText(this, "Invalid quantity or price", Toast.LENGTH_SHORT).show();
                     return;
                 }
-
                 String productId = findProductIdByName(nameStr);
+                Product prod = findProductById(productId);
+                if (prod != null) {
+                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
+                    if (ceiling > 9999) ceiling = 9999;
+                    int maxReceivable = ceiling - prod.getQuantity();
+                    if (maxReceivable <= 0) {
+                        Toast.makeText(this, "Cannot order this product: it is already at or above ceiling", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    if (qty > maxReceivable) {
+                        Toast.makeText(this, "Quantity too large. Maximum receivable is " + maxReceivable, Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                }
                 POItem existing = null;
                 for (POItem it : poItems) {
                     if (it.getProductName().equalsIgnoreCase(nameStr)) {
@@ -185,9 +188,16 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                 Toast.makeText(this, "Invalid number format", Toast.LENGTH_SHORT).show();
             }
         });
-
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         dialog.show();
+    }
+
+    private Product findProductById(String id) {
+        if (availableProducts == null) return null;
+        for (Product p : availableProducts) {
+            if (p.getProductId() != null && p.getProductId().equals(id)) return p;
+        }
+        return null;
     }
 
     private String findProductIdByName(String name) {
@@ -211,28 +221,36 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
     private void savePurchaseOrder() {
         String supplier = etSupplierName.getText().toString().trim();
         String supplierPhone = etSupplierPhone.getText() != null ? etSupplierPhone.getText().toString().trim() : "";
-
         if (supplier.isEmpty()) {
             etSupplierName.setError("Supplier name required");
             return;
         }
-
         if (poItems.isEmpty()) {
             Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show();
             return;
         }
-
+        for (POItem item : poItems) {
+            if (item.getProductId() != null && !item.getProductId().isEmpty()) {
+                Product prod = findProductById(item.getProductId());
+                if (prod != null) {
+                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
+                    if (ceiling > 9999) ceiling = 9999;
+                    int maxReceivable = ceiling - prod.getQuantity();
+                    if (item.getQuantity() > maxReceivable) {
+                        Toast.makeText(this, "Item " + item.getProductName() + " quantity exceeds allowed receive limit: " + maxReceivable, Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                }
+            }
+        }
         String id = poRef.push().getKey();
         if (id == null) {
             Toast.makeText(this, "Error generating ID", Toast.LENGTH_SHORT).show();
             return;
         }
-
         String poNumber = "PO-" + System.currentTimeMillis() / 1000;
-
         double total = 0;
         for (POItem item : poItems) total += item.getSubtotal();
-
         PurchaseOrder po = new PurchaseOrder(
                 id,
                 poNumber,
@@ -243,7 +261,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                 total,
                 new ArrayList<>(poItems)
         );
-
         poRef.child(id).setValue(po)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Purchase Order created", Toast.LENGTH_SHORT).show();

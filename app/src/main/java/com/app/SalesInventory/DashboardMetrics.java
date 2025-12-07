@@ -1,5 +1,8 @@
 package com.app.SalesInventory;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class DashboardMetrics {
     private double totalSalesToday;
     private double totalInventoryValue;
@@ -67,5 +70,35 @@ public class DashboardMetrics {
 
     public void setLastUpdated(long lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    public Map<String, Object> toMap() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("totalSalesToday", totalSalesToday);
+        m.put("totalInventoryValue", totalInventoryValue);
+        m.put("lowStockCount", lowStockCount);
+        m.put("pendingOrdersCount", pendingOrdersCount);
+        m.put("revenue", revenue);
+        m.put("lastUpdated", lastUpdated);
+        return m;
+    }
+
+    public static DashboardMetrics fromMap(Map<String, Object> m) {
+        DashboardMetrics d = new DashboardMetrics();
+        if (m == null) return d;
+        Object o;
+        o = m.get("totalSalesToday");
+        if (o instanceof Number) d.totalSalesToday = ((Number) o).doubleValue();
+        o = m.get("totalInventoryValue");
+        if (o instanceof Number) d.totalInventoryValue = ((Number) o).doubleValue();
+        o = m.get("lowStockCount");
+        if (o instanceof Number) d.lowStockCount = ((Number) o).intValue();
+        o = m.get("pendingOrdersCount");
+        if (o instanceof Number) d.pendingOrdersCount = ((Number) o).intValue();
+        o = m.get("revenue");
+        if (o instanceof Number) d.revenue = ((Number) o).doubleValue();
+        o = m.get("lastUpdated");
+        if (o instanceof Number) d.lastUpdated = ((Number) o).longValue();
+        return d;
     }
 }

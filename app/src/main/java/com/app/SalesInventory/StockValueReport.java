@@ -1,5 +1,7 @@
 package com.app.SalesInventory;
 
+import java.util.Locale;
+
 public class StockValueReport {
     private String productId;
     private String productName;
@@ -7,17 +9,12 @@ public class StockValueReport {
     private int quantity;
     private double costPrice;
     private double sellingPrice;
-    private double totalCostValue;
-    private double totalSellingValue;
-    private double profit;
-    private String profitMargin;
     private int reorderLevel;
     private int criticalLevel;
-    private String stockStatus; // CRITICAL, LOW, NORMAL, OVERSTOCK
+    private int ceilingLevel;
+    private int floorLevel;
 
-    public StockValueReport(String productId, String productName, String category,
-                            int quantity, double costPrice, double sellingPrice,
-                            int reorderLevel, int criticalLevel, int ceilingLevel) {
+    public StockValueReport(String productId, String productName, String category, int quantity, double costPrice, double sellingPrice, int reorderLevel, int criticalLevel, int ceilingLevel, int floorLevel) {
         this.productId = productId;
         this.productName = productName;
         this.category = category;
@@ -26,41 +23,79 @@ public class StockValueReport {
         this.sellingPrice = sellingPrice;
         this.reorderLevel = reorderLevel;
         this.criticalLevel = criticalLevel;
-
-        // Calculate values
-        this.totalCostValue = quantity * costPrice;
-        this.totalSellingValue = quantity * sellingPrice;
-        this.profit = totalSellingValue - totalCostValue;
-
-        // Calculate profit margin
-        if (totalSellingValue > 0) {
-            this.profitMargin = String.format("%.2f%%", (profit / totalSellingValue) * 100);
-        } else {
-            this.profitMargin = "0%";
-        }
-
-        // Determine stock status
-        if (quantity <= criticalLevel) {
-            this.stockStatus = "CRITICAL";
-        } else if (quantity <= reorderLevel) {
-            this.stockStatus = "LOW";
-        } else if (quantity >= ceilingLevel) {
-            this.stockStatus = "OVERSTOCK";
-        } else {
-            this.stockStatus = "NORMAL";
-        }
+        this.ceilingLevel = ceilingLevel;
+        this.floorLevel = floorLevel;
     }
 
-    // Getters
-    public String getProductId() { return productId; }
-    public String getProductName() { return productName; }
-    public String getCategory() { return category; }
-    public int getQuantity() { return quantity; }
-    public double getCostPrice() { return costPrice; }
-    public double getSellingPrice() { return sellingPrice; }
-    public double getTotalCostValue() { return totalCostValue; }
-    public double getTotalSellingValue() { return totalSellingValue; }
-    public double getProfit() { return profit; }
-    public String getProfitMargin() { return profitMargin; }
-    public String getStockStatus() { return stockStatus; }
+    public String getProductId() {
+        return productId == null ? "" : productId;
+    }
+
+    public String getProductName() {
+        return productName == null ? "" : productName;
+    }
+
+    public String getCategory() {
+        return category == null ? "" : category;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public double getCostPrice() {
+        return costPrice;
+    }
+
+    public double getSellingPrice() {
+        return sellingPrice;
+    }
+
+    public int getReorderLevel() {
+        return reorderLevel;
+    }
+
+    public int getCriticalLevel() {
+        return criticalLevel;
+    }
+
+    public int getCeilingLevel() {
+        return ceilingLevel;
+    }
+
+    public int getFloorLevel() {
+        return floorLevel;
+    }
+
+    public double getTotalCostValue() {
+        return costPrice * quantity;
+    }
+
+    public double getTotalSellingValue() {
+        return sellingPrice * quantity;
+    }
+
+    public double getProfit() {
+        return getTotalSellingValue() - getTotalCostValue();
+    }
+
+    public String getProfitMargin() {
+        double sell = getTotalSellingValue();
+        if (sell <= 0) return "0.00%";
+        double margin = (getProfit() / sell) * 100.0;
+        return String.format(Locale.getDefault(), "%.2f%%", margin);
+    }
+
+    public String getStockStatus() {
+        if (criticalLevel > 0 && quantity <= criticalLevel) {
+            return "CRITICAL";
+        }
+        if (reorderLevel > 0 && quantity <= reorderLevel) {
+            return "LOW";
+        }
+        if (ceilingLevel > 0 && quantity > ceilingLevel) {
+            return "OVERSTOCK";
+        }
+        return "NORMAL";
+    }
 }

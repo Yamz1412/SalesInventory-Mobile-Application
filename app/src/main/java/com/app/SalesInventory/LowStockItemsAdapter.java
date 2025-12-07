@@ -48,8 +48,15 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
         int qty = p.getQuantity();
         int reorder = p.getReorderLevel();
         int critical = p.getCriticalLevel();
-        holder.stockInfo.setText("Stock: " + qty + " | Reorder: " + reorder + " | Critical: " + critical);
+        int floor = p.getFloorLevel();
+        String floorStr = floor > 0 ? " | Floor: " + floor : "";
+        holder.stockInfo.setText("Stock: " + qty + " | Reorder: " + reorder + " | Critical: " + critical + floorStr);
         holder.currentStock.setText(String.valueOf(qty));
+        if (floor > 0 && qty <= floor) {
+            holder.currentStock.setTextColor(ctx.getResources().getColor(R.color.errorRed));
+        } else {
+            holder.currentStock.setTextColor(ctx.getResources().getColor(R.color.textColorPrimary));
+        }
 
         String imageUrl = p.getImageUrl();
         String imagePath = p.getImagePath();

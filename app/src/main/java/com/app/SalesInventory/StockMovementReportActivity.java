@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -19,7 +20,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import java.io.File;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ public class StockMovementReportActivity extends BaseActivity {
     private int grandTotalAdjusted = 0;
 
     private static final int PERMISSION_REQUEST_CODE = 200;
+    private int pendingExportType = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,8 +92,52 @@ public class StockMovementReportActivity extends BaseActivity {
         recyclerViewReport.setLayoutManager(new LinearLayoutManager(this));
         recyclerViewReport.setAdapter(adapter);
 
-        btnExportPDF.setOnClickListener(v -> exportToPDF());
-        btnExportCSV.setOnClickListener(v -> exportToCSV());
+        btnExportPDF.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_PDF));
+        btnExportCSV.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_CSV));
+    }
+
+    private void startExport(int exportType) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                pendingExportType = exportType;
+                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+                return;
+            }
+        }
+        if (exportType == ReportExportUtil.EXPORT_PDF) exportToPDF();
+        else exportToCSV();
+    }
+
+    private void exportToPDF() {
+        try {
+            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
+            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
+            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
+            try {
+                pdfGenerator.generateStockMovementReportPDF(r.outputStream, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
+                exportUtil.showExportSuccess(r.displayPath);
+            } finally {
+                try { r.outputStream.close(); } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            exportUtil.showExportError(e.getMessage() == null ? "Error exporting PDF" : e.getMessage());
+        }
+    }
+
+    private void exportToCSV() {
+        try {
+            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_CSV);
+            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
+            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
+            try {
+                csvGenerator.generateStockMovementReportCSV(r.outputStream, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
+                exportUtil.showExportSuccess(r.displayPath);
+            } finally {
+                try { r.outputStream.close(); } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            exportUtil.showExportError(e.getMessage() == null ? "Error exporting CSV" : e.getMessage());
+        }
     }
 
     private void loadData() {
@@ -204,50 +250,11 @@ public class StockMovementReportActivity extends BaseActivity {
         }
     }
 
-    private void exportToPDF() {
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-            return;
-        }
-
-        try {
-            File exportDir = exportUtil.getExportDirectory();
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
-            File file = new File(exportDir, fileName);
-
-            if (pdfGenerator != null) {
-                pdfGenerator.generateStockMovementReportPDF(file, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
-                exportUtil.showExportSuccess(file.getAbsolutePath());
-            }
-        } catch (Exception e) {
-            exportUtil.showExportError(e.getMessage());
-        }
-    }
-
-    private void exportToCSV() {
-        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-            return;
-        }
-
-        try {
-            File exportDir = exportUtil.getExportDirectory();
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_CSV);
-            File file = new File(exportDir, fileName);
-
-            if (csvGenerator != null) {
-                csvGenerator.generateStockMovementReportCSV(file, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
-                exportUtil.showExportSuccess(file.getAbsolutePath());
-            }
-        } catch (Exception e) {
-            exportUtil.showExportError(e.getMessage());
-        }
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
+            pendingExportType = 0;
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
             } else {

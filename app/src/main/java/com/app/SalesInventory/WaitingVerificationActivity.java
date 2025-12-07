@@ -4,15 +4,16 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.Toast;
-import androidx.appcompat.app.AppCompatActivity;
+
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.util.HashMap;
 import java.util.Map;
 
-public class WaitingVerificationActivity extends BaseActivity  {
+public class WaitingVerificationActivity extends BaseActivity {
     private Button btnRefresh;
     private Button btnResend;
     private FirebaseAuth auth;
@@ -57,20 +58,7 @@ public class WaitingVerificationActivity extends BaseActivity  {
                 String uid = reloaded.getUid();
                 firestore.collection("users").document(uid).get().addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                        DocumentSnapshot doc = task.getResult();
-                        Object approvedObj = doc.get("approved");
-                        boolean approved = false;
-                        if (approvedObj instanceof Boolean) {
-                            approved = (Boolean) approvedObj;
-                        }
-                        if (approved) {
-                            Intent i = new Intent(WaitingVerificationActivity.this, MainActivity.class);
-                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(i);
-                            finish();
-                        } else {
-                            Toast.makeText(WaitingVerificationActivity.this, "Email verified. Waiting for admin approval.", Toast.LENGTH_LONG).show();
-                        }
+                        goToMain();
                     } else {
                         Map<String, Object> profile = new HashMap<>();
                         profile.put("uid", uid);
@@ -81,10 +69,7 @@ public class WaitingVerificationActivity extends BaseActivity  {
                         profile.put("approved", true);
                         profile.put("createdAt", System.currentTimeMillis());
                         firestore.collection("users").document(uid).set(profile).addOnSuccessListener(aVoid2 -> {
-                            Intent i = new Intent(WaitingVerificationActivity.this, MainActivity.class);
-                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(i);
-                            finish();
+                            goToMain();
                         }).addOnFailureListener(e -> {
                             Toast.makeText(WaitingVerificationActivity.this, "Failed to create profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
                         });
@@ -100,6 +85,12 @@ public class WaitingVerificationActivity extends BaseActivity  {
         });
     }
 
+    private void goToMain() {
+        Intent i = new Intent(WaitingVerificationActivity.this, MainActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(i);
+        finish();
+    }
     @Override
     protected void onDestroy() {
         super.onDestroy();

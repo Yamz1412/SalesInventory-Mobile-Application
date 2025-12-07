@@ -14,11 +14,6 @@ import android.widget.Toast;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,7 +27,6 @@ public class StockAdjustmentActivity extends BaseActivity {
     private TextView tvCurrentStock, tvNewStock;
     private Button btnAdjust, btnViewHistory;
 
-    private DatabaseReference productRef, adjustmentRef;
     private List<Product> productList;
     private Product selectedProduct;
     private ProductRepository productRepository;
@@ -52,8 +46,6 @@ public class StockAdjustmentActivity extends BaseActivity {
         btnAdjust = findViewById(R.id.btnAdjust);
         btnViewHistory = findViewById(R.id.btnViewHistory);
 
-        productRef = FirebaseDatabase.getInstance().getReference("Product");
-        adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
         productRepository = SalesInventoryApplication.getProductRepository();
 
         setupSpinners();
@@ -66,44 +58,30 @@ public class StockAdjustmentActivity extends BaseActivity {
                     selectedProduct = productList.get(position - 1);
                     tvCurrentStock.setText(String.valueOf(selectedProduct.getQuantity()));
                     calculateNewStock();
+                } else {
+                    selectedProduct = null;
+                    tvCurrentStock.setText("0");
+                    calculateNewStock();
                 }
             }
-
             @Override
             public void onNothingSelected(android.widget.AdapterView<?> parent) {
             }
         });
 
         etQuantity.addTextChangedListener(new android.text.TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                calculateNewStock();
-            }
-
-            @Override
-            public void afterTextChanged(android.text.Editable s) {
-            }
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateNewStock(); }
+            @Override public void afterTextChanged(android.text.Editable s) {}
         });
 
         spinnerAdjustmentType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                calculateNewStock();
-            }
-
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {
-            }
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) { calculateNewStock(); }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
 
         btnAdjust.setOnClickListener(v -> performAdjustment());
-        btnViewHistory.setOnClickListener(v -> {
-            startActivity(new android.content.Intent(this, AdjustmentHistoryActivity.class));
-        });
+        btnViewHistory.setOnClickListener(v -> startActivity(new android.content.Intent(this, AdjustmentHistoryActivity.class)));
     }
 
     private void setupSpinners() {
@@ -127,31 +105,26 @@ public class StockAdjustmentActivity extends BaseActivity {
     }
 
     private void loadProducts() {
-        productRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                productList = new ArrayList<>();
-                List<String> productNames = new ArrayList<>();
-                productNames.add("Select Product");
+        productList = new ArrayList<>();
+        List<String> productNames = new ArrayList<>();
+        productNames.add("Select Product");
 
-                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
-                    Product product = dataSnapshot.getValue(Product.class);
-                    if (product != null && product.isActive()) {
-                        productList.add(product);
-                        productNames.add(product.getProductName());
+        productRepository.getAllProducts().observe(this, products -> {
+            productList.clear();
+            if (products != null) {
+                for (Product p : products) {
+                    if (p != null && p.isActive()) {
+                        productList.add(p);
+                        productNames.add(p.getProductName());
                     }
                 }
-
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(StockAdjustmentActivity.this,
-                        android.R.layout.simple_spinner_item, productNames);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                spinnerProduct.setAdapter(adapter);
             }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(StockAdjustmentActivity.this, "Error loading products", Toast.LENGTH_SHORT).show();
-            }
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(StockAdjustmentActivity.this,
+                    android.R.layout.simple_spinner_item, productNames);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spinnerProduct.setAdapter(adapter);
+            spinnerProduct.setEnabled(true);
         });
     }
 
@@ -216,16 +189,48 @@ public class StockAdjustmentActivity extends BaseActivity {
                     ? currentStock + adjustmentQty
                     : currentStock - adjustmentQty;
 
-            if (newStock < 0) {
+            int floor = Math.max(1, selectedProduct.getFloorLevel());
+            int ceiling = selectedProduct.getCeilingLevel() <= 0 ? Math.max(selectedProduct.getQuantity(), Math.max(selectedProduct.getReorderLevel() * 2, 100)) : selectedProduct.getCeilingLevel();
+            if (ceiling > 9999) ceiling = 9999;
+
+            if (adjustmentType.equals("Add Stock") && newStock > ceiling) {
+                int allowed = ceiling - currentStock;
+                if (allowed <= 0) {
+                    Toast.makeText(this, "Cannot add stock: product already at or above ceiling", Toast.LENGTH_LONG).show();
+                    return;
+                } else {
+                    int finalAllowed = allowed;
+                    int finalCurrentStock = currentStock;
+                    String finalAdjustmentType = adjustmentType;
+                    String finalReason = reason;
+                    String finalRemarks = remarks;
+                    new AlertDialog.Builder(this)
+                            .setTitle("Limit reached")
+                            .setMessage("Adding " + adjustmentQty + " would exceed ceiling. You can add up to " + finalAllowed + " units. Add allowed amount?")
+                            .setPositiveButton("Add " + finalAllowed, (dialog, which) -> saveAdjustment(finalAdjustmentType, finalAllowed, finalCurrentStock, finalCurrentStock + finalAllowed, finalReason, finalRemarks))
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return;
+                }
+            }
+
+            if (newStock < floor) {
+                int finalCurrentStock = currentStock;
+                int finalNewStock = Math.max(floor, newStock);
+                int finalAdjustmentQty = adjustmentQty;
+                String finalAdjustmentType = adjustmentType;
+                String finalReason = reason;
+                String finalRemarks = remarks;
                 new AlertDialog.Builder(this)
                         .setTitle("Warning")
-                        .setMessage("This will result in negative stock. Continue?")
+                        .setMessage("This will result in stock below floor (" + floor + "). Continue?")
                         .setPositiveButton("Continue", (dialog, which) ->
-                                saveAdjustment(adjustmentType, adjustmentQty, currentStock, newStock, reason, remarks))
+                                saveAdjustment(finalAdjustmentType, finalAdjustmentQty, finalCurrentStock, finalNewStock, finalReason, finalRemarks))
                         .setNegativeButton("Cancel", null)
                         .show();
             } else {
-                saveAdjustment(adjustmentType, adjustmentQty, currentStock, newStock, reason, remarks);
+                int boundedNewStock = Math.min(newStock, 9999);
+                saveAdjustment(adjustmentType, adjustmentQty, currentStock, boundedNewStock, reason, remarks);
             }
         } catch (NumberFormatException e) {
             etQuantity.setError("Please enter a valid number");
@@ -239,7 +244,7 @@ public class StockAdjustmentActivity extends BaseActivity {
             return;
         }
 
-        String adjustmentId = adjustmentRef.push().getKey();
+        String adjustmentId = com.google.firebase.database.FirebaseDatabase.getInstance().getReference().push().getKey();
         String userId = currentUser.getUid();
 
         if (adjustmentId == null) {
@@ -247,7 +252,7 @@ public class StockAdjustmentActivity extends BaseActivity {
             return;
         }
 
-        int finalNewStock = Math.max(0, newStock);
+        int finalNewStock = Math.max(1, Math.min(newStock, 9999));
 
         StockAdjustment adjustment = new StockAdjustment(
                 adjustmentId,
@@ -266,7 +271,7 @@ public class StockAdjustmentActivity extends BaseActivity {
         Map<String, Object> updates = new HashMap<>();
         updates.put("/StockAdjustments/" + adjustmentId, adjustment);
 
-        FirebaseDatabase.getInstance().getReference().updateChildren(updates)
+        com.google.firebase.database.FirebaseDatabase.getInstance().getReference().updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     productRepository.updateProductQuantity(selectedProduct.getProductId(), finalNewStock, new ProductRepository.OnProductUpdatedListener() {
                         @Override
@@ -276,7 +281,6 @@ public class StockAdjustmentActivity extends BaseActivity {
                                 clearForm();
                             });
                         }
-
                         @Override
                         public void onError(String error) {
                             runOnUiThread(() -> Toast.makeText(StockAdjustmentActivity.this, "Error updating product: " + error, Toast.LENGTH_SHORT).show());

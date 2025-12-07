@@ -13,9 +13,9 @@ import java.util.List;
 
 public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSummaryAdapter.ViewHolder> {
 
-    private List<AdjustmentSummaryData> summaryList;
+    private List<AdjustmentSummaryReport> summaryList;
 
-    public AdjustmentSummaryAdapter(List<AdjustmentSummaryData> summaryList) {
+    public AdjustmentSummaryAdapter(List<AdjustmentSummaryReport> summaryList) {
         this.summaryList = summaryList;
     }
 
@@ -29,36 +29,28 @@ public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSum
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        AdjustmentSummaryData summary = summaryList.get(position);
+        AdjustmentSummaryReport report = summaryList.get(position);
         Context context = holder.itemView.getContext();
 
-        holder.tvProductName.setText(summary.getProductName());
-        holder.tvTotalAdjustments.setText("Total: " + summary.getTotalAdjustments() + " adjustments");
-        holder.tvAdditions.setText("+Add: " + summary.getTotalAdditions() + " units");
-        holder.tvRemovals.setText("-Remove: " + summary.getTotalRemovals() + " units");
-        holder.tvNetChange.setText("Net: " + (summary.getNetChange() >= 0 ? "+" : "") + summary.getNetChange());
+        holder.tvProductName.setText(report.getProductName());
+        holder.tvTotalAdjustments.setText(String.valueOf(report.getTotalAdjustments()));
+        holder.tvAdditions.setText("+" + report.getAdditions());
+        holder.tvRemovals.setText("-" + report.getRemovals());
 
-        // Color code net change
-        if (summary.getNetChange() > 0) {
+        int net = report.getNetChange();
+        holder.tvNetChange.setText((net >= 0 ? "+" : "") + net);
+
+        if (net > 0) {
             holder.tvNetChange.setTextColor(context.getResources().getColor(R.color.successGreen));
-        } else if (summary.getNetChange() < 0) {
+        } else if (net < 0) {
             holder.tvNetChange.setTextColor(context.getResources().getColor(R.color.errorRed));
         } else {
             holder.tvNetChange.setTextColor(context.getResources().getColor(R.color.textColorSecondary));
         }
 
-        // Build reason summary
-        StringBuilder reasons = new StringBuilder();
-        if (!summary.getAdditionReasons().isEmpty()) {
-            reasons.append("Added: ").append(String.join(", ", summary.getAdditionReasons()));
-        }
-        if (!summary.getRemovalReasons().isEmpty()) {
-            if (reasons.length() > 0) reasons.append("\n");
-            reasons.append("Removed: ").append(String.join(", ", summary.getRemovalReasons()));
-        }
-
-        if (reasons.length() > 0) {
-            holder.tvReasons.setText(reasons.toString());
+        String reasonsText = report.getReasonsText();
+        if (reasonsText != null && !reasonsText.isEmpty()) {
+            holder.tvReasons.setText(reasonsText);
             holder.tvReasons.setVisibility(View.VISIBLE);
         } else {
             holder.tvReasons.setVisibility(View.GONE);

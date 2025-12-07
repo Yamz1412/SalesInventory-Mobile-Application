@@ -98,6 +98,7 @@ public class SyncWorker extends Worker {
         doc.put("reorderLevel", pe.reorderLevel);
         doc.put("criticalLevel", pe.criticalLevel);
         doc.put("ceilingLevel", pe.ceilingLevel);
+        doc.put("floorLevel", pe.floorLevel);
         doc.put("unit", pe.unit);
         doc.put("barcode", pe.barcode);
         doc.put("supplier", pe.supplier);

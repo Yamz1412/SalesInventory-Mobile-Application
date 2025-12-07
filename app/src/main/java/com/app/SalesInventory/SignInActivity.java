@@ -1,7 +1,7 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
-
+import android.app.Application;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -13,7 +13,6 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
@@ -22,7 +21,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
-
+import com.google.firebase.messaging.FirebaseMessaging;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,37 +59,132 @@ public class SignInActivity extends BaseActivity {
                 @Override
                 public void onComplete(@NonNull Task<Void> task) {
                     FirebaseUser reloaded = fAuth.getCurrentUser();
-                    if (reloaded != null && reloaded.isEmailVerified()) {
-                        String uid = reloaded.getUid();
-                        fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                            @Override
-                            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                                progressBar.setVisibility(View.INVISIBLE);
-                                if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                                    DocumentSnapshot doc = task.getResult();
-                                    Boolean approved = doc.getBoolean("approved");
-                                    if (approved == null) approved = false;
-                                    if (approved) {
-                                        applyRemoteTheme(doc);
-                                        updateUserProfileFromAuth(reloaded, doc);
-                                        FirestoreManager.getInstance().updateCurrentUserId(uid);
-                                        Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                        startActivity(intent);
-                                        finish();
-                                    }
-                                } else {
-                                    Toast.makeText(SignInActivity.this, "Unable to verify user profile", Toast.LENGTH_LONG).show();
+                    progressBar.setVisibility(View.INVISIBLE);
+                    if (reloaded == null) {
+                        prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
+                        return;
+                    }
+                    checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
+                        @Override
+                        public void onProceed(boolean allowed) {
+                            if (!allowed) {
+                                prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
+                            } else {
+                                String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+                                if (owner != null && !owner.isEmpty()) {
+                                    ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
+                                    syncer.startRealtimeSync(owner);
+                                    FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
                                 }
                             }
-                        });
-                    } else {
-                        progressBar.setVisibility(View.INVISIBLE);
-                        prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
-                    }
+                        }
+                    });
                 }
             });
         }
+    }
+
+    private interface RoleCheckCallback {
+        void onProceed(boolean allowed);
+    }
+
+    private void checkUserRoleAndProceedAfterReload(@NonNull final FirebaseUser reloaded, @NonNull final RoleCheckCallback cb) {
+        final String uid = reloaded.getUid();
+        fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<DocumentSnapshot> adminTask) {
+                DocumentSnapshot adminSnap;
+                if (adminTask.isSuccessful() && adminTask.getResult() != null && adminTask.getResult().exists()) {
+                    adminSnap = adminTask.getResult();
+                } else {
+                    adminSnap = null;
+                }
+                fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                    @Override
+                    public void onComplete(@NonNull Task<DocumentSnapshot> userTask) {
+                        DocumentSnapshot userSnap;
+                        if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
+                            userSnap = userTask.getResult();
+                        } else {
+                            userSnap = null;
+                        }
+                        boolean approved = false;
+                        String role = "Unknown";
+                        if (adminSnap != null && adminSnap.exists()) {
+                            Boolean adminApproved = adminSnap.getBoolean("approved");
+                            if (adminApproved == null) adminApproved = false;
+                            approved = adminApproved;
+                            String adminRole = adminSnap.getString("role");
+                            if (adminRole != null) role = adminRole;
+                        } else if (userSnap != null && userSnap.exists()) {
+                            Boolean userApproved = userSnap.getBoolean("approved");
+                            if (userApproved == null) userApproved = false;
+                            approved = userApproved;
+                            String userRole = userSnap.getString("role");
+                            if (userRole == null) userRole = userSnap.getString("Role");
+                            if (userRole != null) role = userRole;
+                            String ownerAdminId = userSnap.getString("ownerAdminId");
+                            if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                                FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
+                                FirebaseMessaging.getInstance().subscribeToTopic("owner_" + ownerAdminId);
+                            } else {
+                                FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                                FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
+                            }
+                        } else {
+                            approved = false;
+                            FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                            FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
+                        }
+                        if (!approved) {
+                            cb.onProceed(false);
+                            Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
+                            Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
+                            startActivity(intent);
+                            finish();
+                            return;
+                        }
+                        if ("Admin".equalsIgnoreCase(role)) {
+                            if (reloaded.isEmailVerified()) {
+                                applyRemoteTheme(userSnap);
+                                updateUserProfileFromAuth(reloaded, userSnap);
+                                FirestoreManager.getInstance().updateCurrentUserId(uid);
+                                FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                                FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
+                                ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
+                                syncer.startRealtimeSync(uid);
+                                Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                startActivity(intent);
+                                finish();
+                                cb.onProceed(true);
+                                return;
+                            } else {
+                                Toast.makeText(SignInActivity.this, "Please verify your email before logging in. Check your inbox.", Toast.LENGTH_LONG).show();
+                                FirebaseAuth.getInstance().signOut();
+                                cb.onProceed(false);
+                                return;
+                            }
+                        } else {
+                            applyRemoteTheme(userSnap);
+                            updateUserProfileFromAuth(reloaded, userSnap);
+                            FirestoreManager.getInstance().updateCurrentUserId(uid);
+                            String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+                            if (owner != null && !owner.isEmpty()) {
+                                FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
+                                ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
+                                syncer.startRealtimeSync(owner);
+                            }
+                            Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            startActivity(intent);
+                            finish();
+                            cb.onProceed(true);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private void applyRemoteTheme(DocumentSnapshot doc) {
@@ -108,14 +202,13 @@ public class SignInActivity extends BaseActivity {
         }
     }
 
-    private void updateUserProfileFromAuth(FirebaseUser user, DocumentSnapshot existingDoc) {
+    private void updateUserProfileFromAuth(com.google.firebase.auth.FirebaseUser user, DocumentSnapshot existingDoc) {
         if (user == null) return;
         String uid = user.getUid();
         String email = user.getEmail() != null ? user.getEmail() : "";
         String name = user.getDisplayName() != null ? user.getDisplayName() : "";
         String phone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
         String photoUrl = user.getPhotoUrl() != null ? user.getPhotoUrl().toString() : "";
-
         Map<String, Object> data = new HashMap<>();
         if (!email.isEmpty()) {
             data.put("email", email);
@@ -137,9 +230,8 @@ public class SignInActivity extends BaseActivity {
                 data.put("photoUrl", existingPhoto);
             }
         }
-
         if (!data.isEmpty()) {
-            fStore.collection("users").document(uid).set(data, SetOptions.merge());
+            FirebaseFirestore.getInstance().collection("users").document(uid).set(data, SetOptions.merge());
         }
     }
 
@@ -162,68 +254,37 @@ public class SignInActivity extends BaseActivity {
         fAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
+                progressBar.setVisibility(View.INVISIBLE);
                 if (task.isSuccessful()) {
-                    FirebaseUser user = fAuth.getCurrentUser();
+                    com.google.firebase.auth.FirebaseUser user = fAuth.getCurrentUser();
                     if (user != null) {
                         user.reload().addOnCompleteListener(new OnCompleteListener<Void>() {
                             @Override
                             public void onComplete(@NonNull Task<Void> t) {
-                                progressBar.setVisibility(View.INVISIBLE);
-                                FirebaseUser reloaded = fAuth.getCurrentUser();
-                                if (reloaded != null && reloaded.isEmailVerified()) {
-                                    String uid = reloaded.getUid();
-                                    fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                                        @Override
-                                        public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                                            if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                                                DocumentSnapshot doc = task.getResult();
-                                                Boolean approved = doc.getBoolean("approved");
-                                                if (approved == null) approved = false;
-                                                if (approved) {
-                                                    if (rememberCheck != null && rememberCheck.isChecked()) {
-                                                        prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
-                                                    } else {
-                                                        prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
-                                                    }
-                                                    applyRemoteTheme(doc);
-                                                    updateUserProfileFromAuth(reloaded, doc);
-                                                    FirestoreManager.getInstance().updateCurrentUserId(uid);
-                                                    Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                                    startActivity(intent);
-                                                    finish();
-                                                } else {
-                                                    Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
-                                                    Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
-                                                    startActivity(intent);
-                                                    finish();
-                                                }
+                                com.google.firebase.auth.FirebaseUser reloaded = fAuth.getCurrentUser();
+                                if (reloaded == null) {
+                                    Toast.makeText(SignInActivity.this, "Sign in failed", Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
+                                    @Override
+                                    public void onProceed(boolean success) {
+                                        if (!success) {
+                                        } else {
+                                            if (rememberCheck != null && rememberCheck.isChecked()) {
+                                                prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
                                             } else {
-                                                FirebaseUser u = fAuth.getCurrentUser();
-                                                if (u != null) {
-                                                    updateUserProfileFromAuth(u, null);
-                                                    Toast.makeText(SignInActivity.this, "Profile initialized, please wait for admin approval", Toast.LENGTH_LONG).show();
-                                                    Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
-                                                    startActivity(intent);
-                                                    finish();
-                                                } else {
-                                                    Toast.makeText(SignInActivity.this, "User profile missing", Toast.LENGTH_LONG).show();
-                                                }
+                                                prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
                                             }
                                         }
-                                    });
-                                } else {
-                                    Toast.makeText(SignInActivity.this, "Please verify your email before logging in. Check your inbox.", Toast.LENGTH_LONG).show();
-                                    fAuth.signOut();
-                                }
+                                    }
+                                });
                             }
                         });
                     } else {
-                        progressBar.setVisibility(View.INVISIBLE);
                         Toast.makeText(SignInActivity.this, "Sign in failed", Toast.LENGTH_LONG).show();
                     }
                 } else {
-                    progressBar.setVisibility(View.INVISIBLE);
                     String errorMessage = task.getException() != null ? task.getException().getMessage() : "Login failed";
                     Toast.makeText(SignInActivity.this, "Error: " + errorMessage, Toast.LENGTH_LONG).show();
                 }

@@ -53,7 +53,7 @@ public class CategoryRepository {
                     if (category != null) {
                         category.setCategoryId(document.getId());
                         if (category.getType() == null || category.getType().isEmpty()) {
-                            category.setType("Raw");
+                            category.setType("Inventory");
                         }
                         categoryList.add(category);
                     }
@@ -84,7 +84,7 @@ public class CategoryRepository {
                             if (category != null) {
                                 category.setCategoryId(document.getId());
                                 if (category.getType() == null || category.getType().isEmpty()) {
-                                    category.setType("Raw");
+                                    category.setType("Inventory");
                                 }
                                 list.add(category);
                             }
@@ -111,7 +111,7 @@ public class CategoryRepository {
         categoryMap.put("categoryName", category.getCategoryName());
         categoryMap.put("description", category.getDescription() != null ? category.getDescription() : "");
         categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
-        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Raw");
+        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Inventory");
         categoryMap.put("active", category.isActive());
         categoryMap.put("timestamp", firestoreManager.getServerTimestamp());
         firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath()).add(categoryMap)
@@ -140,7 +140,7 @@ public class CategoryRepository {
         categoryMap.put("categoryName", category.getCategoryName());
         categoryMap.put("description", category.getDescription() != null ? category.getDescription() : "");
         categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
-        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Raw");
+        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Inventory");
         categoryMap.put("active", category.isActive());
         firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath())
                 .document(category.getCategoryId())
@@ -187,7 +187,7 @@ public class CategoryRepository {
                         if (category != null) {
                             category.setCategoryId(documentSnapshot.getId());
                             if (category.getType() == null || category.getType().isEmpty()) {
-                                category.setType("Raw");
+                                category.setType("Inventory");
                             }
                             listener.onCategoryFetched(category);
                             return;

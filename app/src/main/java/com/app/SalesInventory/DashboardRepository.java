@@ -5,6 +5,10 @@ import androidx.lifecycle.MediatorLiveData;
 
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -13,43 +17,56 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nullable;
+
 public class DashboardRepository {
     private SalesRepository salesRepository;
     private ProductRepository productRepository;
     private AlertRepository alertRepository;
-
     private final MediatorLiveData<DashboardMetrics> metricsLiveData = new MediatorLiveData<>();
     private boolean metricsSourcesAdded = false;
     private DashboardRepository.OnMetricsLoadedListener metricsListener;
+    private final FirebaseFirestore firestore;
 
     public DashboardRepository() {
         salesRepository = SalesRepository.getInstance();
         productRepository = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
         alertRepository = AlertRepository.getInstance(SalesInventoryApplication.getInstance());
+        firestore = FirestoreManager.getInstance().getDb();
     }
 
     public void getDashboardMetrics(OnMetricsLoadedListener listener) {
         metricsListener = listener;
-
         LiveData<Double> totalSalesLive = salesRepository.getTotalSalesToday();
         LiveData<List<Product>> productsLive = productRepository.getAllProducts();
         LiveData<List<Alert>> alertsLive = alertRepository.getUnreadAlerts();
         LiveData<Double> revenueLive = salesRepository.getTotalMonthlyRevenue();
-
         if (!metricsSourcesAdded) {
             metricsSourcesAdded = true;
             metricsLiveData.addSource(totalSalesLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(productsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(alertsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(revenueLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
-
             metricsLiveData.observeForever(metrics -> {
                 if (metrics != null && metricsListener != null) {
                     metricsListener.onMetricsLoaded(metrics);
                 }
             });
+            String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+            if (owner != null && !owner.isEmpty()) {
+                DocumentReference dr = firestore.collection("dashboard").document(owner);
+                dr.addSnapshotListener(new EventListener<DocumentSnapshot>() {
+                    @Override
+                    public void onEvent(@Nullable DocumentSnapshot snapshot, @Nullable com.google.firebase.firestore.FirebaseFirestoreException e) {
+                        if (snapshot != null && snapshot.exists()) {
+                            Map<String, Object> data = snapshot.getData();
+                            DashboardMetrics dm = DashboardMetrics.fromMap(data);
+                            metricsLiveData.postValue(dm);
+                        }
+                    }
+                });
+            }
         }
-
         recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive);
     }
 
@@ -61,26 +78,20 @@ public class DashboardRepository {
         List<Product> products = productsLive.getValue();
         List<Alert> alerts = alertsLive.getValue();
         Double revenue = revenueLive.getValue();
-
         double inventoryValue = 0;
         int lowOrCriticalCount = 0;
-
         if (products != null) {
             for (Product p : products) {
                 if (p == null || !p.isActive()) continue;
                 String type = p.getProductType() == null ? "" : p.getProductType();
                 if ("Menu".equalsIgnoreCase(type)) continue;
-
                 inventoryValue += (p.getQuantity() * p.getCostPrice());
-
                 if (p.isCriticalStock() || p.isLowStock()) {
                     lowOrCriticalCount++;
                 }
             }
         }
-
         int pendingAlertsCount = alerts != null ? alerts.size() : 0;
-
         DashboardMetrics metrics = new DashboardMetrics(
                 totalSales != null ? totalSales : 0.0,
                 inventoryValue,
@@ -89,6 +100,15 @@ public class DashboardRepository {
                 revenue != null ? revenue : 0.0
         );
         metricsLiveData.setValue(metrics);
+        saveMetricsToFirestore(metrics);
+    }
+
+    private void saveMetricsToFirestore(DashboardMetrics metrics) {
+        String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (owner == null || owner.isEmpty()) return;
+        try {
+            firestore.collection("dashboard").document(owner).set(metrics.toMap());
+        } catch (Exception ignored) {}
     }
 
     public void getRecentActivities(int limit, OnActivitiesLoadedListener listener) {
@@ -118,12 +138,10 @@ public class DashboardRepository {
         if (allSales == null || allSales.isEmpty()) {
             return entries;
         }
-
         int days = 7;
         long now = System.currentTimeMillis();
         long oneDayMillis = 24L * 60L * 60L * 1000L;
         Map<Integer, Double> dayIndexToAmount = new HashMap<>();
-
         for (Sales s : allSales) {
             long ts = s.getTimestamp() > 0 ? s.getTimestamp() : s.getDate();
             if (ts <= 0) continue;
@@ -135,12 +153,10 @@ public class DashboardRepository {
             Double current = dayIndexToAmount.get(index);
             dayIndexToAmount.put(index, (current != null ? current : 0.0) + amount);
         }
-
         for (int i = 0; i < days; i++) {
             double value = dayIndexToAmount.get(i) != null ? dayIndexToAmount.get(i) : 0.0;
             entries.add(new Entry(i, (float) value));
         }
-
         return entries;
     }
 
@@ -150,7 +166,6 @@ public class DashboardRepository {
         if (allSales == null || allSales.isEmpty()) {
             return new TopProductsResult(entries, labels);
         }
-
         Map<String, Integer> productQty = new HashMap<>();
         for (Sales s : allSales) {
             String productId = s.getProductId();
@@ -159,7 +174,6 @@ public class DashboardRepository {
             Integer current = productQty.get(productId);
             productQty.put(productId, (current != null ? current : 0) + qty);
         }
-
         Map<String, String> idToName = new HashMap<>();
         if (allProducts != null) {
             for (Product p : allProducts) {
@@ -168,11 +182,9 @@ public class DashboardRepository {
                 }
             }
         }
-
         List<Map.Entry<String, Integer>> sorted = new ArrayList<>(productQty.entrySet());
         Collections.sort(sorted, (a, b) -> Integer.compare(b.getValue(), a.getValue()));
         int max = Math.min(5, sorted.size());
-
         for (int i = 0; i < max; i++) {
             Map.Entry<String, Integer> e = sorted.get(i);
             String productId = e.getKey();
@@ -182,7 +194,6 @@ public class DashboardRepository {
             if (name == null || name.isEmpty()) name = productId;
             labels.add(name);
         }
-
         return new TopProductsResult(entries, labels);
     }
 
@@ -191,7 +202,6 @@ public class DashboardRepository {
         int low = 0;
         int critical = 0;
         int out = 0;
-
         if (products != null) {
             for (Product p : products) {
                 int qty = p.getQuantity();
@@ -206,7 +216,6 @@ public class DashboardRepository {
                 }
             }
         }
-
         return new int[]{inStock, low, critical, out};
     }
 

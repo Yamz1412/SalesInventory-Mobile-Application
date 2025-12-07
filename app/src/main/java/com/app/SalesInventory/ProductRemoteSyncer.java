@@ -5,25 +5,27 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QuerySnapshot;
 
 public class ProductRemoteSyncer {
     private static final String TAG = "ProductRemoteSyncer";
 
     private final ProductRepository productRepository;
-    private final FirestoreManager firestoreManager;
     private final FirebaseFirestore db;
+    private ListenerRegistration productsListener;
 
     public ProductRemoteSyncer(Application application) {
         this.productRepository = ProductRepository.getInstance(application);
-        this.firestoreManager = FirestoreManager.getInstance();
-        this.db = firestoreManager.getDb();
+        this.db = FirestoreManager.getInstance().getDb();
     }
 
     public void syncAllProducts(@Nullable Runnable onFinished) {
-        String path = firestoreManager.getUserProductsPath();
+        String path = FirestoreManager.getInstance().getUserProductsPath();
         db.collection(path)
                 .get()
                 .addOnSuccessListener(this::handleSnapshot)
@@ -46,9 +48,37 @@ public class ProductRemoteSyncer {
         }
     }
 
+    public void startRealtimeSync(String ownerAdminUid) {
+        stopRealtimeSync();
+        if (ownerAdminUid == null || ownerAdminUid.isEmpty()) return;
+        String path = "products/" + ownerAdminUid + "/items";
+        productsListener = db.collection(path).addSnapshotListener(new EventListener<QuerySnapshot>() {
+            @Override
+            public void onEvent(@Nullable QuerySnapshot snapshots, @Nullable com.google.firebase.firestore.FirebaseFirestoreException error) {
+                if (error != null) {
+                    Log.e(TAG, "Realtime listener error", error);
+                    return;
+                }
+                if (snapshots == null) return;
+                for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                    DocumentSnapshot doc = dc.getDocument();
+                    Product p = mapDocToProduct(doc);
+                    if (p == null) continue;
+                    productRepository.upsertFromRemote(p);
+                }
+            }
+        });
+    }
+
+    public void stopRealtimeSync() {
+        if (productsListener != null) {
+            productsListener.remove();
+            productsListener = null;
+        }
+    }
+
     private Product mapDocToProduct(DocumentSnapshot doc) {
         if (doc == null || !doc.exists()) return null;
-
         Product p = new Product();
         p.setProductId(doc.getId());
         p.setProductName(getString(doc, "productName"));
@@ -61,6 +91,7 @@ public class ProductRemoteSyncer {
         p.setReorderLevel(getInt(doc, "reorderLevel"));
         p.setCriticalLevel(getInt(doc, "criticalLevel"));
         p.setCeilingLevel(getInt(doc, "ceilingLevel"));
+        p.setFloorLevel(getInt(doc, "floorLevel"));
         p.setUnit(getString(doc, "unit"));
         p.setBarcode(getString(doc, "barcode"));
         p.setSupplier(getString(doc, "supplier"));
@@ -80,12 +111,10 @@ public class ProductRemoteSyncer {
     }
 
     private double getDouble(DocumentSnapshot doc, String field) {
-        Number n = doc.getDouble(field);
-        if (n == null) {
-            Long l = doc.getLong(field);
-            return l == null ? 0.0 : l.doubleValue();
-        }
-        return n.doubleValue();
+        Double d = doc.getDouble(field);
+        if (d != null) return d;
+        Long l = doc.getLong(field);
+        return l == null ? 0.0 : l.doubleValue();
     }
 
     private int getInt(DocumentSnapshot doc, String field) {

@@ -164,10 +164,13 @@
         tools:itemCount="6" />
 
     <LinearLayout
+        android:id="@+id/bottom_button_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:padding="12dp"
+        android:background="?android:colorBackground"
+        android:elevation="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_adjust_stock"
@@ -191,6 +194,15 @@
             android:text="Adjustment Summary Report"
             android:layout_marginTop="8dp"
             style="@style/CustomButtonOutlined" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_delete_product"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Deleted Products"
+            android:layout_marginTop="8dp"
+            style="@style/CustomButtonOutlined"
+            app:iconTint="@color/text_secondary" />
 
     </LinearLayout>
 
