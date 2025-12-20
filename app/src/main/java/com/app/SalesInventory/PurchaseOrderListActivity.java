@@ -7,6 +7,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -20,13 +22,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class PurchaseOrderListActivity extends BaseActivity  {
+public class PurchaseOrderListActivity extends BaseActivity {
 
     private RecyclerView recyclerView;
     private PurchaseOrderAdapter adapter;
     private List<PurchaseOrder> purchaseOrderList;
     private FloatingActionButton fabAddPO;
+    private Button btnViewArchives;
     private DatabaseReference poRef;
+    private ValueEventListener poListListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +39,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
         recyclerView = findViewById(R.id.recyclerViewPurchaseOrders);
         fabAddPO = findViewById(R.id.fabAddPO);
+        btnViewArchives = findViewById(R.id.btnViewArchives);
 
         purchaseOrderList = new ArrayList<>();
         adapter = new PurchaseOrderAdapter(this, purchaseOrderList, this::viewPurchaseOrder);
@@ -50,33 +55,52 @@ public class PurchaseOrderListActivity extends BaseActivity  {
             Intent intent = new Intent(PurchaseOrderListActivity.this, CreatePurchaseOrderActivity.class);
             startActivity(intent);
         });
+
+        btnViewArchives.setOnClickListener(v -> {
+            Intent i = new Intent(PurchaseOrderListActivity.this, DeleteProductActivity.class);
+            i.putExtra("archiveType", "po");
+            startActivity(i);
+        });
     }
 
     private void loadPurchaseOrders() {
-        poRef.addValueEventListener(new ValueEventListener() {
+        if (poRef == null) return;
+        poListListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 purchaseOrderList.clear();
                 for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
                     PurchaseOrder po = dataSnapshot.getValue(PurchaseOrder.class);
                     if (po != null) {
+                        if (po.getPoId() == null || po.getPoId().isEmpty()) po.setPoId(dataSnapshot.getKey());
                         purchaseOrderList.add(po);
                     }
                 }
                 Collections.reverse(purchaseOrderList);
-                adapter.notifyDataSetChanged();
+                adapter.setPurchaseOrders(purchaseOrderList);
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Toast.makeText(PurchaseOrderListActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
-        });
+        };
+        poRef.addValueEventListener(poListListener);
     }
 
     private void viewPurchaseOrder(PurchaseOrder po) {
+        if (po == null) return;
         Intent intent = new Intent(this, PurchaseOrderDetailActivity.class);
         intent.putExtra("poId", po.getPoId());
         startActivity(intent);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (poRef != null && poListListener != null) {
+            poRef.removeEventListener(poListListener);
+            poListListener = null;
+        }
     }
 }

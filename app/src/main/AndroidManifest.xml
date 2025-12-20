@@ -42,7 +42,27 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
+            android:name=".Conditions"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
             android:name=".DeliveryReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name=".InventoryMovementsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name=".StockMovementReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name=".AdjustmentSummaryReportActivity"
             android:exported="false"
             android:windowSoftInputMode="stateHidden|adjustResize" />
 
@@ -72,12 +92,7 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
-            android:name=".History"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-
-        <activity
-            android:name=".AdjustmentHistoryActivity"
+            android:name=".AlertsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
@@ -87,17 +102,17 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
-            android:name=".AdjustmentSummaryReportActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-
-        <activity
-            android:name=".StockMovementReportActivity"
+            android:name=".History"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
             android:name=".StockValueReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".AdjustmentHistoryActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
@@ -132,12 +147,12 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
-            android:name=".Conditions"
+            android:name=".MainActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
-            android:name=".MainActivity"
+            android:name=".ReceiptActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 

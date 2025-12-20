@@ -9,17 +9,27 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustmentAdapter.ViewHolder> {
 
-    private List<StockAdjustment> adjustmentList;
+    private List<StockAdjustment> adjustmentList = new ArrayList<>();
     private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
 
     public StockAdjustmentAdapter(List<StockAdjustment> adjustmentList) {
-        this.adjustmentList = adjustmentList;
+        if (adjustmentList != null) this.adjustmentList = adjustmentList;
+    }
+
+    public void setAdjustments(List<StockAdjustment> adjustments) {
+        if (adjustments == null) {
+            this.adjustmentList = new ArrayList<>();
+        } else {
+            this.adjustmentList = adjustments;
+        }
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -32,11 +42,13 @@ public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustment
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        if (adjustmentList == null || position < 0 || position >= adjustmentList.size()) return;
         StockAdjustment adjustment = adjustmentList.get(position);
+        if (adjustment == null) return;
 
-        holder.tvProductName.setText(adjustment.getProductName());
-        holder.tvAdjustmentType.setText(adjustment.getAdjustmentType());
-        holder.tvReason.setText(adjustment.getReason());
+        holder.tvProductName.setText(adjustment.getProductName() == null ? "" : adjustment.getProductName());
+        holder.tvAdjustmentType.setText(adjustment.getAdjustmentType() == null ? "" : adjustment.getAdjustmentType());
+        holder.tvReason.setText(adjustment.getReason() == null ? "" : adjustment.getReason());
 
         String quantityText = "Qty: " + adjustment.getQuantityBefore() + " → " + adjustment.getQuantityAfter();
         holder.tvQuantity.setText(quantityText);
@@ -51,10 +63,9 @@ public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustment
             holder.tvRemarks.setVisibility(View.GONE);
         }
 
-        holder.tvAdjustedBy.setText("By: " + adjustment.getAdjustedBy());
+        holder.tvAdjustedBy.setText("By: " + (adjustment.getAdjustedBy() == null ? "" : adjustment.getAdjustedBy()));
 
-        // Set color based on adjustment type
-        if (adjustment.getAdjustmentType().equals("Add Stock")) {
+        if ("Add Stock".equalsIgnoreCase(adjustment.getAdjustmentType())) {
             holder.tvAdjustmentType.setTextColor(holder.itemView.getContext()
                     .getResources().getColor(R.color.successGreen));
         } else {
@@ -65,7 +76,7 @@ public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustment
 
     @Override
     public int getItemCount() {
-        return adjustmentList.size();
+        return adjustmentList == null ? 0 : adjustmentList.size();
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {

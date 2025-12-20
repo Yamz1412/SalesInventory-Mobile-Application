@@ -1,27 +1,34 @@
 package com.app.SalesInventory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class DashboardMetrics {
     private double totalSalesToday;
+    private double revenue;
     private double totalInventoryValue;
     private int lowStockCount;
     private int pendingOrdersCount;
-    private double revenue;
-    private long lastUpdated;
+    private int nearExpiryCount;
+    private List<TopProduct> topProducts;
 
     public DashboardMetrics() {
-        this.lastUpdated = System.currentTimeMillis();
+        topProducts = new ArrayList<>();
     }
 
-    public DashboardMetrics(double totalSalesToday, double totalInventoryValue, int lowStockCount, int pendingOrdersCount, double revenue) {
+    public DashboardMetrics(double totalSalesToday,
+                            double totalInventoryValue,
+                            int lowStockCount,
+                            int pendingOrdersCount,
+                            double revenue) {
+        this();
         this.totalSalesToday = totalSalesToday;
         this.totalInventoryValue = totalInventoryValue;
         this.lowStockCount = lowStockCount;
         this.pendingOrdersCount = pendingOrdersCount;
         this.revenue = revenue;
-        this.lastUpdated = System.currentTimeMillis();
     }
 
     public double getTotalSalesToday() {
@@ -30,6 +37,14 @@ public class DashboardMetrics {
 
     public void setTotalSalesToday(double totalSalesToday) {
         this.totalSalesToday = totalSalesToday;
+    }
+
+    public double getRevenue() {
+        return revenue;
+    }
+
+    public void setRevenue(double revenue) {
+        this.revenue = revenue;
     }
 
     public double getTotalInventoryValue() {
@@ -56,49 +71,122 @@ public class DashboardMetrics {
         this.pendingOrdersCount = pendingOrdersCount;
     }
 
-    public double getRevenue() {
-        return revenue;
+    public int getNearExpiryCount() {
+        return nearExpiryCount;
     }
 
-    public void setRevenue(double revenue) {
-        this.revenue = revenue;
+    public void setNearExpiryCount(int nearExpiryCount) {
+        this.nearExpiryCount = nearExpiryCount;
     }
 
-    public long getLastUpdated() {
-        return lastUpdated;
+    public List<TopProduct> getTopProducts() {
+        return topProducts;
     }
 
-    public void setLastUpdated(long lastUpdated) {
-        this.lastUpdated = lastUpdated;
+    public void setTopProducts(List<TopProduct> topProducts) {
+        this.topProducts = topProducts == null ? new ArrayList<>() : topProducts;
     }
 
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();
         m.put("totalSalesToday", totalSalesToday);
+        m.put("revenue", revenue);
         m.put("totalInventoryValue", totalInventoryValue);
         m.put("lowStockCount", lowStockCount);
         m.put("pendingOrdersCount", pendingOrdersCount);
-        m.put("revenue", revenue);
-        m.put("lastUpdated", lastUpdated);
+        m.put("nearExpiryCount", nearExpiryCount);
+        List<Map<String, Object>> tops = new ArrayList<>();
+        if (topProducts != null) {
+            for (TopProduct tp : topProducts) {
+                Map<String, Object> tm = new HashMap<>();
+                tm.put("productName", tp.getProductName());
+                tm.put("quantitySold", tp.getQuantitySold());
+                tops.add(tm);
+            }
+        }
+        m.put("topProducts", tops);
         return m;
     }
 
     public static DashboardMetrics fromMap(Map<String, Object> m) {
-        DashboardMetrics d = new DashboardMetrics();
-        if (m == null) return d;
-        Object o;
-        o = m.get("totalSalesToday");
-        if (o instanceof Number) d.totalSalesToday = ((Number) o).doubleValue();
-        o = m.get("totalInventoryValue");
-        if (o instanceof Number) d.totalInventoryValue = ((Number) o).doubleValue();
-        o = m.get("lowStockCount");
-        if (o instanceof Number) d.lowStockCount = ((Number) o).intValue();
-        o = m.get("pendingOrdersCount");
-        if (o instanceof Number) d.pendingOrdersCount = ((Number) o).intValue();
-        o = m.get("revenue");
-        if (o instanceof Number) d.revenue = ((Number) o).doubleValue();
-        o = m.get("lastUpdated");
-        if (o instanceof Number) d.lastUpdated = ((Number) o).longValue();
-        return d;
+        DashboardMetrics dm = new DashboardMetrics();
+        if (m == null) return dm;
+        try {
+            Object v;
+            v = m.get("totalSalesToday");
+            if (v instanceof Number) dm.setTotalSalesToday(((Number) v).doubleValue());
+            else if (v instanceof String) dm.setTotalSalesToday(Double.parseDouble((String) v));
+
+            v = m.get("revenue");
+            if (v instanceof Number) dm.setRevenue(((Number) v).doubleValue());
+            else if (v instanceof String) dm.setRevenue(Double.parseDouble((String) v));
+
+            v = m.get("totalInventoryValue");
+            if (v instanceof Number) dm.setTotalInventoryValue(((Number) v).doubleValue());
+            else if (v instanceof String) dm.setTotalInventoryValue(Double.parseDouble((String) v));
+
+            v = m.get("lowStockCount");
+            if (v instanceof Number) dm.setLowStockCount(((Number) v).intValue());
+            else if (v instanceof String) dm.setLowStockCount(Integer.parseInt((String) v));
+
+            v = m.get("pendingOrdersCount");
+            if (v instanceof Number) dm.setPendingOrdersCount(((Number) v).intValue());
+            else if (v instanceof String) dm.setPendingOrdersCount(Integer.parseInt((String) v));
+
+            v = m.get("nearExpiryCount");
+            if (v instanceof Number) dm.setNearExpiryCount(((Number) v).intValue());
+            else if (v instanceof String) dm.setNearExpiryCount(Integer.parseInt((String) v));
+
+            Object topsObj = m.get("topProducts");
+            List<TopProduct> tops = new ArrayList<>();
+            if (topsObj instanceof List) {
+                List<?> list = (List<?>) topsObj;
+                for (Object o : list) {
+                    if (o instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> tm = (Map<String, Object>) o;
+                        String name = tm.get("productName") != null ? String.valueOf(tm.get("productName")) : "";
+                        int qty = 0;
+                        Object qo = tm.get("quantitySold");
+                        if (qo instanceof Number) qty = ((Number) qo).intValue();
+                        else if (qo instanceof String) {
+                            try { qty = Integer.parseInt((String) qo); } catch (Exception ignored) {}
+                        }
+                        tops.add(new TopProduct(name, qty));
+                    }
+                }
+            }
+            dm.setTopProducts(tops);
+        } catch (Exception ignored) {}
+        return dm;
+    }
+
+    public static class TopProduct {
+        private String productName;
+        private int quantitySold;
+
+        public TopProduct() {
+        }
+
+        public TopProduct(String productName, int quantitySold) {
+            this.productName = productName;
+            this.quantitySold = quantitySold;
+        }
+
+        public String getProductName() {
+            return productName == null ? "" : productName;
+        }
+
+        public void setProductName(String productName) {
+            this.productName = productName;
+        }
+
+        public int getQuantitySold() {
+            return quantitySold;
+        }
+
+        public void setQuantitySold(int quantitySold) {
+            this.quantitySold = quantitySold;
+        }
     }
 }

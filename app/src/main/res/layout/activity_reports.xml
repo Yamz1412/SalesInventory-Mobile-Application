@@ -139,12 +139,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="1dp"
         android:weightSum="2">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/BtnSalesReport"
-            android:layout_width="30dp"
+            android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Sales Journal (SJE)"
@@ -159,13 +159,12 @@
             android:layout_marginStart="8dp"
             style="@style/CustomButton" />
     </LinearLayout>
-
     <com.google.android.material.button.MaterialButton
         android:id="@+id/BtnComprehensiveReports"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="📊 Comprehensive Reports (CSV)"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="1dp"
         android:textStyle="bold"
         style="@style/CustomButton" />
 
@@ -174,17 +173,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="📝 Overall Summary PDF"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="1dp"
         android:textStyle="bold"
         style="@style/CustomButtonOutlined" />
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/BtnSampleData"
+        android:id="@+id/BtnInventoryMovements"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🧪 Sample Data (Admin)"
-        android:layout_marginTop="8dp"
-        android:textStyle="bold"
+        android:text="Inventory Movements"
+        android:layout_marginTop="0dp"
         style="@style/CustomButtonOutlined" />
 
     <LinearLayout

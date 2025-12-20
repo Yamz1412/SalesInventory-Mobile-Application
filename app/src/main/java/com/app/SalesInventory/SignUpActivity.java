@@ -7,21 +7,27 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
-
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
-
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.functions.FirebaseFunctions;
+import android.text.InputFilter;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.util.Patterns;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class SignUpActivity extends BaseActivity {
     private static final int TERMS_REQUEST_CODE = 101;
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[A-Za-z. ]{1,80}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+63\\d{10}$");
     private TextInputEditText mName;
     private TextInputEditText mEmail;
     private TextInputEditText mPhone;
@@ -33,14 +39,12 @@ public class SignUpActivity extends BaseActivity {
     private ProgressBar progressBar;
     private FirebaseAuth firebaseAuth;
     private FirebaseFirestore firestore;
-    private boolean anyAdminExists = false;
-    private boolean adminCheckCompleted = false;
+    private FirebaseFunctions functions;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sign_up);
-
         mName = findViewById(R.id.mName);
         mEmail = findViewById(R.id.mEmail);
         mPhone = findViewById(R.id.mPhone);
@@ -50,37 +54,87 @@ public class SignUpActivity extends BaseActivity {
         btnSignUp = findViewById(R.id.BtnSignUp);
         btnSignInPage = findViewById(R.id.SignInPage);
         progressBar = findViewById(R.id.progressBar);
-
         firebaseAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
-
+        functions = FirebaseFunctions.getInstance();
         btnSignInPage.setOnClickListener(v -> {
             Intent i = new Intent(SignUpActivity.this, SignInActivity.class);
             startActivity(i);
             finish();
         });
-
-        firestore.collection("users")
-                .whereEqualTo("role", "Admin")
-                .limit(1)
-                .get()
-                .addOnCompleteListener(task -> {
-                    adminCheckCompleted = true;
-                    if (task.isSuccessful()) {
-                        QuerySnapshot snap = task.getResult();
-                        anyAdminExists = snap != null && !snap.isEmpty();
-                    } else {
-                        anyAdminExists = true;
-                    }
-                });
-
         if (android.os.Build.VERSION.SDK_INT >= 21) {
             Window window = this.getWindow();
             window.setStatusBarColor(this.getResources().getColor(R.color.statusBarColor));
         }
-
+        applyInputFilters();
         setupTermsLink();
         btnSignUp.setOnClickListener(v -> attemptSignUp());
+    }
+
+    private void applyInputFilters() {
+        InputFilter nameFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence src, int start, int end, Spanned dest, int dstart, int dend) {
+                for (int i = start; i < end; i++) {
+                    char c = src.charAt(i);
+                    if (!(Character.isLetter(c) || c == '.' || Character.isSpaceChar(c))) {
+                        return "";
+                    }
+                }
+                int newLen = dest.length() - (dend - dstart) + (end - start);
+                if (newLen > 80) return "";
+                return null;
+            }
+        };
+        mName.setFilters(new InputFilter[] { nameFilter });
+        InputFilter phoneFilter = new InputFilter.LengthFilter(13);
+        mPhone.setFilters(new InputFilter[] { phoneFilter });
+        if (mPhone.getText() == null || mPhone.getText().toString().trim().isEmpty()) {
+            mPhone.setText("+63");
+            mPhone.setSelection(mPhone.getText().length());
+        }
+        mPhone.addTextChangedListener(new android.text.TextWatcher() {
+            boolean self = false;
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(android.text.Editable s) {
+                if (self) return;
+                self = true;
+                String val = s.toString();
+                String cleaned = val.replaceAll("[^0-9+]", "");
+                if (!cleaned.startsWith("+")) {
+                    cleaned = cleaned.replaceFirst("^0+", "");
+                    if (cleaned.startsWith("63")) cleaned = "+" + cleaned;
+                    else cleaned = "+63" + cleaned.replaceFirst("^\\+", "");
+                }
+                if (!cleaned.startsWith("+63")) {
+                    String digitsOnly = cleaned.replaceAll("[^0-9]", "");
+                    cleaned = "+63" + digitsOnly;
+                }
+                String afterPrefix = cleaned.length() > 3 ? cleaned.substring(3).replaceAll("[^0-9]", "") : "";
+                if (afterPrefix.length() > 10) afterPrefix = afterPrefix.substring(0, 10);
+                String result = "+63" + afterPrefix;
+                mPhone.setText(result);
+                mPhone.setSelection(result.length());
+                self = false;
+            }
+        });
+        InputFilter passwordFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                String result = dest.subSequence(0, dstart) + source.toString() + dest.subSequence(dend, dest.length());
+                if (result.length() > 64) return "";
+                int nonAlnum = 0;
+                for (int i = 0; i < result.length(); i++) {
+                    char c = result.charAt(i);
+                    if (!Character.isLetterOrDigit(c)) nonAlnum++;
+                    if (nonAlnum > 1) return "";
+                }
+                return null;
+            }
+        };
+        mPassword.setFilters(new InputFilter[] { passwordFilter });
+        mCPassword.setFilters(new InputFilter[] { passwordFilter });
     }
 
     private void setupTermsLink() {
@@ -92,7 +146,6 @@ public class SignUpActivity extends BaseActivity {
                 Intent intent = new Intent(SignUpActivity.this, Conditions.class);
                 startActivityForResult(intent, TERMS_REQUEST_CODE);
             }
-
             @Override
             public void updateDrawState(@NonNull android.text.TextPaint ds) {
                 super.updateDrawState(ds);
@@ -111,27 +164,45 @@ public class SignUpActivity extends BaseActivity {
         String phone = mPhone.getText() != null ? mPhone.getText().toString().trim() : "";
         String password = mPassword.getText() != null ? mPassword.getText().toString() : "";
         String cpassword = mCPassword.getText() != null ? mCPassword.getText().toString() : "";
-
-        if (name.isEmpty() || email.isEmpty() || password.isEmpty() || cpassword.isEmpty() || !mCheck.isChecked()) {
+        if (name.isEmpty() || email.isEmpty() || phone.isEmpty() || !mCheck.isChecked()) {
             Toast.makeText(this, "Please complete the form", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!password.equals(cpassword)) {
-            Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+        if (!NAME_PATTERN.matcher(name).matches()) {
+            Toast.makeText(this, "Name can only contain letters, spaces and dot (max 80 chars)", Toast.LENGTH_LONG).show();
             return;
         }
-        if (!adminCheckCompleted) {
-            Toast.makeText(this, "Please wait...", Toast.LENGTH_SHORT).show();
+        if (TextUtils.isEmpty(email) || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_LONG).show();
             return;
         }
-
-        if (anyAdminExists) {
-            Toast.makeText(this, "Admin account already exists. Please contact the admin.", Toast.LENGTH_LONG).show();
+        if (!PHONE_PATTERN.matcher(phone).matches()) {
+            Toast.makeText(this, "Phone must start with +63 followed by 10 digits", Toast.LENGTH_LONG).show();
             return;
         }
-
+        boolean usingPassword = password != null && !password.isEmpty();
+        if (usingPassword) {
+            if (!password.equals(cpassword)) {
+                Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (password.length() < 6) {
+                Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int nonAlnum = 0;
+            for (int i = 0; i < password.length(); i++) {
+                char c = password.charAt(i);
+                if (!Character.isLetterOrDigit(c)) nonAlnum++;
+                if (nonAlnum > 1) {
+                    Toast.makeText(this, "Password may contain at most one special symbol", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+        }
         progressBar.setVisibility(android.view.View.VISIBLE);
-        firebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(createTask -> {
+        String passwordToUse = usingPassword ? password : generateRandomPassword();
+        firebaseAuth.createUserWithEmailAndPassword(email, passwordToUse).addOnCompleteListener(createTask -> {
             if (createTask.isSuccessful()) {
                 FirebaseUser createdUser = firebaseAuth.getCurrentUser();
                 if (createdUser == null) {
@@ -149,21 +220,42 @@ public class SignUpActivity extends BaseActivity {
                 profile.put("role", "Admin");
                 profile.put("approved", autoApprove);
                 profile.put("createdAt", System.currentTimeMillis());
-
                 firestore.collection("users").document(uid).set(profile).addOnCompleteListener(setTask -> {
-                    createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
-                        runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
-                        Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        startActivity(i);
-                        finish();
-                    }).addOnFailureListener(e -> {
-                        runOnUiThread(() -> {
-                            progressBar.setVisibility(android.view.View.GONE);
-                            Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
-                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(i);
-                            finish();
+                    Map<String, Object> adminDoc = new HashMap<>();
+                    adminDoc.put("uid", uid);
+                    adminDoc.put("email", createdUser.getEmail() != null ? createdUser.getEmail() : "");
+                    adminDoc.put("name", name);
+                    adminDoc.put("phone", phone);
+                    adminDoc.put("role", "Admin");
+                    adminDoc.put("approved", autoApprove);
+                    adminDoc.put("createdAt", System.currentTimeMillis());
+                    firestore.collection("admin").document(uid).set(adminDoc).addOnCompleteListener(adminSetTask -> {
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("uid", uid);
+                        data.put("name", name);
+                        data.put("email", createdUser.getEmail() != null ? createdUser.getEmail() : "");
+                        data.put("phone", phone);
+                        functions.getHttpsCallable("createAdminOwner").call(data).addOnCompleteListener(fnTask -> {
+                            createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
+                                runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
+                                Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
+                                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                startActivity(i);
+                                finish();
+                            }).addOnFailureListener(e -> {
+                                runOnUiThread(() -> {
+                                    progressBar.setVisibility(android.view.View.GONE);
+                                    Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
+                                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                    startActivity(i);
+                                    finish();
+                                });
+                            });
+                        }).addOnFailureListener(e -> {
+                            runOnUiThread(() -> {
+                                progressBar.setVisibility(android.view.View.GONE);
+                                Toast.makeText(SignUpActivity.this, "Failed to register admin: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            });
                         });
                     });
                 }).addOnFailureListener(e -> runOnUiThread(() -> {
@@ -178,6 +270,16 @@ public class SignUpActivity extends BaseActivity {
                 });
             }
         });
+    }
+
+    private String generateRandomPassword() {
+        SecureRandom rnd = new SecureRandom();
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            sb.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     @Override

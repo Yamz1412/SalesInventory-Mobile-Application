@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="10dp"
+    android:background="@color/white">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvReceiptItemName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Item Name"
+            android:textSize="14sp"
+            android:textColor="@color/textColorPrimary" />
+
+        <TextView
+            android:id="@+id/tvReceiptItemQty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="x1"
+            android:textSize="12sp"
+            android:textColor="@color/textColorSecondary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvReceiptItemPrice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="₱0.00"
+        android:textSize="14sp"
+        android:textColor="@color/textColorPrimary"
+        android:gravity="end" />
+
+</LinearLayout>

@@ -7,6 +7,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.Spanned;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -22,13 +26,14 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class CreatePurchaseOrderActivity extends BaseActivity  {
     private Toolbar toolbar;
     private TextInputEditText etSupplierName, etSupplierPhone, etOrderDate, etExpectedDate, etNotes;
     private RecyclerView recyclerViewItems;
     private TextView tvTotalAmount;
-    private Button btnAddItem, btnCreatePO;
+    private Button btnAddItem, btnCreatePO, btnCancelPO;
     private POItemAdapter adapter;
     private List<POItem> poItems;
     private DatabaseReference poRef;
@@ -36,6 +41,14 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
     private ProductRepository productRepository;
     private List<Product> availableProducts = new ArrayList<>();
     private List<String> productNames = new ArrayList<>();
+
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+63\\d{10}$");
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[A-Za-z. ]+$");
+    private static final Pattern QUANTITY_PATTERN = Pattern.compile("^\\d{1,5}$");
+    private static final Pattern PRICE_PATTERN = Pattern.compile("^\\d{1,7}(\\.\\d{0,2})?$");
+
+    private TextWatcher phoneWatcher;
+    private InputFilter nameFilter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +78,65 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         tvTotalAmount = findViewById(R.id.tvTotalAmount);
         btnAddItem = findViewById(R.id.btnAddItem);
         btnCreatePO = findViewById(R.id.btnCreatePO);
+        btnCancelPO = findViewById(R.id.btnCancelPO);
         calendar = Calendar.getInstance();
         updateDateLabel(etOrderDate);
+
+        nameFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence src, int start, int end, Spanned dest, int dstart, int dend) {
+                for (int i = start; i < end; i++) {
+                    char c = src.charAt(i);
+                    if (!(Character.isLetter(c) || c == '.' || Character.isSpaceChar(c))) {
+                        return "";
+                    }
+                }
+                return null;
+            }
+        };
+        etSupplierName.setFilters(new InputFilter[] { nameFilter, new InputFilter.LengthFilter(80) });
+
+        etSupplierPhone.setFilters(new InputFilter[] { new InputFilter.LengthFilter(13) });
+        if (etSupplierPhone.getText() == null || etSupplierPhone.getText().toString().trim().isEmpty()) {
+            etSupplierPhone.setText("+63");
+            etSupplierPhone.setSelection(etSupplierPhone.getText().length());
+        }
+
+        phoneWatcher = new TextWatcher() {
+            boolean selfChange = false;
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) { }
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (selfChange) return;
+                selfChange = true;
+                String val = s.toString();
+                String cleaned = val.replaceAll("[^+0-9]", "");
+                if (!cleaned.startsWith("+")) {
+                    if (cleaned.startsWith("0")) {
+                        cleaned = cleaned.replaceFirst("^0+", "");
+                        cleaned = "+63" + cleaned;
+                    } else if (cleaned.startsWith("63")) {
+                        cleaned = "+" + cleaned;
+                    } else {
+                        cleaned = "+63" + cleaned.replaceFirst("^\\+", "");
+                    }
+                }
+                if (!cleaned.startsWith("+63")) {
+                    String digitsOnly = cleaned.replaceAll("[^0-9]", "");
+                    cleaned = "+63" + digitsOnly;
+                }
+                String afterPrefix = cleaned.substring(3).replaceAll("[^0-9]", "");
+                if (afterPrefix.length() > 10) afterPrefix = afterPrefix.substring(0, 10);
+                String result = "+63" + afterPrefix;
+                etSupplierPhone.setText(result);
+                etSupplierPhone.setSelection(result.length());
+                selfChange = false;
+            }
+        };
+        etSupplierPhone.addTextChangedListener(phoneWatcher);
     }
 
     private void loadProductsForSpinner() {
@@ -97,7 +167,45 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         etOrderDate.setOnClickListener(v -> showDatePicker(etOrderDate));
         etExpectedDate.setOnClickListener(v -> showDatePicker(etExpectedDate));
         btnAddItem.setOnClickListener(v -> showAddItemDialog());
-        btnCreatePO.setOnClickListener(v -> savePurchaseOrder());
+        btnCreatePO.setOnClickListener(v -> showConfirmCreateDialog());
+        btnCancelPO.setOnClickListener(v -> showConfirmCancelDialog());
+    }
+
+    private void showConfirmCreateDialog() {
+        String supplier = etSupplierName.getText() == null ? "" : etSupplierName.getText().toString().trim();
+        String phone = etSupplierPhone.getText() == null ? "" : etSupplierPhone.getText().toString().trim();
+
+        if (supplier.isEmpty()) {
+            etSupplierName.setError("Supplier name required");
+            return;
+        }
+        if (!NAME_PATTERN.matcher(supplier).matches()) {
+            etSupplierName.setError("Supplier name can only contain letters, spaces and dot");
+            return;
+        }
+        if (!PHONE_PATTERN.matcher(phone).matches()) {
+            etSupplierPhone.setError("Phone must be in format +63########## (10 digits after +63)");
+            return;
+        }
+        if (poItems.isEmpty()) {
+            Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Create Purchase Order")
+                .setMessage("Are you sure you want to create this purchase order?")
+                .setPositiveButton("Create", (dialog, which) -> savePurchaseOrder())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showConfirmCancelDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Cancel Purchase Order")
+                .setMessage("Discard this purchase order?")
+                .setPositiveButton("Discard", (dialog, which) -> finish())
+                .setNegativeButton("Keep Editing", null)
+                .show();
     }
 
     private void showDatePicker(final EditText editText) {
@@ -134,6 +242,31 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         TextInputEditText etUnitPrice = view.findViewById(R.id.etUnitPrice);
         Button btnAdd = view.findViewById(R.id.btnAdd);
         Button btnCancel = view.findViewById(R.id.btnCancel);
+
+        InputFilter digitsOnlyFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence src, int start, int end, Spanned dest, int dstart, int dend) {
+                for (int i = start; i < end; i++) {
+                    char c = src.charAt(i);
+                    if (!Character.isDigit(c)) return "";
+                }
+                return null;
+            }
+        };
+
+        etQuantity.setFilters(new InputFilter[] { digitsOnlyFilter, new InputFilter.LengthFilter(5) });
+
+        InputFilter priceFilter = new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                String newText = dest.subSequence(0, dstart) + source.toString() + dest.subSequence(dend, dest.length());
+                if (newText.isEmpty()) return null;
+                if (!newText.matches("^\\d{0,7}(\\.\\d{0,2})?$")) return "";
+                return null;
+            }
+        };
+        etUnitPrice.setFilters(new InputFilter[] { priceFilter, new InputFilter.LengthFilter(10) });
+
         btnAdd.setOnClickListener(v -> {
             String nameStr = etProductName.getText() != null ? etProductName.getText().toString().trim() : "";
             String qtyStr = etQuantity.getText() != null ? etQuantity.getText().toString().trim() : "";
@@ -146,6 +279,14 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                 Toast.makeText(this, "Please fill quantity and unit price", Toast.LENGTH_SHORT).show();
                 return;
             }
+            if (!QUANTITY_PATTERN.matcher(qtyStr).matches()) {
+                Toast.makeText(this, "Quantity must be up to 5 digits", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!PRICE_PATTERN.matcher(priceStr).matches()) {
+                Toast.makeText(this, "Unit price must be up to 7 digits (optionally 2 decimals)", Toast.LENGTH_SHORT).show();
+                return;
+            }
             try {
                 int qty = Integer.parseInt(qtyStr);
                 double price = Double.parseDouble(priceStr);
@@ -154,20 +295,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                     return;
                 }
                 String productId = findProductIdByName(nameStr);
-                Product prod = findProductById(productId);
-                if (prod != null) {
-                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
-                    if (ceiling > 9999) ceiling = 9999;
-                    int maxReceivable = ceiling - prod.getQuantity();
-                    if (maxReceivable <= 0) {
-                        Toast.makeText(this, "Cannot order this product: it is already at or above ceiling", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    if (qty > maxReceivable) {
-                        Toast.makeText(this, "Quantity too large. Maximum receivable is " + maxReceivable, Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                }
                 POItem existing = null;
                 for (POItem it : poItems) {
                     if (it.getProductName().equalsIgnoreCase(nameStr)) {
@@ -225,23 +352,17 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
             etSupplierName.setError("Supplier name required");
             return;
         }
+        if (!NAME_PATTERN.matcher(supplier).matches()) {
+            etSupplierName.setError("Supplier name can only contain letters, spaces and dot");
+            return;
+        }
+        if (!PHONE_PATTERN.matcher(supplierPhone).matches()) {
+            etSupplierPhone.setError("Phone must be in format +63##########");
+            return;
+        }
         if (poItems.isEmpty()) {
             Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show();
             return;
-        }
-        for (POItem item : poItems) {
-            if (item.getProductId() != null && !item.getProductId().isEmpty()) {
-                Product prod = findProductById(item.getProductId());
-                if (prod != null) {
-                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
-                    if (ceiling > 9999) ceiling = 9999;
-                    int maxReceivable = ceiling - prod.getQuantity();
-                    if (item.getQuantity() > maxReceivable) {
-                        Toast.makeText(this, "Item " + item.getProductName() + " quantity exceeds allowed receive limit: " + maxReceivable, Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                }
-            }
         }
         String id = poRef.push().getKey();
         if (id == null) {
@@ -272,7 +393,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
+            showConfirmCancelDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);

@@ -28,11 +28,19 @@ public class Product {
     private long expiryDate;
     private String imagePath;
     private String imageUrl;
+    private long lastUpdated;
+    private double costToComplete;
+    private double sellingCosts;
+    private double normalProfitPercent;
 
     public Product() {
         this.productType = "Raw";
         this.expiryDate = 0L;
         this.floorLevel = 0;
+        this.lastUpdated = System.currentTimeMillis();
+        this.costToComplete = 0.0;
+        this.sellingCosts = 0.0;
+        this.normalProfitPercent = 0.0;
     }
 
     public Product(long localId, String productId, String productName, String categoryId, String categoryName, String description, double costPrice, double sellingPrice, int quantity, int reorderLevel, int criticalLevel, int ceilingLevel, String unit, String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
@@ -57,6 +65,10 @@ public class Product {
         this.isActive = isActive;
         this.productType = "Raw";
         this.expiryDate = 0L;
+        this.lastUpdated = System.currentTimeMillis();
+        this.costToComplete = 0.0;
+        this.sellingCosts = 0.0;
+        this.normalProfitPercent = 0.0;
     }
 
     public long getLocalId() {
@@ -243,6 +255,38 @@ public class Product {
         this.imageUrl = imageUrl;
     }
 
+    public long getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(long lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
+
+    public double getCostToComplete() {
+        return costToComplete;
+    }
+
+    public void setCostToComplete(double costToComplete) {
+        this.costToComplete = costToComplete;
+    }
+
+    public double getSellingCosts() {
+        return sellingCosts;
+    }
+
+    public void setSellingCosts(double sellingCosts) {
+        this.sellingCosts = sellingCosts;
+    }
+
+    public double getNormalProfitPercent() {
+        return normalProfitPercent;
+    }
+
+    public void setNormalProfitPercent(double normalProfitPercent) {
+        this.normalProfitPercent = normalProfitPercent;
+    }
+
     public boolean isCriticalStock() {
         return quantity <= reorderLevel;
     }
@@ -287,6 +331,10 @@ public class Product {
         m.put("expiryDate", expiryDate);
         m.put("imagePath", imagePath);
         m.put("imageUrl", imageUrl);
+        m.put("lastUpdated", lastUpdated);
+        m.put("costToComplete", costToComplete);
+        m.put("sellingCosts", sellingCosts);
+        m.put("normalProfitPercent", normalProfitPercent);
         return m;
     }
 
@@ -350,6 +398,26 @@ public class Product {
         if (o != null) p.imagePath = String.valueOf(o);
         o = m.get("imageUrl");
         if (o != null) p.imageUrl = String.valueOf(o);
+        o = m.get("lastUpdated");
+        if (o instanceof Number) p.lastUpdated = ((Number) o).longValue();
+        else if (o instanceof String) {
+            try { p.lastUpdated = Long.parseLong((String) o); } catch (Exception ignored) {}
+        }
+        o = m.get("costToComplete");
+        if (o instanceof Number) p.costToComplete = ((Number) o).doubleValue();
+        else if (o instanceof String) {
+            try { p.costToComplete = Double.parseDouble(((String) o).replaceAll("[^\\d.-]", "")); } catch (Exception ignored) {}
+        }
+        o = m.get("sellingCosts");
+        if (o instanceof Number) p.sellingCosts = ((Number) o).doubleValue();
+        else if (o instanceof String) {
+            try { p.sellingCosts = Double.parseDouble(((String) o).replaceAll("[^\\d.-]", "")); } catch (Exception ignored) {}
+        }
+        o = m.get("normalProfitPercent");
+        if (o instanceof Number) p.normalProfitPercent = ((Number) o).doubleValue();
+        else if (o instanceof String) {
+            try { p.normalProfitPercent = Double.parseDouble(((String) o).replaceAll("[^\\d.-]", "")); } catch (Exception ignored) {}
+        }
         return p;
     }
 

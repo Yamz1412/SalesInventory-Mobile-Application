@@ -44,6 +44,15 @@
                     android:textColor="@color/textColorSecondary"
                     android:layout_marginTop="4dp" />
 
+                <TextView
+                    android:id="@+id/tvFloorLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Floor: 1"
+                    android:textSize="12sp"
+                    android:textColor="@color/textColorSecondary"
+                    android:layout_marginTop="4dp" />
+
             </LinearLayout>
 
             <TextView

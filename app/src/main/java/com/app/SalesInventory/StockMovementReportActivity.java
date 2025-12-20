@@ -1,12 +1,10 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -14,253 +12,277 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-
-import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class StockMovementReportActivity extends BaseActivity {
+public class StockMovementReportActivity extends AppCompatActivity {
 
-    private RecyclerView recyclerViewReport;
+    private TextView tvTotalReceived;
+    private TextView tvTotalSold;
+    private TextView tvTotalAdjustments;
+    private Button btnExportPDF;
+    private Button btnExportCSV;
     private ProgressBar progressBar;
-    private TextView tvNoData, tvTotalReceived, tvTotalSold, tvTotalAdjustments;
-    private Button btnExportPDF, btnExportCSV;
-
+    private TextView tvNoData;
+    private RecyclerView recyclerViewReport;
     private StockMovementAdapter adapter;
-    private List<StockMovementReport> reportList;
-
-    private DatabaseReference productRef, salesRef, adjustmentRef;
+    private ProductRepository productRepository;
+    private InventoryMovementsRepository movementsRepository;
     private ReportExportUtil exportUtil;
     private PDFGenerator pdfGenerator;
     private CSVGenerator csvGenerator;
-
-    private int grandTotalReceived = 0;
-    private int grandTotalSold = 0;
-    private int grandTotalAdjusted = 0;
-
-    private static final int PERMISSION_REQUEST_CODE = 200;
-    private int pendingExportType = 0;
+    private final ExecutorService exportExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stock_movement_report);
-
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Stock Movement Report");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        initializeViews();
-        loadData();
-    }
-
-    private void initializeViews() {
-        recyclerViewReport = findViewById(R.id.recyclerViewReport);
-        progressBar = findViewById(R.id.progressBar);
-        tvNoData = findViewById(R.id.tvNoData);
         tvTotalReceived = findViewById(R.id.tvTotalReceived);
         tvTotalSold = findViewById(R.id.tvTotalSold);
         tvTotalAdjustments = findViewById(R.id.tvTotalAdjustments);
         btnExportPDF = findViewById(R.id.btnExportPDF);
         btnExportCSV = findViewById(R.id.btnExportCSV);
+        progressBar = findViewById(R.id.progressBar);
+        tvNoData = findViewById(R.id.tvNoData);
+        recyclerViewReport = findViewById(R.id.recyclerViewReport);
 
-        exportUtil = new ReportExportUtil(this);
-        csvGenerator = new CSVGenerator();
-
-        try {
-            pdfGenerator = new PDFGenerator(this);
-        } catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Error initializing PDF Generator", Toast.LENGTH_SHORT).show();
-            btnExportPDF.setEnabled(false);
-        }
-
-        productRef = FirebaseDatabase.getInstance().getReference("Product");
-        salesRef = FirebaseDatabase.getInstance().getReference("Sales");
-        adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
-
-        reportList = new ArrayList<>();
-        adapter = new StockMovementAdapter(reportList);
+        adapter = new StockMovementAdapter(new ArrayList<>());
         recyclerViewReport.setLayoutManager(new LinearLayoutManager(this));
         recyclerViewReport.setAdapter(adapter);
 
-        btnExportPDF.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_PDF));
-        btnExportCSV.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_CSV));
-    }
-
-    private void startExport(int exportType) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                pendingExportType = exportType;
-                requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-                return;
-            }
-        }
-        if (exportType == ReportExportUtil.EXPORT_PDF) exportToPDF();
-        else exportToCSV();
-    }
-
-    private void exportToPDF() {
+        productRepository = ProductRepository.getInstance(getApplication());
+        movementsRepository = InventoryMovementsRepository.getInstance(getApplication());
+        exportUtil = new ReportExportUtil(this);
         try {
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
-            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
-            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
-            try {
-                pdfGenerator.generateStockMovementReportPDF(r.outputStream, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
-                exportUtil.showExportSuccess(r.displayPath);
-            } finally {
-                try { r.outputStream.close(); } catch (Exception ignored) {}
-            }
+            pdfGenerator = new PDFGenerator(this);
         } catch (Exception e) {
-            exportUtil.showExportError(e.getMessage() == null ? "Error exporting PDF" : e.getMessage());
+            pdfGenerator = null;
         }
+        csvGenerator = new CSVGenerator();
+
+        btnExportPDF.setOnClickListener(v -> exportPdf());
+        btnExportCSV.setOnClickListener(v -> exportCsv());
+
+        loadData();
     }
 
-    private void exportToCSV() {
-        try {
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_CSV);
-            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
-            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
-            try {
-                csvGenerator.generateStockMovementReportCSV(r.outputStream, reportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
-                exportUtil.showExportSuccess(r.displayPath);
-            } finally {
-                try { r.outputStream.close(); } catch (Exception ignored) {}
-            }
-        } catch (Exception e) {
-            exportUtil.showExportError(e.getMessage() == null ? "Error exporting CSV" : e.getMessage());
-        }
+    private long getStartOfMonthMillis() {
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.DAY_OF_MONTH, 1);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
     }
 
     private void loadData() {
         progressBar.setVisibility(View.VISIBLE);
-        grandTotalReceived = 0;
-        grandTotalSold = 0;
-        grandTotalAdjusted = 0;
-
-        Map<String, StockMovementReport> reportMap = new HashMap<>();
-
-        productRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Product p = ds.getValue(Product.class);
-                    if (p != null && p.isActive()) {
-                        StockMovementReport report = new StockMovementReport(
-                                p.getProductId(),
-                                p.getProductName(),
-                                p.getCategoryName(),
-                                p.getQuantity(),
-                                0,
-                                0,
-                                0,
-                                p.getQuantity(),
-                                System.currentTimeMillis()
-                        );
-                        if (p.getProductId() != null) {
-                            reportMap.put(p.getProductId(), report);
-                        }
-                    }
+        productRepository.getAllProducts().observe(this, products -> {
+            movementsRepository.getAllMovements().observe(this, movements -> {
+                try {
+                    computeAndDisplay(products, movements);
+                } catch (Exception e) {
+                    progressBar.setVisibility(View.GONE);
+                    tvNoData.setVisibility(View.VISIBLE);
+                    recyclerViewReport.setVisibility(View.GONE);
                 }
-                loadSales(reportMap);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                progressBar.setVisibility(View.GONE);
-                Toast.makeText(StockMovementReportActivity.this, "Error loading products: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-            }
+            });
         });
     }
 
-    private void loadSales(Map<String, StockMovementReport> reportMap) {
-        salesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Sales s = ds.getValue(Sales.class);
-                    if (s != null && s.getProductId() != null && reportMap.containsKey(s.getProductId())) {
-                        StockMovementReport report = reportMap.get(s.getProductId());
-                        int qty = s.getQuantity();
-                        report.addSold(qty);
-                        grandTotalSold += qty;
+    private void computeAndDisplay(List<Product> products, List<InventoryMovement> movements) {
+        Map<String, StockMovementReport> map = new HashMap<>();
+        if (products != null) {
+            for (Product p : products) {
+                if (p == null || !p.isActive()) continue;
+                String pid = p.getProductId();
+                if (pid == null) continue;
+                StockMovementReport smr = new StockMovementReport(
+                        pid,
+                        p.getProductName() == null ? "" : p.getProductName(),
+                        p.getCategoryName() == null ? "" : p.getCategoryName(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        p.getQuantity(),
+                        System.currentTimeMillis()
+                );
+                map.put(pid, smr);
+            }
+        }
+
+        long startMonth = getStartOfMonthMillis();
+        int totalReceived = 0;
+        int totalSold = 0;
+        int totalAdjustments = 0;
+
+        if (movements != null) {
+            for (InventoryMovement m : movements) {
+                if (m == null) continue;
+                String pid = m.getProductId();
+                if (pid == null) continue;
+                long ts = m.getTimestamp();
+                if (ts < startMonth) continue;
+                StockMovementReport smr = map.get(pid);
+                if (smr == null) {
+                    smr = new StockMovementReport(
+                            pid,
+                            m.getProductName() == null ? "" : m.getProductName(),
+                            "",
+                            0, 0, 0, 0, 0, System.currentTimeMillis()
+                    );
+                    map.put(pid, smr);
+                }
+                String type = m.getType() == null ? "" : m.getType().toUpperCase(Locale.ROOT);
+                int qty = m.getChange();
+                if ("RECEIVE".equals(type) || "IN".equals(type) || "ADD".equals(type)) {
+                    smr.addReceived(Math.max(0, qty));
+                    totalReceived += Math.max(0, qty);
+                } else if ("SALE".equals(type) || "OUT".equals(type) || "REMOVE".equals(type)) {
+                    smr.addSold(Math.max(0, Math.abs(qty)));
+                    totalSold += Math.max(0, Math.abs(qty));
+                } else if ("ADJUST".equals(type) || "ADJUSTMENT".equals(type)) {
+                    smr.addAdjusted(qty);
+                    totalAdjustments += Math.abs(qty);
+                } else {
+                    if (qty > 0) {
+                        smr.addReceived(qty);
+                        totalReceived += qty;
+                    } else {
+                        smr.addSold(Math.abs(qty));
+                        totalSold += Math.abs(qty);
                     }
                 }
-                loadAdjustments(reportMap);
             }
+        }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-            }
-        });
-    }
+        List<StockMovementReport> list = new ArrayList<>(map.values());
+        for (StockMovementReport s : list) {
+            s.setClosingStock(s.getClosingStock());
+            s.calculateOpening();
+        }
 
-    private void loadAdjustments(Map<String, StockMovementReport> reportMap) {
-        adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    StockAdjustment adj = ds.getValue(StockAdjustment.class);
-                    if (adj != null && adj.getProductId() != null && reportMap.containsKey(adj.getProductId())) {
-                        StockMovementReport report = reportMap.get(adj.getProductId());
-                        if ("Add Stock".equals(adj.getAdjustmentType())) {
-                            report.addReceived(adj.getQuantityAdjusted());
-                            grandTotalReceived += adj.getQuantityAdjusted();
-                        } else {
-                            report.addAdjusted(adj.getQuantityAdjusted());
-                            grandTotalAdjusted += adj.getQuantityAdjusted();
-                        }
-                    }
-                }
-                finalizeReport(reportMap);
-            }
+        Collections.sort(list, (a, b) -> Integer.compare(b.getSold(), a.getSold()));
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-            }
-        });
-    }
+        tvTotalReceived.setText(String.format(Locale.getDefault(), "%d units", totalReceived));
+        tvTotalSold.setText(String.format(Locale.getDefault(), "%d units", totalSold));
+        tvTotalAdjustments.setText(String.format(Locale.getDefault(), "%d units", totalAdjustments));
 
-    private void finalizeReport(Map<String, StockMovementReport> reportMap) {
-        reportList.clear();
-        for (StockMovementReport report : reportMap.values()) {
-            report.calculateOpening();
-            reportList.add(report);
+        if (list.isEmpty()) {
+            tvNoData.setVisibility(View.VISIBLE);
+            recyclerViewReport.setVisibility(View.GONE);
+        } else {
+            tvNoData.setVisibility(View.GONE);
+            recyclerViewReport.setVisibility(View.VISIBLE);
+            adapter = new StockMovementAdapter(list);
+            recyclerViewReport.setAdapter(adapter);
         }
 
         progressBar.setVisibility(View.GONE);
-        adapter.notifyDataSetChanged();
-
-        tvTotalReceived.setText(grandTotalReceived + " units");
-        tvTotalSold.setText(grandTotalSold + " units");
-        tvTotalAdjustments.setText(grandTotalAdjusted + " units");
-
-        if (reportList.isEmpty()) {
-            tvNoData.setVisibility(View.VISIBLE);
-        } else {
-            tvNoData.setVisibility(View.GONE);
-        }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            pendingExportType = 0;
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Permission granted", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
-            }
+    private void exportPdf() {
+        if (exportUtil == null || !exportUtil.isStorageAvailable()) {
+            if (exportUtil != null) exportUtil.showExportError("Storage not available");
+            else Toast.makeText(this, "Export utility not available", Toast.LENGTH_SHORT).show();
+            return;
         }
+        List<StockMovementReport> items = adapter == null ? null : adapter.getReportList();
+        if (items == null || items.isEmpty()) {
+            exportUtil.showExportError("No movement data to export");
+            return;
+        }
+        String fileName = exportUtil.generateFileName("StockMovement_Report", ReportExportUtil.EXPORT_PDF);
+        ReportExportUtil.ExportResult r;
+        try {
+            r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
+        } catch (Exception e) {
+            exportUtil.showExportError("Unable to get output");
+            return;
+        }
+        if (r == null || r.outputStream == null) {
+            exportUtil.showExportError("Unable to get output");
+            return;
+        }
+        final ReportExportUtil.ExportResult res = r;
+        exportExecutor.execute(() -> {
+            try {
+                int totalReceived = 0;
+                int totalSold = 0;
+                int totalAdj = 0;
+                for (StockMovementReport s : items) {
+                    totalReceived += s.getReceived();
+                    totalSold += s.getSold();
+                    totalAdj += Math.abs(s.getAdjusted());
+                }
+                PDFGenerator gen = new PDFGenerator(StockMovementReportActivity.this);
+                gen.generateStockMovementReportPDF(res.outputStream, items, totalReceived, totalSold, totalAdj);
+                try { res.outputStream.close(); } catch (Exception ignored) {}
+                runOnUiThread(() -> exportUtil.showExportSuccess(res.displayPath));
+            } catch (Exception e) {
+                try { res.outputStream.close(); } catch (Exception ignored) {}
+                runOnUiThread(() -> exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage()));
+            }
+        });
+    }
+
+    private void exportCsv() {
+        if (exportUtil == null || !exportUtil.isStorageAvailable()) {
+            if (exportUtil != null) exportUtil.showExportError("Storage not available");
+            else Toast.makeText(this, "Export utility not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<StockMovementReport> items = adapter == null ? null : adapter.getReportList();
+        if (items == null || items.isEmpty()) {
+            exportUtil.showExportError("No movement data to export");
+            return;
+        }
+        String fileName = exportUtil.generateFileName("StockMovement_Report", ReportExportUtil.EXPORT_CSV);
+        ReportExportUtil.ExportResult r;
+        try {
+            r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
+        } catch (Exception e) {
+            exportUtil.showExportError("Unable to get output");
+            return;
+        }
+        if (r == null || r.outputStream == null) {
+            exportUtil.showExportError("Unable to get output");
+            return;
+        }
+        final ReportExportUtil.ExportResult res = r;
+        exportExecutor.execute(() -> {
+            try {
+                int totalReceived = 0;
+                int totalSold = 0;
+                int totalAdj = 0;
+                for (StockMovementReport s : items) {
+                    totalReceived += s.getReceived();
+                    totalSold += s.getSold();
+                    totalAdj += Math.abs(s.getAdjusted());
+                }
+                CSVGenerator csv = new CSVGenerator();
+                csv.generateStockMovementReportCSV(res.outputStream, items, totalReceived, totalSold, totalAdj);
+                try { res.outputStream.close(); } catch (Exception ignored) {}
+                runOnUiThread(() -> exportUtil.showExportSuccess(res.displayPath));
+            } catch (Exception e) {
+                try { res.outputStream.close(); } catch (Exception ignored) {}
+                runOnUiThread(() -> exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage()));
+            }
+        });
     }
 
     @Override

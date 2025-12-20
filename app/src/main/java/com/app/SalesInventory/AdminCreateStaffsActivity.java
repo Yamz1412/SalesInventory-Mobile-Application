@@ -20,6 +20,7 @@ import com.google.firebase.firestore.SetOptions;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class AdminCreateStaffsActivity extends BaseActivity {
     private EditText etStaffName;
@@ -34,6 +35,9 @@ public class AdminCreateStaffsActivity extends BaseActivity {
     private FirebaseFunctions functions;
     private FirebaseFirestore fStore;
     private AuthManager authManager;
+
+    private static final Pattern NAME_PATTERN = Pattern.compile("^[A-Za-z\\s]+$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+63\\d{10}$");
 
     public static void startForCreate(Context ctx) {
         Intent i = new Intent(ctx, AdminCreateStaffsActivity.class);
@@ -62,6 +66,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
     }
 
     private void createStaffAccount() {
+        tvCreateStaffMessage.setVisibility(View.GONE);
         String name = etStaffName.getText().toString().trim();
         String email = etStaffEmail.getText().toString().trim();
         String phone = etStaffPhone.getText().toString().trim();
@@ -72,13 +77,34 @@ public class AdminCreateStaffsActivity extends BaseActivity {
             showMessage("Name, Email and Password are required");
             return;
         }
+        if (!NAME_PATTERN.matcher(name).matches()) {
+            showMessage("Name must contain only letters and spaces");
+            return;
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            showMessage("Invalid email address");
+            return;
+        }
         if (!password.equals(confirm)) {
             showMessage("Passwords do not match");
             return;
         }
+        if (password.length() < 6) {
+            showMessage("Password must be at least 6 characters");
+            return;
+        }
+        if (TextUtils.isEmpty(phone)) {
+            showMessage("Phone number is required and must start with +63 followed by 10 digits");
+            return;
+        }
+        if (!PHONE_PATTERN.matcher(phone).matches()) {
+            showMessage("Phone must be in the format +63XXXXXXXXXX (10 digits after +63)");
+            return;
+        }
 
-        progressBarCreateStaff.setVisibility(android.view.View.VISIBLE);
-        tvCreateStaffMessage.setVisibility(android.view.View.GONE);
+        progressBarCreateStaff.setVisibility(View.VISIBLE);
+        btnCreateStaffAccount.setEnabled(false);
+        tvCreateStaffMessage.setVisibility(View.GONE);
 
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
@@ -89,6 +115,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         functions.getHttpsCallable("adminCreateStaffUser").call(data)
                 .addOnCompleteListener(task -> {
                     progressBarCreateStaff.setVisibility(View.GONE);
+                    btnCreateStaffAccount.setEnabled(true);
                     if (!task.isSuccessful() || task.getResult() == null) {
                         Exception e = task.getException();
                         Log.e("AdminCreateStaff", "createStaff failed", e);
@@ -118,6 +145,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
                     fStore.collection("users").document(newUid).set(userData, SetOptions.merge())
                             .addOnCompleteListener(t -> {
                                 if (t.isSuccessful()) {
+                                    setResult(RESULT_OK);
                                     Toast.makeText(this, "Staff account created", Toast.LENGTH_SHORT).show();
                                     finish();
                                 } else {
@@ -129,7 +157,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
 
     private void showMessage(String msg) {
         tvCreateStaffMessage.setText(msg);
-        tvCreateStaffMessage.setVisibility(android.view.View.VISIBLE);
+        tvCreateStaffMessage.setVisibility(View.VISIBLE);
     }
 
     public interface UpdateCallback {

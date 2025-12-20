@@ -6,15 +6,15 @@ import java.util.Map;
 public class BatchStockOperation {
     private String operationId;
     private String operationName;
-    private String operationType; // "ADD", "SUBTRACT", "SET"
+    private String operationType;
     private int quantity;
     private String reason;
     private String remarks;
     private long createdAt;
     private String createdBy;
-    private Map<String, Integer> productChanges; // productId -> new quantity
+    private Map<String, Integer> productChanges;
     private int totalProductsAffected;
-    private String status; // "PENDING", "COMPLETED", "FAILED"
+    private String status;
 
     public BatchStockOperation() {
         this.productChanges = new HashMap<>();
@@ -36,7 +36,6 @@ public class BatchStockOperation {
         this.productChanges = new HashMap<>();
     }
 
-    // Getters and Setters
     public String getOperationId() { return operationId; }
     public void setOperationId(String operationId) { this.operationId = operationId; }
 
@@ -70,7 +69,6 @@ public class BatchStockOperation {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    // Helper methods
     public void addProductChange(String productId, int newQuantity) {
         productChanges.put(productId, newQuantity);
     }

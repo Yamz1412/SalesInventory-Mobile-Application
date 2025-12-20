@@ -17,44 +17,45 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <com.google.android.material.textfield.TextInputLayout
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Supplier Name"
-            style="@style/CustomTextInputLayout"
-            app:boxStrokeColor="@color/colorPrimary"
-            app:hintTextColor="@color/colorPrimary">
+            android:orientation="vertical"
+            android:padding="16dp">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etSupplierName"
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/textColorPrimary" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:hint="Supplier Name"
+                style="@style/CustomTextInputLayout"
+                app:boxStrokeColor="@color/colorPrimary"
+                app:hintTextColor="@color/colorPrimary">
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="Supplier Phone"
-            style="@style/CustomTextInputLayout"
-            app:boxStrokeColor="@color/colorPrimary"
-            app:hintTextColor="@color/colorPrimary">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etSupplierName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/textColorPrimary" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etSupplierPhone"
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="phone"
-                android:textColor="@color/textColorPrimary" />
+                android:layout_marginTop="8dp"
+                android:hint="Supplier Phone"
+                style="@style/CustomTextInputLayout"
+                app:boxStrokeColor="@color/colorPrimary"
+                app:hintTextColor="@color/colorPrimary">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etSupplierPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="phone"
+                    android:textColor="@color/textColorPrimary" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <LinearLayout
@@ -189,21 +190,34 @@
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:textColor="@color/colorPrimary" />
-
             </LinearLayout>
-
         </LinearLayout>
-
     </ScrollView>
-
-    <Button
-        android:id="@+id/btnCreatePO"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:text="CREATE PURCHASE ORDER"
-        android:textColor="@color/white"
-        android:padding="16dp"
-        style="@style/CustomButton" />
+        android:layout_height="80dp"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:weightSum="2">
 
+        <Button
+            android:id="@+id/btnCancelPO"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="CANCEL"
+            android:textColor="@color/colorPrimary"
+            style="@style/CustomButtonOutlined" />
+
+        <Button
+            android:id="@+id/btnCreatePO"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="CREATE PO"
+            android:textColor="@color/white"
+            android:padding="14dp"
+            style="@style/CustomButton" />
+    </LinearLayout>
 </LinearLayout>

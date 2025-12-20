@@ -7,15 +7,13 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * AlertRepository - single place to read/write alerts and publish local notifications
- */
 public class AlertRepository {
     private static final String TAG = "AlertRepository";
     private static AlertRepository instance;
@@ -48,20 +46,29 @@ public class AlertRepository {
             Log.w(TAG, "User not authenticated. Cannot start sync.");
             return;
         }
+        String path = firestoreManager.getUserAlertsPath();
+        if (path == null) {
+            Log.w(TAG, "startRealtimeSync skipped: businessOwnerId not set yet");
+            return;
+        }
         syncListener.listenToAlerts(snapshot -> {
             List<Alert> alertList = new ArrayList<>();
             List<Alert> unread = new ArrayList<>();
             int unreadCount = 0;
             if (snapshot != null) {
                 for (DocumentSnapshot document : snapshot.getDocuments()) {
-                    Alert alert = document.toObject(Alert.class);
-                    if (alert != null) {
-                        alert.setId(document.getId());
-                        alertList.add(alert);
-                        if (!alert.isRead()) {
-                            unread.add(alert);
-                            unreadCount++;
+                    try {
+                        Alert alert = document.toObject(Alert.class);
+                        if (alert != null) {
+                            alert.setId(document.getId());
+                            alertList.add(alert);
+                            if (!alert.isRead()) {
+                                unread.add(alert);
+                                unreadCount++;
+                            }
                         }
+                    } catch (Exception e) {
+                        Log.w(TAG, "skip malformed alert doc " + document.getId(), e);
                     }
                 }
             }
@@ -76,26 +83,64 @@ public class AlertRepository {
     public LiveData<List<Alert>> getUnreadAlerts() { return unreadAlerts; }
     public LiveData<Integer> getUnreadAlertCount() { return unreadAlertCount; }
 
-    public void addAlert(Alert alert, OnAlertAddedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            listener.onError("User not authenticated");
+    public void fetchUnreadAlerts(OnAlertsFetchedListener listener) {
+        if (!firestoremanagerIsReady()) {
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
+        String path = firestoreManager.getUserAlertsPath();
+        firestoreManager.getDb()
+                .collection(path)
+                .whereEqualTo("read", false)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<Alert> alerts = new ArrayList<>();
+                    if (snapshot != null) {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            try {
+                                Alert alert = doc.toObject(Alert.class);
+                                if (alert != null) {
+                                    alert.setId(doc.getId());
+                                    alerts.add(alert);
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "skip malformed alert doc " + doc.getId(), e);
+                            }
+                        }
+                    }
+                    listener.onAlertsFetched(alerts);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error fetching unread alerts", e);
+                    List<Alert> fallback = unreadAlerts.getValue();
+                    if (fallback != null && !fallback.isEmpty()) {
+                        listener.onAlertsFetched(fallback);
+                    } else {
+                        listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to fetch alerts");
+                    }
+                });
+    }
+
+    public void addAlert(Alert alert, OnAlertAddedListener listener) {
+        if (!firestoremanagerIsReady()) {
+            listener.onError("User not authenticated or owner id not set");
+            return;
+        }
+        String path = firestoreManager.getUserAlertsPath();
         Map<String, Object> alertMap = convertAlertToMap(alert);
         String currentUserId = AuthManager.getInstance().getCurrentUserId();
         alertMap.put("createdBy", currentUserId != null ? currentUserId : "client");
         alertMap.put("source", "client");
         alertMap.put("createdAt", firestoreManager.getServerTimestamp());
 
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath())
+        firestoreManager.getDb().collection(path)
                 .add(alertMap)
                 .addOnSuccessListener(documentReference -> {
                     String alertId = documentReference.getId();
                     alert.setId(alertId);
                     listener.onAlertAdded(alertId);
                     Log.d(TAG, "Alert added: " + alertId);
-
-                    // show a local notification on the device that created the alert
                     try {
                         String title = getTitleForType(alert.getType());
                         String body = alert.getMessage() != null ? alert.getMessage() : "";
@@ -111,12 +156,13 @@ public class AlertRepository {
     }
 
     public void addAlertIfNotExists(String productId, String type, String message, long timestamp, OnAlertAddedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            listener.onError("User not authenticated");
+        if (!firestoremanagerIsReady()) {
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
+        String path = firestoreManager.getUserAlertsPath();
         firestoreManager.getDb()
-                .collection(firestoreManager.getUserAlertsPath())
+                .collection(path)
                 .whereEqualTo("productId", productId)
                 .whereEqualTo("type", type)
                 .whereEqualTo("read", false)
@@ -142,13 +188,14 @@ public class AlertRepository {
     }
 
     public void markAlertAsRead(String alertId, OnAlertUpdatedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            listener.onError("User not authenticated");
+        if (!firestoremanagerIsReady()) {
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
+        String path = firestoreManager.getUserAlertsPath();
         Map<String, Object> updates = new HashMap<>();
         updates.put("read", true);
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).document(alertId).update(updates)
+        firestoreManager.getDb().collection(path).document(alertId).update(updates)
                 .addOnSuccessListener(aVoid -> {
                     listener.onAlertUpdated();
                     Log.d(TAG, "Alert marked as read: " + alertId);
@@ -161,18 +208,19 @@ public class AlertRepository {
 
     public void markAllAlertsAsRead(OnBatchUpdatedListener listener) {
         if (!firestoremanagerIsReady()) {
-            listener.onError("User not authenticated");
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).whereEqualTo("read", false).get()
+        String path = firestoreManager.getUserAlertsPath();
+        firestoreManager.getDb().collection(path).whereEqualTo("read", false).get()
                 .addOnSuccessListener(snapshot -> {
-                    if (snapshot.isEmpty()) {
+                    if (snapshot == null || snapshot.isEmpty()) {
                         listener.onBatchUpdated(0);
                         return;
                     }
                     int count = 0;
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).document(doc.getId()).update("read", true);
+                        firestoreManager.getDb().collection(path).document(doc.getId()).update("read", true);
                         count++;
                     }
                     listener.onBatchUpdated(count);
@@ -186,10 +234,11 @@ public class AlertRepository {
 
     public void deleteAlert(String alertId, OnAlertDeletedListener listener) {
         if (!firestoremanagerIsReady()) {
-            listener.onError("User not authenticated");
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).document(alertId).delete()
+        String path = firestoreManager.getUserAlertsPath();
+        firestoreManager.getDb().collection(path).document(alertId).delete()
                 .addOnSuccessListener(aVoid -> {
                     listener.onAlertDeleted();
                     Log.d(TAG, "Alert deleted: " + alertId);
@@ -202,17 +251,24 @@ public class AlertRepository {
 
     public void getAlertsByType(String type, OnAlertsFetchedListener listener) {
         if (!firestoremanagerIsReady()) {
-            listener.onError("User not authenticated");
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).whereEqualTo("type", type).get()
+        String path = firestoreManager.getUserCategoriesPath();
+        firestoreManager.getDb().collection(path).whereEqualTo("type", type).get()
                 .addOnSuccessListener(snapshot -> {
                     List<Alert> alerts = new ArrayList<>();
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Alert alert = doc.toObject(Alert.class);
-                        if (alert != null) {
-                            alert.setId(doc.getId());
-                            alerts.add(alert);
+                    if (snapshot != null) {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            try {
+                                Alert alert = doc.toObject(Alert.class);
+                                if (alert != null) {
+                                    alert.setId(doc.getId());
+                                    alerts.add(alert);
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "skip malformed alert doc " + doc.getId(), e);
+                            }
                         }
                     }
                     listener.onAlertsFetched(alerts);
@@ -225,17 +281,24 @@ public class AlertRepository {
 
     public void getAlertsByProduct(String productId, OnAlertsFetchedListener listener) {
         if (!firestoremanagerIsReady()) {
-            listener.onError("User not authenticated");
+            listener.onError("User not authenticated or owner id not set");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).whereEqualTo("productId", productId).get()
+        String path = firestoreManager.getUserAlertsPath();
+        firestoreManager.getDb().collection(path).whereEqualTo("productId", productId).get()
                 .addOnSuccessListener(snapshot -> {
                     List<Alert> alerts = new ArrayList<>();
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Alert alert = doc.toObject(Alert.class);
-                        if (alert != null) {
-                            alert.setId(doc.getId());
-                            alerts.add(alert);
+                    if (snapshot != null) {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            try {
+                                Alert alert = doc.toObject(Alert.class);
+                                if (alert != null) {
+                                    alert.setId(doc.getId());
+                                    alerts.add(alert);
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "skip malformed alert doc " + doc.getId(), e);
+                            }
                         }
                     }
                     listener.onAlertsFetched(alerts);
@@ -273,10 +336,10 @@ public class AlertRepository {
     }
 
     private boolean firestoremanagerIsReady() {
-        return firestoreManager != null && firestoreManager.isUserAuthenticated();
+        String path = firestoreManager != null ? firestoreManager.getUserAlertsPath() : null;
+        return firestoreManager != null && firestoreManager.isUserAuthenticated() && path != null;
     }
 
-    // Listener interfaces
     public interface OnAlertsFetchedListener {
         void onAlertsFetched(List<Alert> alerts);
         void onError(String error);

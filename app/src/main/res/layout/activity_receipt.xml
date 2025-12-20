@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:background="@color/backgroundColor">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvReceiptTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Receipt"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textColor="@color/colorPrimary"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/tvReceiptEmail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Email: "
+            android:textSize="14sp"
+            android:layout_marginBottom="2dp"
+            android:gravity="center"
+            android:textColor="@color/primary"/>
+
+        <TextView
+            android:id="@+id/tvReceiptDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Date: "
+            android:textSize="14sp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center"
+            android:textColor="@color/darkGray"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="4dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <ListView
+                    android:id="@+id/lvReceiptItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="220dp"
+                    android:divider="@color/lightGray"
+                    android:dividerHeight="1dp"
+                    tools:listitem="@layout/item_receipt_row"
+                    android:background="@color/white"
+                    android:padding="4dp"
+                    android:clipToPadding="false" />
+
+                <TextView
+                    android:id="@+id/tvReceiptTotal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Total: ₱0.00"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp"
+                    android:gravity="end" />
+
+                <TextView
+                    android:id="@+id/tvReceiptCash"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Cash: ₱0.00"
+                    android:textSize="16sp"
+                    android:layout_marginTop="4dp"
+                    android:gravity="end" />
+
+                <TextView
+                    android:id="@+id/tvReceiptChange"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Change: ₱0.00"
+                    android:textSize="16sp"
+                    android:layout_marginTop="4dp"
+                    android:gravity="end" />
+
+                <TextView
+                    android:id="@+id/tvReceiptDelivery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Delivery:"
+                    android:textSize="14sp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <Button
+            android:id="@+id/btnReceiptConfirm"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Confirm"
+            android:backgroundTint="@color/colorPrimary"
+            android:textColor="@color/white" />
+
+    </LinearLayout>
+</ScrollView>

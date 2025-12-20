@@ -17,6 +17,7 @@ import com.bumptech.glide.signature.ObjectKey;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
@@ -72,6 +73,9 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
         String category = p.getCategoryName() == null ? "" : p.getCategoryName();
         holder.code.setText(category.isEmpty() ? "Uncategorized" : category);
+
+        double selling = p.getSellingPrice();
+        holder.price.setText("₱" + String.format(Locale.US, "%.2f", selling));
 
         String imageUrl = p.getImageUrl();
         String imagePath = p.getImagePath();

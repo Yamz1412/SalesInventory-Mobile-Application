@@ -79,37 +79,22 @@
         </LinearLayout>
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center"
-            android:layout_marginTop="4dp">
+            android:layout_marginTop="8dp">
 
             <ImageButton
                 android:id="@+id/btnDecreaseQty"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="decrease_quantity"
-                android:src="@drawable/ic_remove" />
-
-            <TextView
-                android:id="@+id/tvStock"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="8dp"
-                android:text="0"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnBackground" />
-
-            <ImageButton
-                android:id="@+id/btnIncreaseQty"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="increase_quantity"
-                android:src="@drawable/ic_add" />
+                android:background="@drawable/edite_round"
+                android:contentDescription="decrease_quantity"
+                android:src="@drawable/ic_remove"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                app:tint="@color/black" />
         </LinearLayout>
 
         <TextView

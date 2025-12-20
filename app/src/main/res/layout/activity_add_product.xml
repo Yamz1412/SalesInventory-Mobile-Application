@@ -181,12 +181,42 @@
                 android:layout_marginBottom="15dp">
 
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/floorLevelET"
+                    android:id="@+id/costToCompleteET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
+                    android:inputType="numberDecimal"
                     android:textColor="?attr/colorOnBackground"
-                    android:hint="Floor Level (optional)" />
+                    android:hint="Estimated Cost to Complete (optional)" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/CustomTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="15dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/sellingCostsET"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Estimated Selling Costs (optional)" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/CustomTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="15dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/normalProfitPercentET"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Normal Profit % (optional, default 20)" />
             </com.google.android.material.textfield.TextInputLayout>
 
         </LinearLayout>

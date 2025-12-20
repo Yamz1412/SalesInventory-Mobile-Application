@@ -40,12 +40,14 @@ public class FirestoreSyncListener {
     }
 
     public void listenToProducts(OnProductsChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            Log.w(TAG, "User not authenticated for products listener");
+        String path = firestoreManager.getUserProductsPath();
+        if (path == null) {
+            Log.w(TAG, "listenToProducts skipped: businessOwnerId not set yet");
+            productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Owner not set"));
             return;
         }
         productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to products"));
-        ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserProductsPath()).addSnapshotListener((value, error) -> {
+        ListenerRegistration registration = firestoreManager.getDb().collection(path).addSnapshotListener((value, error) -> {
             if (error != null) {
                 productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
@@ -65,6 +67,7 @@ public class FirestoreSyncListener {
                         }
                     }
                 } catch (Exception e) {
+                    Log.w(TAG, "Error upserting remote products", e);
                 }
             }
         });
@@ -72,11 +75,14 @@ public class FirestoreSyncListener {
     }
 
     public void listenToSales(OnSalesChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
+        String path = firestoreManager.getUserSalesPath();
+        if (path == null) {
+            Log.w(TAG, "listenToSales skipped: businessOwnerId not set yet");
+            salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Owner not set"));
             return;
         }
         salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to sales"));
-        ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).addSnapshotListener((value, error) -> {
+        ListenerRegistration registration = firestoreManager.getDb().collection(path).addSnapshotListener((value, error) -> {
             if (error != null) {
                 salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
@@ -92,11 +98,14 @@ public class FirestoreSyncListener {
     }
 
     public void listenToAdjustments(OnAdjustmentsChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
+        String path = firestoreManager.getUserAdjustmentsPath();
+        if (path == null) {
+            Log.w(TAG, "listenToAdjustments skipped: businessOwnerId not set yet");
+            adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Owner not set"));
             return;
         }
         adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to adjustments"));
-        ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).addSnapshotListener((value, error) -> {
+        ListenerRegistration registration = firestoreManager.getDb().collection(path).addSnapshotListener((value, error) -> {
             if (error != null) {
                 adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
@@ -112,11 +121,14 @@ public class FirestoreSyncListener {
     }
 
     public void listenToAlerts(OnAlertsChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
+        String path = firestoreManager.getUserAlertsPath();
+        if (path == null) {
+            Log.w(TAG, "listenToAlerts skipped: businessOwnerId not set yet");
+            alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Owner not set"));
             return;
         }
         alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to alerts"));
-        ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).addSnapshotListener((value, error) -> {
+        ListenerRegistration registration = firestoreManager.getDb().collection(path).addSnapshotListener((value, error) -> {
             if (error != null) {
                 alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
@@ -132,11 +144,14 @@ public class FirestoreSyncListener {
     }
 
     public void listenToCategories(OnCategoriesChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            Log.w(TAG, "listenToCategories skipped: businessOwnerId not set yet");
+            categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Owner not set"));
             return;
         }
         categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to categories"));
-        ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath()).addSnapshotListener((value, error) -> {
+        ListenerRegistration registration = firestoreManager.getDb().collection(path).addSnapshotListener((value, error) -> {
             if (error != null) {
                 categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;

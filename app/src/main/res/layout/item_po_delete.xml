@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:gravity="center_vertical"
+    android:background="@drawable/card_background"
+    android:layout_marginBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvPONumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PO-000000"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/black"/>
+
+        <TextView
+            android:id="@+id/tvSupplier"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Supplier"
+            android:textSize="14sp"
+            android:textColor="@color/gray"/>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvTotalAmount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="₱0.00"
+        android:layout_marginEnd="12dp"
+        android:textColor="@color/primaryVariant"
+        android:textStyle="bold"/>
+
+    <ImageButton
+        android:id="@+id/btnArchive"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/ic_archive"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="Archive"
+        android:tint="@color/textColorSecondary" />
+
+</LinearLayout>

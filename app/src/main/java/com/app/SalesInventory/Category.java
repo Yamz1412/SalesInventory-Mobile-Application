@@ -1,5 +1,8 @@
 package com.app.SalesInventory;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Category {
     private String color;
     private String categoryId;
@@ -17,7 +20,7 @@ public class Category {
         this.categoryName = categoryName;
         this.description = description;
         this.timestamp = timestamp;
-        this.type = "Raw";
+        this.type = "Inventory";
         this.active = true;
     }
 
@@ -26,7 +29,7 @@ public class Category {
         this.categoryName = categoryName;
         this.description = description;
         this.timestamp = timestamp;
-        this.type = type == null || type.isEmpty() ? "Raw" : type;
+        this.type = type == null || type.isEmpty() ? "Inventory" : type;
         this.active = active;
         this.color = color;
     }
@@ -72,7 +75,7 @@ public class Category {
     }
 
     public String getType() {
-        return type == null || type.isEmpty() ? "Raw" : type;
+        return type == null || type.isEmpty() ? "Inventory" : type;
     }
 
     public void setType(String type) {
@@ -93,5 +96,16 @@ public class Category {
 
     public String getName() {
         return getCategoryName();
+    }
+
+    public Map<String, Object> toMap() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("categoryName", getCategoryName());
+        m.put("description", getDescription());
+        m.put("color", getColor());
+        m.put("type", getType());
+        m.put("active", isActive());
+        m.put("timestamp", getTimestamp() > 0 ? getTimestamp() : System.currentTimeMillis());
+        return m;
     }
 }

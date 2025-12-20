@@ -7,17 +7,19 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
-
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.InputFilter;
+import android.text.Spanned;
 import android.text.TextWatcher;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,10 +31,9 @@ import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.common.util.concurrent.ListenableFuture;
-
+import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,8 +153,20 @@ public class sellProduct extends BaseActivity {
                 this, android.R.layout.simple_spinner_item, methods);
         pmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerPaymentMethod.setAdapter(pmAdapter);
+        spinnerPaymentMethod.setSelection(0);
 
         tvTotalPrice.setText("₱0.00");
+        tvChange.setText("Change: ₱0.00");
+
+        etDiscount.setFilters(new InputFilter[] { createPercentFilter(3,2) });
+        etCashGiven.setFilters(new InputFilter[] { createDecimalFilter(7,2), new InputFilter.LengthFilter(12) });
+    }
+
+    private ActivityResultLauncher<String> getGalleryLauncher() {
+        return registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                uri -> {}
+        );
     }
 
     private void initGalleryLauncher() {
@@ -177,7 +190,7 @@ public class sellProduct extends BaseActivity {
     private void setupListeners() {
         etDiscount.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateTotalFromCart(); }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { enforceDiscountLimit(); calculateTotalFromCart(); }
             @Override public void afterTextChanged(Editable s) {}
         });
 
@@ -194,6 +207,11 @@ public class sellProduct extends BaseActivity {
                 boolean isCash = "Cash".equals(method);
                 setPaymentSections(isCash);
                 calculateChange();
+                if (!isCash) {
+                    btnCaptureReceipt.setEnabled(true);
+                } else {
+                    btnCaptureReceipt.setEnabled(false);
+                }
             }
 
             @Override
@@ -207,6 +225,9 @@ public class sellProduct extends BaseActivity {
         rgDeliveryType.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rbDelivery) {
                 layoutDeliveryDetails.setVisibility(View.VISIBLE);
+                if (spinnerPaymentMethod.getSelectedItem() != null && "E-Payment".equals(spinnerPaymentMethod.getSelectedItem().toString())) {
+                    layoutEPaymentSection.setVisibility(View.VISIBLE);
+                }
             } else {
                 layoutDeliveryDetails.setVisibility(View.GONE);
             }
@@ -253,7 +274,7 @@ public class sellProduct extends BaseActivity {
                 }
                 tvDetails.setText(detailText);
                 tvQty.setText("x" + item.quantity);
-                tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.getLineTotal()));
+                tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.unitPrice));
                 return convertView;
             }
         };
@@ -270,9 +291,10 @@ public class sellProduct extends BaseActivity {
         String discountStr = etDiscount.getText() != null ? etDiscount.getText().toString().trim() : "";
         try {
             discountPercent = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
-            if (discountPercent < 0 || discountPercent > 100) {
-                discountPercent = 0;
-                etDiscount.setText("0");
+            if (discountPercent < 0) discountPercent = 0;
+            if (discountPercent > 100) {
+                discountPercent = 100;
+                etDiscount.setText("100");
             }
         } catch (NumberFormatException e) {
             discountPercent = 0;
@@ -293,7 +315,10 @@ public class sellProduct extends BaseActivity {
     }
 
     private void calculateChange() {
-        String method = (String) spinnerPaymentMethod.getSelectedItem();
+        String method = null;
+        try {
+            method = (String) spinnerPaymentMethod.getSelectedItem();
+        } catch (Exception ignored) {}
         if (!"Cash".equals(method)) {
             tvChange.setText("Change: ₱0.00");
             return;
@@ -310,14 +335,23 @@ public class sellProduct extends BaseActivity {
             return;
         }
         try {
-            BigDecimal cashBD = new BigDecimal(cashStr);
-            BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
-            if (!PaymentUtils.validatePayment(cashBD, finalBD)) {
+            String cleaned = cashStr.replaceAll("[^\\d.\\-]", "");
+            if (cleaned.isEmpty()) {
                 tvChange.setText("Change: ₱0.00");
                 btnConfirmSale.setEnabled(false);
-                if (cashBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
-                    Toast.makeText(this, "Cash exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
-                }
+                return;
+            }
+            BigDecimal cashBD = new BigDecimal(cleaned);
+            BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
+            if (cashBD.compareTo(BigDecimal.ZERO) < 0) {
+                tvChange.setText("Change: ₱0.00");
+                btnConfirmSale.setEnabled(false);
+                return;
+            }
+            if (cashBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+                Toast.makeText(this, "Cash exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
+                btnConfirmSale.setEnabled(false);
+                tvChange.setText("Change: ₱0.00");
                 return;
             }
             double cash = cashBD.doubleValue();
@@ -411,7 +445,7 @@ public class sellProduct extends BaseActivity {
                 }
                 tvDetails.setText(detailText);
                 tvQty.setText("x" + item.quantity);
-                tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.getLineTotal()));
+                tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.unitPrice));
 
                 convertView.setOnClickListener(v -> showEditSingleItemDialog(item, editAdapter[0]));
 
@@ -486,6 +520,7 @@ public class sellProduct extends BaseActivity {
                 } else {
                     item.quantity = q;
                     parentAdapter.notifyDataSetChanged();
+                    calculateTotalFromCart();
                 }
             } catch (NumberFormatException e) {
                 Toast.makeText(this, "Invalid quantity", Toast.LENGTH_SHORT).show();
@@ -495,6 +530,7 @@ public class sellProduct extends BaseActivity {
         builder.setNeutralButton("Remove", (d, w) -> {
             item.quantity = 0;
             parentAdapter.notifyDataSetChanged();
+            calculateTotalFromCart();
         });
         builder.show();
     }
@@ -610,14 +646,31 @@ public class sellProduct extends BaseActivity {
             Toast.makeText(this, "Camera not ready", Toast.LENGTH_SHORT).show();
             return;
         }
-        receiptCaptured = true;
-        tvReceiptStatus.setText("Receipt captured");
-        if (imgReceiptPreview != null) {
-            imgReceiptPreview.setVisibility(View.VISIBLE);
-            imgReceiptPreview.setImageResource(R.drawable.ic_image_placeholder);
-        }
-        Toast.makeText(this, "Receipt captured", Toast.LENGTH_SHORT).show();
-        if (cameraDialog != null) cameraDialog.dismiss();
+        File dir = new File(getExternalFilesDir(null), "receipts");
+        if (!dir.exists()) dir.mkdirs();
+        File file = new File(dir, "receipt_" + System.currentTimeMillis() + ".jpg");
+        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
+        imageCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(this), new ImageCapture.OnImageSavedCallback() {
+            @Override
+            public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                Uri uri = Uri.fromFile(file);
+                galleryReceiptUri = uri;
+                receiptCaptured = true;
+                runOnUiThread(() -> {
+                    tvReceiptStatus.setText("Receipt captured");
+                    if (imgReceiptPreview != null) {
+                        imgReceiptPreview.setVisibility(View.VISIBLE);
+                        imgReceiptPreview.setImageURI(uri);
+                    }
+                    Toast.makeText(sellProduct.this, "Receipt captured", Toast.LENGTH_SHORT).show();
+                });
+                if (cameraDialog != null) cameraDialog.dismiss();
+            }
+            @Override
+            public void onError(@NonNull ImageCaptureException exception) {
+                runOnUiThread(() -> Toast.makeText(sellProduct.this, "Capture failed: " + exception.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        });
     }
 
     private void confirmSale() {
@@ -673,7 +726,8 @@ public class sellProduct extends BaseActivity {
             }
             BigDecimal cashBD;
             try {
-                cashBD = new BigDecimal(cashStr);
+                String cleaned = cashStr.replaceAll("[^\\d.\\-]", "");
+                cashBD = new BigDecimal(cleaned);
             } catch (NumberFormatException e) {
                 etCashGiven.setError("Invalid amount");
                 return;
@@ -682,13 +736,39 @@ public class sellProduct extends BaseActivity {
                 etCashGiven.setError("Invalid payment amount");
                 return;
             }
-            saveSale("Cash", isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
+            double cash = cashBD.doubleValue();
+            double change = cash - finalTotal;
+            Intent i = new Intent(this, ReceiptActivity.class);
+            i.putExtra("paymentMethod", "Cash");
+            i.putExtra("finalTotal", finalTotal);
+            i.putExtra("cashGiven", cash);
+            i.putExtra("change", change);
+            i.putExtra("isDelivery", isDelivery);
+            i.putExtra("deliveryName", deliveryName);
+            i.putExtra("deliveryPhone", deliveryPhone);
+            i.putExtra("deliveryAddress", deliveryAddress);
+            i.putExtra("deliveryPayment", deliveryPayment);
+            i.putExtra("receiptUri", "");
+            startActivity(i);
+            finish();
         } else {
-            if (!receiptCaptured) {
+            if (!receiptCaptured || galleryReceiptUri == null) {
                 Toast.makeText(this, "Please attach payment receipt first", Toast.LENGTH_SHORT).show();
                 return;
             }
-            saveSale("E-Payment", isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
+            Intent i = new Intent(this, ReceiptActivity.class);
+            i.putExtra("paymentMethod", "E-Payment");
+            i.putExtra("finalTotal", finalTotal);
+            i.putExtra("cashGiven", 0.0);
+            i.putExtra("change", 0.0);
+            i.putExtra("isDelivery", isDelivery);
+            i.putExtra("deliveryName", deliveryName);
+            i.putExtra("deliveryPhone", deliveryPhone);
+            i.putExtra("deliveryAddress", deliveryAddress);
+            i.putExtra("deliveryPayment", deliveryPayment);
+            i.putExtra("receiptUri", galleryReceiptUri.toString());
+            startActivity(i);
+            finish();
         }
     }
 
@@ -744,28 +824,35 @@ public class sellProduct extends BaseActivity {
             sale.setDeliveryPhone(deliveryPhone);
             sale.setDeliveryAddress(deliveryAddress);
             sale.setDeliveryPaymentMethod(deliveryPayment);
+            if (galleryReceiptUri != null) {
+                try {
+                    sale.setReceiptUri(galleryReceiptUri.toString());
+                } catch (Exception ignored) {
+                }
+            }
 
-            salesRepository.addSale(sale, new SalesRepository.OnSaleAddedListener() {
+            Sales currentSale = sale;
+            CartManager.CartItem currentItem = item;
+
+            salesRepository.addSale(currentSale, new SalesRepository.OnSaleAddedListener() {
                 @Override
                 public void onSaleAdded(String saleId) {
+                    productRepository.updateProductQuantity(currentItem.productId, Math.max(0, currentItem.stock - currentItem.quantity), new ProductRepository.OnProductUpdatedListener() {
+                        @Override
+                        public void onProductUpdated() {
+                        }
+                        @Override
+                        public void onError(String error) {
+                            runOnUiThread(() ->
+                                    Toast.makeText(sellProduct.this, "Error updating stock: " + error, Toast.LENGTH_SHORT).show());
+                        }
+                    });
                 }
 
                 @Override
                 public void onError(String error) {
                     runOnUiThread(() ->
                             Toast.makeText(sellProduct.this, "Failed: " + error, Toast.LENGTH_SHORT).show());
-                }
-            });
-
-            productRepository.updateProductQuantity(item.productId, Math.max(0, item.stock - item.quantity), new ProductRepository.OnProductUpdatedListener() {
-                @Override
-                public void onProductUpdated() {
-                }
-
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() ->
-                            Toast.makeText(sellProduct.this, "Error updating stock: " + error, Toast.LENGTH_SHORT).show());
                 }
             });
         }
@@ -824,6 +911,52 @@ public class sellProduct extends BaseActivity {
         super.onDestroy();
         if (productRepository != null && criticalListener != null) {
             productRepository.unregisterCriticalStockListener(criticalListener);
+        }
+    }
+
+    private InputFilter createDecimalFilter(final int maxIntegerDigits, final int maxDecimalDigits) {
+        return new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                String result = dest.subSequence(0, dstart) + source.toString() + dest.subSequence(dend, dest.length());
+                if (result.equals(".")) return "0.";
+                if (result.isEmpty()) return null;
+                if (!result.matches("^\\d{0," + maxIntegerDigits + "}(\\.\\d{0," + maxDecimalDigits + "})?$")) {
+                    return "";
+                }
+                return null;
+            }
+        };
+    }
+
+    private InputFilter createPercentFilter(final int maxIntegerDigits, final int maxDecimalDigits) {
+        return new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                String result = dest.subSequence(0, dstart) + source.toString() + dest.subSequence(dend, dest.length());
+                if (result.isEmpty()) return null;
+                if (!result.matches("^\\d{0," + maxIntegerDigits + "}(\\.\\d{0," + maxDecimalDigits + "})?$")) return "";
+                try {
+                    double v = Double.parseDouble(result);
+                    if (v > 100) return "";
+                } catch (NumberFormatException ignored) {}
+                return null;
+            }
+        };
+    }
+
+    private void enforceDiscountLimit() {
+        String s = etDiscount.getText() != null ? etDiscount.getText().toString().trim() : "";
+        if (s.isEmpty()) return;
+        try {
+            double v = Double.parseDouble(s);
+            if (v < 0) {
+                etDiscount.setText("0");
+            } else if (v > 100) {
+                etDiscount.setText("100");
+            }
+        } catch (NumberFormatException e) {
+            etDiscount.setText("0");
         }
     }
 }

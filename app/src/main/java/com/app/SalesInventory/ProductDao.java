@@ -6,7 +6,6 @@ import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.Update;
-
 import java.util.List;
 
 @Dao
@@ -24,6 +23,9 @@ public interface ProductDao {
     @Query("SELECT * FROM products WHERE localId = :localId LIMIT 1")
     ProductEntity getByLocalId(long localId);
 
+    @Query("SELECT * FROM products WHERE productName = :productName LIMIT 1")
+    ProductEntity getByProductNameSync(String productName);
+
     @Insert
     long insert(ProductEntity entity);
 
@@ -38,4 +40,7 @@ public interface ProductDao {
 
     @Query("SELECT * FROM products ORDER BY lastUpdated DESC")
     List<ProductEntity> getAllProductsSync();
+
+    @Query("UPDATE products SET quantity = :quantity, lastUpdated = :lastUpdated, syncState = :syncState WHERE localId = :localId")
+    void updateQuantityByLocalId(long localId, int quantity, long lastUpdated, String syncState);
 }

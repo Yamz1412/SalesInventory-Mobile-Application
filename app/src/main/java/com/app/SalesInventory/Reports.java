@@ -1,15 +1,7 @@
 package com.app.SalesInventory;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
-
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -19,6 +11,15 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -26,34 +27,50 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-
 import java.util.Locale;
 import java.util.Map;
 
-public class Reports extends BaseActivity  {
+public class Reports extends BaseActivity {
 
     private static final int REQUEST_WRITE_STORAGE = 1001;
 
-    private TextView totalProductsTV, lowStockTV, totalRevenueTV, totalSalesTV;
-    private Button btnSalesReport, btnInventoryReport, btnComprehensiveReports, btnSampleData, btnOverallPdf;
+    private TextView totalProductsTV;
+    private TextView lowStockTV;
+    private TextView totalRevenueTV;
+    private TextView totalSalesTV;
+    private Button btnSalesReport;
+    private Button btnInventoryReport;
+    private Button btnInventoryMovements;
+    private Button btnComprehensiveReports;
+    private Button btnOverallPdf;
     private ListView reportsListView;
 
     private ProductRepository productRepository;
     private SalesRepository salesRepository;
+    private InventoryMovementsRepository movementsRepository;
     private AuthManager authManager;
 
     private List<Product> productList = new ArrayList<>();
     private List<Sales> salesList = new ArrayList<>();
-    private ReportAdapter adapter;
+    private List<InventoryMovement> movementsList = new ArrayList<>();
+
     private List<ReportItem> reportItems;
+    private ReportAdapter adapter;
+
+    private List<SalesJournalEntry> journalEntries;
+    private SalesJournalAdapter journalAdapter;
 
     private File lastGeneratedFile;
     private String lastGeneratedMimeType;
 
     private ActivityResultLauncher<Intent> saveFileLauncher;
+
+    private CSVGenerator csvGenerator;
+    private ReportExportUtil exportUtil;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,11 +78,26 @@ public class Reports extends BaseActivity  {
         setContentView(R.layout.activity_reports);
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesInventoryApplication.getSalesRepository();
+        movementsRepository = InventoryMovementsRepository.getInstance(getApplication());
         authManager = AuthManager.getInstance();
+        csvGenerator = new CSVGenerator();
+        exportUtil = new ReportExportUtil(this);
         initializeUI();
         setupSaveLauncher();
         setupListeners();
         loadData();
+        journalEntries = new ArrayList<>();
+        journalAdapter = new SalesJournalAdapter(this, journalEntries);
+        reportsListView.setAdapter(journalAdapter);
+        SalesRealtimeSyncManager.getInstance(getApplication()).getJournalLiveData().observe(this, journalList -> {
+            journalEntries.clear();
+            if (journalList != null) journalEntries.addAll(journalList);
+            journalAdapter.notifyDataSetChanged();
+        });
+        movementsRepository.getAllMovements().observe(this, movements -> {
+            movementsList.clear();
+            if (movements != null) movementsList.addAll(movements);
+        });
     }
 
     private void initializeUI() {
@@ -75,13 +107,12 @@ public class Reports extends BaseActivity  {
         totalRevenueTV = findViewById(R.id.totalRevenueTV);
         btnSalesReport = findViewById(R.id.BtnSalesReport);
         btnInventoryReport = findViewById(R.id.BtnInventoryReport);
+        btnInventoryMovements = findViewById(R.id.BtnInventoryMovements);
         btnComprehensiveReports = findViewById(R.id.BtnComprehensiveReports);
-        btnSampleData = findViewById(R.id.BtnSampleData);
         btnOverallPdf = findViewById(R.id.BtnOverallPdf);
         reportsListView = findViewById(R.id.ReportsListView);
         reportItems = new ArrayList<>();
         adapter = new ReportAdapter(this, reportItems);
-        reportsListView.setAdapter(adapter);
     }
 
     private void setupSaveLauncher() {
@@ -99,14 +130,14 @@ public class Reports extends BaseActivity  {
     }
 
     private void setupListeners() {
-        btnSalesReport.setOnClickListener(v -> showSalesReport());
+        btnSalesReport.setOnClickListener(v -> reportsListView.setAdapter(journalAdapter));
         btnInventoryReport.setOnClickListener(v -> startActivity(new Intent(Reports.this, InventoryReportsActivity.class)));
+        btnInventoryMovements.setOnClickListener(v -> startActivity(new Intent(Reports.this, InventoryMovementsActivity.class)));
         btnComprehensiveReports.setOnClickListener(v -> {
             if (ensureWritePermission()) {
                 exportComprehensiveReports();
             }
         });
-        btnSampleData.setOnClickListener(v -> loadSampleData());
         btnOverallPdf.setOnClickListener(v -> {
             if (ensureWritePermission()) {
                 exportOverallSummaryPdf();
@@ -125,16 +156,20 @@ public class Reports extends BaseActivity  {
             if (sales != null) {
                 salesList = sales;
                 updateSalesStats();
-                showSalesReport();
             }
         });
     }
 
     private void updateProductStats() {
         if (productList == null) return;
-        int total = productList.size();
+        int total = 0;
         int lowStock = 0;
         for (Product p : productList) {
+            if (p == null) continue;
+            if (!p.isActive()) continue;
+            String type = p.getProductType() == null ? "" : p.getProductType();
+            if ("Menu".equalsIgnoreCase(type)) continue;
+            total++;
             if (p.isLowStock() || p.isCriticalStock()) lowStock++;
         }
         totalProductsTV.setText(String.valueOf(total));
@@ -150,57 +185,7 @@ public class Reports extends BaseActivity  {
         totalRevenueTV.setText(String.format(Locale.getDefault(), "₱%.2f", revenue));
     }
 
-    private void showSalesReport() {
-        reportItems.clear();
-        if (salesList != null && !salesList.isEmpty()) {
-            SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Map<String, DailySummary> dailyMap = new HashMap<>();
-            for (Sales s : salesList) {
-                long ts = s.getDate() > 0 ? s.getDate() : s.getTimestamp();
-                String dayKey = dayFormat.format(new Date(ts));
-                DailySummary ds = dailyMap.get(dayKey);
-                if (ds == null) {
-                    ds = new DailySummary(dayKey);
-                    dailyMap.put(dayKey, ds);
-                }
-                ds.transactionCount++;
-                ds.netSales += s.getTotalPrice();
-                if ("DELIVERY".equals(s.getDeliveryType())) {
-                    ds.deliveryCount++;
-                    ds.deliverySales += s.getTotalPrice();
-                }
-            }
-            List<String> keys = new ArrayList<>(dailyMap.keySet());
-            java.util.Collections.sort(keys);
-            for (String day : keys) {
-                DailySummary ds = dailyMap.get(day);
-                if (ds == null) continue;
-                String name = "Sales Journal";
-                String dateStr = day;
-                String qtyStr = "Txns: " + ds.transactionCount + " | Deliveries: " + ds.deliveryCount;
-                String amountStr = String.format(Locale.getDefault(), "₱%.2f", ds.netSales);
-                reportItems.add(new ReportItem(name, dateStr, qtyStr, amountStr));
-            }
-        }
-        adapter.notifyDataSetChanged();
-    }
-
-    private void showInventoryReport() {
-        reportItems.clear();
-        if (productList != null) {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            for (Product p : productList) {
-                String dateStr = sdf.format(new Date(p.getDateAdded()));
-                double totalValue = p.getQuantity() * p.getSellingPrice();
-                String qtyStr = "Stock: " + p.getQuantity() + " | Floor: " + p.getFloorLevel();
-                reportItems.add(new ReportItem(p.getProductName(), dateStr, qtyStr, String.format(Locale.getDefault(), "₱%.2f", totalValue)));
-            }
-        }
-        adapter.notifyDataSetChanged();
-    }
-
     private void exportComprehensiveReports() {
-        ReportExportUtil exportUtil = new ReportExportUtil(this);
         File exportDir = exportUtil.getExportDirectory();
         if (exportDir == null) {
             exportUtil.showExportError("Unable to access export directory");
@@ -214,7 +199,7 @@ public class Reports extends BaseActivity  {
             lastGeneratedMimeType = "text/csv";
             promptUserToSaveFile(invFile.getName(), "text/csv");
         } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Inventory export failed: " + e.getMessage());
+            exportUtil.showExportError("Inventory export failed: " + e.getMessage());
         }
         try {
             String csvNameSales = exportUtil.generateFileName("SalesReport", ReportExportUtil.EXPORT_CSV);
@@ -224,38 +209,72 @@ public class Reports extends BaseActivity  {
             lastGeneratedMimeType = "text/csv";
             promptUserToSaveFile(salesFile.getName(), "text/csv");
         } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Sales export failed: " + e.getMessage());
+            exportUtil.showExportError("Sales export failed: " + e.getMessage());
         }
         try {
-            String csvNameJournal = exportUtil.generateFileName("SalesJournal_Report", ReportExportUtil.EXPORT_CSV);
-            File journalFile = new File(exportDir, csvNameJournal);
-            writeSalesJournalCsv(journalFile);
+            String csvNameProductJournal = exportUtil.generateFileName("SalesJournal_ProductReport", ReportExportUtil.EXPORT_CSV);
+            File journalFile = new File(exportDir, csvNameProductJournal);
+            writeSalesProductJournalCsv(journalFile);
             lastGeneratedFile = journalFile;
             lastGeneratedMimeType = "text/csv";
             promptUserToSaveFile(journalFile.getName(), "text/csv");
         } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Sales journal export failed: " + e.getMessage());
+            exportUtil.showExportError("Sales product journal export failed: " + e.getMessage());
+        }
+        try {
+            String csvNameDailyJournal = exportUtil.generateFileName("SalesJournal_DailyReport", ReportExportUtil.EXPORT_CSV);
+            File dailyFile = new File(exportDir, csvNameDailyJournal);
+            writeSalesJournalCsv(dailyFile);
+            lastGeneratedFile = dailyFile;
+            lastGeneratedMimeType = "text/csv";
+            promptUserToSaveFile(dailyFile.getName(), "text/csv");
+        } catch (Exception e) {
+            exportUtil.showExportError("Sales daily journal export failed: " + e.getMessage());
+        }
+        try {
+            String csvNameMovements = exportUtil.generateFileName("InventoryMovements", ReportExportUtil.EXPORT_CSV);
+            File movFile = new File(exportDir, csvNameMovements);
+            csvGenerator.generateInventoryMovementsCSV(movFile, movementsList);
+            lastGeneratedFile = movFile;
+            lastGeneratedMimeType = "text/csv";
+            promptUserToSaveFile(movFile.getName(), "text/csv");
+        } catch (Exception e) {
+            exportUtil.showExportError("Inventory movements export failed: " + e.getMessage());
+        }
+        try {
+            String csvNameSalesChart = exportUtil.generateFileName("SalesOverTime_ChartData", ReportExportUtil.EXPORT_CSV);
+            File chartCsv = new File(exportDir, csvNameSalesChart);
+            writeSalesChartDataCsv(chartCsv);
+            lastGeneratedFile = chartCsv;
+            lastGeneratedMimeType = "text/csv";
+            promptUserToSaveFile(chartCsv.getName(), "text/csv");
+        } catch (Exception e) {
+            exportUtil.showExportError("Chart CSV export failed: " + e.getMessage());
         }
     }
 
     private void exportOverallSummaryPdf() {
+        File exportDir = exportUtil.getExportDirectory();
+        if (exportDir == null) {
+            exportUtil.showExportError("Unable to access export directory");
+            return;
+        }
         try {
-            ReportExportUtil exportUtil = new ReportExportUtil(this);
-            File exportDir = exportUtil.getExportDirectory();
-            if (exportDir == null) {
-                exportUtil.showExportError("Unable to access export directory");
-                return;
-            }
             String pdfName = exportUtil.generateFileName("OverallReports", ReportExportUtil.EXPORT_PDF);
             File pdfFile = new File(exportDir, pdfName);
 
-            int totalProducts = productList != null ? productList.size() : 0;
+            int totalProducts = 0;
             int lowOrCritical = 0;
             double inventoryValue = 0;
             if (productList != null) {
                 for (Product p : productList) {
+                    if (p == null || !p.isActive()) continue;
+                    String type = p.getProductType() == null ? "" : p.getProductType();
+                    if ("Menu".equalsIgnoreCase(type)) continue;
+                    totalProducts++;
+                    double unitMarket = InventoryValuationUtil.applyLCMWithDefaults(p.getSellingPrice(), p.getSellingPrice());
+                    inventoryValue += p.getQuantity() * unitMarket;
                     if (p.isLowStock() || p.isCriticalStock()) lowOrCritical++;
-                    inventoryValue += p.getQuantity() * p.getSellingPrice();
                 }
             }
 
@@ -267,12 +286,14 @@ public class Reports extends BaseActivity  {
                 for (Sales s : salesList) {
                     totalTransactions++;
                     totalSalesAmount += s.getTotalPrice();
-                    if ("DELIVERY".equals(s.getDeliveryType())) {
+                    if ("DELIVERY".equalsIgnoreCase(s.getDeliveryType())) {
                         deliveryCount++;
                         deliverySalesAmount += s.getTotalPrice();
                     }
                 }
             }
+
+            List<Bitmap> charts = ChartRenderer.renderCharts(this, salesList, productList);
 
             PDFGenerator generator = new PDFGenerator(this);
             generator.generateOverallSummaryReportPDF(
@@ -283,14 +304,82 @@ public class Reports extends BaseActivity  {
                     totalTransactions,
                     totalSalesAmount,
                     deliveryCount,
-                    deliverySalesAmount
+                    deliverySalesAmount,
+                    charts
             );
 
             lastGeneratedFile = pdfFile;
             lastGeneratedMimeType = "application/pdf";
             promptUserToSaveFile(pdfFile.getName(), "application/pdf");
         } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Overall PDF export failed: " + e.getMessage());
+            exportUtil.showExportError("Overall PDF export failed: " + e.getMessage());
+        }
+    }
+
+    public void writeSalesJournalCsv(File file) throws IOException {
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(file);
+            writer.append("Date,Transaction Count,Net Sales,Delivery Count,Delivery Net Sales\n");
+            if (salesList != null && !salesList.isEmpty()) {
+                SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                Map<String, DailySummary> dailyMap = new HashMap<>();
+                for (Sales s : salesList) {
+                    long ts = s.getDate() > 0 ? s.getDate() : s.getTimestamp();
+                    if (ts <= 0) continue;
+                    String dayKey = dayFormat.format(new Date(ts));
+                    DailySummary ds = dailyMap.get(dayKey);
+                    if (ds == null) {
+                        ds = new DailySummary(dayKey);
+                        dailyMap.put(dayKey, ds);
+                    }
+                    ds.transactionCount++;
+                    ds.netSales += s.getTotalPrice();
+                    if ("DELIVERY".equalsIgnoreCase(s.getDeliveryType())) {
+                        ds.deliveryCount++;
+                        ds.deliverySales += s.getTotalPrice();
+                    }
+                }
+                List<String> keys = new ArrayList<>(dailyMap.keySet());
+                Collections.sort(keys);
+                for (String day : keys) {
+                    DailySummary ds = dailyMap.get(day);
+                    if (ds == null) continue;
+                    writer.append(String.format(Locale.getDefault(), "\"%s\",%d,%.2f,%d,%.2f\n",
+                            day, ds.transactionCount, ds.netSales, ds.deliveryCount, ds.deliverySales));
+                }
+            }
+            writer.flush();
+        } finally {
+            if (writer != null) writer.close();
+        }
+    }
+
+    public void writeSalesChartDataCsv(File file) throws IOException {
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(file);
+            writer.append("Date,SalesAmount\n");
+            if (salesList != null && !salesList.isEmpty()) {
+                Map<String, Double> map = new HashMap<>();
+                SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                for (Sales s : salesList) {
+                    long ts = s.getDate() > 0 ? s.getDate() : s.getTimestamp();
+                    if (ts <= 0) continue;
+                    String key = fmt.format(new Date(ts));
+                    double v = map.containsKey(key) ? map.get(key) : 0;
+                    v += s.getTotalPrice();
+                    map.put(key, v);
+                }
+                List<String> keys = new ArrayList<>(map.keySet());
+                Collections.sort(keys);
+                for (String k : keys) {
+                    writer.append(String.format(Locale.getDefault(), "\"%s\",%.2f\n", k, map.get(k)));
+                }
+            }
+            writer.flush();
+        } finally {
+            if (writer != null) writer.close();
         }
     }
 
@@ -306,7 +395,8 @@ public class Reports extends BaseActivity  {
                     int qty = p.getQuantity();
                     int floor = p.getFloorLevel();
                     double price = p.getSellingPrice();
-                    double total = qty * price;
+                    double unitMarket = InventoryValuationUtil.applyLCMWithDefaults(price, price);
+                    double total = qty * unitMarket;
                     writer.append(String.format(Locale.getDefault(), "\"%s\",\"%s\",%d,%d,%.2f,%.2f\n", name, category, qty, floor, price, total));
                 }
             }
@@ -324,7 +414,7 @@ public class Reports extends BaseActivity  {
             if (salesList != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
                 for (Sales s : salesList) {
-                    String dateStr = sdf.format(new Date(s.getDate()));
+                    String dateStr = sdf.format(new Date(s.getDate() > 0 ? s.getDate() : s.getTimestamp()));
                     String name = sanitizeForCsv(s.getProductName());
                     int qty = s.getQuantity();
                     double total = s.getTotalPrice();
@@ -343,36 +433,20 @@ public class Reports extends BaseActivity  {
         }
     }
 
-    private void writeSalesJournalCsv(File file) throws IOException {
+    private void writeSalesProductJournalCsv(File file) throws IOException {
         FileWriter writer = null;
         try {
             writer = new FileWriter(file);
-            writer.append("Date,Transaction Count,Net Sales,Delivery Count,Delivery Net Sales\n");
-            if (salesList != null && !salesList.isEmpty()) {
-                SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                Map<String, DailySummary> dailyMap = new HashMap<>();
-                for (Sales s : salesList) {
-                    long ts = s.getDate() > 0 ? s.getDate() : s.getTimestamp();
-                    String dayKey = dayFormat.format(new Date(ts));
-                    DailySummary ds = dailyMap.get(dayKey);
-                    if (ds == null) {
-                        ds = new DailySummary(dayKey);
-                        dailyMap.put(dayKey, ds);
-                    }
-                    ds.transactionCount++;
-                    ds.netSales += s.getTotalPrice();
-                    if ("DELIVERY".equals(s.getDeliveryType())) {
-                        ds.deliveryCount++;
-                        ds.deliverySales += s.getTotalPrice();
-                    }
-                }
-                List<String> keys = new ArrayList<>(dailyMap.keySet());
-                java.util.Collections.sort(keys);
-                for (String day : keys) {
-                    DailySummary ds = dailyMap.get(day);
-                    if (ds == null) continue;
-                    writer.append(String.format(Locale.getDefault(), "\"%s\",%d,%.2f,%d,%.2f\n",
-                            day, ds.transactionCount, ds.netSales, ds.deliveryCount, ds.deliverySales));
+            writer.append("Product ID,Product Name,Total Quantity,Total Amount,Last Sale Date\n");
+            if (journalEntries != null && !journalEntries.isEmpty()) {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+                for (SalesJournalEntry e : journalEntries) {
+                    String pid = sanitizeForCsv(e.getProductId());
+                    String pname = sanitizeForCsv(e.getProductName());
+                    int qty = e.getTotalQuantity();
+                    double amt = e.getTotalAmount();
+                    String dateStr = e.getLastSaleTimestamp() > 0 ? sdf.format(new Date(e.getLastSaleTimestamp())) : "";
+                    writer.append(String.format(Locale.getDefault(), "\"%s\",\"%s\",%d,%.2f,\"%s\"\n", pid, pname, qty, amt, dateStr));
                 }
             }
             writer.flush();
@@ -406,19 +480,6 @@ public class Reports extends BaseActivity  {
         }
     }
 
-    private void shareFile(File file, String mimeType) {
-        try {
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType(mimeType);
-            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(shareIntent, "Share report"));
-        } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Share failed: " + e.getMessage());
-        }
-    }
-
     private void promptUserToSaveFile(String suggestedName, String mimeType) {
         if (lastGeneratedFile == null) return;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
@@ -433,7 +494,7 @@ public class Reports extends BaseActivity  {
             FileInputStream in = new FileInputStream(source);
             OutputStream out = getContentResolver().openOutputStream(destUri);
             if (out == null) {
-                new ReportExportUtil(this).showExportError("Unable to open destination");
+                exportUtil.showExportError("Unable to open destination");
                 in.close();
                 return;
             }
@@ -445,122 +506,10 @@ public class Reports extends BaseActivity  {
             out.flush();
             in.close();
             out.close();
-            new ReportExportUtil(this).showExportSuccess(destUri.getPath());
+            exportUtil.showExportSuccess(destUri.getPath());
         } catch (Exception e) {
-            new ReportExportUtil(this).showExportError("Save failed: " + e.getMessage());
+            exportUtil.showExportError("Save failed: " + e.getMessage());
         }
-    }
-
-    private void loadSampleData() {
-        authManager.isCurrentUserAdminAsync(success -> runOnUiThread(() -> {
-            if (!success) {
-                Toast.makeText(Reports.this, "Admin access required to load sample data", Toast.LENGTH_LONG).show();
-                return;
-            }
-            insertSampleData();
-        }));
-    }
-
-    private void insertSampleData() {
-        long now = System.currentTimeMillis();
-        long oneDay = 24L * 60L * 60L * 1000L;
-
-        com.google.firebase.database.DatabaseReference productRef = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("Product");
-        com.google.firebase.database.DatabaseReference salesRef = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("Sales");
-
-        Product coffee = new Product();
-        coffee.setProductId("P_SAMPLE_1");
-        coffee.setProductName("Sample Coffee");
-        coffee.setCategoryName("Beverages");
-        coffee.setQuantity(50);
-        coffee.setSellingPrice(50);
-        coffee.setCostPrice(10);
-        coffee.setReorderLevel(5);
-        coffee.setCeilingLevel(200);
-        coffee.setCriticalLevel(5);
-        coffee.setFloorLevel(2);
-        coffee.setDateAdded(now);
-        coffee.setActive(true);
-        productRef.child(coffee.getProductId()).setValue(coffee);
-
-        Product tea = new Product();
-        tea.setProductId("P_SAMPLE_2");
-        tea.setProductName("Sample Tea");
-        tea.setCategoryName("Beverages");
-        tea.setQuantity(30);
-        tea.setSellingPrice(30);
-        tea.setCostPrice(8);
-        tea.setReorderLevel(4);
-        tea.setCeilingLevel(100);
-        tea.setCriticalLevel(4);
-        tea.setFloorLevel(3);
-        tea.setDateAdded(now);
-        tea.setActive(true);
-        productRef.child(tea.getProductId()).setValue(tea);
-
-        Product bread = new Product();
-        bread.setProductId("P_SAMPLE_3");
-        bread.setProductName("Sample Bread");
-        bread.setCategoryName("Bakery");
-        bread.setQuantity(20);
-        bread.setSellingPrice(20);
-        bread.setCostPrice(7);
-        bread.setReorderLevel(3);
-        bread.setCeilingLevel(60);
-        bread.setCriticalLevel(3);
-        bread.setFloorLevel(2);
-        bread.setDateAdded(now);
-        bread.setActive(true);
-        productRef.child(bread.getProductId()).setValue(bread);
-
-        List<Sales> sampleSales = new ArrayList<>();
-        sampleSales.add(buildSampleSale("P_SAMPLE_1", "Sample Coffee", 2, 50, now - oneDay * 2, false));
-        sampleSales.add(buildSampleSale("P_SAMPLE_2", "Sample Tea", 3, 30, now - oneDay * 2, true));
-        sampleSales.add(buildSampleSale("P_SAMPLE_1", "Sample Coffee", 1, 50, now - oneDay, true));
-        sampleSales.add(buildSampleSale("P_SAMPLE_3", "Sample Bread", 4, 20, now - oneDay, false));
-        sampleSales.add(buildSampleSale("P_SAMPLE_2", "Sample Tea", 2, 30, now, true));
-
-        for (Sales s : sampleSales) {
-            String key = salesRef.push().getKey();
-            if (key != null) {
-                s.setId(key);
-                salesRef.child(key).setValue(s);
-            }
-        }
-
-        Toast.makeText(this, "Sample data loaded", Toast.LENGTH_SHORT).show();
-    }
-
-    private Sales buildSampleSale(String productId, String productName, int qty, double price, long ts, boolean delivery) {
-        Sales s = new Sales();
-        String orderId = "SAMPLE_" + ts + "_" + productId;
-        s.setOrderId(orderId);
-        s.setProductId(productId);
-        s.setProductName(productName);
-        s.setQuantity(qty);
-        s.setPrice(price);
-        s.setTotalPrice(price * qty);
-        s.setPaymentMethod("Cash");
-        s.setDate(ts);
-        s.setTimestamp(ts);
-        if (delivery) {
-            s.setDeliveryType("DELIVERY");
-            s.setDeliveryStatus("PENDING");
-            s.setDeliveryDate(0);
-            s.setDeliveryName("Sample Customer");
-            s.setDeliveryPhone("09123456789");
-            s.setDeliveryAddress("Sample Address");
-            s.setDeliveryPaymentMethod("COD");
-        } else {
-            s.setDeliveryType("WALK_IN");
-            s.setDeliveryStatus("DELIVERED");
-            s.setDeliveryDate(ts);
-            s.setDeliveryName("");
-            s.setDeliveryPhone("");
-            s.setDeliveryAddress("");
-            s.setDeliveryPaymentMethod("");
-        }
-        return s;
     }
 
     private static class ReportItem {

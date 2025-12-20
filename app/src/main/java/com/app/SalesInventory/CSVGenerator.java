@@ -12,7 +12,6 @@ import java.util.Locale;
 import java.io.OutputStream;
 
 public class CSVGenerator {
-
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
 
     public void generateStockValueReportCSV(File outputFile, List<StockValueReport> reports) throws Exception {
@@ -140,6 +139,40 @@ public class CSVGenerator {
                 writer.append(String.valueOf(net)).append(",");
                 writer.append(escapeCsv(String.join("; ", summary.getAdditionReasons()))).append(",");
                 writer.append(escapeCsv(String.join("; ", summary.getRemovalReasons()))).append("\n");
+            }
+        }
+        writer.flush();
+        writer.close();
+    }
+
+    public void generateInventoryMovementsCSV(File outputFile, List<InventoryMovement> movements) throws Exception {
+        FileOutputStream fos = new FileOutputStream(outputFile);
+        try {
+            generateInventoryMovementsCSV(fos, movements);
+        } finally {
+            try { fos.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    public void generateInventoryMovementsCSV(OutputStream outputStream, List<InventoryMovement> movements) throws Exception {
+        Writer writer = new BufferedWriter(new OutputStreamWriter(outputStream, "UTF-8"));
+        writer.append("INVENTORY MOVEMENTS\n");
+        writer.append("Generated on,").append(dateFormat.format(new Date())).append("\n\n");
+        writer.append("Movement ID,Product ID,Product Name,Change,Quantity Before,Quantity After,Type,Reason,Remarks,Timestamp,Performed By\n");
+        if (movements != null) {
+            for (InventoryMovement m : movements) {
+                String ts = m.getTimestamp() > 0 ? dateFormat.format(new Date(m.getTimestamp())) : "";
+                writer.append(escapeCsv(m.getMovementId())).append(",");
+                writer.append(escapeCsv(m.getProductId())).append(",");
+                writer.append(escapeCsv(m.getProductName())).append(",");
+                writer.append(String.valueOf(m.getChange())).append(",");
+                writer.append(String.valueOf(m.getQuantityBefore())).append(",");
+                writer.append(String.valueOf(m.getQuantityAfter())).append(",");
+                writer.append(escapeCsv(m.getType())).append(",");
+                writer.append(escapeCsv(m.getReason())).append(",");
+                writer.append(escapeCsv(m.getRemarks())).append(",");
+                writer.append(escapeCsv(ts)).append(",");
+                writer.append(escapeCsv(m.getPerformedBy())).append("\n");
             }
         }
         writer.flush();

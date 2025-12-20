@@ -45,17 +45,26 @@ public class CategoryRepository {
             Log.w(TAG, "User not authenticated. Cannot start sync.");
             return;
         }
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            Log.w(TAG, "startRealtimeSync skipped: businessOwnerId not set yet");
+            return;
+        }
         syncListener.listenToCategories(snapshot -> {
             List<Category> categoryList = new ArrayList<>();
             if (snapshot != null) {
                 for (DocumentSnapshot document : snapshot.getDocuments()) {
-                    Category category = document.toObject(Category.class);
-                    if (category != null) {
-                        category.setCategoryId(document.getId());
-                        if (category.getType() == null || category.getType().isEmpty()) {
-                            category.setType("Inventory");
+                    try {
+                        Category category = document.toObject(Category.class);
+                        if (category != null) {
+                            category.setCategoryId(document.getId());
+                            if (category.getType() == null || category.getType().isEmpty()) {
+                                category.setType("Inventory");
+                            }
+                            categoryList.add(category);
                         }
-                        categoryList.add(category);
+                    } catch (Exception e) {
+                        Log.w(TAG, "skip malformed category doc " + document.getId(), e);
                     }
                 }
             }
@@ -73,20 +82,29 @@ public class CategoryRepository {
             callback.onError("User not authenticated");
             return;
         }
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            callback.onError("Business owner ID not set");
+            return;
+        }
         firestoreManager.getDb()
-                .collection(firestoreManager.getUserCategoriesPath())
+                .collection(path)
                 .get()
                 .addOnSuccessListener(snapshot -> {
                     List<Category> list = new ArrayList<>();
                     if (snapshot != null) {
                         for (DocumentSnapshot document : snapshot.getDocuments()) {
-                            Category category = document.toObject(Category.class);
-                            if (category != null) {
-                                category.setCategoryId(document.getId());
-                                if (category.getType() == null || category.getType().isEmpty()) {
-                                    category.setType("Inventory");
+                            try {
+                                Category category = document.toObject(Category.class);
+                                if (category != null) {
+                                    category.setCategoryId(document.getId());
+                                    if (category.getType() == null || category.getType().isEmpty()) {
+                                        category.setType("Inventory");
+                                    }
+                                    list.add(category);
                                 }
-                                list.add(category);
+                            } catch (Exception e) {
+                                Log.w(TAG, "skip malformed category doc " + document.getId(), e);
                             }
                         }
                     }
@@ -103,33 +121,41 @@ public class CategoryRepository {
             listener.onError("User not authenticated");
             return;
         }
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            listener.onError("Business owner ID not set");
+            return;
+        }
         if (category.getCategoryName() == null || category.getCategoryName().isEmpty()) {
             listener.onError("Category name cannot be empty");
             return;
         }
-        Map<String, Object> categoryMap = new HashMap<>();
-        categoryMap.put("categoryName", category.getCategoryName());
-        categoryMap.put("description", category.getDescription() != null ? category.getDescription() : "");
-        categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
-        categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Inventory");
-        categoryMap.put("active", category.isActive());
-        categoryMap.put("timestamp", firestoreManager.getServerTimestamp());
-        firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath()).add(categoryMap)
-                .addOnSuccessListener(documentReference -> {
-                    String categoryId = documentReference.getId();
-                    category.setCategoryId(categoryId);
-                    listener.onCategoryAdded(categoryId);
-                    Log.d(TAG, "Category added: " + categoryId);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error adding category", e);
-                    listener.onError(e.getMessage());
-                });
+        try {
+            firestoreManager.getDb().collection(path).add(category.toMap())
+                    .addOnSuccessListener(documentReference -> {
+                        String categoryId = documentReference.getId();
+                        category.setCategoryId(categoryId);
+                        listener.onCategoryAdded(categoryId);
+                        Log.d(TAG, "Category added: " + categoryId);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error adding category", e);
+                        listener.onError(e.getMessage());
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding category", e);
+            listener.onError(e.getMessage());
+        }
     }
 
     public void updateCategory(Category category, OnCategoryUpdatedListener listener) {
         if (!firestoreManager.isUserAuthenticated()) {
             listener.onError("User not authenticated");
+            return;
+        }
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            listener.onError("Business owner ID not set");
             return;
         }
         if (category.getCategoryId() == null || category.getCategoryId().isEmpty()) {
@@ -142,7 +168,7 @@ public class CategoryRepository {
         categoryMap.put("color", category.getColor() != null ? category.getColor() : "#000000");
         categoryMap.put("type", category.getType() != null && !category.getType().isEmpty() ? category.getType() : "Inventory");
         categoryMap.put("active", category.isActive());
-        firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath())
+        firestoreManager.getDb().collection(path)
                 .document(category.getCategoryId())
                 .update(categoryMap)
                 .addOnSuccessListener(aVoid -> {
@@ -160,7 +186,12 @@ public class CategoryRepository {
             listener.onError("User not authenticated");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath())
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            listener.onError("Business owner ID not set");
+            return;
+        }
+        firestoreManager.getDb().collection(path)
                 .document(categoryId)
                 .delete()
                 .addOnSuccessListener(aVoid -> {
@@ -178,7 +209,12 @@ public class CategoryRepository {
             listener.onError("User not authenticated");
             return;
         }
-        firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath())
+        String path = firestoreManager.getUserCategoriesPath();
+        if (path == null) {
+            listener.onError("Business owner ID not set");
+            return;
+        }
+        firestoreManager.getDb().collection(path)
                 .document(categoryId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {

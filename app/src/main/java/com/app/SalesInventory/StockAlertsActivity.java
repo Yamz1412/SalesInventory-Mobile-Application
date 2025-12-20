@@ -14,9 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Shows stock alerts. If started with an "alertId" extra, will mark that alert as read automatically.
- */
 public class StockAlertsActivity extends BaseActivity {
 
     private RecyclerView recyclerViewAlerts;

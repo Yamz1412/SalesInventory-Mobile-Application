@@ -1,9 +1,11 @@
 package com.app.SalesInventory;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 import androidx.core.content.ContextCompat;
@@ -12,7 +14,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,8 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class InventoryReportsActivity extends BaseActivity  {
+public class InventoryReportsActivity extends BaseActivity {
 
+    private static final String TAG = "InventoryReportsActivity";
     private Button btnStockValue;
     private Button btnStockMovement;
     private Button btnAdjustmentSummary;
@@ -62,32 +64,61 @@ public class InventoryReportsActivity extends BaseActivity  {
         salesRef = FirebaseDatabase.getInstance().getReference("Sales");
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
         exportUtil = new ReportExportUtil(this);
+
+        if (btnStockValue != null) btnStockValue.setClickable(true);
+        if (btnStockMovement != null) btnStockMovement.setClickable(true);
+        if (btnAdjustmentSummary != null) btnAdjustmentSummary.setClickable(true);
+        if (btnExport != null) btnExport.setClickable(true);
+        if (btnDeliveryReport != null) btnDeliveryReport.setClickable(true);
+        if (btnReceivingReport != null) btnReceivingReport.setClickable(true);
     }
 
     private void setupClickListeners() {
-        btnStockValue.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, StockValueReportActivity.class)));
-        btnStockMovement.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, StockMovementReportActivity.class)));
-        btnAdjustmentSummary.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, AdjustmentSummaryReportActivity.class)));
-        btnReceivingReport.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, ReceivingReportActivity.class)));
-        btnDeliveryReport.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, DeliveryReportActivity.class)));
-        btnExport.setOnClickListener(v -> {
+        if (btnStockValue != null) btnStockValue.setOnClickListener(v -> {
+            Toast.makeText(this, "Opening Stock Value Report...", Toast.LENGTH_SHORT).show();
+            safeStartActivity(StockValueReportActivity.class);
+        });
+        if (btnStockMovement != null) btnStockMovement.setOnClickListener(v -> {
+            Toast.makeText(this, "Opening Stock Movement Report...", Toast.LENGTH_SHORT).show();
+            safeStartActivity(StockMovementReportActivity.class);
+        });
+        if (btnAdjustmentSummary != null) btnAdjustmentSummary.setOnClickListener(v -> {
+            Toast.makeText(this, "Opening Adjustment Summary...", Toast.LENGTH_SHORT).show();
+            safeStartActivity(AdjustmentSummaryReportActivity.class);
+        });
+        if (btnReceivingReport != null) btnReceivingReport.setOnClickListener(v -> {
+            Toast.makeText(this, "Opening Receiving Report...", Toast.LENGTH_SHORT).show();
+            safeStartActivity(ReceivingReportActivity.class);
+        });
+        if (btnDeliveryReport != null) btnDeliveryReport.setOnClickListener(v -> {
+            Toast.makeText(this, "Opening Delivery Report...", Toast.LENGTH_SHORT).show();
+            safeStartActivity(DeliveryReportActivity.class);
+        });
+
+        if (btnExport != null) btnExport.setOnClickListener(v -> {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
                     return;
                 }
             }
+            Toast.makeText(this, "Preparing combined PDF...", Toast.LENGTH_SHORT).show();
             exportAllReportsPdf();
         });
     }
 
+    private void safeStartActivity(Class<?> cls) {
+        try {
+            Intent intent = new Intent(this, cls);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start activity " + (cls == null ? "null" : cls.getName()), e);
+            String msg = "Cannot open report: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void exportAllReportsPdf() {
-        Toast.makeText(this, "Preparing combined PDF...", Toast.LENGTH_SHORT).show();
         productRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot productSnapshot) {
@@ -111,8 +142,8 @@ public class InventoryReportsActivity extends BaseActivity  {
                             String pid = s.getProductId();
                             int q = s.getQuantity();
                             if (pid != null) {
-                                if (soldMap.containsKey(pid)) soldMap.put(pid, soldMap.get(pid) + q);
-                                else soldMap.put(pid, q);
+                                Integer prev = soldMap.get(pid);
+                                soldMap.put(pid, (prev != null ? prev : 0) + q);
                                 totalSoldHolder[0] += q;
                             }
                         }
@@ -130,12 +161,12 @@ public class InventoryReportsActivity extends BaseActivity  {
                                     int qty = a.getQuantityAdjusted();
                                     if (pid == null) continue;
                                     if ("Add Stock".equals(a.getAdjustmentType())) {
-                                        if (receivedMap.containsKey(pid)) receivedMap.put(pid, receivedMap.get(pid) + qty);
-                                        else receivedMap.put(pid, qty);
+                                        Integer prev = receivedMap.get(pid);
+                                        receivedMap.put(pid, (prev != null ? prev : 0) + qty);
                                         totalReceivedHolder[0] += qty;
                                     } else {
-                                        if (adjustedMap.containsKey(pid)) adjustedMap.put(pid, adjustedMap.get(pid) + qty);
-                                        else adjustedMap.put(pid, qty);
+                                        Integer prevAdj = adjustedMap.get(pid);
+                                        adjustedMap.put(pid, (prevAdj != null ? prevAdj : 0) + qty);
                                         totalAdjustedHolder[0] += qty;
                                     }
                                 }
@@ -144,6 +175,14 @@ public class InventoryReportsActivity extends BaseActivity  {
                                     List<StockMovementReport> movementReports = new ArrayList<>();
                                     List<AdjustmentSummaryData> adjustmentSummaries = new ArrayList<>();
                                     for (Product p : products) {
+                                        double costToComplete = p.getCostToComplete();
+                                        double sellingCosts = p.getSellingCosts();
+                                        double normalProfitPercent = p.getNormalProfitPercent();
+                                        double unitCeiling = p.getSellingPrice() - (costToComplete + sellingCosts);
+                                        if (unitCeiling < 0) unitCeiling = 0;
+                                        double unitFloor = unitCeiling * (1.0 - (normalProfitPercent / 100.0));
+                                        if (unitFloor < 0) unitFloor = 0;
+                                        double unitMarket = Math.max(unitFloor, Math.min(p.getSellingPrice(), unitCeiling));
                                         StockValueReport vr = new StockValueReport(
                                                 p.getProductId(),
                                                 p.getProductName(),
@@ -154,7 +193,10 @@ public class InventoryReportsActivity extends BaseActivity  {
                                                 p.getReorderLevel(),
                                                 p.getCriticalLevel(),
                                                 p.getCeilingLevel(),
-                                                p.getFloorLevel()
+                                                p.getFloorLevel(),
+                                                unitCeiling,
+                                                unitFloor,
+                                                unitMarket
                                         );
                                         valueReports.add(vr);
                                         int rec = receivedMap.containsKey(p.getProductId()) ? receivedMap.get(p.getProductId()) : 0;

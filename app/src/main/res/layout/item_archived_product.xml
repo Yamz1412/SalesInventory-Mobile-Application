@@ -27,12 +27,23 @@
                 android:textColor="?attr/colorOnBackground"/>
 
             <TextView
-                android:id="@+id/tv_item_sub"
+                android:id="@+id/tv_item_supplier"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Supplier name"
+                android:textSize="14sp"
+                android:textColor="@color/textColorSecondary"
+                android:layout_marginTop="2dp"/>
+
+            <TextView
+                android:id="@+id/tv_item_meta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Qty / price"
                 android:textSize="14sp"
-                android:textColor="@color/textColorSecondary"/>
+                android:textColor="@color/textColorSecondary"
+                android:layout_marginTop="4dp"/>
+
         </LinearLayout>
 
         <Button

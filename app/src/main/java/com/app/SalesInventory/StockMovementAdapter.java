@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
+import java.util.Locale;
 
 public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdapter.ViewHolder> {
 
@@ -17,6 +18,10 @@ public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdap
 
     public StockMovementAdapter(List<StockMovementReport> reportList) {
         this.reportList = reportList;
+    }
+
+    public List<StockMovementReport> getReportList() {
+        return reportList;
     }
 
     @NonNull
@@ -39,9 +44,8 @@ public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdap
         holder.tvSold.setText("Sold: -" + report.getSold());
         holder.tvAdjusted.setText("Adjusted: " + (report.getAdjusted() >= 0 ? "+" : "") + report.getAdjusted());
         holder.tvClosing.setText("Closing: " + report.getClosingStock());
-        holder.tvMovement.setText("Movement: " + String.format("%.2f%%", report.getMovementPercentage()));
+        holder.tvMovement.setText(String.format(Locale.getDefault(), "%.2f%%", report.getMovementPercentage()));
 
-        // Color code movement percentage
         if (report.getMovementPercentage() > 50) {
             holder.tvMovement.setTextColor(context.getResources().getColor(R.color.successGreen));
         } else if (report.getMovementPercentage() > 20) {
@@ -53,7 +57,7 @@ public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdap
 
     @Override
     public int getItemCount() {
-        return reportList.size();
+        return reportList == null ? 0 : reportList.size();
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {

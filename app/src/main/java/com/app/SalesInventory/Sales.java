@@ -1,7 +1,7 @@
 package com.app.SalesInventory;
 
 public class Sales {
-    private String id;
+    private String saleId;
     private String orderId;
     private String productId;
     private String productName;
@@ -18,16 +18,27 @@ public class Sales {
     private String deliveryPhone;
     private String deliveryAddress;
     private String deliveryPaymentMethod;
+    private String receiptUri;
+    private String buyerEmail;
+    private String dateTimeString;
 
     public Sales() {
     }
 
     public String getId() {
-        return id;
+        return saleId;
     }
 
     public void setId(String id) {
-        this.id = id;
+        this.saleId = id;
+    }
+
+    public String getSaleId() {
+        return saleId;
+    }
+
+    public void setSaleId(String saleId) {
+        this.saleId = saleId;
     }
 
     public String getOrderId() {
@@ -156,5 +167,29 @@ public class Sales {
 
     public void setDeliveryPaymentMethod(String deliveryPaymentMethod) {
         this.deliveryPaymentMethod = deliveryPaymentMethod;
+    }
+
+    public String getReceiptUri() {
+        return receiptUri;
+    }
+
+    public void setReceiptUri(String receiptUri) {
+        this.receiptUri = receiptUri;
+    }
+
+    public String getBuyerEmail() {
+        return buyerEmail;
+    }
+
+    public void setBuyerEmail(String buyerEmail) {
+        this.buyerEmail = buyerEmail;
+    }
+
+    public String getDateTimeString() {
+        return dateTimeString;
+    }
+
+    public void setDateTimeString(String dateTimeString) {
+        this.dateTimeString = dateTimeString;
     }
 }

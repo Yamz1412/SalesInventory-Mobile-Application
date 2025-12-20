@@ -5,8 +5,7 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     android:fillViewport="true"
-    android:background="#FFFFFF"
-    tools:context=".Signup">
+    android:background="#FFFFFF">
 
     <LinearLayout
         android:layout_width="match_parent"

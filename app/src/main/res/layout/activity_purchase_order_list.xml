@@ -2,11 +2,13 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/coordinatorRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:colorBackground">
 
     <LinearLayout
+        android:id="@+id/mainColumn"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -30,12 +32,43 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewPurchaseOrders"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:padding="8dp"
             android:clipToPadding="false"
             tools:listitem="@layout/item_purchase_order"
             tools:itemCount="3"
             android:scrollbars="vertical" />
+
+        <LinearLayout
+            android:id="@+id/bottom_buttons_row"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:background="@android:color/transparent"
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnViewArchives"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="View Archives"
+                    android:textAllCaps="false"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:textColor="@android:color/white" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -43,13 +76,13 @@
         android:id="@+id/fabAddPO"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="24dp"
         android:src="@android:drawable/ic_input_add"
         android:contentDescription="Create Purchase Order"
         app:backgroundTint="?attr/colorOnPrimary"
         app:tint="?attr/colorPrimary"
         app:elevation="6dp"
-        app:borderWidth="0dp" />
+        app:borderWidth="0dp"
+        android:layout_margin="24dp"
+        android:layout_gravity="bottom|end" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

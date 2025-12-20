@@ -1,6 +1,10 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import java.io.ByteArrayOutputStream;
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
@@ -8,13 +12,16 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.layout.element.Table;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -34,6 +41,135 @@ public class PDFGenerator {
         this.regularFont = PdfFontFactory.createFont();
     }
 
+    public File generateReceiptPdf(String orderId,
+                                   List<CartManager.CartItem> items,
+                                   double finalTotal,
+                                   double cashGiven,
+                                   double change,
+                                   boolean isDelivery,
+                                   String deliveryName,
+                                   String deliveryPhone,
+                                   String deliveryAddress,
+                                   String deliveryPayment,
+                                   String paymentMethod,
+                                   String receiptUri) throws Exception {
+        File folder = new File(context.getExternalFilesDir(null), "transaction");
+        if (!folder.exists()) folder.mkdirs();
+        String filename = "receipt_" + orderId + ".pdf";
+        File outFile = new File(folder, filename);
+        try (OutputStream os = new FileOutputStream(outFile)) {
+            PdfWriter writer = new PdfWriter(os);
+            PdfDocument pdfDoc = new PdfDocument(writer);
+            Document document = new Document(pdfDoc);
+            Text titleText = new Text("RECEIPT");
+            Paragraph title = new Paragraph(titleText)
+                    .setFont(boldFont)
+                    .setFontSize(18)
+                    .setTextAlignment(TextAlignment.CENTER);
+            document.add(title);
+            Paragraph meta = new Paragraph("Order ID: " + orderId + "\nDate: " + dateFormat.format(new Date()))
+                    .setFont(regularFont)
+                    .setFontSize(10)
+                    .setTextAlignment(TextAlignment.CENTER);
+            document.add(meta);
+            document.add(new Paragraph("\n"));
+            Table table = new Table(UnitValue.createPercentArray(new float[]{5, 1, 2})).setWidth(UnitValue.createPercentValue(100));
+            table.addHeaderCell(createHeaderCell("Item"));
+            table.addHeaderCell(createHeaderCell("Qty"));
+            table.addHeaderCell(createHeaderCell("Amount"));
+            if (items != null) {
+                for (CartManager.CartItem it : items) {
+                    table.addCell(new Cell().add(new Paragraph(it.productName).setFont(regularFont).setFontSize(11)));
+                    table.addCell(new Cell().add(new Paragraph(String.valueOf(it.quantity)).setFont(regularFont).setFontSize(11)).setTextAlignment(TextAlignment.CENTER));
+                    table.addCell(new Cell().add(new Paragraph(String.format(Locale.US, "₱%.2f", it.getLineTotal())).setFont(regularFont).setFontSize(11)).setTextAlignment(TextAlignment.RIGHT));
+                }
+            }
+            document.add(table);
+            document.add(new Paragraph("\n"));
+            Paragraph totals = new Paragraph()
+                    .add(new Text(String.format(Locale.US, "Total: ₱%.2f", finalTotal)).setFont(boldFont).setFontSize(12))
+                    .setTextAlignment(TextAlignment.RIGHT);
+            document.add(totals);
+            if (cashGiven > 0) {
+                Paragraph cash = new Paragraph()
+                        .add(new Text(String.format(Locale.US, "Cash: ₱%.2f", cashGiven)).setFont(regularFont).setFontSize(11))
+                        .setTextAlignment(TextAlignment.RIGHT);
+                document.add(cash);
+                Paragraph ch = new Paragraph()
+                        .add(new Text(String.format(Locale.US, "Change: ₱%.2f", change)).setFont(regularFont).setFontSize(11))
+                        .setTextAlignment(TextAlignment.RIGHT);
+                document.add(ch);
+            }
+            document.add(new Paragraph("\n"));
+            Paragraph payment = new Paragraph("Payment Method: " + paymentMethod)
+                    .setFont(regularFont)
+                    .setFontSize(11);
+            document.add(payment);
+            if (isDelivery) {
+                Paragraph del = new Paragraph()
+                        .add(new Text("Delivery Details").setFont(boldFont).setFontSize(12))
+                        .add("\n")
+                        .add(new Text(deliveryName + " • " + deliveryPhone).setFont(regularFont).setFontSize(11))
+                        .add("\n")
+                        .add(new Text(deliveryAddress).setFont(regularFont).setFontSize(11))
+                        .add("\n")
+                        .add(new Text("Delivery Payment: " + deliveryPayment).setFont(regularFont).setFontSize(11));
+                document.add(del);
+            }
+            if (receiptUri != null && !receiptUri.isEmpty()) {
+                try {
+                    Uri uri = Uri.parse(receiptUri);
+                    try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+                        if (in != null) {
+                            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                            byte[] buf = new byte[8192];
+                            int r;
+                            while ((r = in.read(buf)) != -1) bos.write(buf, 0, r);
+                            byte[] bytes = bos.toByteArray();
+                            Image img = new Image(ImageDataFactory.create(bytes));
+                            img.setAutoScale(true);
+                            img.setWidth(UnitValue.createPercentValue(100));
+                            document.add(new Paragraph("\n"));
+                            document.add(img);
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+            document.add(new Paragraph("\n"));
+            Paragraph footer = new Paragraph("Thank you for your purchase")
+                    .setFont(boldFont)
+                    .setFontSize(12)
+                    .setTextAlignment(TextAlignment.CENTER);
+            document.add(footer);
+            document.close();
+        }
+        return outFile;
+    }
+
+    public File generateReceiptPdf(String orderId,
+                                   List<CartManager.CartItem> items,
+                                   double finalTotal,
+                                   double cashGiven,
+                                   double change,
+                                   boolean isDelivery,
+                                   String deliveryName,
+                                   String deliveryPhone,
+                                   String deliveryAddress,
+                                   String deliveryPayment,
+                                   String paymentMethod) throws Exception {
+        return generateReceiptPdf(orderId, items, finalTotal, cashGiven, change, isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment, paymentMethod, null);
+    }
+
+    private Cell createHeaderCell(String text) throws Exception {
+        Text headerText = new Text(text);
+        Paragraph headerParagraph = new Paragraph(headerText)
+                .setFont(boldFont);
+        return new Cell()
+                .add(headerParagraph)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(ColorConstants.LIGHT_GRAY);
+    }
+
     public void generateOverallSummaryReportPDF(File outputFile,
                                                 int totalProducts,
                                                 int lowOrCriticalProducts,
@@ -41,10 +177,11 @@ public class PDFGenerator {
                                                 int totalTransactions,
                                                 double totalSalesAmount,
                                                 int deliveryCount,
-                                                double deliverySalesAmount) throws Exception {
+                                                double deliverySalesAmount,
+                                                List<Bitmap> charts) throws Exception {
         OutputStream os = new FileOutputStream(outputFile);
         try {
-            generateOverallSummaryReportPDF(os, totalProducts, lowOrCriticalProducts, inventoryValue, totalTransactions, totalSalesAmount, deliveryCount, deliverySalesAmount);
+            generateOverallSummaryReportPDF(os, totalProducts, lowOrCriticalProducts, inventoryValue, totalTransactions, totalSalesAmount, deliveryCount, deliverySalesAmount, charts);
         } finally {
             try { os.close(); } catch (Exception ignored) {}
         }
@@ -57,7 +194,8 @@ public class PDFGenerator {
                                                 int totalTransactions,
                                                 double totalSalesAmount,
                                                 int deliveryCount,
-                                                double deliverySalesAmount) throws Exception {
+                                                double deliverySalesAmount,
+                                                List<Bitmap> charts) throws Exception {
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
@@ -88,6 +226,18 @@ public class PDFGenerator {
                 .setFontSize(14)
                 .setMarginTop(12);
         document.add(chartTitle);
+        if (charts != null) {
+            for (Bitmap bmp : charts) {
+                if (bmp == null) continue;
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, bos);
+                byte[] bytes = bos.toByteArray();
+                Image img = new Image(ImageDataFactory.create(bytes));
+                img.setAutoScale(true);
+                img.setWidth(UnitValue.createPercentValue(100));
+                document.add(img);
+            }
+        }
         double maxAmount = Math.max(totalSalesAmount, deliverySalesAmount);
         if (maxAmount <= 0) maxAmount = 1;
         int barWidthSales = (int) Math.round((totalSalesAmount / maxAmount) * 40);
@@ -197,16 +347,6 @@ public class PDFGenerator {
         document.close();
     }
 
-    public void generateStockMovementReportPDF(File outputFile, List<StockMovementReport> reports,
-                                               int totalReceived, int totalSold, int totalAdjustments) throws Exception {
-        OutputStream os = new FileOutputStream(outputFile);
-        try {
-            generateStockMovementReportPDF(os, reports, totalReceived, totalSold, totalAdjustments);
-        } finally {
-            try { os.close(); } catch (Exception ignored) {}
-        }
-    }
-
     public void generateStockMovementReportPDF(OutputStream outputStream, List<StockMovementReport> reports,
                                                int totalReceived, int totalSold, int totalAdjustments) throws Exception {
         PdfWriter writer = new PdfWriter(outputStream);
@@ -265,16 +405,6 @@ public class PDFGenerator {
         document.close();
     }
 
-    public void generateAdjustmentSummaryReportPDF(File outputFile, List<AdjustmentSummaryData> summaryList,
-                                                   int totalAdjustments, int totalAdditions, int totalRemovals) throws Exception {
-        OutputStream os = new FileOutputStream(outputFile);
-        try {
-            generateAdjustmentSummaryReportPDF(os, summaryList, totalAdjustments, totalAdditions, totalRemovals);
-        } finally {
-            try { os.close(); } catch (Exception ignored) {}
-        }
-    }
-
     public void generateAdjustmentSummaryReportPDF(OutputStream outputStream, List<AdjustmentSummaryData> summaryList,
                                                    int totalAdjustments, int totalAdditions, int totalRemovals) throws Exception {
         PdfWriter writer = new PdfWriter(outputStream);
@@ -322,9 +452,7 @@ public class PDFGenerator {
                 int net = summary.getTotalAdditions() - summary.getTotalRemovals();
                 table.addCell(String.valueOf(net));
                 StringBuilder reasons = new StringBuilder();
-                if (!summary.getAdditionReasons().isEmpty()) {
-                    reasons.append("Added: ").append(String.join(", ", summary.getAdditionReasons()));
-                }
+                if (!summary.getAdditionReasons().isEmpty()) reasons.append("Added: ").append(String.join(", ", summary.getAdditionReasons()));
                 if (!summary.getRemovalReasons().isEmpty()) {
                     if (reasons.length() > 0) reasons.append("; ");
                     reasons.append("Removed: ").append(String.join(", ", summary.getRemovalReasons()));
@@ -333,20 +461,8 @@ public class PDFGenerator {
             }
         }
         document.add(table);
-        document.add(new Paragraph("\n\nReport generated by: Sales Inventory System")
-                .setFontSize(9)
-                .setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("\n\nReport generated by: Sales Inventory System").setFontSize(9).setTextAlignment(TextAlignment.CENTER));
         document.close();
-    }
-
-    private Cell createHeaderCell(String text) throws Exception {
-        Text headerText = new Text(text);
-        Paragraph headerParagraph = new Paragraph(headerText)
-                .setFont(boldFont);
-        return new Cell()
-                .add(headerParagraph)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setBackgroundColor(ColorConstants.LIGHT_GRAY);
     }
 
     public void generateCombinedInventoryReportPDF(OutputStream outputStream,

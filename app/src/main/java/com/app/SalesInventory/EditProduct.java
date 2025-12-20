@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -8,6 +9,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.InputFilter;
+import android.text.Spanned;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -33,7 +36,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class EditProduct extends BaseActivity {
-    private EditText productNameET, costPriceET, sellingPriceET, quantityET, unitET, minStockET, expiryDateET, floorLevelET;
+    private EditText productNameET, costPriceET, sellingPriceET, quantityET, unitET, minStockET, expiryDateET;
+    private EditText costToCompleteET, sellingCostsET, normalProfitPercentET;
     private Spinner categorySpinner;
     private Button updateBtn, cancelBtn;
     private ImageButton btnEditPhoto;
@@ -44,7 +48,7 @@ public class EditProduct extends BaseActivity {
     private Product currentProduct;
     private String selectedImagePath;
     private SimpleDateFormat expiryFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
-    private Calendar calendar = Calendar.getInstance();
+    private Calendar expiryCalendar = Calendar.getInstance();
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<String> permissionLauncher;
     private DatabaseReference categoryRef;
@@ -62,8 +66,10 @@ public class EditProduct extends BaseActivity {
         quantityET = findViewById(R.id.quantityET);
         unitET = findViewById(R.id.unitET);
         minStockET = findViewById(R.id.minStockET);
-        floorLevelET = findViewById(R.id.floorLevelET);
         expiryDateET = findViewById(R.id.expiryDateET);
+        costToCompleteET = findViewById(R.id.costToCompleteET);
+        sellingCostsET = findViewById(R.id.sellingCostsET);
+        normalProfitPercentET = findViewById(R.id.normalProfitPercentET);
         categorySpinner = findViewById(R.id.categorySpinner);
         updateBtn = findViewById(R.id.updateBtn);
         cancelBtn = findViewById(R.id.cancelBtn);
@@ -74,7 +80,8 @@ public class EditProduct extends BaseActivity {
         setupImagePickers();
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
         setupCategorySpinner();
-        expiryDateET.setOnClickListener(v -> showDatePicker());
+        applyInputLimits();
+        expiryDateET.setOnClickListener(v -> showExpiryDatePicker());
         Bundle extras = getIntent().getExtras();
         if (extras != null) {
             productId = extras.getString("productId");
@@ -91,6 +98,52 @@ public class EditProduct extends BaseActivity {
         btnEditPhoto.setOnClickListener(v -> tryPickImage());
     }
 
+    private void showExpiryDatePicker() {
+        Calendar now = Calendar.getInstance();
+        int year = now.get(Calendar.YEAR);
+        int month = now.get(Calendar.MONTH);
+        int day = now.get(Calendar.DAY_OF_MONTH);
+        DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
+            expiryCalendar.set(Calendar.YEAR, y);
+            expiryCalendar.set(Calendar.MONTH, m);
+            expiryCalendar.set(Calendar.DAY_OF_MONTH, d);
+            Date date = expiryCalendar.getTime();
+            expiryDateET.setText(expiryFormat.format(date));
+        }, year, month, day);
+        dialog.getDatePicker().setMinDate(System.currentTimeMillis());
+        dialog.show();
+    }
+
+    private InputFilter createDecimalFilter(final int maxIntegerDigits, final int maxDecimalDigits) {
+        return new InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                String result = dest.subSequence(0, dstart) + source.toString() + dest.subSequence(dend, dest.length());
+                if (result.equals(".")) return "0.";
+                if (result.isEmpty()) return null;
+                if (!result.matches("^\\d{0," + maxIntegerDigits + "}(\\.\\d{0," + maxDecimalDigits + "})?$")) {
+                    return "";
+                }
+                return null;
+            }
+        };
+    }
+
+    private InputFilter createIntegerLengthFilter(final int maxDigits) {
+        return new InputFilter.LengthFilter(maxDigits);
+    }
+
+    private void applyInputLimits() {
+        costPriceET.setFilters(new InputFilter[] { createDecimalFilter(7, 2), createIntegerLengthFilter(10) });
+        sellingPriceET.setFilters(new InputFilter[] { createDecimalFilter(7, 2), createIntegerLengthFilter(10) });
+        costToCompleteET.setFilters(new InputFilter[] { createDecimalFilter(7, 2), createIntegerLengthFilter(10) });
+        sellingCostsET.setFilters(new InputFilter[] { createDecimalFilter(7, 2), createIntegerLengthFilter(10) });
+        normalProfitPercentET.setFilters(new InputFilter[] { createIntegerLengthFilter(3) });
+        quantityET.setFilters(new InputFilter[] { createIntegerLengthFilter(4) });
+        minStockET.setFilters(new InputFilter[] { createIntegerLengthFilter(3) });
+    }
+
+    @SuppressLint("WrongConstant")
     private void setupImagePickers() {
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -98,6 +151,12 @@ public class EditProduct extends BaseActivity {
                     if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                         Uri uri = result.getData().getData();
                         if (uri != null) {
+                            try {
+                                Intent dataIntent = result.getData();
+                                int takeFlags = dataIntent.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                                getContentResolver().takePersistableUriPermission(uri, takeFlags);
+                            } catch (Exception ignored) {
+                            }
                             selectedImagePath = uri.toString();
                             btnEditPhoto.setImageURI(uri);
                         }
@@ -127,30 +186,12 @@ public class EditProduct extends BaseActivity {
     }
 
     private void openImagePicker() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         imagePickerLauncher.launch(intent);
-    }
-
-    private void showDatePicker() {
-        long initial = currentProduct != null ? currentProduct.getExpiryDate() : 0L;
-        if (initial > 0 && initial >= System.currentTimeMillis()) {
-            calendar.setTimeInMillis(initial);
-        } else {
-            calendar.setTimeInMillis(System.currentTimeMillis());
-        }
-        int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH);
-        int day = calendar.get(Calendar.DAY_OF_MONTH);
-        DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
-            calendar.set(Calendar.YEAR, y);
-            calendar.set(Calendar.MONTH, m);
-            calendar.set(Calendar.DAY_OF_MONTH, d);
-            Date date = calendar.getTime();
-            expiryDateET.setText(expiryFormat.format(date));
-        }, year, month, day);
-        dialog.getDatePicker().setMinDate(System.currentTimeMillis());
-        dialog.show();
     }
 
     private void setupCategorySpinner() {
@@ -171,7 +212,7 @@ public class EditProduct extends BaseActivity {
                 categoryList.addAll(temp);
                 filterCategoriesByType();
                 if (currentProduct != null) {
-                    setSpinnerSelectionToCategory(currentProduct.getCategoryName());
+                    setSpinnerSelectionToCategory(currentProduct.getCategoryId(), currentProduct.getCategoryName());
                 }
             }
             @Override
@@ -233,7 +274,6 @@ public class EditProduct extends BaseActivity {
             quantityET.setText(String.valueOf(currentProduct.getQuantity()));
             unitET.setText(currentProduct.getUnit());
             minStockET.setText(String.valueOf(currentProduct.getReorderLevel()));
-            floorLevelET.setText(String.valueOf(Math.max(1, currentProduct.getFloorLevel())));
             if (currentProduct.getExpiryDate() > 0 && currentProduct.getExpiryDate() >= System.currentTimeMillis()) {
                 expiryDateET.setText(expiryFormat.format(new Date(currentProduct.getExpiryDate())));
             } else {
@@ -262,16 +302,25 @@ public class EditProduct extends BaseActivity {
                 rbInventoryEdit.setChecked(true);
             }
             filterCategoriesByType();
-            setSpinnerSelectionToCategory(currentProduct.getCategoryName());
+            setSpinnerSelectionToCategory(currentProduct.getCategoryId(), currentProduct.getCategoryName());
         }
     }
 
-    private void setSpinnerSelectionToCategory(String categoryName) {
-        if (categoryName == null) return;
+    private void setSpinnerSelectionToCategory(String categoryId, String categoryName) {
+        if (categoryId == null && (categoryName == null || categoryName.isEmpty())) return;
         for (int i = 0; i < availableCategories.size(); i++) {
             Category c = availableCategories.get(i);
-            if (c != null && categoryName.equalsIgnoreCase(c.getCategoryName())) {
-                categorySpinner.setSelection(i);
+            if (c == null) continue;
+            String cid = c.getCategoryId();
+            String cname = c.getCategoryName();
+            boolean match = false;
+            if (categoryId != null && cid != null && !categoryId.isEmpty() && cid.equals(categoryId)) match = true;
+            if (!match && categoryName != null && cname != null && !categoryName.isEmpty() && cname.equalsIgnoreCase(categoryName.trim())) match = true;
+            if (match) {
+                try {
+                    categorySpinner.setSelection(i);
+                } catch (Exception ignored) {
+                }
                 return;
             }
         }
@@ -283,7 +332,6 @@ public class EditProduct extends BaseActivity {
             quantityET.setText("");
             costPriceET.setText("");
             minStockET.setText("");
-            floorLevelET.setText("");
             unitET.setText("");
         }
     }
@@ -298,25 +346,39 @@ public class EditProduct extends BaseActivity {
         updateBtn.setEnabled(false);
         updateBtn.setText("Updating...");
         try {
-            String costStr = costPriceET.getText().toString().trim();
-            String sellingStr = sellingPriceET.getText().toString().trim();
-            String qtyStr = quantityET.getText().toString().trim();
-            String minStockStr = minStockET.getText().toString().trim();
+            String costStr = costPriceET.getText() == null ? "" : costPriceET.getText().toString().trim();
+            String sellingStr = sellingPriceET.getText() == null ? "" : sellingPriceET.getText().toString().trim();
+            String qtyStr = quantityET.getText() == null ? "" : quantityET.getText().toString().trim();
+            String minStockStr = minStockET.getText() == null ? "" : minStockET.getText().toString().trim();
             boolean isMenu = rbMenuEdit.isChecked();
-            currentProduct.setProductName(productNameET.getText().toString().trim());
-            currentProduct.setCostPrice(Double.parseDouble(costStr.isEmpty() ? "0" : costStr));
-            if (isMenu) {
-                currentProduct.setSellingPrice(0);
-            } else {
-                currentProduct.setSellingPrice(Double.parseDouble(sellingStr.isEmpty() ? "0" : sellingStr));
+            double costVal = 0;
+            double sellingVal = 0;
+            int newQty = 0;
+            try {
+                costVal = Double.parseDouble(costStr.isEmpty() ? "0" : costStr);
+            } catch (NumberFormatException ignored) {
+                costVal = 0;
             }
-            int newQty = Integer.parseInt(qtyStr.isEmpty() ? "0" : qtyStr);
+            try {
+                sellingVal = Double.parseDouble(sellingStr.isEmpty() ? "0" : sellingStr);
+            } catch (NumberFormatException ignored) {
+                sellingVal = 0;
+            }
+            try {
+                newQty = Integer.parseInt(qtyStr.isEmpty() ? "0" : qtyStr);
+            } catch (NumberFormatException ignored) {
+                newQty = 0;
+            }
             if (newQty < 0) newQty = 0;
+            currentProduct.setProductName(productNameET.getText().toString().trim());
+            currentProduct.setCostPrice(costVal);
+            currentProduct.setSellingPrice(sellingVal);
             currentProduct.setQuantity(newQty);
             currentProduct.setUnit(unitET.getText().toString().trim());
             currentProduct.setReorderLevel(Integer.parseInt(minStockStr.isEmpty() ? "0" : minStockStr));
             currentProduct.setFloorLevel(1);
             currentProduct.setCriticalLevel(1);
+            currentProduct.setCeilingLevel(Math.max(currentProduct.getCeilingLevel(), newQty));
             String expiryStr = expiryDateET.getText().toString().trim();
             long expiry = 0L;
             if (!expiryStr.isEmpty()) {
@@ -344,8 +406,80 @@ public class EditProduct extends BaseActivity {
                 currentProduct.setCategoryId(selCat.getCategoryId());
                 currentProduct.setCategoryName(selCat.getCategoryName());
             }
-        } catch (NumberFormatException e) {
-            Toast.makeText(this, "Invalid number format", Toast.LENGTH_SHORT).show();
+            double ctc = 0;
+            double sc = 0;
+            int profit = 0;
+            try {
+                ctc = Double.parseDouble(costToCompleteET.getText() != null ? costToCompleteET.getText().toString() : "0");
+            } catch (Exception ignored) {
+            }
+            try {
+                sc = Double.parseDouble(sellingCostsET.getText() != null ? sellingCostsET.getText().toString() : "0");
+            } catch (Exception ignored) {
+            }
+            try {
+                profit = Integer.parseInt(normalProfitPercentET.getText() != null ? normalProfitPercentET.getText().toString() : "0");
+            } catch (Exception ignored) {
+            }
+            if (costVal < 0 || costVal > 1000000) {
+                Toast.makeText(this, "Buying price must be between 0 and 1,000,000", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            if (ctc < 0 || ctc > 1000000) {
+                Toast.makeText(this, "Estimated Cost to Complete must be between 0 and 1,000,000", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            if (sc < 0 || sc > 1000000) {
+                Toast.makeText(this, "Estimated Selling Costs must be between 0 and 1,000,000", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            if (profit < 0 || profit > 999) {
+                Toast.makeText(this, "Profit percent must be a 0-999 value", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            if (newQty < 0 || newQty > 1000) {
+                Toast.makeText(this, "Quantity must be 0 to 1000", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            int reorder = currentProduct.getReorderLevel();
+            if (reorder < 0 || reorder > 999) {
+                Toast.makeText(this, "Reorder level must be 0 to 999", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+            if (minStockET.getText() != null) {
+                try {
+                    int crit = Integer.parseInt(minStockET.getText().toString());
+                    if (crit < 1 || crit > 50) {
+                        Toast.makeText(this, "Critical level must be between 1 and 50", Toast.LENGTH_SHORT).show();
+                        updateBtn.setEnabled(true);
+                        updateBtn.setText("Update Product");
+                        return;
+                    }
+                    currentProduct.setCriticalLevel(crit);
+                } catch (Exception ignored) {
+                    currentProduct.setCriticalLevel(1);
+                }
+            }
+            if (sellingVal < 0 || sellingVal > 9999999) {
+                Toast.makeText(this, "Selling price must be between 0 and 9,999,999", Toast.LENGTH_SHORT).show();
+                updateBtn.setEnabled(true);
+                updateBtn.setText("Update Product");
+                return;
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Invalid input", Toast.LENGTH_SHORT).show();
             updateBtn.setEnabled(true);
             updateBtn.setText("Update Product");
             return;
@@ -404,6 +538,14 @@ public class EditProduct extends BaseActivity {
             }
             if (isMenu && sellingPrice <= 0) {
                 Toast.makeText(this, "Selling price must be greater than 0 for menu items", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            if (costPrice > 1000000) {
+                Toast.makeText(this, "Buying price must be 1,000,000 or less", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+            if (sellingPrice > 9999999) {
+                Toast.makeText(this, "Selling price must be 9,999,999 or less", Toast.LENGTH_SHORT).show();
                 return false;
             }
         } catch (NumberFormatException e) {

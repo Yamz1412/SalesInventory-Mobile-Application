@@ -10,11 +10,6 @@ import android.os.Build;
 
 import androidx.core.app.NotificationCompat;
 
-/**
- * Centralized helper for showing local notifications.
- * - Creates notification channel on Android O+
- * - Deep-links into StockAlertsActivity if alertId provided
- */
 public class NotificationHelper {
     private static final String CHANNEL_ID = "sales_inventory_alerts";
     private static final String CHANNEL_NAME = "Alerts";

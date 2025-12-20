@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  function isAuthenticated() { return request.auth != null; }
+  function isAdminByCollection(database) { return isAuthenticated() && exists(/databases/$(database)/documents/admin/$(request.auth.uid)) && get(/databases/$(database)/documents/admin/$(request.auth.uid)).data.approved == true; }
+  function isAdmin(database) { return request.auth.token.admin == true || isAdminByCollection(database); }
+  function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
+  function isStaffOfOwner(database, userId) { return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.ownerAdminId == userId; }
+  match /databases/{database}/documents {
+    match /admin/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin(database);
+      allow update: if isAdmin(database);
+      allow delete: if isAdmin(database);
+    }
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) || isAdmin(database);
+      allow update: if isAdmin(database) || isOwner(userId);
+      allow delete: if isAdmin(database);
+    }
+    match /dashboard/{ownerId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(ownerId) || isAdmin(database);
+    }
+    match /alerts/{ownerId}/items/{alertId} {
+      allow read: if isOwner(ownerId) || isStaffOfOwner(database, ownerId) || isAdmin(database);
+      allow create: if isAdmin(database) || isOwner(ownerId);
+      allow update: if isAdmin(database) || resource.data.createdBy == request.auth.uid || isOwner(ownerId);
+      allow delete: if isAdmin(database) || isOwner(ownerId);
+    }
+    match /products/{userId}/items/{itemId} {
+      allow read: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+      allow write: if isOwner(userId) || isAdmin(database);
+    }
+    match /sales/{userId}/items/{itemId} {
+      allow read, write: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+    }
+    match /adjustments/{userId}/items/{itemId} {
+      allow read, write: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+    }
+    match /categories/{userId}/items/{itemId} {
+      allow read, write: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+    }
+    match /purchaseOrders/{userId}/items/{itemId} {
+      allow read: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+      allow write: if isOwner(userId) || isAdmin(database);
+    }
+    match /deliveries/{userId}/items/{itemId} {
+      allow read, write: if isOwner(userId) || isStaffOfOwner(database, userId) || isAdmin(database);
+    }
+    match /{document=**} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}

@@ -79,7 +79,7 @@
                     android:text="0 alerts"
                     android:textSize="24sp"
                     android:textStyle="bold"
-                    android:textColor="@color/warningYellow"
+                    android:textColor="@color/red"
                     android:layout_marginTop="4dp"
                     android:visibility="gone" />
 

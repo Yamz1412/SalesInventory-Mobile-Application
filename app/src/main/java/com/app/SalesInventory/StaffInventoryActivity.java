@@ -82,7 +82,7 @@ public class StaffInventoryActivity extends AppCompatActivity {
                 } else {
                     emptyStateTV.setVisibility(android.view.View.GONE);
                 }
-                adapter.setItems(list);
+                adapter.submitSortedList(list);
             });
         }
 
@@ -104,7 +104,7 @@ public class StaffInventoryActivity extends AppCompatActivity {
             String name = p.getProductName() != null ? p.getProductName().toLowerCase() : "";
             if (name.contains(q)) out.add(p);
         }
-        adapter.setItems(out);
+        adapter.submitSortedList(out);
         if (out.isEmpty()) {
             emptyStateTV.setVisibility(android.view.View.VISIBLE);
         } else {

@@ -43,10 +43,19 @@ public class DashboardViewModel extends AndroidViewModel {
         dashboardMetrics = new MutableLiveData<>();
         recentActivities = new MutableLiveData<>();
         isLoading = new MutableLiveData<>(false);
-        errorMessage = new MutableLiveData<>();
+        errorMessage = new MutableLiveData<>("");
         executorService = Executors.newSingleThreadExecutor();
         salesRepository = SalesRepository.getInstance();
         productRepository = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
+
+        LiveData<DashboardMetrics> metricsLive = repository.getMetricsLiveData();
+        if (metricsLive != null) {
+            metricsLive.observeForever(dm -> {
+                if (dm != null) {
+                    dashboardMetrics.postValue(dm);
+                }
+            });
+        }
     }
 
     public LiveData<DashboardMetrics> getDashboardMetrics() {
@@ -64,6 +73,7 @@ public class DashboardViewModel extends AndroidViewModel {
     public LiveData<String> getErrorMessage() {
         return errorMessage;
     }
+
     public void clearErrorMessage() {
         errorMessage.setValue("");
     }
@@ -79,7 +89,7 @@ public class DashboardViewModel extends AndroidViewModel {
                 }
             });
         } catch (Exception e) {
-            errorMessage.postValue("Error loading dashboard: " + e.getMessage());
+            errorMessage.postValue("Error loading dashboard: " + (e.getMessage() == null ? "" : e.getMessage()));
             isLoading.postValue(false);
         }
     }
@@ -88,21 +98,18 @@ public class DashboardViewModel extends AndroidViewModel {
         try {
             repository.getRecentActivities(10, activities -> recentActivities.postValue(activities));
         } catch (Exception e) {
-            errorMessage.postValue("Error loading activities: " + e.getMessage());
+            errorMessage.postValue("Error loading activities: " + (e.getMessage() == null ? "" : e.getMessage()));
         }
     }
 
     public void loadChartData(LineChart salesTrendChart, BarChart topProductsChart, PieChart inventoryStatusChart) {
         executorService.execute(() -> {
             try {
-                LiveData<List<Sales>> salesLive = salesRepository.getAllSales();
-                LiveData<List<Product>> productsLive = productRepository.getAllProducts();
-
-                List<Sales> allSales = salesLive.getValue();
-                List<Product> products = productsLive.getValue();
+                List<Sales> allSales = salesRepository.getAllSales().getValue();
+                List<Product> products = productRepository.getAllProducts().getValue();
 
                 List<Entry> salesTrendEntries = repository.getSalesTrendData(allSales);
-                TopProductsResult topProductsResult = repository.getTopProductsData(allSales, products);
+                DashboardRepository.TopProductsResult topProductsResult = repository.getTopProductsData(allSales, products);
                 List<BarEntry> topProductEntries = topProductsResult.getEntries();
                 List<String> topProductNames = topProductsResult.getProductNames();
                 int[] invStatus = repository.getInventoryStatusBreakdown(products);
@@ -117,7 +124,7 @@ public class DashboardViewModel extends AndroidViewModel {
                     setupInventoryStatusChart(inventoryStatusChart, invStatus);
                 }
             } catch (Exception e) {
-                errorMessage.postValue("Error loading charts: " + e.getMessage());
+                errorMessage.postValue("Error loading charts: " + (e.getMessage() == null ? "" : e.getMessage()));
             }
         });
     }

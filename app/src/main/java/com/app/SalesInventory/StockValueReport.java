@@ -13,8 +13,11 @@ public class StockValueReport {
     private int criticalLevel;
     private int ceilingLevel;
     private int floorLevel;
+    private double unitCeiling;
+    private double unitFloor;
+    private double unitMarket;
 
-    public StockValueReport(String productId, String productName, String category, int quantity, double costPrice, double sellingPrice, int reorderLevel, int criticalLevel, int ceilingLevel, int floorLevel) {
+    public StockValueReport(String productId, String productName, String category, int quantity, double costPrice, double sellingPrice, int reorderLevel, int criticalLevel, int ceilingLevel, int floorLevel, double unitCeiling, double unitFloor, double unitMarket) {
         this.productId = productId;
         this.productName = productName;
         this.category = category;
@@ -25,6 +28,9 @@ public class StockValueReport {
         this.criticalLevel = criticalLevel;
         this.ceilingLevel = ceilingLevel;
         this.floorLevel = floorLevel;
+        this.unitCeiling = unitCeiling;
+        this.unitFloor = unitFloor;
+        this.unitMarket = unitMarket;
     }
 
     public String getProductId() {
@@ -67,12 +73,24 @@ public class StockValueReport {
         return floorLevel;
     }
 
+    public double getUnitCeiling() {
+        return unitCeiling;
+    }
+
+    public double getUnitFloor() {
+        return unitFloor;
+    }
+
+    public double getUnitMarket() {
+        return unitMarket;
+    }
+
     public double getTotalCostValue() {
         return costPrice * quantity;
     }
 
     public double getTotalSellingValue() {
-        return sellingPrice * quantity;
+        return unitMarket * quantity;
     }
 
     public double getProfit() {

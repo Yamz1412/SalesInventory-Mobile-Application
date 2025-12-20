@@ -7,7 +7,7 @@ public class PaymentUtils {
     public static boolean validatePayment(BigDecimal input, BigDecimal remaining) {
         if (input == null) return false;
         if (input.compareTo(BigDecimal.ZERO) <= 0) return false;
-        if (remaining != null && input.compareTo(remaining) > 0) return false;
+        if (remaining != null && input.compareTo(remaining) < 0) return false;
         if (input.compareTo(PAYMENT_MAX) > 0) return false;
         return true;
     }

@@ -172,10 +172,36 @@ public class SellList extends BaseActivity {
         Button btnAddToCart = dialogView.findViewById(R.id.btnOptionAddToCart);
 
         tvName.setText(product.getProductName());
-        tvPrice.setText("₱" + String.format(Locale.US, "%.2f", product.getSellingPrice()));
 
         rbMedium.setChecked(true);
         etQty.setText("1");
+
+        double basePrice = product.getSellingPrice();
+
+        Runnable updatePriceRunnable = () -> {
+            String size;
+            int checkedId = rgSize.getCheckedRadioButtonId();
+            if (checkedId == R.id.rbSizeSmall) {
+                size = "Small";
+            } else if (checkedId == R.id.rbSizeLarge) {
+                size = "Large";
+            } else {
+                size = "Medium";
+            }
+            List<String> addonList = new ArrayList<>();
+            if (cbExtraShot.isChecked()) addonList.add("Extra Shot");
+            if (cbWhipped.isChecked()) addonList.add("Whipped Cream");
+            if (cbSyrup.isChecked()) addonList.add("Syrup");
+            double unitPrice = computeUnitPrice(basePrice, size, addonList);
+            tvPrice.setText("₱" + String.format(Locale.US, "%.2f", unitPrice));
+        };
+
+        rgSize.setOnCheckedChangeListener((group, checkedId) -> updatePriceRunnable.run());
+        cbExtraShot.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceRunnable.run());
+        cbWhipped.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceRunnable.run());
+        cbSyrup.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceRunnable.run());
+
+        updatePriceRunnable.run();
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
@@ -222,11 +248,14 @@ public class SellList extends BaseActivity {
                 return;
             }
 
+            List<String> addonListForPrice = addonList;
+            double unitPrice = computeUnitPrice(basePrice, size, addonListForPrice);
+
             String displayName = product.getProductName() + " (" + size + ")";
             cartManager.addItem(
                     product.getProductId(),
                     displayName,
-                    product.getSellingPrice(),
+                    unitPrice,
                     q,
                     product.getQuantity(),
                     size,
@@ -238,5 +267,21 @@ public class SellList extends BaseActivity {
         });
 
         dialog.show();
+    }
+
+    private double computeUnitPrice(double basePrice, String size, List<String> addons) {
+        double multiplier = 1.0;
+        if ("Small".equalsIgnoreCase(size)) multiplier = 0.9;
+        else if ("Large".equalsIgnoreCase(size)) multiplier = 1.2;
+        else multiplier = 1.0;
+        double price = basePrice * multiplier;
+        if (addons != null) {
+            for (String a : addons) {
+                if ("Extra Shot".equalsIgnoreCase(a)) price += 10.0;
+                else if ("Whipped Cream".equalsIgnoreCase(a)) price += 5.0;
+                else if ("Syrup".equalsIgnoreCase(a)) price += 3.0;
+            }
+        }
+        return price;
     }
 }

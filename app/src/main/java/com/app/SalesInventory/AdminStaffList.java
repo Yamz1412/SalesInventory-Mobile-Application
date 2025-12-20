@@ -44,6 +44,12 @@ public class AdminStaffList extends AppCompatActivity {
         loadStaff();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        loadStaff();
+    }
+
     private void loadStaff() {
         progressBar.setVisibility(View.VISIBLE);
         tvNoStaff.setVisibility(View.GONE);

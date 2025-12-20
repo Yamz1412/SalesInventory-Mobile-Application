@@ -8,7 +8,7 @@ public class StockAlert {
     private int reorderLevel;
     private int criticalLevel;
     private int ceilingLevel;
-    private String alertType; // "CRITICAL", "LOW", "OVERSTOCK"
+    private String alertType;
     private String category;
     private long createdAt;
     private boolean isResolved;
@@ -122,11 +122,11 @@ public class StockAlert {
 
     public int getSeverity() {
         if ("CRITICAL".equals(alertType)) {
-            return 3; // Highest
+            return 3;
         } else if ("LOW".equals(alertType)) {
             return 2;
         } else if ("OVERSTOCK".equals(alertType)) {
-            return 1; // Lowest
+            return 1;
         }
         return 0;
     }

@@ -47,7 +47,7 @@ public class FirestoreManager {
                 currentUserId = u.getUid();
             }
         }
-        return currentUserId == null ? "unknown" : currentUserId;
+        return currentUserId;
     }
 
     public void setBusinessOwnerId(String ownerId) {
@@ -58,31 +58,49 @@ public class FirestoreManager {
         if (businessOwnerId != null && !businessOwnerId.isEmpty()) {
             return businessOwnerId;
         }
-        return ensureCurrentUserId();
+        return null;
     }
 
     public String getUserProductsPath() {
-        return "products/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "products/" + owner + "/items";
     }
 
     public String getUserSalesPath() {
-        return "sales/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "sales/" + owner + "/items";
     }
 
     public String getUserAdjustmentsPath() {
-        return "adjustments/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "adjustments/" + owner + "/items";
     }
 
     public String getUserAlertsPath() {
-        return "alerts/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "alerts/" + owner + "/items";
     }
 
     public String getUserCategoriesPath() {
-        return "categories/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "categories/" + owner + "/items";
     }
 
     public String getUserPurchaseOrdersPath() {
-        return "purchaseOrders/" + getBusinessOwnerId() + "/items";
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "purchaseOrders/" + owner + "/items";
+    }
+
+    public String getUserDeliveriesPath() {
+        String owner = getBusinessOwnerId();
+        if (owner == null) return null;
+        return "deliveries/" + owner + "/items";
     }
 
     public Object getServerTimestamp() {

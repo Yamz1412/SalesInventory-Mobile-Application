@@ -24,7 +24,6 @@ public class StockMovementReport {
         this.adjusted = adjusted;
         this.closingStock = closingStock;
         this.reportDate = reportDate;
-
         calculateMovementPercentage();
     }
     public void addReceived(int qty) {
@@ -48,7 +47,6 @@ public class StockMovementReport {
         if (this.openingStock < 0) {
             this.openingStock = 0;
         }
-
         calculateMovementPercentage();
     }
 
@@ -61,7 +59,6 @@ public class StockMovementReport {
         }
     }
 
-    // Getters
     public String getProductId() { return productId; }
     public String getProductName() { return productName; }
     public String getCategory() { return category; }

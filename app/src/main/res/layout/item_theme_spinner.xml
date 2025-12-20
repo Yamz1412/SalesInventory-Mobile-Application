@@ -2,6 +2,10 @@
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tvThemeName"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:padding="12dp"
-    android:textSize="16sp" />
+    android:layout_height="48dp"
+    android:gravity="center_vertical"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:textColor="?android:textColorPrimary"
+    android:textSize="14sp"
+    android:background="?attr/colorSurface" />

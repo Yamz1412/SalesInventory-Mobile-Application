@@ -24,6 +24,16 @@ public abstract class BaseActivity extends AppCompatActivity {
         super.onResume();
         ThemeManager.getInstance(this).applySystemColorsToWindow(this);
     }
+    @Override
+    protected void onPostCreate(@Nullable Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        try {
+            ThemeManager tm = ThemeManager.getInstance(this);
+            if (tm != null) {
+                tm.applyTheme(this);
+            }
+        } catch (Exception ignored) {}
+    }
 
     private void enforceAuthentication() {
         if (this instanceof FirstActivity

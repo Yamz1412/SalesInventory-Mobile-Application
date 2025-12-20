@@ -1,1 +1,25 @@
-/build
+# Android / Java
+.gradle/
+*/build/
+**/build/
+local.properties
+/.idea/
+/*.iml
+captures/
+.externalNativeBuild/
+
+# Firebase functions / Node
+app/functions/node_modules/
+app/functions/.firebase/
+app/functions/.firebase-debug.log
+app/functions/deploy-debug.txt
+
+# lockfiles you don't want in root (only keep the ones you need)
+# (If you want functions' package-lock.json committed, don't ignore it)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Misc
+.DS_Store
+*.log

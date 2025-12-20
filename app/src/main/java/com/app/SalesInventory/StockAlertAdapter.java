@@ -1,14 +1,13 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -35,15 +34,12 @@ public class StockAlertAdapter extends RecyclerView.Adapter<StockAlertAdapter.Vi
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         StockAlert alert = alertList.get(position);
-
         holder.tvProductName.setText(alert.getProductName());
         holder.tvCategory.setText("Category: " + alert.getCategory());
         holder.tvAlertMessage.setText(alert.getAlertMessage());
         holder.tvCurrentQty.setText("Current: " + alert.getCurrentQuantity() + " units");
-
         String dateText = dateFormat.format(new Date(alert.getCreatedAt()));
         holder.tvAlertDate.setText(dateText);
-
         String type = alert.getAlertType();
         if ("CRITICAL".equals(type)) {
             holder.itemView.setBackgroundColor(context.getResources().getColor(R.color.errorRed));
@@ -74,12 +70,37 @@ public class StockAlertAdapter extends RecyclerView.Adapter<StockAlertAdapter.Vi
             holder.tvAlertType.setText(type);
             holder.tvAlertType.setTextColor(context.getResources().getColor(R.color.white));
         }
-
         holder.tvAlertMessage.setTextColor(context.getResources().getColor(R.color.white));
         holder.tvProductName.setTextColor(context.getResources().getColor(R.color.white));
         holder.tvCategory.setTextColor(context.getResources().getColor(R.color.white));
         holder.tvCurrentQty.setTextColor(context.getResources().getColor(R.color.white));
         holder.tvAlertDate.setTextColor(context.getResources().getColor(R.color.white));
+        holder.itemView.setOnClickListener(v -> {
+            String productId = alert.getProductId();
+            if (productId == null || productId.isEmpty()) return;
+            try {
+                Class<?> cls = Class.forName("com.app.SalesInventory.ProductDetailsActivity");
+                Intent i = new Intent(context, cls);
+                i.putExtra("productId", productId);
+                context.startActivity(i);
+                return;
+            } catch (Exception ignored) {}
+            try {
+                Class<?> cls = Class.forName("com.app.SalesInventory.AddProductActivity");
+                Intent i = new Intent(context, cls);
+                i.putExtra("productId", productId);
+                context.startActivity(i);
+                return;
+            } catch (Exception ignored) {}
+            try {
+                Class<?> cls = Class.forName("com.app.SalesInventory.Inventory");
+                Intent i = new Intent(context, cls);
+                i.putExtra("productId", productId);
+                i.putExtra("readonly", false);
+                context.startActivity(i);
+                return;
+            } catch (Exception ignored) {}
+        });
     }
 
     @Override
@@ -89,7 +110,6 @@ public class StockAlertAdapter extends RecyclerView.Adapter<StockAlertAdapter.Vi
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvAlertType, tvProductName, tvCategory, tvAlertMessage, tvCurrentQty, tvAlertDate;
-
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             tvAlertType = itemView.findViewById(R.id.tvAlertType);

@@ -56,6 +56,12 @@ public class ProductEntity {
     public long expiryDate;
     @ColumnInfo(name = "productType")
     public String productType;
+    @ColumnInfo(name = "costToComplete")
+    public double costToComplete;
+    @ColumnInfo(name = "sellingCosts")
+    public double sellingCosts;
+    @ColumnInfo(name = "normalProfitPercent")
+    public double normalProfitPercent;
 
     public ProductEntity() {}
 }

@@ -17,11 +17,19 @@
         <item name="colorOnBackground">@color/text_primary</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="android:colorBackground">@color/dashboard_background</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:textColorHint">@color/text_secondary</item>
+        <item name="android:colorForeground">@color/text_primary</item>
+        <item name="colorControlNormal">@color/text_primary</item>
     </style>
 
     <style name="AppTheme_Dark" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
+        <item name="boxStrokeColor">@android:color/white</item>
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="colorPrimary">@android:color/black</item>
         <item name="colorPrimaryVariant">@android:color/black</item>
@@ -37,6 +45,12 @@
         <item name="android:colorBackground">@android:color/black</item>
         <item name="hintTextColor">@color/white</item>
         <item name="android:textColorHint">@color/white</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/lightGray</item>
+        <item name="android:colorForeground">@android:color/white</item>
+        <item name="colorControlNormal">@color/lightGray</item>
     </style>
 
     <style name="AppTheme_Ocean" parent="Theme.MaterialComponents.Light.NoActionBar">
@@ -44,6 +58,7 @@
         <item name="android:statusBarColor">@color/blue</item>
         <item name="android:navigationBarColor">@color/blue</item>
         <item name="colorPrimary">@color/blue</item>
+        <item name="boxStrokeColor">@android:color/black</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorSecondary">@color/info_primary</item>
         <item name="colorSecondaryVariant">@color/info_primary</item>
@@ -57,6 +72,12 @@
         <item name="android:colorBackground">@color/blue</item>
         <item name="hintTextColor">@color/black</item>
         <item name="android:textColorHint">@color/black</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/lightGray</item>
+        <item name="android:colorForeground">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
     </style>
 
     <style name="AppTheme_Forest" parent="Theme.MaterialComponents.Light.NoActionBar">
@@ -76,7 +97,14 @@
         <item name="colorOnSurface">@android:color/white</item>
         <item name="android:colorBackground">@color/success_primary</item>
         <item name="hintTextColor">@color/darkGray</item>
+        <item name="boxStrokeColor">@color/darkGray</item>
         <item name="android:textColorHint">@color/darkGray</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/lightGray</item>
+        <item name="android:colorForeground">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
     </style>
 
     <style name="AppTheme_Sunset" parent="Theme.MaterialComponents.Light.NoActionBar">
@@ -95,8 +123,15 @@
         <item name="colorOnBackground">@android:color/white</item>
         <item name="colorOnSurface">@android:color/white</item>
         <item name="android:colorBackground">@color/orange</item>
-        <item name="hintTextColor">@color/white</item>
+        <item name="hintTextColor">@color/black</item>
+        <item name="boxStrokeColor">@android:color/black</item>
         <item name="android:textColorHint">@color/white</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/lightGray</item>
+        <item name="android:colorForeground">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
     </style>
 
     <style name="AppTheme_Purple" parent="Theme.MaterialComponents.Light.NoActionBar">
@@ -116,7 +151,14 @@
         <item name="colorOnSurface">@android:color/white</item>
         <item name="android:colorBackground">@color/purple_700</item>
         <item name="hintTextColor">@color/white</item>
+        <item name="boxStrokeColor">@android:color/white</item>
         <item name="android:textColorHint">@color/white</item>
+
+        <!-- Added to ensure text, icons and controls are visible in this theme -->
+        <item name="android:textColorPrimary">@android:color/white</item>
+        <item name="android:textColorSecondary">@color/lightGray</item>
+        <item name="android:colorForeground">@android:color/white</item>
+        <item name="colorControlNormal">@android:color/white</item>
     </style>
 
     <style name="AppTheme" parent="AppTheme_Light" />
@@ -176,5 +218,11 @@
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="android:statusBarColor">@color/primary</item>
         <item name="android:navigationBarColor">@android:color/white</item>
+
+        <!-- Added to ensure text and icons visibility for app theme -->
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:colorForeground">@color/text_primary</item>
+        <item name="colorControlNormal">@color/text_primary</item>
     </style>
 </resources>

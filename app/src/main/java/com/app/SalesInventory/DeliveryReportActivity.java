@@ -12,12 +12,17 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-
 import java.util.Locale;
 import java.util.Map;
 
@@ -28,69 +33,101 @@ public class DeliveryReportActivity extends BaseActivity {
     private DeliveryReportAdapter adapter;
     private SalesRepository salesRepository;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
+    private DatabaseReference poRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_delivery_report);
-
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Delivery Report");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
-
         recyclerView = findViewById(R.id.recyclerViewDelivery);
         tvNoData = findViewById(R.id.tvNoDataDelivery);
-
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new DeliveryReportAdapter(new ArrayList<>(), orderId -> markOrderDelivered(orderId));
         recyclerView.setAdapter(adapter);
-
         salesRepository = SalesRepository.getInstance();
-
+        poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
         loadData();
     }
 
     private void loadData() {
         salesRepository.getAllSales().observe(this, sales -> {
-            if (sales == null || sales.isEmpty()) {
-                adapter.setItems(new ArrayList<>());
-                tvNoData.setVisibility(View.VISIBLE);
-                recyclerView.setVisibility(View.GONE);
-                return;
-            }
-
             Map<String, DeliveryOrder> map = new HashMap<>();
-            for (Sales s : sales) {
-                if (s.getDeliveryType() == null || !"DELIVERY".equals(s.getDeliveryType())) {
-                    continue;
+            if (sales != null) {
+                for (Sales s : sales) {
+                    if (s == null) continue;
+                    if (s.getDeliveryType() == null || !"DELIVERY".equalsIgnoreCase(s.getDeliveryType())) continue;
+                    String orderId = s.getOrderId();
+                    if (orderId == null) continue;
+                    DeliveryOrder o = map.get(orderId);
+                    if (o == null) {
+                        o = new DeliveryOrder();
+                        o.orderId = orderId;
+                        o.deliveryStatus = s.getDeliveryStatus() == null ? "PENDING" : s.getDeliveryStatus();
+                        o.deliveryDate = s.getDeliveryDate();
+                        o.orderDate = s.getDate();
+                        o.totalAmount = 0;
+                        o.customerName = s.getDeliveryName();
+                        o.paymentType = s.getDeliveryPaymentMethod();
+                        o.source = "SALE";
+                        map.put(orderId, o);
+                    }
+                    o.totalAmount += s.getTotalPrice();
                 }
-                String orderId = s.getOrderId();
-                if (orderId == null) continue;
-                DeliveryOrder o = map.get(orderId);
-                if (o == null) {
-                    o = new DeliveryOrder();
-                    o.orderId = orderId;
-                    o.deliveryStatus = s.getDeliveryStatus() == null ? "PENDING" : s.getDeliveryStatus();
-                    o.deliveryDate = s.getDeliveryDate();
-                    o.orderDate = s.getDate();
-                    o.totalAmount = 0;
-                    o.customerName = s.getDeliveryName();
-                    o.paymentType = s.getDeliveryPaymentMethod();
-                    map.put(orderId, o);
-                }
-                o.totalAmount += s.getTotalPrice();
             }
+            poRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot != null && snapshot.exists()) {
+                        for (DataSnapshot ds : snapshot.getChildren()) {
+                            PurchaseOrder po = ds.getValue(PurchaseOrder.class);
+                            if (po == null) continue;
+                            String status = po.getStatus();
+                            if (status == null) continue;
+                            if (!("RECEIVED".equalsIgnoreCase(status) || PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(status))) continue;
+                            String poId = po.getPoId();
+                            if (poId == null || poId.isEmpty()) poId = ds.getKey();
+                            if (poId == null) continue;
+                            if (map.containsKey(poId)) continue;
+                            DeliveryOrder od = new DeliveryOrder();
+                            od.orderId = poId;
+                            od.deliveryStatus = "RECEIVED";
+                            od.deliveryDate = po.getOrderDate();
+                            od.orderDate = po.getOrderDate();
+                            od.totalAmount = po.getTotalAmount();
+                            od.customerName = po.getSupplierName();
+                            od.paymentType = "PURCHASE_ORDER";
+                            od.source = "PO";
+                            map.put(poId, od);
+                        }
+                    }
+                    List<DeliveryOrder> list = new ArrayList<>(map.values());
+                    if (list.isEmpty()) {
+                        tvNoData.setVisibility(View.VISIBLE);
+                        recyclerView.setVisibility(View.GONE);
+                    } else {
+                        tvNoData.setVisibility(View.GONE);
+                        recyclerView.setVisibility(View.VISIBLE);
+                        adapter.setItems(list);
+                    }
+                }
 
-            List<DeliveryOrder> list = new ArrayList<>(map.values());
-            if (list.isEmpty()) {
-                tvNoData.setVisibility(View.VISIBLE);
-                recyclerView.setVisibility(View.GONE);
-            } else {
-                tvNoData.setVisibility(View.GONE);
-                recyclerView.setVisibility(View.VISIBLE);
-                adapter.setItems(list);
-            }
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    List<DeliveryOrder> list = new ArrayList<>(map.values());
+                    if (list.isEmpty()) {
+                        tvNoData.setVisibility(View.VISIBLE);
+                        recyclerView.setVisibility(View.GONE);
+                    } else {
+                        tvNoData.setVisibility(View.GONE);
+                        recyclerView.setVisibility(View.VISIBLE);
+                        adapter.setItems(list);
+                    }
+                }
+            });
         });
     }
 
@@ -100,7 +137,7 @@ public class DeliveryReportActivity extends BaseActivity {
             if (sales == null) return;
             long now = System.currentTimeMillis();
             for (Sales s : sales) {
-                if (orderId.equals(s.getOrderId()) && "DELIVERY".equals(s.getDeliveryType())) {
+                if (orderId.equals(s.getOrderId()) && "DELIVERY".equalsIgnoreCase(s.getDeliveryType())) {
                     s.setDeliveryStatus("DELIVERED");
                     s.setDeliveryDate(now);
                     salesRepository.updateSaleDeliveryStatus(s);
@@ -124,6 +161,7 @@ public class DeliveryReportActivity extends BaseActivity {
         long deliveryDate;
         String customerName;
         String paymentType;
+        String source;
     }
 
     private interface OnMarkDeliveredListener {
@@ -163,14 +201,18 @@ public class DeliveryReportActivity extends BaseActivity {
             holder.tvStatus.setText(o.deliveryStatus == null ? "PENDING" : o.deliveryStatus);
             holder.tvCustomer.setText(o.customerName == null ? "" : o.customerName);
             holder.tvPayment.setText(o.paymentType == null ? "" : o.paymentType);
-
-            if ("DELIVERED".equals(o.deliveryStatus)) {
+            if ("PO".equals(o.source)) {
+                holder.tvStatus.setTextColor(getResources().getColor(R.color.successGreen));
                 holder.btnMarkDelivered.setVisibility(View.GONE);
             } else {
-                holder.btnMarkDelivered.setVisibility(View.VISIBLE);
-                holder.btnMarkDelivered.setOnClickListener(v -> {
-                    if (listener != null) listener.onMarkDelivered(o.orderId);
-                });
+                if ("DELIVERED".equalsIgnoreCase(o.deliveryStatus)) {
+                    holder.btnMarkDelivered.setVisibility(View.GONE);
+                } else {
+                    holder.btnMarkDelivered.setVisibility(View.VISIBLE);
+                    holder.btnMarkDelivered.setOnClickListener(v -> {
+                        if (listener != null) listener.onMarkDelivered(o.orderId);
+                    });
+                }
             }
         }
 

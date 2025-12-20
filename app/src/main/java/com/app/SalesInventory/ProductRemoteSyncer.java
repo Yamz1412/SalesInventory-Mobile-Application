@@ -2,9 +2,7 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 import android.util.Log;
-
 import androidx.annotation.Nullable;
-
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
@@ -14,7 +12,6 @@ import com.google.firebase.firestore.QuerySnapshot;
 
 public class ProductRemoteSyncer {
     private static final String TAG = "ProductRemoteSyncer";
-
     private final ProductRepository productRepository;
     private final FirebaseFirestore db;
     private ListenerRegistration productsListener;

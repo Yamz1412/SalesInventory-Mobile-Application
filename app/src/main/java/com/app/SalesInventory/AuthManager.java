@@ -1,6 +1,5 @@
 package com.app.SalesInventory;
 
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -74,8 +73,19 @@ public class AuthManager {
         return false;
     }
 
+    public Boolean getCachedIsApproved() {
+        return cachedIsApproved;
+    }
+
     public String getCurrentUserRole() {
         return cachedRole != null ? cachedRole : "Unknown";
+    }
+
+    public void clearCache() {
+        cachedIsAdmin = null;
+        cachedIsApproved = null;
+        cachedRole = null;
+        FirestoreManager.getInstance().setBusinessOwnerId(null);
     }
 
     public void refreshCurrentUserStatus(@NonNull final SimpleCallback callback) {
@@ -84,9 +94,11 @@ public class AuthManager {
             cachedIsAdmin = false;
             cachedIsApproved = false;
             cachedRole = "Unknown";
+            FirestoreManager.getInstance().setBusinessOwnerId(null);
             callback.onComplete(false);
             return;
         }
+        final String uid = u.getUid();
         u.getIdToken(true).addOnCompleteListener(new OnCompleteListener<GetTokenResult>() {
             @Override
             public void onComplete(@NonNull Task<GetTokenResult> task) {
@@ -99,11 +111,10 @@ public class AuthManager {
                     cachedIsAdmin = true;
                     cachedIsApproved = true;
                     cachedRole = "Admin";
-                    FirestoreManager.getInstance().setBusinessOwnerId(u.getUid());
+                    FirestoreManager.getInstance().setBusinessOwnerId(uid);
                     callback.onComplete(true);
                     return;
                 }
-                final String uid = u.getUid();
                 fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> adminTask) {
@@ -135,6 +146,7 @@ public class AuthManager {
                                 boolean result = false;
                                 boolean approvedFlag = false;
                                 String foundRole = "Unknown";
+                                String ownerAdminId = null;
                                 if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
                                     DocumentSnapshot userDoc = userTask.getResult();
                                     String role = userDoc.getString("role");
@@ -150,12 +162,12 @@ public class AuthManager {
                                     } else if (role != null) {
                                         foundRole = role.trim();
                                     }
-                                    String ownerAdminId = userDoc.getString("ownerAdminId");
-                                    if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
-                                        FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
-                                    } else {
-                                        FirestoreManager.getInstance().setBusinessOwnerId(uid);
-                                    }
+                                    ownerAdminId = userDoc.getString("ownerAdminId");
+                                }
+                                if (foundRole.equalsIgnoreCase("Admin")) {
+                                    FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                                } else if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                                    FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
                                 } else {
                                     FirestoreManager.getInstance().setBusinessOwnerId(uid);
                                 }
@@ -204,6 +216,7 @@ public class AuthManager {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> userTask) {
                         String resolvedRole = "Unknown";
+                        String ownerAdminId = null;
                         if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
                             DocumentSnapshot doc = userTask.getResult();
                             Boolean approved = doc.getBoolean("approved");
@@ -216,12 +229,12 @@ public class AuthManager {
                             } else {
                                 resolvedRole = "Staff";
                             }
-                            String ownerAdminId = doc.getString("ownerAdminId");
-                            if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
-                                FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
-                            } else {
-                                FirestoreManager.getInstance().setBusinessOwnerId(uid);
-                            }
+                            ownerAdminId = doc.getString("ownerAdminId");
+                        }
+                        if (resolvedRole.equalsIgnoreCase("Admin")) {
+                            FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                        } else if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
+                            FirestoreManager.getInstance().setBusinessOwnerId(ownerAdminId);
                         } else {
                             FirestoreManager.getInstance().setBusinessOwnerId(uid);
                         }
@@ -234,7 +247,16 @@ public class AuthManager {
     }
 
     public void fetchPendingStaffAccounts(final UsersCallback callback) {
-        fStore.collection("users").whereEqualTo("approved", false).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+        String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (owner == null || owner.isEmpty()) {
+            FirebaseUser u = auth.getCurrentUser();
+            owner = u == null ? null : u.getUid();
+        }
+        if (owner == null) {
+            callback.onComplete(new ArrayList<>());
+            return;
+        }
+        fStore.collection("users").whereEqualTo("approved", false).whereEqualTo("ownerAdminId", owner).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
                 List<AdminUserItem> list = new ArrayList<>();
@@ -257,7 +279,16 @@ public class AuthManager {
     }
 
     public void fetchAllStaffAccounts(final UsersCallback callback) {
-        fStore.collection("users").whereEqualTo("approved", true).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+        String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (owner == null || owner.isEmpty()) {
+            FirebaseUser u = auth.getCurrentUser();
+            owner = u == null ? null : u.getUid();
+        }
+        if (owner == null) {
+            callback.onComplete(new ArrayList<>());
+            return;
+        }
+        fStore.collection("users").whereEqualTo("approved", true).whereEqualTo("ownerAdminId", owner).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
             public void onComplete(@NonNull Task<QuerySnapshot> task) {
                 List<AdminUserItem> list = new ArrayList<>();
@@ -408,10 +439,12 @@ public class AuthManager {
             }
             if (owner != null && !owner.isEmpty()) {
                 FirebaseMessaging.getInstance().unsubscribeFromTopic("owner_" + owner).addOnCompleteListener(unsubTask -> {
+                    clearCache();
                     FirebaseAuth.getInstance().signOut();
                     if (onComplete != null) onComplete.run();
                 });
             } else {
+                clearCache();
                 FirebaseAuth.getInstance().signOut();
                 if (onComplete != null) onComplete.run();
             }

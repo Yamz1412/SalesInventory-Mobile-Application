@@ -41,123 +41,6 @@
     </LinearLayout>
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="@drawable/card_background"
-        android:padding="16dp"
-        android:layout_marginBottom="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Customize Colors"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="12dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Primary Color:"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="14sp"
-                android:gravity="center_vertical" />
-
-            <TextView
-                android:id="@+id/primaryColorTV"
-                android:layout_width="50dp"
-                android:layout_height="50dp"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:background="@drawable/color_picker_bg" />
-
-            <Button
-                android:id="@+id/customPrimaryBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Pick"
-                android:background="@drawable/btn_primary" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Secondary Color:"
-                android:textColor="@color/textColorSecondary"
-                android:textSize="14sp"
-                android:gravity="center_vertical" />
-
-            <TextView
-                android:id="@+id/secondaryColorTV"
-                android:layout_width="50dp"
-                android:layout_height="50dp"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:background="@drawable/color_picker_bg" />
-
-            <Button
-                android:id="@+id/customSecondaryBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Pick"
-                android:background="@drawable/btn_primary" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Accent Color:"
-                android:textColor="@color/colorAccent"
-                android:textSize="14sp"
-                android:gravity="center_vertical" />
-
-            <TextView
-                android:id="@+id/accentColorTV"
-                android:layout_width="50dp"
-                android:layout_height="50dp"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:textSize="10sp"
-                android:background="@drawable/color_picker_bg" />
-
-            <Button
-                android:id="@+id/customAccentBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Pick"
-                android:background="@drawable/btn_primary" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-    <LinearLayout
         android:id="@+id/colorPreviewLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -187,6 +70,13 @@
 
     </LinearLayout>
 
+    <Button
+        android:id="@+id/btnUserManual"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="User Manual"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/btn_primary" />
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
