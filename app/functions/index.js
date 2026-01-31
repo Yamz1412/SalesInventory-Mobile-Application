@@ -20,6 +20,7 @@ async function getStaffUidsForAdmin(adminUid) {
   const q = await db.collection("users").where("ownerAdminId", "==", adminUid).get();
   return q.docs.map(d => d.id);
 }
+
 async function cloneCollectionForStaff(collection, adminUid, staffUid) {
   const adminColRef = db.collection(`${collection}/${adminUid}/items`);
   const staffColRef = db.collection(`${collection}/${staffUid}/items`);
@@ -41,6 +42,7 @@ async function cloneCollectionForStaff(collection, adminUid, staffUid) {
   }
   if (ops > 0) await batch.commit();
 }
+
 async function cloneAdminToStaff(adminUid, staffUid) {
   for (const col of syncCollections) {
     try {
@@ -138,7 +140,7 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
   }
 
   const callerClaims = context.auth.token || {};
-  
+
   if (!callerClaims.admin) {
     const adminDoc = await db.collection("admin").doc(context.auth.uid).get();
     if (!(adminDoc.exists && adminDoc.data().approved === true)) {
@@ -199,10 +201,10 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
         if (phone) adminData.phone = phone;
 
         await db.collection("admin").doc(uid).set(adminData, { merge: true });
-        await db.collection("users").doc(uid).set({ 
-          ownerAdminId: uid, 
-          role: "Admin", 
-          approved: true 
+        await db.collection("users").doc(uid).set({
+          ownerAdminId: uid,
+          role: "Admin",
+          approved: true
         }, { merge: true });
       } else {
         await admin.auth().setCustomUserClaims(uid, {});
@@ -223,7 +225,7 @@ exports.adminCreateStaffUser = functions.https.onCall(async (data, context) => {
   }
 
   const adminUid = context.auth.uid;
-  
+
   const adminDoc = await db.collection("admin").doc(adminUid).get();
   const callerClaims = context.auth.token || {};
   const isAdminClaim = callerClaims.admin === true;
@@ -278,7 +280,7 @@ exports.adminSetUserPassword = functions.https.onCall(async (data, context) => {
   }
 
   const adminUid = context.auth.uid;
-  
+
   const adminDoc = await db.collection("admin").doc(adminUid).get();
   const callerClaims = context.auth.token || {};
   const isAdminClaim = callerClaims.admin === true;
@@ -330,23 +332,22 @@ exports.createAdminOwner = functions.https.onCall(async (data, context) => {
   const email = data?.email || "";
   const phone = data?.phone || "";
 
-  
-  const adminData = {
-    uid: uid,
-    name: name,
-    email: email,
-    phone: phone,
-    role: "Admin",
-    approved: true,
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
-  };
-
   try {
+    const adminData = {
+      uid: uid,
+      name: name,
+      email: email,
+      phone: phone,
+      role: "Admin",
+      approved: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
     await db.collection("admin").doc(uid).set(adminData, { merge: true });
-    await db.collection("users").doc(uid).set({ 
-      ownerAdminId: uid, 
-      role: "Admin", 
-      approved: true 
+    await db.collection("users").doc(uid).set({
+      ownerAdminId: uid,
+      role: "Admin",
+      approved: true
     }, { merge: true });
     await admin.auth().setCustomUserClaims(uid, { admin: true });
 
@@ -405,7 +406,7 @@ exports.onProductWrite = functions.firestore
   .onWrite(async (change, context) => {
     const owner = context.params.owner;
     const productId = context.params.productId;
-    
+
     const before = change.before.exists ? change.before.data() : null;
     const after = change.after.exists ? change.after.data() : null;
 
@@ -575,7 +576,7 @@ exports.onDocumentDeletedArchive = functions.firestore
     const collection = context.params.collection;
     const owner = context.params.owner;
     const docId = context.params.docId;
-    
+
     const data = snap.data() || {};
     const archivePath = `archives/${owner}/${collection}/${docId}`;
 
@@ -593,3 +594,44 @@ exports.onDocumentDeletedArchive = functions.firestore
       return null;
     }
   });
+
+  exports.deleteUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth || !context.auth.uid) {
+    throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+  }
+
+  const adminUid = context.auth.uid;
+  const targetUid = data?.uid || "";
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "uid is required");
+  }
+
+  const adminDoc = await db.collection("admin").doc(adminUid).get();
+  const callerClaims = context.auth.token || {};
+  const isAdminClaim = callerClaims.admin === true;
+  const isAdminDoc = adminDoc.exists && adminDoc.data()?.approved === true;
+
+  if (!isAdminClaim && !isAdminDoc) {
+    throw new functions.https.HttpsError("permission-denied", "Only admins can delete users");
+  }
+
+  const staffDoc = await db.collection("users").doc(targetUid).get();
+  if (staffDoc.exists) {
+    const staffData = staffDoc.data() || {};
+    const ownerAdminId = staffData.ownerAdminId || "";
+    
+    if (ownerAdminId !== adminUid) {
+      throw new functions.https.HttpsError("permission-denied", "You can only delete your own staff");
+    }
+  }
+
+  try {
+    await admin.auth().deleteUser(targetUid);
+    console.log(`User ${targetUid} deleted from Auth`);
+    return { success: true };
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Failed to delete user");
+  }
+});

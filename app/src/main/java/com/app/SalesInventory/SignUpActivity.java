@@ -2,6 +2,8 @@ package com.app.SalesInventory;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.view.Window;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -53,6 +55,24 @@ public class SignUpActivity extends BaseActivity {
 
         firebaseAuth = FirebaseAuth.getInstance();
         firestore = FirebaseFirestore.getInstance();
+
+        mPhone.setInputType(InputType.TYPE_CLASS_NUMBER);
+        mPhone.setText("+63");
+        mPhone.setSelection(mPhone.getText().length());
+
+        InputFilter phoneFilter = (source, start, end, dest, dstart, dend) -> {
+            if (dstart < 3) return "";
+            for (int i = start; i < end; i++) {
+                if (!Character.isDigit(source.charAt(i))) {
+                    return "";
+                }
+            }
+            if (dest.length() + (end - start) > 13) {
+                return "";
+            }
+            return null;
+        };
+        mPhone.setFilters(new InputFilter[]{phoneFilter});
 
         btnSignInPage.setOnClickListener(v -> {
             Intent i = new Intent(SignUpActivity.this, SignInActivity.class);
@@ -116,6 +136,12 @@ public class SignUpActivity extends BaseActivity {
             Toast.makeText(this, "Please complete the form", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        if (phone.length() != 13) {
+            Toast.makeText(this, "Please enter a valid 10-digit number after +63", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (!password.equals(cpassword)) {
             Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
             return;

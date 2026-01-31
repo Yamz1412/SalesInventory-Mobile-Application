@@ -1,10 +1,12 @@
 package com.app.SalesInventory;
 
 import android.app.Application;
+import android.util.Log;
 
 import androidx.lifecycle.MutableLiveData;
 
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 public class SalesRepository {
+    private static final String TAG = "SalesRepository";
     private static SalesRepository instance;
     private FirestoreManager firestoreManager;
     private MutableLiveData<List<Sales>> allSales;
@@ -51,20 +54,149 @@ public class SalesRepository {
         return instance;
     }
 
+    private Sales createSalesFromSnapshot(DocumentSnapshot document) {
+        try {
+            Sales sale = document.toObject(Sales.class);
+            return sale;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to deserialize sales with toObject(), trying manual mapping: " + e.getMessage());
+            return createSalesFromMap(document.getData());
+        }
+    }
+
+    private Sales createSalesFromMap(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+
+        Sales sale = new Sales();
+
+        if (data.containsKey("id")) {
+            sale.setId((String) data.get("id"));
+        }
+
+        if (data.containsKey("orderId")) {
+            sale.setOrderId((String) data.get("orderId"));
+        }
+
+        if (data.containsKey("productId")) {
+            sale.setProductId((String) data.get("productId"));
+        }
+
+        if (data.containsKey("productName")) {
+            sale.setProductName((String) data.get("productName"));
+        }
+
+        if (data.containsKey("quantity")) {
+            Object qty = data.get("quantity");
+            if (qty instanceof Number) {
+                sale.setQuantity(((Number) qty).intValue());
+            }
+        }
+
+        if (data.containsKey("price")) {
+            Object price = data.get("price");
+            if (price instanceof Number) {
+                sale.setPrice(((Number) price).doubleValue());
+            }
+        }
+
+        if (data.containsKey("totalPrice")) {
+            Object totalPrice = data.get("totalPrice");
+            if (totalPrice instanceof Number) {
+                sale.setTotalPrice(((Number) totalPrice).doubleValue());
+            }
+        }
+
+        if (data.containsKey("paymentMethod")) {
+            sale.setPaymentMethod((String) data.get("paymentMethod"));
+        }
+
+        if (data.containsKey("date")) {
+            Object dateObj = data.get("date");
+            long dateTime = 0L;
+            if (dateObj instanceof com.google.firebase.Timestamp) {
+                dateTime = ((com.google.firebase.Timestamp) dateObj).toDate().getTime();
+            } else if (dateObj instanceof java.util.Date) {
+                dateTime = ((java.util.Date) dateObj).getTime();
+            } else if (dateObj instanceof Number) {
+                dateTime = ((Number) dateObj).longValue();
+            }
+            sale.setDate(dateTime);
+        }
+
+        if (data.containsKey("timestamp")) {
+            Object tsObj = data.get("timestamp");
+            long timestamp = 0L;
+            if (tsObj instanceof com.google.firebase.Timestamp) {
+                timestamp = ((com.google.firebase.Timestamp) tsObj).toDate().getTime();
+            } else if (tsObj instanceof java.util.Date) {
+                timestamp = ((java.util.Date) tsObj).getTime();
+            } else if (tsObj instanceof Number) {
+                timestamp = ((Number) tsObj).longValue();
+            }
+            sale.setTimestamp(timestamp);
+        }
+
+        if (data.containsKey("deliveryType")) {
+            sale.setDeliveryType((String) data.get("deliveryType"));
+        }
+
+        if (data.containsKey("deliveryStatus")) {
+            sale.setDeliveryStatus((String) data.get("deliveryStatus"));
+        }
+
+        if (data.containsKey("deliveryDate")) {
+            Object deliveryDateObj = data.get("deliveryDate");
+            long deliveryDateTime = 0L;
+            if (deliveryDateObj instanceof com.google.firebase.Timestamp) {
+                deliveryDateTime = ((com.google.firebase.Timestamp) deliveryDateObj).toDate().getTime();
+            } else if (deliveryDateObj instanceof java.util.Date) {
+                deliveryDateTime = ((java.util.Date) deliveryDateObj).getTime();
+            } else if (deliveryDateObj instanceof Number) {
+                deliveryDateTime = ((Number) deliveryDateObj).longValue();
+            }
+            sale.setDeliveryDate(deliveryDateTime);
+        }
+
+        if (data.containsKey("deliveryName")) {
+            sale.setDeliveryName((String) data.get("deliveryName"));
+        }
+
+        if (data.containsKey("deliveryPhone")) {
+            sale.setDeliveryPhone((String) data.get("deliveryPhone"));
+        }
+
+        if (data.containsKey("deliveryAddress")) {
+            sale.setDeliveryAddress((String) data.get("deliveryAddress"));
+        }
+
+        if (data.containsKey("deliveryPaymentMethod")) {
+            sale.setDeliveryPaymentMethod((String) data.get("deliveryPaymentMethod"));
+        }
+
+        return sale;
+    }
+
     private void loadAllSales() {
         firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
+                        Log.e(TAG, "Error loading all sales", error);
                         return;
                     }
                     if (snapshot != null) {
                         List<Sales> salesList = new ArrayList<>();
-                        for (com.google.firebase.firestore.DocumentSnapshot document : snapshot.getDocuments()) {
-                            Sales sale = document.toObject(Sales.class);
-                            if (sale != null) {
-                                sale.setId(document.getId());
-                                salesList.add(sale);
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            try {
+                                Sales sale = createSalesFromSnapshot(document);
+                                if (sale != null) {
+                                    sale.setId(document.getId());
+                                    salesList.add(sale);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error deserializing sales document: " + document.getId(), e);
                             }
                         }
                         allSales.postValue(salesList);
@@ -80,14 +212,19 @@ public class SalesRepository {
                 .whereLessThanOrEqualTo("timestamp", endOfDay)
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
+                        Log.e(TAG, "Error loading today sales", error);
                         return;
                     }
                     double total = 0.0;
                     if (snapshot != null) {
-                        for (com.google.firebase.firestore.DocumentSnapshot document : snapshot.getDocuments()) {
-                            Sales sale = document.toObject(Sales.class);
-                            if (sale != null) {
-                                total += sale.getTotalPrice();
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            try {
+                                Sales sale = createSalesFromSnapshot(document);
+                                if (sale != null) {
+                                    total += sale.getTotalPrice();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error deserializing sales document: " + document.getId(), e);
                             }
                         }
                     }
@@ -103,14 +240,19 @@ public class SalesRepository {
                 .whereLessThanOrEqualTo("timestamp", endOfMonth)
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
+                        Log.e(TAG, "Error loading monthly sales", error);
                         return;
                     }
                     double total = 0.0;
                     if (snapshot != null) {
-                        for (com.google.firebase.firestore.DocumentSnapshot document : snapshot.getDocuments()) {
-                            Sales sale = document.toObject(Sales.class);
-                            if (sale != null) {
-                                total += sale.getTotalPrice();
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            try {
+                                Sales sale = createSalesFromSnapshot(document);
+                                if (sale != null) {
+                                    total += sale.getTotalPrice();
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error deserializing sales document: " + document.getId(), e);
                             }
                         }
                     }
@@ -124,15 +266,20 @@ public class SalesRepository {
                 .limit(10)
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
+                        Log.e(TAG, "Error loading recent sales", error);
                         return;
                     }
                     if (snapshot != null) {
                         List<Sales> salesList = new ArrayList<>();
-                        for (com.google.firebase.firestore.DocumentSnapshot document : snapshot.getDocuments()) {
-                            Sales sale = document.toObject(Sales.class);
-                            if (sale != null) {
-                                sale.setId(document.getId());
-                                salesList.add(sale);
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            try {
+                                Sales sale = createSalesFromSnapshot(document);
+                                if (sale != null) {
+                                    sale.setId(document.getId());
+                                    salesList.add(sale);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error deserializing sales document: " + document.getId(), e);
                             }
                         }
                         recentSales.postValue(salesList);

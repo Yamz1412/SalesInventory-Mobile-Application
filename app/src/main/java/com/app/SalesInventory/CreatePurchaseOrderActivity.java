@@ -52,6 +52,14 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         loadProductsForSpinner();
         setupRecyclerView();
         setupListeners();
+
+        AuthManager authManager = AuthManager.getInstance();
+        authManager.refreshCurrentUserStatus(success -> {
+            if (!authManager.isCurrentUserAdmin()) {
+                Toast.makeText(CreatePurchaseOrderActivity.this, "Error: User not approved", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
     }
 
     private void initializeViews() {
@@ -154,20 +162,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                     return;
                 }
                 String productId = findProductIdByName(nameStr);
-                Product prod = findProductById(productId);
-                if (prod != null) {
-                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
-                    if (ceiling > 9999) ceiling = 9999;
-                    int maxReceivable = ceiling - prod.getQuantity();
-                    if (maxReceivable <= 0) {
-                        Toast.makeText(this, "Cannot order this product: it is already at or above ceiling", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    if (qty > maxReceivable) {
-                        Toast.makeText(this, "Quantity too large. Maximum receivable is " + maxReceivable, Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                }
                 POItem existing = null;
                 for (POItem it : poItems) {
                     if (it.getProductName().equalsIgnoreCase(nameStr)) {
@@ -228,20 +222,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
         if (poItems.isEmpty()) {
             Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show();
             return;
-        }
-        for (POItem item : poItems) {
-            if (item.getProductId() != null && !item.getProductId().isEmpty()) {
-                Product prod = findProductById(item.getProductId());
-                if (prod != null) {
-                    int ceiling = prod.getCeilingLevel() <= 0 ? Math.max(prod.getQuantity(), Math.max(prod.getReorderLevel() * 2, 100)) : prod.getCeilingLevel();
-                    if (ceiling > 9999) ceiling = 9999;
-                    int maxReceivable = ceiling - prod.getQuantity();
-                    if (item.getQuantity() > maxReceivable) {
-                        Toast.makeText(this, "Item " + item.getProductName() + " quantity exceeds allowed receive limit: " + maxReceivable, Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                }
-            }
         }
         String id = poRef.push().getKey();
         if (id == null) {

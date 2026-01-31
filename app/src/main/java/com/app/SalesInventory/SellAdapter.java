@@ -73,6 +73,9 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
         String category = p.getCategoryName() == null ? "" : p.getCategoryName();
         holder.code.setText(category.isEmpty() ? "Uncategorized" : category);
 
+        double price = p.getSellingPrice();
+        holder.price.setText("₱" + String.format(java.util.Locale.US, "%.2f", price));
+
         String imageUrl = p.getImageUrl();
         String imagePath = p.getImagePath();
         String toLoad = null;

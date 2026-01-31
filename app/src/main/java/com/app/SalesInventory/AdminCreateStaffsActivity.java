@@ -3,6 +3,8 @@ package com.app.SalesInventory;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -54,6 +56,24 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         progressBarCreateStaff = findViewById(R.id.progressBarCreateStaff);
         tvCreateStaffMessage = findViewById(R.id.tvCreateStaffMessage);
 
+        etStaffPhone.setInputType(InputType.TYPE_CLASS_NUMBER);
+        etStaffPhone.setText("+63");
+        etStaffPhone.setSelection(etStaffPhone.getText().length());
+
+        InputFilter filter = (source, start, end, dest, dstart, dend) -> {
+            if (dstart < 3) return "";
+            for (int i = start; i < end; i++) {
+                if (!Character.isDigit(source.charAt(i))) {
+                    return "";
+                }
+            }
+            if (dest.length() + (end - start) > 13) {
+                return "";
+            }
+            return null;
+        };
+        etStaffPhone.setFilters(new InputFilter[]{filter});
+
         functions = FirebaseFunctions.getInstance();
         fStore = FirebaseFirestore.getInstance();
         authManager = AuthManager.getInstance();
@@ -72,8 +92,19 @@ public class AdminCreateStaffsActivity extends BaseActivity {
             showMessage("Name, Email and Password are required");
             return;
         }
+
+        if (phone.length() != 13) {
+            showMessage("Please enter a valid 10-digit number after +63");
+            return;
+        }
+
         if (!password.equals(confirm)) {
             showMessage("Passwords do not match");
+            return;
+        }
+
+        if (password.length() < 6) {
+            showMessage("Password must be at least 6 characters");
             return;
         }
 
@@ -92,7 +123,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
                     if (!task.isSuccessful() || task.getResult() == null) {
                         Exception e = task.getException();
                         Log.e("AdminCreateStaff", "createStaff failed", e);
-                        String msg = e != null ? e.getMessage() : "Unknown";
+                        String msg = e != null ? e.getMessage() : "Unknown error";
                         showMessage("Failed to create staff account: " + msg);
                         return;
                     }
@@ -118,13 +149,22 @@ public class AdminCreateStaffsActivity extends BaseActivity {
                     fStore.collection("users").document(newUid).set(userData, SetOptions.merge())
                             .addOnCompleteListener(t -> {
                                 if (t.isSuccessful()) {
-                                    Toast.makeText(this, "Staff account created", Toast.LENGTH_SHORT).show();
+                                    Toast.makeText(this, "Staff account created successfully", Toast.LENGTH_SHORT).show();
+                                    clearForm();
                                     finish();
                                 } else {
-                                    showMessage("Failed to save staff data");
+                                    showMessage("Failed to save staff data: " + (t.getException() != null ? t.getException().getMessage() : "Unknown"));
                                 }
                             });
                 });
+    }
+
+    private void clearForm() {
+        etStaffName.setText("");
+        etStaffEmail.setText("");
+        etStaffPhone.setText("+63");
+        etStaffPassword.setText("");
+        etStaffConfirmPassword.setText("");
     }
 
     private void showMessage(String msg) {

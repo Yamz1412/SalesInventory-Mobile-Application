@@ -49,7 +49,13 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     public void updateProducts(List<Product> list) {
-        setItems(list);
+        if (list == null) {
+            this.items.clear();
+        } else {
+            this.items.clear();
+            this.items.addAll(new ArrayList<>(list));
+        }
+        notifyDataSetChanged();
     }
 
     public void addOrUpdate(Product p) {

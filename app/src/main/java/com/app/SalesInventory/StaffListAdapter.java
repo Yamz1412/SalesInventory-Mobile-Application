@@ -17,6 +17,11 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
     private final List<Object> items = new ArrayList<>();
     private final Context ctx;
     private int selected = RecyclerView.NO_POSITION;
+    private OnItemLongClickListener longClickListener;
+
+    public interface OnItemLongClickListener {
+        boolean onItemLongClick(int position, AdminUserItem item);
+    }
 
     public StaffListAdapter(Context ctx, List<Object> initial) {
         this.ctx = ctx;
@@ -36,6 +41,10 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
         return items.get(selected);
     }
 
+    public void setOnItemLongClickListener(OnItemLongClickListener listener) {
+        this.longClickListener = listener;
+    }
+
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -50,16 +59,31 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
         String email = extract(ai, "email", "getEmail");
         String phone = extract(ai, "phone", "getPhone");
         String role = extract(ai, "role", "getRole");
+
         holder.tvName.setText(name != null && !name.isEmpty() ? name : "Unnamed");
         holder.tvEmail.setText(email != null ? email : "");
         holder.tvPhone.setText(phone != null ? phone : "");
         holder.tvRole.setText(role != null ? role : "Staff");
         holder.itemView.setSelected(position == selected);
+
         holder.itemView.setOnClickListener(v -> {
             int old = selected;
             selected = holder.getAdapterPosition();
             notifyItemChanged(old);
             notifyItemChanged(selected);
+        });
+
+        holder.itemView.setOnLongClickListener(v -> {
+            int old = selected;
+            selected = holder.getAdapterPosition();
+            notifyItemChanged(old);
+            notifyItemChanged(selected);
+
+            if (ai instanceof AdminUserItem && longClickListener != null) {
+                AdminUserItem staff = (AdminUserItem) ai;
+                return longClickListener.onItemLongClick(position, staff);
+            }
+            return false;
         });
     }
 

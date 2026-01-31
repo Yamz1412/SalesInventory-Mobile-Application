@@ -41,17 +41,20 @@ public class DashboardRepository {
         LiveData<List<Product>> productsLive = productRepository.getAllProducts();
         LiveData<List<Alert>> alertsLive = alertRepository.getUnreadAlerts();
         LiveData<Double> revenueLive = salesRepository.getTotalMonthlyRevenue();
+
         if (!metricsSourcesAdded) {
             metricsSourcesAdded = true;
             metricsLiveData.addSource(totalSalesLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(productsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(alertsLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
             metricsLiveData.addSource(revenueLive, v -> recomputeMetrics(totalSalesLive, productsLive, alertsLive, revenueLive));
+
             metricsLiveData.observeForever(metrics -> {
                 if (metrics != null && metricsListener != null) {
                     metricsListener.onMetricsLoaded(metrics);
                 }
             });
+
             String owner = FirestoreManager.getInstance().getBusinessOwnerId();
             if (owner != null && !owner.isEmpty()) {
                 DocumentReference dr = firestore.collection("dashboard").document(owner);
@@ -80,6 +83,7 @@ public class DashboardRepository {
         Double revenue = revenueLive.getValue();
         double inventoryValue = 0;
         int lowOrCriticalCount = 0;
+
         if (products != null) {
             for (Product p : products) {
                 if (p == null || !p.isActive()) continue;
@@ -91,7 +95,9 @@ public class DashboardRepository {
                 }
             }
         }
+
         int pendingAlertsCount = alerts != null ? alerts.size() : 0;
+
         DashboardMetrics metrics = new DashboardMetrics(
                 totalSales != null ? totalSales : 0.0,
                 inventoryValue,
@@ -115,23 +121,32 @@ public class DashboardRepository {
         salesRepository.getRecentSales().observeForever(sales -> {
             List<RecentActivity> activities = new ArrayList<>();
             if (sales != null) {
-                int count = Math.min(limit, sales.size());
-                for (int i = 0; i < count; i++) {
-                    Sales sale = sales.get(i);
-                    RecentActivity activity = new RecentActivity(
-                            sale.getId(),
-                            "Sale: " + sale.getProductName(),
-                            "Qty: " + sale.getQuantity() + " | ₱" + String.format("%.2f", sale.getTotalPrice()),
-                            "SALE",
-                            "COMPLETED",
-                            sale.getTimestamp()
-                    );
-                    activities.add(activity);
+                    Calendar cal = Calendar.getInstance();
+                    cal.set(Calendar.HOUR_OF_DAY, 0);
+                    cal.set(Calendar.MINUTE, 0);
+                    cal.set(Calendar.SECOND, 0);
+                    cal.set(Calendar.MILLISECOND, 0);
+                    long startOfToday = cal.getTimeInMillis();
+
+                    for (Sales sale : sales) {
+                        long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : sale.getDate();
+                        if (ts >= startOfToday) {
+                            RecentActivity activity = new RecentActivity(
+                                    sale.getId(),
+                                    "Sale: " + sale.getProductName(),
+                                    "Qty: " + sale.getQuantity() + " | ₱" + String.format("%,.2f", sale.getTotalPrice()),
+                                    "SALE",
+                                    "COMPLETED",
+                                    ts
+                            );
+                            activities.add(activity);
+                        }
+                        if (activities.size() >= limit) break;
+                    }
                 }
-            }
-            listener.onActivitiesLoaded(activities);
-        });
-    }
+                listener.onActivitiesLoaded(activities);
+    });
+}
 
     public List<Entry> getSalesTrendData(List<Sales> allSales) {
         List<Entry> entries = new ArrayList<>();
@@ -142,6 +157,7 @@ public class DashboardRepository {
         long now = System.currentTimeMillis();
         long oneDayMillis = 24L * 60L * 60L * 1000L;
         Map<Integer, Double> dayIndexToAmount = new HashMap<>();
+
         for (Sales s : allSales) {
             long ts = s.getTimestamp() > 0 ? s.getTimestamp() : s.getDate();
             if (ts <= 0) continue;
@@ -153,6 +169,7 @@ public class DashboardRepository {
             Double current = dayIndexToAmount.get(index);
             dayIndexToAmount.put(index, (current != null ? current : 0.0) + amount);
         }
+
         for (int i = 0; i < days; i++) {
             double value = dayIndexToAmount.get(i) != null ? dayIndexToAmount.get(i) : 0.0;
             entries.add(new Entry(i, (float) value));
@@ -166,6 +183,7 @@ public class DashboardRepository {
         if (allSales == null || allSales.isEmpty()) {
             return new TopProductsResult(entries, labels);
         }
+
         Map<String, Integer> productQty = new HashMap<>();
         for (Sales s : allSales) {
             String productId = s.getProductId();
@@ -174,6 +192,7 @@ public class DashboardRepository {
             Integer current = productQty.get(productId);
             productQty.put(productId, (current != null ? current : 0) + qty);
         }
+
         Map<String, String> idToName = new HashMap<>();
         if (allProducts != null) {
             for (Product p : allProducts) {
@@ -182,6 +201,7 @@ public class DashboardRepository {
                 }
             }
         }
+
         List<Map.Entry<String, Integer>> sorted = new ArrayList<>(productQty.entrySet());
         Collections.sort(sorted, (a, b) -> Integer.compare(b.getValue(), a.getValue()));
         int max = Math.min(5, sorted.size());
@@ -202,6 +222,7 @@ public class DashboardRepository {
         int low = 0;
         int critical = 0;
         int out = 0;
+
         if (products != null) {
             for (Product p : products) {
                 int qty = p.getQuantity();

@@ -18,8 +18,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="12dp">
 
+            <!-- HEADER SECTION -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -37,7 +38,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/dashboard"
-                        android:textSize="28sp"
+                        android:textSize="24sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorOnBackground" />
 
@@ -46,39 +47,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/last_updated"
-                        android:textSize="12sp"
+                        android:textSize="11sp"
                         android:textColor="@color/text_secondary"
-                        android:layout_marginTop="4dp" />
+                        android:layout_marginTop="2dp" />
 
                 </LinearLayout>
 
+                <!-- HEADER BUTTONS -->
                 <FrameLayout
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginStart="8dp"
-                    android:layout_marginEnd="8dp">
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp">
 
                     <ImageButton
                         android:id="@+id/btn_notifications"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:background="@android:color/transparent"
-                        android:padding="8dp"
+                        android:padding="6dp"
                         android:src="@drawable/ic_notifications"
                         app:tint="@color/text_secondary"
                         android:contentDescription="notifications"
-                        android:onClick="onNotificationsClicked" />
+                        android:onClick="onNotificationsClicked"
+                        android:scaleType="centerInside" />
 
                     <TextView
                         android:id="@+id/tv_notification_badge"
-                        android:layout_width="15dp"
-                        android:layout_height="15dp"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
                         android:layout_gravity="end|top"
-                        android:translationX="-5dp"
-                        android:translationY="3dp"
+                        android:translationX="-3dp"
+                        android:translationY="2dp"
                         android:visibility="visible"
                         android:gravity="center"
-                        android:textSize="8sp"
+                        android:textSize="7sp"
                         android:textColor="@android:color/white"
                         android:background="@drawable/bg_notification_badge" />
 
@@ -86,21 +89,25 @@
 
                 <ImageButton
                     android:id="@+id/btn_settings"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="@android:color/transparent"
-                    android:padding="8dp"
+                    android:padding="6dp"
                     android:src="@drawable/ic_settings"
-                    app:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary"
+                    android:scaleType="centerInside"
+                    android:contentDescription="settings" />
 
                 <ImageButton
                     android:id="@+id/btn_profile"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="@android:color/transparent"
-                    android:padding="8dp"
+                    android:padding="6dp"
                     android:src="@drawable/ic_profile"
-                    app:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary"
+                    android:scaleType="centerInside"
+                    android:contentDescription="profile" />
 
             </LinearLayout>
 
@@ -112,37 +119,40 @@
                 android:visibility="gone"
                 android:indeterminate="true" />
 
+            <!-- QUICK OVERVIEW SECTION -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/quick_overview"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="10dp" />
 
+            <!-- ROW 1: Today's Sales, Inventory Value, Low Stock -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="10dp">
+                android:layout_marginBottom="8dp"
+                android:baselineAligned="false">
 
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_total_sales"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginEnd="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@android:color/white"
-                    app:cardElevation="4dp">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -150,11 +160,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_sales"
                                 app:tint="@color/accent_primary" />
 
@@ -162,10 +172,12 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="@string/today_sales"
-                                android:textSize="12sp"
+                                android:text="Today Sales"
+                                android:textSize="11sp"
                                 android:textColor="@color/text_primary"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
                         </LinearLayout>
 
                         <TextView
@@ -173,7 +185,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₱0.00"
-                            android:textSize="20sp"
+                            android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="@color/accent_primary" />
                     </LinearLayout>
@@ -182,19 +194,19 @@
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_inventory_value"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@android:color/white"
-                    app:cardElevation="4dp">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -202,11 +214,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_inventory"
                                 app:tint="@color/success_primary" />
 
@@ -214,10 +226,12 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="@string/inventory_value"
-                                android:textSize="12sp"
+                                android:text="Inventory"
+                                android:textSize="11sp"
                                 android:textColor="@color/text_primary"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
 
                         </LinearLayout>
 
@@ -226,7 +240,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₱0.00"
-                            android:textSize="20sp"
+                            android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="@color/success_primary" />
 
@@ -237,18 +251,18 @@
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_low_stock"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginStart="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@color/warning_primary"
-                    app:cardElevation="4dp">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -256,11 +270,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_warning"
                                 app:tint="@android:color/holo_red_dark" />
 
@@ -268,10 +282,12 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="@string/low_stock_items"
-                                android:textSize="12sp"
+                                android:text="Low Stock"
+                                android:textSize="11sp"
                                 android:textColor="@android:color/darker_gray"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
 
                         </LinearLayout>
 
@@ -280,7 +296,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textSize="28sp"
+                            android:textSize="24sp"
                             android:textStyle="bold"
                             android:textColor="@android:color/darker_gray" />
 
@@ -290,27 +306,29 @@
 
             </LinearLayout>
 
+            <!-- ROW 2: Pending Orders, Revenue, Near Expiry -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="12dp">
+                android:layout_marginBottom="8dp"
+                android:baselineAligned="false">
 
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_pending_orders"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginEnd="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@android:color/white"
-                    app:cardElevation="4dp">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -318,11 +336,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_orders"
                                 app:tint="@color/info_primary" />
 
@@ -330,10 +348,12 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="@string/pending_orders"
-                                android:textSize="12sp"
+                                android:text="Pending PO"
+                                android:textSize="11sp"
                                 android:textColor="@color/text_primary"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
 
                         </LinearLayout>
 
@@ -342,7 +362,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="0"
-                            android:textSize="28sp"
+                            android:textSize="24sp"
                             android:textStyle="bold"
                             android:textColor="@color/info_primary" />
 
@@ -353,19 +373,19 @@
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_revenue"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@android:color/white"
-                    app:cardElevation="4dp">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -373,11 +393,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_pesos"
                                 app:tint="@color/primary" />
 
@@ -385,10 +405,12 @@
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="@string/monthly_revenue"
-                                android:textSize="12sp"
+                                android:text="Month Revenue"
+                                android:textSize="11sp"
                                 android:textColor="@color/text_primary"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
 
                         </LinearLayout>
 
@@ -397,7 +419,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="₱0.00"
-                            android:textSize="24sp"
+                            android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="@color/primary" />
 
@@ -408,19 +430,18 @@
                 <androidx.cardview.widget.CardView
                     android:id="@+id/card_near_expiry"
                     android:layout_width="0dp"
-                    android:layout_height="120dp"
+                    android:layout_height="110dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    app:cardCornerRadius="12dp"
+                    android:layout_marginStart="4dp"
+                    app:cardCornerRadius="10dp"
                     app:cardBackgroundColor="@android:color/white"
-                    app:cardElevation="4dp"
-                    android:visibility="gone">
+                    app:cardElevation="3dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:orientation="vertical"
-                        android:padding="16dp"
+                        android:padding="12dp"
                         android:gravity="center_vertical">
 
                         <LinearLayout
@@ -428,11 +449,11 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center_vertical"
-                            android:layout_marginBottom="8dp">
+                            android:layout_marginBottom="6dp">
 
                             <ImageView
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
                                 android:src="@drawable/ic_warning"
                                 app:tint="@color/warning_primary" />
 
@@ -441,9 +462,11 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:text="Near Expiry"
-                                android:textSize="12sp"
+                                android:textSize="11sp"
                                 android:textColor="@color/text_primary"
-                                android:layout_marginStart="8dp" />
+                                android:layout_marginStart="6dp"
+                                android:lines="1"
+                                android:ellipsize="end" />
 
                         </LinearLayout>
 
@@ -455,147 +478,126 @@
                             android:textSize="24sp"
                             android:textStyle="bold"
                             android:textColor="@color/warning_primary" />
-
                     </LinearLayout>
-
                 </androidx.cardview.widget.CardView>
-
             </LinearLayout>
 
+            <!-- QUICK ACTIONS SECTION -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/quick_actions"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="10dp" />
 
             <GridLayout
                 android:id="@+id/quick_actions_grid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:columnCount="3"
-                android:rowCount="2"
-                android:useDefaultMargins="true">
+                android:columnCount="2"
+                android:alignmentMode="alignMargins"
+                android:useDefaultMargins="false"
+                android:columnOrderPreserved="true">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_create_sale"
                     android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="0"
-                    android:layout_column="0"
                     android:layout_columnWeight="1"
-                    android:text="@string/create_sale"
+                    android:layout_height="90dp"
+                    android:text="Create Sale"
                     app:icon="@drawable/ic_add_sale"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
-                    style="@style/DashboardButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_add_product"
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="0"
-                    android:layout_column="1"
-                    android:layout_columnWeight="1"
-                    android:text="@string/add_product"
-                    app:icon="@drawable/ic_add_product"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
-                    style="@style/DashboardButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_create_po"
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="0"
-                    android:layout_column="2"
-                    android:layout_columnWeight="1"
-                    android:text="@string/create_po"
-                    app:icon="@drawable/ic_purchase_order"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
-                    style="@style/DashboardButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_view_reports"
-                    android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="1"
-                    android:layout_column="0"
-                    android:layout_columnWeight="1"
-                    android:text="@string/view_reports"
-                    app:icon="@drawable/ic_reports"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
                     style="@style/DashboardButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_inventory"
                     android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="1"
-                    android:layout_column="1"
                     android:layout_columnWeight="1"
-                    android:text="@string/inventory"
+                    android:layout_height="90dp"
+                    android:text="Inventory"
                     app:icon="@drawable/ic_inventory"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
+                    style="@style/DashboardButton" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_view_reports"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:layout_height="90dp"
+                    android:text="Reports"
+                    app:icon="@drawable/ic_reports"
+                    style="@style/DashboardButton" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_add_product"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:layout_height="90dp"
+                    android:text="Add Product"
+                    app:icon="@drawable/ic_add_product"
+                    style="@style/DashboardButton" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_create_po"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:layout_height="90dp"
+                    android:text="Create P.O"
+                    app:icon="@drawable/ic_purchase_order"
                     style="@style/DashboardButton" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_customers"
                     android:layout_width="0dp"
-                    android:layout_height="100dp"
-                    android:layout_row="1"
-                    android:layout_column="2"
                     android:layout_columnWeight="1"
+                    android:layout_height="90dp"
                     android:text="Categories"
                     app:icon="@drawable/ic_category"
-                    app:iconSize="28dp"
-                    app:iconGravity="top"
                     style="@style/DashboardButton" />
 
             </GridLayout>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_manage_users"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
                 android:text="Manage Users"
+                android:textSize="13sp"
                 style="@style/CustomButtonOutlined" />
 
+            <!-- ANALYTICS SECTION -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/analytics"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
-                android:layout_marginTop="20dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginTop="14dp"
+                android:layout_marginBottom="10dp" />
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
+                android:layout_height="220dp"
+                android:layout_marginBottom="10dp"
+                app:cardCornerRadius="10dp"
                 app:cardBackgroundColor="?android:colorBackground"
-                app:cardElevation="4dp">
+                app:cardElevation="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/sales_trend"
-                        android:textSize="14sp"
+                        android:text="Sales Trend (7 Days)"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorOnBackground" />
 
@@ -604,7 +606,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:layout_marginTop="8dp" />
+                        android:layout_marginTop="6dp" />
 
                 </LinearLayout>
 
@@ -612,23 +614,23 @@
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
+                android:layout_height="220dp"
+                android:layout_marginBottom="10dp"
+                app:cardCornerRadius="10dp"
                 app:cardBackgroundColor="?android:colorBackground"
-                app:cardElevation="4dp">
+                app:cardElevation="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/top_products"
-                        android:textSize="14sp"
+                        android:text="Top 5 Products"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorOnBackground" />
 
@@ -637,7 +639,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:layout_marginTop="8dp" />
+                        android:layout_marginTop="6dp" />
 
                 </LinearLayout>
 
@@ -645,23 +647,23 @@
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="12dp"
+                android:layout_height="220dp"
+                android:layout_marginBottom="10dp"
+                app:cardCornerRadius="10dp"
                 app:cardBackgroundColor="?android:colorBackground"
-                app:cardElevation="4dp">
+                app:cardElevation="3dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="10dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/inventory_status"
-                        android:textSize="14sp"
+                        android:text="Inventory Status"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorOnBackground" />
 
@@ -670,29 +672,30 @@
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:layout_marginTop="8dp" />
+                        android:layout_marginTop="6dp" />
 
                 </LinearLayout>
 
             </androidx.cardview.widget.CardView>
 
+            <!-- RECENT ACTIVITY SECTION -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/recent_activity"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="10dp" />
 
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
-                app:cardCornerRadius="12dp"
+                app:cardCornerRadius="10dp"
                 app:cardBackgroundColor="?android:colorBackground"
-                app:cardElevation="4dp">
+                app:cardElevation="3dp">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rv_recent_activity"
@@ -701,9 +704,10 @@
                     android:nestedScrollingEnabled="false"
                     tools:listitem="@layout/item_recent_activity"
                     tools:itemCount="3"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="12dp" />
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="10dp" />
             </androidx.cardview.widget.CardView>
+
         </LinearLayout>
     </ScrollView>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

@@ -15,10 +15,15 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,7 +35,7 @@ public class SettingsActivity extends BaseActivity {
     private Button resetThemeBtn, applyBtn;
     private LinearLayout colorPreviewLayout;
     private TextView primaryColorTV, secondaryColorTV, accentColorTV;
-    private Button btnBackup, btnRestore;
+    private Button btnBackup, btnRestore, btnUserManual;
     private View previewPrimary, previewSecondary, previewAccent;
 
     private ThemeManager themeManager;
@@ -65,6 +70,7 @@ public class SettingsActivity extends BaseActivity {
         accentColorTV = findViewById(R.id.accentColorTV);
         btnBackup = findViewById(R.id.btnBackup);
         btnRestore = findViewById(R.id.btnRestore);
+        btnUserManual = findViewById(R.id.btnUserManual);
         previewPrimary = findViewById(R.id.previewPrimary);
         previewSecondary = findViewById(R.id.previewSecondary);
         previewAccent = findViewById(R.id.previewAccent);
@@ -167,6 +173,7 @@ public class SettingsActivity extends BaseActivity {
                 currentAccent = selectedTheme.accentColor;
                 updateColorPreview();
                 Log.d(TAG, "Theme selected (preview): " + selectedTheme.name);
+                btnUserManual.setOnClickListener(v -> openOfflineUserManual());
             }
 
             @Override
@@ -202,6 +209,38 @@ public class SettingsActivity extends BaseActivity {
         btnBackup.setOnClickListener(v -> backupLauncher.launch("sales_inventory_backup.db"));
 
         btnRestore.setOnClickListener(v -> restoreLauncher.launch("*/*"));
+    }
+
+    private void openOfflineUserManual() {
+        String fileName = "user_manual.pdf";
+        File file = new File(getCacheDir(), fileName);
+
+        try {
+            if (!file.exists()) {
+                InputStream is = getAssets().open(fileName);
+                OutputStream os = new FileOutputStream(file);
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = is.read(buffer)) > 0) {
+                    os.write(buffer, 0, length);
+                }
+                os.flush();
+                os.close();
+                is.close();
+            }
+
+            android.net.Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "application/pdf");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+
+            startActivity(Intent.createChooser(intent, "Open User Manual"));
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening PDF", e);
+            Toast.makeText(this, "No PDF viewer found or error opening file", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openColorPicker(ThemeColorPicker.OnColorSelectedListener listener) {

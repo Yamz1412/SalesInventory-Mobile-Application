@@ -13,9 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * AlertRepository - single place to read/write alerts and publish local notifications
- */
 public class AlertRepository {
     private static final String TAG = "AlertRepository";
     private static AlertRepository instance;
@@ -54,14 +51,18 @@ public class AlertRepository {
             int unreadCount = 0;
             if (snapshot != null) {
                 for (DocumentSnapshot document : snapshot.getDocuments()) {
-                    Alert alert = document.toObject(Alert.class);
-                    if (alert != null) {
-                        alert.setId(document.getId());
-                        alertList.add(alert);
-                        if (!alert.isRead()) {
-                            unread.add(alert);
-                            unreadCount++;
+                    try {
+                        Alert alert = createAlertFromSnapshot(document);
+                        if (alert != null) {
+                            alert.setId(document.getId());
+                            alertList.add(alert);
+                            if (!alert.isRead()) {
+                                unread.add(alert);
+                                unreadCount++;
+                            }
                         }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error deserializing alert document: " + document.getId(), e);
                     }
                 }
             }
@@ -70,6 +71,71 @@ public class AlertRepository {
             unreadAlertCount.postValue(unreadCount);
             Log.d(TAG, "Alerts synced from Firestore: " + alertList.size() + " (Unread: " + unreadCount + ")");
         });
+    }
+
+    private Alert createAlertFromSnapshot(DocumentSnapshot document) {
+        try {
+            Alert alert = document.toObject(Alert.class);
+            return alert;
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to deserialize alert with toObject(), trying manual mapping: " + e.getMessage());
+            return createAlertFromMap(document.getData());
+        }
+    }
+
+    private Alert createAlertFromMap(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+
+        Alert alert = new Alert();
+
+        if (data.containsKey("id")) {
+            alert.setId((String) data.get("id"));
+        }
+
+        if (data.containsKey("productId")) {
+            alert.setProductId((String) data.get("productId"));
+        }
+
+        if (data.containsKey("type")) {
+            alert.setType((String) data.get("type"));
+        }
+
+        if (data.containsKey("message")) {
+            alert.setMessage((String) data.get("message"));
+        }
+
+        if (data.containsKey("read")) {
+            Object readObj = data.get("read");
+            alert.setRead(readObj instanceof Boolean ? (Boolean) readObj : false);
+        }
+
+        if (data.containsKey("timestamp")) {
+            Object timestampObj = data.get("timestamp");
+            long timestamp = 0L;
+
+            if (timestampObj instanceof com.google.firebase.Timestamp) {
+                com.google.firebase.Timestamp ts = (com.google.firebase.Timestamp) timestampObj;
+                timestamp = ts.toDate().getTime();
+            } else if (timestampObj instanceof java.util.Date) {
+                timestamp = ((java.util.Date) timestampObj).getTime();
+            } else if (timestampObj instanceof Number) {
+                timestamp = ((Number) timestampObj).longValue();
+            }
+
+            alert.setTimestamp(timestamp);
+        }
+
+        if (data.containsKey("source")) {
+            alert.setSource((String) data.get("source"));
+        }
+
+        if (data.containsKey("createdBy")) {
+            alert.setCreatedBy((String) data.get("createdBy"));
+        }
+
+        return alert;
     }
 
     public LiveData<List<Alert>> getAllAlerts() { return allAlerts; }
@@ -95,7 +161,6 @@ public class AlertRepository {
                     listener.onAlertAdded(alertId);
                     Log.d(TAG, "Alert added: " + alertId);
 
-                    // show a local notification on the device that created the alert
                     try {
                         String title = getTitleForType(alert.getType());
                         String body = alert.getMessage() != null ? alert.getMessage() : "";
@@ -209,10 +274,14 @@ public class AlertRepository {
                 .addOnSuccessListener(snapshot -> {
                     List<Alert> alerts = new ArrayList<>();
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Alert alert = doc.toObject(Alert.class);
-                        if (alert != null) {
-                            alert.setId(doc.getId());
-                            alerts.add(alert);
+                        try {
+                            Alert alert = createAlertFromSnapshot(doc);
+                            if (alert != null) {
+                                alert.setId(doc.getId());
+                                alerts.add(alert);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error deserializing alert: " + doc.getId(), e);
                         }
                     }
                     listener.onAlertsFetched(alerts);
@@ -232,10 +301,14 @@ public class AlertRepository {
                 .addOnSuccessListener(snapshot -> {
                     List<Alert> alerts = new ArrayList<>();
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Alert alert = doc.toObject(Alert.class);
-                        if (alert != null) {
-                            alert.setId(doc.getId());
-                            alerts.add(alert);
+                        try {
+                            Alert alert = createAlertFromSnapshot(doc);
+                            if (alert != null) {
+                                alert.setId(doc.getId());
+                                alerts.add(alert);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error deserializing alert: " + doc.getId(), e);
                         }
                     }
                     listener.onAlertsFetched(alerts);
@@ -276,7 +349,6 @@ public class AlertRepository {
         return firestoreManager != null && firestoreManager.isUserAuthenticated();
     }
 
-    // Listener interfaces
     public interface OnAlertsFetchedListener {
         void onAlertsFetched(List<Alert> alerts);
         void onError(String error);

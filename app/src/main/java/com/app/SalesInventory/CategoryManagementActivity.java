@@ -44,6 +44,16 @@ public class CategoryManagementActivity extends BaseActivity  {
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
         loadCategories();
         fabAddCategory.setOnClickListener(v -> showAddCategoryDialog());
+
+        AuthManager authManager = AuthManager.getInstance();
+        authManager.refreshCurrentUserStatus(success -> {
+            if (!authManager.isCurrentUserAdmin()) {
+                Toast.makeText(CategoryManagementActivity.this, "Error: User not approved", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
+
+        fabAddCategory.setEnabled(authManager.isCurrentUserAdmin());
     }
 
     private void loadCategories() {

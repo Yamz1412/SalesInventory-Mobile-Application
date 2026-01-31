@@ -66,7 +66,6 @@ public class AddProductActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_add_product);
-        authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
         btnAddPhoto = findViewById(R.id.btnAddPhoto);
         productNameET = findViewById(R.id.productNameET);
@@ -88,6 +87,15 @@ public class AddProductActivity extends BaseActivity {
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
         setupCategorySpinner();
         setupImagePickers();
+
+        authManager = AuthManager.getInstance();
+        authManager.refreshCurrentUserStatus(success -> {
+            if (!authManager.isCurrentUserAdmin()) {
+                Toast.makeText(AddProductActivity.this, "Error: User not approved", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
+
         rgProductType.setOnCheckedChangeListener((group, checkedId) -> {
             updateLayoutForSelectedType();
             filterCategoriesByType();

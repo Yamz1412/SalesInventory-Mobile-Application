@@ -263,6 +263,7 @@ public class MainActivity extends BaseActivity {
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
             if (btnCustomers != null) btnCustomers.setVisibility(View.GONE);
         }
+        quickActionsGrid.invalidate();
         quickActionsGrid.requestLayout();
     }
 
@@ -275,11 +276,15 @@ public class MainActivity extends BaseActivity {
 
     private void updateStatisticsCards(DashboardMetrics metrics) {
         if (metrics == null) return;
-        tvTotalSales.setText(String.format(Locale.getDefault(), "₱%.2f", metrics.getTotalSalesToday()));
-        tvInventoryValue.setText(String.format(Locale.getDefault(), "₱%.2f", metrics.getTotalInventoryValue()));
+        java.text.NumberFormat nf = java.text.NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
+        java.text.DecimalFormat df = (java.text.DecimalFormat) java.text.DecimalFormat.getInstance(Locale.US);
+        df.applyPattern("#,###,##0.00");
+
+        tvTotalSales.setText("₱" + df.format(metrics.getTotalSalesToday()));
+        tvInventoryValue.setText("₱" + df.format(metrics.getTotalInventoryValue()));
+        tvRevenue.setText("₱" + df.format(metrics.getRevenue()));
         tvLowStockCount.setText(String.valueOf(metrics.getLowStockCount()));
         tvPendingOrdersCount.setText(String.valueOf(metrics.getPendingOrdersCount()));
-        tvRevenue.setText(String.format(Locale.getDefault(), "₱%.2f", metrics.getRevenue()));
         updateCardColor(cardLowStock, metrics.getLowStockCount() > 0);
         updateLastUpdatedTime();
     }

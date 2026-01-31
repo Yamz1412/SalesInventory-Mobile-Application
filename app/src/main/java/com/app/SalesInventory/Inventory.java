@@ -109,10 +109,10 @@ public class Inventory extends BaseActivity {
 
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
-                allProducts = new ArrayList<>(products);
+                allProducts.clear();
+                allProducts.addAll(products);
                 updateHeaderStats();
                 applyFilters();
-                // Rebuild spinner so it reflects categories that actually have inventory products
                 listenToCategoriesForFilter();
             }
         });

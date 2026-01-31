@@ -1,12 +1,17 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.ServerTimestamp;
+import java.util.Date;
+
 public class Adjustment {
     private String id;
     private String productId;
     private String productName;
     private int quantityChange;
     private String reason;
-    private long timestamp;
+
+    @ServerTimestamp
+    public Date timestamp;
 
     public Adjustment() {
     }
@@ -17,7 +22,7 @@ public class Adjustment {
         this.productName = productName;
         this.quantityChange = quantityChange;
         this.reason = reason;
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
     }
 
     public String getId() {
@@ -61,10 +66,10 @@ public class Adjustment {
     }
 
     public long getTimestamp() {
-        return timestamp;
+        return timestamp != null ? timestamp.getTime() : 0L;
     }
 
     public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
     }
 }

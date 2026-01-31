@@ -296,6 +296,7 @@ public class sellProduct extends BaseActivity {
         String method = (String) spinnerPaymentMethod.getSelectedItem();
         if (!"Cash".equals(method)) {
             tvChange.setText("Change: ₱0.00");
+            btnConfirmSale.setEnabled(finalTotal > 0);
             return;
         }
         if (finalTotal <= 0) {
@@ -306,7 +307,7 @@ public class sellProduct extends BaseActivity {
         String cashStr = etCashGiven.getText() != null ? etCashGiven.getText().toString().trim() : "";
         if (cashStr.isEmpty()) {
             tvChange.setText("Change: ₱0.00");
-            btnConfirmSale.setEnabled(true);
+            btnConfirmSale.setEnabled(false);
             return;
         }
         try {

@@ -1,6 +1,5 @@
 package com.app.SalesInventory;
 
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -245,9 +244,12 @@ public class AuthManager {
                         if (email == null) email = doc.getString("Email");
                         String name = doc.getString("name");
                         if (name == null) name = doc.getString("Name");
+                        String phone = doc.getString("phone");
+                        if (phone == null) phone = doc.getString("Phone");
+                        if (phone == null) phone = "";
                         Boolean approved = doc.getBoolean("approved");
                         if (approved == null) approved = false;
-                        AdminUserItem u = new AdminUserItem(uid, name != null ? name : "", email != null ? email : "", "Staff", approved);
+                        AdminUserItem u = new AdminUserItem(uid, name != null ? name : "", email != null ? email : "", phone, "Staff", approved);
                         list.add(u);
                     }
                 }
@@ -268,12 +270,15 @@ public class AuthManager {
                         if (email == null) email = doc.getString("Email");
                         String name = doc.getString("name");
                         if (name == null) name = doc.getString("Name");
+                        String phone = doc.getString("phone");
+                        if (phone == null) phone = doc.getString("Phone");
+                        if (phone == null) phone = "";
                         Boolean approved = doc.getBoolean("approved");
                         if (approved == null) approved = true;
                         String role = doc.getString("role");
                         if (role == null) role = doc.getString("Role");
                         if (role == null) role = "Staff";
-                        AdminUserItem u = new AdminUserItem(uid, name != null ? name : "", email != null ? email : "", role, approved);
+                        AdminUserItem u = new AdminUserItem(uid, name != null ? name : "", email != null ? email : "", phone, role, approved);
                         list.add(u);
                     }
                 }

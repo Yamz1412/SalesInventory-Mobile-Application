@@ -1,12 +1,21 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.Exclude;
+import com.google.firebase.firestore.ServerTimestamp;
+import java.util.Date;
+
 public class Alert {
     private String id;
     private String productId;
     private String type;
     private String message;
     private boolean read;
-    private long timestamp;
+
+    @ServerTimestamp
+    public Date timestamp;
+
+    private String source;
+    private String createdBy;
 
     public Alert() {}
 
@@ -15,7 +24,7 @@ public class Alert {
         this.type = type;
         this.message = message;
         this.read = read;
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
     }
 
     public String getId() { return id; }
@@ -33,6 +42,26 @@ public class Alert {
     public boolean isRead() { return read; }
     public void setRead(boolean read) { this.read = read; }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    @Exclude
+    public long getTimestamp() {
+        return timestamp != null ? timestamp.getTime() : 0L;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = new Date(timestamp);
+    }
+
+    public Date getTimestampDate() {
+        return timestamp;
+    }
+
+    public void setTimestampDate(Date timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 }

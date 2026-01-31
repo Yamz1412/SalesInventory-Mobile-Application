@@ -147,7 +147,8 @@ public class Reports extends BaseActivity  {
         double revenue = 0;
         for (Sales s : salesList) revenue += s.getTotalPrice();
         totalSalesTV.setText(String.valueOf(count));
-        totalRevenueTV.setText(String.format(Locale.getDefault(), "₱%.2f", revenue));
+        java.text.DecimalFormat df = new java.text.DecimalFormat("#,##0.00");
+        totalRevenueTV.setText("₱" + df.format(revenue));
     }
 
     private void showSalesReport() {

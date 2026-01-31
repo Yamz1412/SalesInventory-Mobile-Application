@@ -1,20 +1,25 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.ServerTimestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 public class BatchStockOperation {
     private String operationId;
     private String operationName;
-    private String operationType; // "ADD", "SUBTRACT", "SET"
+    private String operationType;
     private int quantity;
     private String reason;
     private String remarks;
-    private long createdAt;
+
+    @ServerTimestamp
+    public Date createdAt;
+
     private String createdBy;
-    private Map<String, Integer> productChanges; // productId -> new quantity
+    private Map<String, Integer> productChanges;
     private int totalProductsAffected;
-    private String status; // "PENDING", "COMPLETED", "FAILED"
+    private String status;
 
     public BatchStockOperation() {
         this.productChanges = new HashMap<>();
@@ -29,14 +34,13 @@ public class BatchStockOperation {
         this.quantity = quantity;
         this.reason = reason;
         this.remarks = remarks;
-        this.createdAt = createdAt;
+        this.createdAt = new Date(createdAt);
         this.createdBy = createdBy;
         this.totalProductsAffected = totalProductsAffected;
         this.status = "PENDING";
         this.productChanges = new HashMap<>();
     }
 
-    // Getters and Setters
     public String getOperationId() { return operationId; }
     public void setOperationId(String operationId) { this.operationId = operationId; }
 
@@ -55,8 +59,8 @@ public class BatchStockOperation {
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
 
-    public long getCreatedAt() { return createdAt; }
-    public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+    public long getCreatedAt() { return createdAt != null ? createdAt.getTime() : 0L; }
+    public void setCreatedAt(long createdAt) { this.createdAt = new Date(createdAt); }
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
@@ -70,7 +74,6 @@ public class BatchStockOperation {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    // Helper methods
     public void addProductChange(String productId, int newQuantity) {
         productChanges.put(productId, newQuantity);
     }

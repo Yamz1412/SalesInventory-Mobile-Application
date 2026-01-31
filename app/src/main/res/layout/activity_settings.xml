@@ -220,6 +220,13 @@
         android:layout_marginTop="16dp" />
 
     <Button
+        android:id="@+id/btnUserManual"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="User Manual"
+        android:layout_marginTop="16dp" />
+
+    <Button
         android:id="@+id/btnRestore"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

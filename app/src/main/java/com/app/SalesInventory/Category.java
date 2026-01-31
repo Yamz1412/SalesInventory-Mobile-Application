@@ -1,11 +1,17 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.ServerTimestamp;
+import java.util.Date;
+
 public class Category {
     private String color;
     private String categoryId;
     private String categoryName;
     private String description;
-    private long timestamp;
+
+    @ServerTimestamp
+    public Date timestamp;
+
     private String type;
     private boolean active;
 
@@ -16,7 +22,7 @@ public class Category {
         this.categoryId = categoryId;
         this.categoryName = categoryName;
         this.description = description;
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
         this.type = "Raw";
         this.active = true;
     }
@@ -25,73 +31,33 @@ public class Category {
         this.categoryId = categoryId;
         this.categoryName = categoryName;
         this.description = description;
-        this.timestamp = timestamp;
+        this.timestamp = new Date(timestamp);
         this.type = type == null || type.isEmpty() ? "Raw" : type;
         this.active = active;
         this.color = color;
     }
 
-    public String getCategoryId() {
-        return categoryId;
-    }
+    public String getCategoryId() { return categoryId; }
+    public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
 
-    public void setCategoryId(String categoryId) {
-        this.categoryId = categoryId;
-    }
+    public String getCategoryName() { return categoryName == null ? "" : categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
 
-    public String getCategoryName() {
-        return categoryName == null ? "" : categoryName;
-    }
+    public String getDescription() { return description == null ? "" : description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public void setCategoryName(String categoryName) {
-        this.categoryName = categoryName;
-    }
+    public long getTimestamp() { return timestamp != null ? timestamp.getTime() : 0L; }
+    public void setTimestamp(long timestamp) { this.timestamp = new Date(timestamp); }
 
-    public String getDescription() {
-        return description == null ? "" : description;
-    }
+    public String getColor() { return color == null ? "" : color; }
+    public void setColor(String color) { this.color = color; }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    public String getType() { return type == null || type.isEmpty() ? "Raw" : type; }
+    public void setType(String type) { this.type = type; }
 
-    public long getTimestamp() {
-        return timestamp;
-    }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
 
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getColor() {
-        return color == null ? "" : color;
-    }
-
-    public void setColor(String color) {
-        this.color = color;
-    }
-
-    public String getType() {
-        return type == null || type.isEmpty() ? "Raw" : type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    public String getId() {
-        return getCategoryId();
-    }
-
-    public String getName() {
-        return getCategoryName();
-    }
+    public String getId() { return getCategoryId(); }
+    public String getName() { return getCategoryName(); }
 }

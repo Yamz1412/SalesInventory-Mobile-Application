@@ -69,8 +69,7 @@ public class SellList extends BaseActivity {
             allMenuProducts.clear();
             if (products != null) {
                 for (Product p : products) {
-                    if (p == null) continue;
-                    if (!p.isActive()) continue;
+                    if (p == null || !p.isActive()) continue;
                     String type = p.getProductType() == null ? "" : p.getProductType();
                     if ("Menu".equalsIgnoreCase(type)) {
                         allMenuProducts.add(p);
@@ -129,7 +128,7 @@ public class SellList extends BaseActivity {
                 }
             }
         }
-        sellAdapter.updateProducts(filteredProducts);
+        sellAdapter.updateProducts(new ArrayList<>(filteredProducts));
     }
 
     private void setupCheckoutButton() {
@@ -172,7 +171,8 @@ public class SellList extends BaseActivity {
         Button btnAddToCart = dialogView.findViewById(R.id.btnOptionAddToCart);
 
         tvName.setText(product.getProductName());
-        tvPrice.setText("₱" + String.format(Locale.US, "%.2f", product.getSellingPrice()));
+        double basePrice = product.getSellingPrice();
+        tvPrice.setText("₱" + String.format(Locale.US, "%.2f", basePrice));
 
         rbMedium.setChecked(true);
         etQty.setText("1");
@@ -181,6 +181,47 @@ public class SellList extends BaseActivity {
                 .setView(dialogView)
                 .setCancelable(false)
                 .create();
+
+        rgSize.setOnCheckedChangeListener((group, checkedId) -> updatePriceDisplay(
+                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
+                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
+                etQty.getText().toString()
+        ));
+
+        cbExtraShot.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
+                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
+                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
+                etQty.getText().toString()
+        ));
+
+        cbWhipped.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
+                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
+                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
+                etQty.getText().toString()
+        ));
+
+        cbSyrup.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
+                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
+                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
+                etQty.getText().toString()
+        ));
+
+        etQty.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updatePriceDisplay(
+                        tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
+                        cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
+                        s.toString()
+                );
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
@@ -223,10 +264,19 @@ public class SellList extends BaseActivity {
             }
 
             String displayName = product.getProductName() + " (" + size + ")";
+            double calculatedPrice = calculateItemPrice(
+                    product.getSellingPrice(),
+                    rbSmall.isChecked(),
+                    rbLarge.isChecked(),
+                    cbExtraShot.isChecked(),
+                    cbWhipped.isChecked(),
+                    cbSyrup.isChecked()
+            );
+
             cartManager.addItem(
                     product.getProductId(),
                     displayName,
-                    product.getSellingPrice(),
+                    calculatedPrice,
                     q,
                     product.getQuantity(),
                     size,
@@ -238,5 +288,36 @@ public class SellList extends BaseActivity {
         });
 
         dialog.show();
+    }
+    private double calculateItemPrice(double basePrice, boolean isSmall, boolean isLarge,
+                                      boolean extraShot, boolean whipped, boolean syrup) {
+        double price = basePrice;
+
+        if (isSmall) {
+            price *= 0.8;
+        } else if (isLarge) {
+            price *= 1.2;
+        }
+
+        if (extraShot) price += 15;
+        if (whipped) price += 10;
+        if (syrup) price += 10;
+
+        return price;
+    }
+    private void updatePriceDisplay(TextView tvPrice, double basePrice, boolean isSmall, boolean isLarge,
+                                    boolean extraShot, boolean whipped, boolean syrup, String qtyStr) {
+        double itemPrice = calculateItemPrice(basePrice, isSmall, isLarge, extraShot, whipped, syrup);
+
+        int qty = 1;
+        try {
+            qty = Integer.parseInt(qtyStr.isEmpty() ? "1" : qtyStr);
+            if (qty <= 0) qty = 1;
+        } catch (Exception e) {
+            qty = 1;
+        }
+
+        double totalPrice = itemPrice * qty;
+        tvPrice.setText("₱" + String.format(Locale.US, "%.2f", totalPrice));
     }
 }

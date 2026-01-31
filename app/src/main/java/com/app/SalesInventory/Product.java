@@ -1,5 +1,8 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.ServerTimestamp;
+
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -21,17 +24,23 @@ public class Product {
     private String unit;
     private String barcode;
     private String supplier;
-    private long dateAdded;
+
+    @ServerTimestamp
+    public Date dateAdded;
+
     private String addedBy;
     private boolean isActive;
     private String productType;
-    private long expiryDate;
+
+    @ServerTimestamp
+    public Date expiryDate;
+
     private String imagePath;
     private String imageUrl;
 
     public Product() {
         this.productType = "Raw";
-        this.expiryDate = 0L;
+        this.expiryDate = null;
         this.floorLevel = 0;
     }
 
@@ -52,11 +61,11 @@ public class Product {
         this.unit = unit;
         this.barcode = barcode;
         this.supplier = supplier;
-        this.dateAdded = dateAdded;
+        this.dateAdded = new Date(dateAdded);
         this.addedBy = addedBy;
         this.isActive = isActive;
         this.productType = "Raw";
-        this.expiryDate = 0L;
+        this.expiryDate = null;
     }
 
     public long getLocalId() {
@@ -188,11 +197,19 @@ public class Product {
     }
 
     public long getDateAdded() {
-        return dateAdded;
+        return dateAdded != null ? dateAdded.getTime() : 0L;
     }
 
     public void setDateAdded(long dateAdded) {
-        this.dateAdded = dateAdded;
+        this.dateAdded = dateAdded > 0 ? new Date(dateAdded) : null;
+    }
+
+    public long getExpiryDate() {
+        return expiryDate != null ? expiryDate.getTime() : 0L;
+    }
+
+    public void setExpiryDate(long expiryDate) {
+        this.expiryDate = expiryDate > 0 ? new Date(expiryDate) : null;
     }
 
     public String getAddedBy() {
@@ -217,14 +234,6 @@ public class Product {
 
     public void setProductType(String productType) {
         this.productType = productType;
-    }
-
-    public long getExpiryDate() {
-        return expiryDate;
-    }
-
-    public void setExpiryDate(long expiryDate) {
-        this.expiryDate = expiryDate;
     }
 
     public String getImagePath() {
@@ -280,11 +289,11 @@ public class Product {
         m.put("unit", unit);
         m.put("barcode", barcode);
         m.put("supplier", supplier);
-        m.put("dateAdded", dateAdded);
+        m.put("dateAdded", dateAdded != null ? dateAdded.getTime() : 0L);
         m.put("addedBy", addedBy);
         m.put("isActive", isActive);
         m.put("productType", productType);
-        m.put("expiryDate", expiryDate);
+        m.put("expiryDate", expiryDate != null ? expiryDate.getTime() : 0L);
         m.put("imagePath", imagePath);
         m.put("imageUrl", imageUrl);
         return m;
@@ -336,7 +345,10 @@ public class Product {
         o = m.get("supplier");
         if (o != null) p.supplier = String.valueOf(o);
         o = m.get("dateAdded");
-        if (o instanceof Number) p.dateAdded = ((Number) o).longValue();
+        if (o instanceof Number) {
+            long val = ((Number) o).longValue();
+            p.dateAdded = val > 0 ? new Date(val) : null;
+        }
         o = m.get("addedBy");
         if (o != null) p.addedBy = String.valueOf(o);
         o = m.get("isActive");
@@ -345,7 +357,10 @@ public class Product {
         o = m.get("productType");
         if (o != null) p.productType = String.valueOf(o);
         o = m.get("expiryDate");
-        if (o instanceof Number) p.expiryDate = ((Number) o).longValue();
+        if (o instanceof Number) {
+            long val = ((Number) o).longValue();
+            p.expiryDate = val > 0 ? new Date(val) : null;
+        }
         o = m.get("imagePath");
         if (o != null) p.imagePath = String.valueOf(o);
         o = m.get("imageUrl");

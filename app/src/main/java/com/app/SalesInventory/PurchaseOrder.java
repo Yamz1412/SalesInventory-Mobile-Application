@@ -1,5 +1,7 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.ServerTimestamp;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +16,10 @@ public class PurchaseOrder {
     private String supplierName;
     private String supplierPhone;
     private String status;
-    private long orderDate;
+
+    @ServerTimestamp
+    public Date orderDate;
+
     private double totalAmount;
     private List<POItem> items;
 
@@ -27,7 +32,7 @@ public class PurchaseOrder {
         this.supplierName = supplierName;
         this.supplierPhone = supplierPhone;
         this.status = status;
-        this.orderDate = orderDate;
+        this.orderDate = new Date(orderDate);
         this.totalAmount = totalAmount;
         this.items = items;
     }
@@ -73,11 +78,11 @@ public class PurchaseOrder {
     }
 
     public long getOrderDate() {
-        return orderDate;
+        return orderDate != null ? orderDate.getTime() : 0L;
     }
 
     public void setOrderDate(long orderDate) {
-        this.orderDate = orderDate;
+        this.orderDate = new Date(orderDate);
     }
 
     public double getTotalAmount() {
@@ -103,7 +108,7 @@ public class PurchaseOrder {
         m.put("supplierName", this.supplierName);
         m.put("supplierPhone", this.supplierPhone);
         m.put("status", this.status);
-        m.put("orderDate", this.orderDate);
+        m.put("orderDate", this.orderDate != null ? this.orderDate.getTime() : 0L);
         m.put("totalAmount", this.totalAmount);
         m.put("items", this.items);
         return m;
