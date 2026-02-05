@@ -111,6 +111,10 @@ public class MainActivity extends BaseActivity {
         btnProfile = findViewById(R.id.btn_profile);
         cardNearExpiry = findViewById(R.id.card_near_expiry);
         tvNearExpiryCount = findViewById(R.id.tv_near_expiry_count);
+
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(this::onSwipeRefresh);
+        }
     }
 
     private void setupNearExpiryCard() {
@@ -146,6 +150,7 @@ public class MainActivity extends BaseActivity {
         viewModel.getDashboardMetrics().observe(this, metrics -> {
             if (metrics != null) {
                 updateStatisticsCards(metrics);
+                updateLastUpdatedTime();
             }
             if (swipeRefresh != null) swipeRefresh.setRefreshing(false);
         });
@@ -219,10 +224,12 @@ public class MainActivity extends BaseActivity {
     }
 
     private void resolveUserRoleAndConfigureUI() {
-        authManager.getCurrentUserRoleAsync(role -> runOnUiThread(() -> {
-            currentUserRole = role == null ? "Unknown" : role;
-            applyRoleVisibility();
-        }));
+        String businessOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        String currentUserId = FirestoreManager.getInstance().getCurrentUserId();
+
+        if (businessOwnerId != null && currentUserId != null && businessOwnerId.equals(currentUserId)) {
+            isAdminFlag = true;
+        }
     }
 
     private void applyRoleVisibility() {
@@ -268,40 +275,64 @@ public class MainActivity extends BaseActivity {
     }
 
     private void loadDashboardData() {
-        if (swipeRefresh != null && !swipeRefresh.isRefreshing()) swipeRefresh.setRefreshing(true);
         viewModel.loadDashboardData();
         viewModel.loadRecentActivities();
         viewModel.loadChartData(salesTrendChart, topProductsChart, inventoryStatusChart);
     }
 
-    private void updateStatisticsCards(DashboardMetrics metrics) {
-        if (metrics == null) return;
-        java.text.NumberFormat nf = java.text.NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
-        java.text.DecimalFormat df = (java.text.DecimalFormat) java.text.DecimalFormat.getInstance(Locale.US);
-        df.applyPattern("#,###,##0.00");
-
-        tvTotalSales.setText("₱" + df.format(metrics.getTotalSalesToday()));
-        tvInventoryValue.setText("₱" + df.format(metrics.getTotalInventoryValue()));
-        tvRevenue.setText("₱" + df.format(metrics.getRevenue()));
-        tvLowStockCount.setText(String.valueOf(metrics.getLowStockCount()));
-        tvPendingOrdersCount.setText(String.valueOf(metrics.getPendingOrdersCount()));
-        updateCardColor(cardLowStock, metrics.getLowStockCount() > 0);
-        updateLastUpdatedTime();
+    private void onSwipeRefresh() {
+        viewModel.refreshDashboardData();
+        viewModel.loadChartData(salesTrendChart, topProductsChart, inventoryStatusChart);
     }
 
-    private void updateCardColor(CardView card, boolean hasAlert) {
-        if (card == null) return;
-        if (hasAlert) {
-            card.setCardBackgroundColor(getColor(R.color.warning_primary));
-        } else {
-            card.setCardBackgroundColor(getColor(R.color.dashboard_card_background));
+    private void updateStatisticsCards(DashboardMetrics metrics) {
+        if (tvTotalSales != null) {
+            tvTotalSales.setText(String.format("₱%,.2f", metrics.getTotalSalesToday()));
+        }
+
+        if (tvRevenue != null) {
+            tvRevenue.setText(String.format("₱%,.2f", metrics.getRevenue()));
+        }
+
+        if (tvLowStockCount != null && cardLowStock != null) {
+            int lowCount = metrics.getLowStockCount();
+            tvLowStockCount.setText(String.valueOf(lowCount));
+            if (lowCount > 0) {
+                cardLowStock.setVisibility(View.VISIBLE);
+            } else {
+                cardLowStock.setVisibility(View.VISIBLE);
+            }
+        }
+
+        if (tvNearExpiryCount != null && cardNearExpiry != null) {
+            int expiryCount = metrics.getNearExpiryCount();
+            tvNearExpiryCount.setText(String.valueOf(expiryCount));
+            if (expiryCount > 0) {
+                cardNearExpiry.setVisibility(View.VISIBLE);
+                //updateCardColor(cardNearExpiry, true);
+            } else {
+                cardNearExpiry.setVisibility(View.GONE);
+            }
+        }
+
+        if (tvPendingOrdersCount != null) {
+            int pendingCount = metrics.getPendingOrdersCount();
+            tvPendingOrdersCount.setText(String.valueOf(pendingCount));
+
+            if (pendingCount > 0) {
+                tvPendingOrdersCount.setTextColor(getColor(R.color.info_primary));
+            } else {
+                tvPendingOrdersCount.setTextColor(getColor(R.color.text_primary));
+            }
         }
     }
 
     private void updateLastUpdatedTime() {
-        SimpleDateFormat sdf = new SimpleDateFormat("hh:mm aa", Locale.getDefault());
-        String currentTime = sdf.format(new Date());
-        if (tvLastUpdated != null) tvLastUpdated.setText("Last updated: " + currentTime);
+        if (tvLastUpdated != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
+            String now = sdf.format(new Date());
+            tvLastUpdated.setText("Last updated: " + now);
+        }
     }
 
     public void onNotificationsClicked(View view) {
@@ -401,6 +432,9 @@ public class MainActivity extends BaseActivity {
         super.onResume();
         resolveUserRoleAndConfigureUI();
         loadDashboardData();
+        if (viewModel != null) {
+            viewModel.refreshDashboardData();
+        }
     }
 
     @Override

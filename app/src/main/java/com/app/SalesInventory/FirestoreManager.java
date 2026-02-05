@@ -50,6 +50,10 @@ public class FirestoreManager {
         return currentUserId == null ? "unknown" : currentUserId;
     }
 
+    public String getCurrentUserId() {
+        return ensureCurrentUserId();
+    }
+
     public void setBusinessOwnerId(String ownerId) {
         this.businessOwnerId = ownerId;
     }

@@ -236,11 +236,12 @@ public class CreatePurchaseOrderActivity extends BaseActivity  {
                 poNumber,
                 supplier,
                 supplierPhone,
-                "Pending",
+                PurchaseOrder.STATUS_PENDING,
                 System.currentTimeMillis(),
                 total,
                 new ArrayList<>(poItems)
         );
+        po.setOwnerAdminId(AuthManager.getInstance().getCurrentUserId());
         poRef.child(id).setValue(po)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Purchase Order created", Toast.LENGTH_SHORT).show();

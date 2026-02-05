@@ -30,11 +30,6 @@ android {
     }
 }
 
-repositories {
-    google()
-    mavenCentral()
-    maven { url 'https://jitpack.io' }
-}
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
@@ -62,10 +57,10 @@ dependencies {
     implementation "androidx.datastore:datastore-preferences:1.2.0"
     implementation "androidx.datastore:datastore-preferences-core:1.2.0"
 
-    implementation 'com.itextpdf:kernel:9.4.0'
-    implementation 'com.itextpdf:layout:9.4.0'
+    implementation 'com.itextpdf:kernel:9.5.0'
+    implementation 'com.itextpdf:layout:9.5.0'
 
-    implementation 'androidx.work:work-runtime:2.11.0'
+    implementation 'androidx.work:work-runtime:2.11.1'
 
     implementation 'androidx.room:room-runtime:2.8.4'
     annotationProcessor 'androidx.room:room-compiler:2.8.4'

@@ -16,6 +16,7 @@ public class PurchaseOrder {
     private String supplierName;
     private String supplierPhone;
     private String status;
+    private String ownerAdminId;
 
     @ServerTimestamp
     public Date orderDate;
@@ -100,6 +101,8 @@ public class PurchaseOrder {
     public void setItems(List<POItem> items) {
         this.items = items;
     }
+    public String getOwnerAdminId() { return ownerAdminId; }
+    public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
 
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();
@@ -108,6 +111,7 @@ public class PurchaseOrder {
         m.put("supplierName", this.supplierName);
         m.put("supplierPhone", this.supplierPhone);
         m.put("status", this.status);
+        m.put("ownerAdminId", this.ownerAdminId);
         m.put("orderDate", this.orderDate != null ? this.orderDate.getTime() : 0L);
         m.put("totalAmount", this.totalAmount);
         m.put("items", this.items);

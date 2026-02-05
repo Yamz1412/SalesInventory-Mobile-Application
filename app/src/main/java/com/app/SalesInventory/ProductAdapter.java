@@ -105,25 +105,17 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         holder.quantityText.setText("Stock: " + qty);
         holder.stockText.setText(String.valueOf(qty));
         holder.costPriceText.setText("Cost: ₱" + String.format(Locale.US, "%.2f", p.getCostPrice()));
-
-        holder.floorText.setVisibility(p.getFloorLevel() > 0 ? View.VISIBLE : View.GONE);
-        holder.floorText.setText("Floor: " + p.getFloorLevel());
-        if (p.getFloorLevel() > 0 && qty <= p.getFloorLevel()) {
-            holder.floorText.setTextColor(ctx.getResources().getColor(R.color.errorRed));
-        } else {
-            holder.floorText.setTextColor(ctx.getResources().getColor(R.color.textColorSecondary));
-        }
-
         String type = p.getProductType() == null ? "" : p.getProductType();
+        double sellingPrice = p.getSellingPrice();
+
         if (holder.sellingPriceText != null) {
-            if ("Raw".equalsIgnoreCase(type)) {
+            if ("Raw".equalsIgnoreCase(type) || sellingPrice <= 0) {
                 holder.sellingPriceText.setVisibility(View.GONE);
             } else {
                 holder.sellingPriceText.setVisibility(View.VISIBLE);
-                holder.sellingPriceText.setText("Selling: ₱" + String.format(Locale.US, "%.2f", p.getSellingPrice()));
+                holder.sellingPriceText.setText("Selling: ₱" + String.format(Locale.US, "%.2f", sellingPrice));
             }
         }
-
         String toLoad = null;
         if (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) toLoad = p.getImageUrl();
         else if (p.getImagePath() != null && !p.getImagePath().isEmpty()) toLoad = p.getImagePath();
@@ -219,15 +211,9 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name;
-        TextView quantityText;
-        TextView costPriceText;
-        TextView stockText;
-        TextView sellingPriceText;
-        TextView floorText;
+        TextView name, quantityText, costPriceText, stockText, sellingPriceText, floorText;
         ImageView productImage;
-        ImageButton btnIncrease;
-        ImageButton btnDecrease;
+        ImageButton btnIncrease, btnDecrease;
 
         VH(@NonNull View itemView) {
             super(itemView);
@@ -237,7 +223,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             costPriceText = itemView.findViewById(R.id.tvCostPrice);
             stockText = itemView.findViewById(R.id.tvStock);
             sellingPriceText = itemView.findViewById(R.id.tvSellingPrice);
-            floorText = itemView.findViewById(R.id.tvFloorLevel);
+            floorText = itemView.findViewById(R.id.tvStatus);
             btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
             btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
         }

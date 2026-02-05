@@ -14,8 +14,12 @@ public class Alert {
     @ServerTimestamp
     public Date timestamp;
 
+    @ServerTimestamp
+    public Date createdAt;
+
     private String source;
     private String createdBy;
+    private String lastModifiedBy;
 
     public Alert() {}
 
@@ -25,22 +29,48 @@ public class Alert {
         this.message = message;
         this.read = read;
         this.timestamp = new Date(timestamp);
+        this.createdAt = new Date(timestamp);
     }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public String getId() {
+        return id;
+    }
 
-    public String getProductId() { return productId; }
-    public void setProductId(String productId) { this.productId = productId; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getType() { return type; }
-    public void setType(String type) { this.type = type; }
+    public String getProductId() {
+        return productId;
+    }
 
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
+    public void setProductId(String productId) {
+        this.productId = productId;
+    }
 
-    public boolean isRead() { return read; }
-    public void setRead(boolean read) { this.read = read; }
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public boolean isRead() {
+        return read;
+    }
+
+    public void setRead(boolean read) {
+        this.read = read;
+    }
 
     @Exclude
     public long getTimestamp() {
@@ -59,9 +89,44 @@ public class Alert {
         this.timestamp = timestamp;
     }
 
-    public String getSource() { return source; }
-    public void setSource(String source) { this.source = source; }
+    @Exclude
+    public long getCreatedAt() {
+        return createdAt != null ? createdAt.getTime() : 0L;
+    }
 
-    public String getCreatedBy() { return createdBy; }
-    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public void setCreatedAt(long createdAt) {
+        this.createdAt = new Date(createdAt);
+    }
+
+    public Date getCreatedAtDate() {
+        return createdAt;
+    }
+
+    public void setCreatedAtDate(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getLastModifiedBy() {
+        return lastModifiedBy;
+    }
+
+    public void setLastModifiedBy(String lastModifiedBy) {
+        this.lastModifiedBy = lastModifiedBy;
+    }
 }

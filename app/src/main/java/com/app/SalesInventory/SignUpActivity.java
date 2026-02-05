@@ -61,38 +61,36 @@ public class SignUpActivity extends BaseActivity {
         mPhone.setSelection(mPhone.getText().length());
 
         InputFilter phoneFilter = (source, start, end, dest, dstart, dend) -> {
-            if (dstart < 3) return "";
+            if (dstart < 3) return dest.subSequence(dstart, dend);
             for (int i = start; i < end; i++) {
-                if (!Character.isDigit(source.charAt(i))) {
-                    return "";
-                }
+                if (!Character.isDigit(source.charAt(i))) return "";
             }
-            if (dest.length() + (end - start) > 13) {
-                return "";
-            }
+            if (dest.length() + (end - start) > 13) return "";
             return null;
         };
         mPhone.setFilters(new InputFilter[]{phoneFilter});
+
+        mPhone.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                if (!s.toString().startsWith("+63")) {
+                    mPhone.setText("+63");
+                    mPhone.setSelection(mPhone.getText().length());
+                }
+            }
+        });
 
         btnSignInPage.setOnClickListener(v -> {
             Intent i = new Intent(SignUpActivity.this, SignInActivity.class);
             startActivity(i);
             finish();
         });
-
-        firestore.collection("users")
-                .whereEqualTo("role", "Admin")
-                .limit(1)
-                .get()
-                .addOnCompleteListener(task -> {
-                    adminCheckCompleted = true;
-                    if (task.isSuccessful()) {
-                        QuerySnapshot snap = task.getResult();
-                        anyAdminExists = snap != null && !snap.isEmpty();
-                    } else {
-                        anyAdminExists = true;
-                    }
-                });
 
         if (android.os.Build.VERSION.SDK_INT >= 21) {
             Window window = this.getWindow();
@@ -146,15 +144,6 @@ public class SignUpActivity extends BaseActivity {
             Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!adminCheckCompleted) {
-            Toast.makeText(this, "Please wait...", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (anyAdminExists) {
-            Toast.makeText(this, "Admin account already exists. Please contact the admin.", Toast.LENGTH_LONG).show();
-            return;
-        }
 
         progressBar.setVisibility(android.view.View.VISIBLE);
         firebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(createTask -> {
@@ -164,38 +153,27 @@ public class SignUpActivity extends BaseActivity {
                     runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
                     return;
                 }
-                String uid = createdUser.getUid();
-                boolean autoApprove = true;
-                Map<String, Object> profile = new HashMap<>();
-                profile.put("photoUrl", createdUser.getPhotoUrl() != null ? createdUser.getPhotoUrl().toString() : "");
-                profile.put("uid", uid);
-                profile.put("email", createdUser.getEmail() != null ? createdUser.getEmail() : "");
-                profile.put("name", name);
-                profile.put("phone", phone);
-                profile.put("role", "Admin");
-                profile.put("approved", autoApprove);
-                profile.put("createdAt", System.currentTimeMillis());
 
-                firestore.collection("users").document(uid).set(profile).addOnCompleteListener(setTask -> {
-                    createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
-                        runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
+                createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
+                    runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
+
+                    Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
+                    i.putExtra("user_name", name);
+                    i.putExtra("user_phone", phone);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(i);
+                    finish();
+                }).addOnFailureListener(e -> {
+                    runOnUiThread(() -> {
+                        progressBar.setVisibility(android.view.View.GONE);
                         Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
+                        i.putExtra("user_name", name);
+                        i.putExtra("user_phone", phone);
                         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                         startActivity(i);
                         finish();
-                    }).addOnFailureListener(e -> {
-                        runOnUiThread(() -> {
-                            progressBar.setVisibility(android.view.View.GONE);
-                            Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
-                            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(i);
-                            finish();
-                        });
                     });
-                }).addOnFailureListener(e -> runOnUiThread(() -> {
-                    progressBar.setVisibility(android.view.View.GONE);
-                    Toast.makeText(SignUpActivity.this, "Failed to save profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                }));
+                });
             } else {
                 runOnUiThread(() -> {
                     progressBar.setVisibility(android.view.View.GONE);

@@ -64,10 +64,14 @@ public class DashboardViewModel extends AndroidViewModel {
     public LiveData<String> getErrorMessage() {
         return errorMessage;
     }
+
     public void clearErrorMessage() {
         errorMessage.setValue("");
     }
 
+    /**
+     * Load dashboard data initially
+     */
     public void loadDashboardData() {
         isLoading.setValue(true);
         try {
@@ -84,9 +88,26 @@ public class DashboardViewModel extends AndroidViewModel {
         }
     }
 
+    /**
+     * Refresh dashboard data after a sale completes
+     * This forces a reload of all metrics
+     */
+    public void refreshDashboardData() {
+        try {
+            repository.refreshMetrics();
+
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                loadDashboardData();
+                loadRecentActivities();
+            }, 500);
+        } catch (Exception e) {
+            errorMessage.postValue("Error refreshing dashboard: " + e.getMessage());
+        }
+    }
+
     public void loadRecentActivities() {
         try {
-            repository.getRecentActivities(10, activities -> recentActivities.postValue(activities));
+            repository.getRecentActivities(activities -> recentActivities.postValue(activities));
         } catch (Exception e) {
             errorMessage.postValue("Error loading activities: " + e.getMessage());
         }

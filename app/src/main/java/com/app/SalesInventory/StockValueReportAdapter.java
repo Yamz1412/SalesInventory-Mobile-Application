@@ -77,7 +77,6 @@ public class StockValueReportAdapter extends RecyclerView.Adapter<StockValueRepo
             tvProductName = itemView.findViewById(R.id.tvProductName);
             tvCategory = itemView.findViewById(R.id.tvCategory);
             tvQuantity = itemView.findViewById(R.id.tvQuantity);
-            tvFloor = itemView.findViewById(R.id.tvFloorLevel);
             tvCostValue = itemView.findViewById(R.id.tvCostValue);
             tvSellingValue = itemView.findViewById(R.id.tvSellingValue);
             tvProfit = itemView.findViewById(R.id.tvProfit);

@@ -41,7 +41,6 @@ public class AddProductActivity extends BaseActivity {
     private TextInputEditText quantityET;
     private TextInputEditText costPriceET;
     private TextInputEditText minStockET;
-    private TextInputEditText floorLevelET;
     private TextInputEditText unitET;
     private TextInputEditText expiryDateET;
     private Button addBtn;
@@ -73,7 +72,6 @@ public class AddProductActivity extends BaseActivity {
         quantityET = findViewById(R.id.quantityET);
         costPriceET = findViewById(R.id.costPriceET);
         minStockET = findViewById(R.id.minStockET);
-        floorLevelET = findViewById(R.id.floorLevelET);
         unitET = findViewById(R.id.unitET);
         expiryDateET = findViewById(R.id.expiryDateET);
         addBtn = findViewById(R.id.addBtn);
@@ -211,7 +209,6 @@ public class AddProductActivity extends BaseActivity {
             quantityET.setText("");
             costPriceET.setText("");
             minStockET.setText("");
-            floorLevelET.setText("");
             unitET.setText("");
         } else {
             layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
@@ -264,7 +261,6 @@ public class AddProductActivity extends BaseActivity {
         int qty = 0;
         int criticalLevel = 1;
         int reorderLevel = 0;
-        int floorLevel = 1;
         int ceilingLevel = 0;
         long expiryDate = 0L;
         try {
@@ -288,7 +284,6 @@ public class AddProductActivity extends BaseActivity {
             qty = 0;
             criticalLevel = 1;
             reorderLevel = 0;
-            floorLevel = 0;
         } else {
             try {
                 costPrice = Double.parseDouble(costPriceET.getText() != null ? costPriceET.getText().toString() : "0");
@@ -302,15 +297,7 @@ public class AddProductActivity extends BaseActivity {
                 reorderLevel = Integer.parseInt(minStockET.getText() != null ? minStockET.getText().toString() : "0");
             } catch (Exception ignored) {
             }
-            floorLevel = 1;
             criticalLevel = 1;
-            try {
-                String floorStr = floorLevelET.getText() != null ? floorLevelET.getText().toString() : "";
-                if (!floorStr.isEmpty()) floorLevel = Integer.parseInt(floorStr);
-            } catch (Exception ignored) {
-                floorLevel = 1;
-            }
-            if (floorLevel < 1) floorLevel = 1;
             if (qty < 0) qty = 0;
             if (reorderLevel < 0) reorderLevel = 0;
             if (criticalLevel < 1) criticalLevel = 1;
@@ -327,7 +314,6 @@ public class AddProductActivity extends BaseActivity {
         p.setCriticalLevel(criticalLevel);
         p.setReorderLevel(reorderLevel);
         p.setCeilingLevel(ceilingLevel);
-        p.setFloorLevel(floorLevel);
         p.setUnit(unitET.getText() != null ? unitET.getText().toString().trim() : "");
         p.setExpiryDate(expiryDate);
         p.setSupplier("");

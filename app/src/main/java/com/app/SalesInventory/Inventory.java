@@ -123,27 +123,14 @@ public class Inventory extends BaseActivity {
         );
         productRepository.registerCriticalStockListener(criticalListener);
 
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override
-            public boolean onQueryTextSubmit(String query) {
-                currentSearchQuery = query == null ? "" : query;
-                applyFilters();
-                return false;
-            }
-
-            @Override
-            public boolean onQueryTextChange(String newText) {
-                currentSearchQuery = newText == null ? "" : newText;
-                applyFilters();
-                return false;
-            }
-        });
-
         productsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView rv, int dx, int dy) {
-                if (dy > 5) hideBottomButtons();
-                else if (dy < -5) showBottomButtons();
+                if (dy > 10) {
+                    hideBottomButtons();
+                } else if (dy < -10) {
+                    showBottomButtons();
+                }
             }
         });
 
@@ -391,13 +378,24 @@ public class Inventory extends BaseActivity {
 
     private void hideBottomButtons() {
         if (bottomButtonLayout == null || buttonsHidden) return;
-        bottomButtonLayout.animate().translationY(bottomButtonLayout.getHeight()).setDuration(220).start();
+        int height = bottomButtonLayout.getHeight();
+        if (height == 0) return;
+
+        bottomButtonLayout.animate()
+                .translationY(height)
+                .setDuration(300)
+                .withEndAction(() -> bottomButtonLayout.setVisibility(View.GONE))
+                .start();
         buttonsHidden = true;
     }
 
     private void showBottomButtons() {
         if (bottomButtonLayout == null || !buttonsHidden) return;
-        bottomButtonLayout.animate().translationY(0).setDuration(220).start();
+        bottomButtonLayout.setVisibility(View.VISIBLE);
+        bottomButtonLayout.animate()
+                .translationY(0)
+                .setDuration(300)
+                .start();
         buttonsHidden = false;
     }
 

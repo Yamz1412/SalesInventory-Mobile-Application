@@ -219,20 +219,19 @@
                             <ImageView
                                 android:layout_width="20dp"
                                 android:layout_height="20dp"
-                                android:src="@drawable/ic_inventory"
-                                app:tint="@color/success_primary" />
+                                android:src="@drawable/ic_pesos"
+                                app:tint="@color/primary" />
 
                             <TextView
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
-                                android:text="Inventory"
+                                android:text="Overall Revenue"
                                 android:textSize="11sp"
                                 android:textColor="@color/text_primary"
                                 android:layout_marginStart="6dp"
                                 android:lines="1"
                                 android:ellipsize="end" />
-
                         </LinearLayout>
 
                         <TextView

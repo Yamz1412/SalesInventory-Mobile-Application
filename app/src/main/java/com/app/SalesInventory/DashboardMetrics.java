@@ -7,6 +7,7 @@ public class DashboardMetrics {
     private double totalSalesToday;
     private double totalInventoryValue;
     private int lowStockCount;
+    private int nearExpiryCount;
     private int pendingOrdersCount;
     private double revenue;
     private long lastUpdated;
@@ -15,11 +16,12 @@ public class DashboardMetrics {
         this.lastUpdated = System.currentTimeMillis();
     }
 
-    public DashboardMetrics(double totalSalesToday, double totalInventoryValue, int lowStockCount, int pendingOrdersCount, double revenue) {
+    public DashboardMetrics(double totalSalesToday, double totalInventoryValue, int lowStockCount, int pendingOrdersCount, int nearExpiryCount, double revenue) {
         this.totalSalesToday = totalSalesToday;
         this.totalInventoryValue = totalInventoryValue;
         this.lowStockCount = lowStockCount;
         this.pendingOrdersCount = pendingOrdersCount;
+        this.nearExpiryCount = nearExpiryCount;
         this.revenue = revenue;
         this.lastUpdated = System.currentTimeMillis();
     }
@@ -56,6 +58,16 @@ public class DashboardMetrics {
         this.pendingOrdersCount = pendingOrdersCount;
     }
 
+    // Fixed: Added missing getter for nearExpiryCount
+    public int getNearExpiryCount() {
+        return nearExpiryCount;
+    }
+
+    // Fixed: Added missing setter for nearExpiryCount
+    public void setNearExpiryCount(int nearExpiryCount) {
+        this.nearExpiryCount = nearExpiryCount;
+    }
+
     public double getRevenue() {
         return revenue;
     }
@@ -78,6 +90,7 @@ public class DashboardMetrics {
         m.put("totalInventoryValue", totalInventoryValue);
         m.put("lowStockCount", lowStockCount);
         m.put("pendingOrdersCount", pendingOrdersCount);
+        m.put("nearExpiryCount", nearExpiryCount);
         m.put("revenue", revenue);
         m.put("lastUpdated", lastUpdated);
         return m;
@@ -95,6 +108,8 @@ public class DashboardMetrics {
         if (o instanceof Number) d.lowStockCount = ((Number) o).intValue();
         o = m.get("pendingOrdersCount");
         if (o instanceof Number) d.pendingOrdersCount = ((Number) o).intValue();
+        o = m.get("nearExpiryCount");
+        if (o instanceof Number) d.nearExpiryCount = ((Number) o).intValue();
         o = m.get("revenue");
         if (o instanceof Number) d.revenue = ((Number) o).doubleValue();
         o = m.get("lastUpdated");

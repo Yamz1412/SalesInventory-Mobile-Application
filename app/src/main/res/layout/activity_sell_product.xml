@@ -114,7 +114,7 @@
 
         <Spinner
             android:id="@+id/spinnerPaymentMethod"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
         <TextView
@@ -294,50 +294,39 @@
                         android:textColor="@color/textColorPrimary"
                         android:layout_marginBottom="4dp" />
 
-                    <TextView
-                        android:id="@+id/tvEPaymentNote"
+                    <Button
+                        android:id="@+id/btnCaptureReceipt"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Capture the customer’s payment receipt, then confirm the sale."
-                        android:textSize="13sp"
-                        android:textColor="@color/textColorSecondary"
-                        android:layout_marginBottom="8dp" />
+                        android:text="Capture or Upload Receipt"
+                        android:backgroundTint="@color/colorPrimary"
+                        android:textColor="@color/white" />
 
-                    <LinearLayout
+                    <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <Button
-                            android:id="@+id/btnCaptureReceipt"
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Capture Receipt"
-                            android:backgroundTint="@color/colorPrimary"
-                            android:textColor="@color/white" />
+                        android:layout_marginTop="12dp">
 
                         <ImageView
                             android:id="@+id/imgReceiptPreview"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:layout_marginStart="12dp"
-                            android:scaleType="centerCrop"
+                            android:layout_width="match_parent"
+                            android:layout_height="250dp"
+                            android:scaleType="fitCenter"
                             android:src="@drawable/ic_image_placeholder"
                             android:background="@drawable/edite_round"
-                            android:padding="4dp"
+                            android:padding="8dp"
                             android:visibility="gone" />
-                    </LinearLayout>
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/tvReceiptStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="No receipt captured"
+                        android:gravity="center"
                         android:textSize="12sp"
                         android:textColor="@color/textColorSecondary"
-                        android:layout_marginTop="4dp" />
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>

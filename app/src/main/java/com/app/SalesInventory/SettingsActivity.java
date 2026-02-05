@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -64,16 +65,12 @@ public class SettingsActivity extends BaseActivity {
         customAccentBtn = findViewById(R.id.customAccentBtn);
         resetThemeBtn = findViewById(R.id.resetThemeBtn);
         applyBtn = findViewById(R.id.applyBtn);
-        colorPreviewLayout = findViewById(R.id.colorPreviewLayout);
         primaryColorTV = findViewById(R.id.primaryColorTV);
         secondaryColorTV = findViewById(R.id.secondaryColorTV);
         accentColorTV = findViewById(R.id.accentColorTV);
         btnBackup = findViewById(R.id.btnBackup);
         btnRestore = findViewById(R.id.btnRestore);
         btnUserManual = findViewById(R.id.btnUserManual);
-        previewPrimary = findViewById(R.id.previewPrimary);
-        previewSecondary = findViewById(R.id.previewSecondary);
-        previewAccent = findViewById(R.id.previewAccent);
         setupThemeSpinner();
     }
 
@@ -173,7 +170,6 @@ public class SettingsActivity extends BaseActivity {
                 currentAccent = selectedTheme.accentColor;
                 updateColorPreview();
                 Log.d(TAG, "Theme selected (preview): " + selectedTheme.name);
-                btnUserManual.setOnClickListener(v -> openOfflineUserManual());
             }
 
             @Override
@@ -209,15 +205,15 @@ public class SettingsActivity extends BaseActivity {
         btnBackup.setOnClickListener(v -> backupLauncher.launch("sales_inventory_backup.db"));
 
         btnRestore.setOnClickListener(v -> restoreLauncher.launch("*/*"));
+
+        btnUserManual.setOnClickListener(v -> openUserManual());
     }
 
-    private void openOfflineUserManual() {
-        String fileName = "user_manual.pdf";
-        File file = new File(getCacheDir(), fileName);
-
+    private void openUserManual() {
         try {
+            File file = new File(getCacheDir(), "USER-MANUAL.pdf");
             if (!file.exists()) {
-                InputStream is = getAssets().open(fileName);
+                InputStream is = getAssets().open("USER-MANUAL.pdf");
                 OutputStream os = new FileOutputStream(file);
                 byte[] buffer = new byte[1024];
                 int length;
@@ -229,17 +225,15 @@ public class SettingsActivity extends BaseActivity {
                 is.close();
             }
 
-            android.net.Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/pdf");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-
             startActivity(Intent.createChooser(intent, "Open User Manual"));
-
         } catch (Exception e) {
+            Toast.makeText(this, "Unable to open manual", Toast.LENGTH_SHORT).show();
             Log.e(TAG, "Error opening PDF", e);
-            Toast.makeText(this, "No PDF viewer found or error opening file", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -287,6 +281,7 @@ public class SettingsActivity extends BaseActivity {
         tintButton(applyBtn, btnPrimaryColor);
         tintButton(btnBackup, btnPrimaryColor);
         tintButton(btnRestore, btnPrimaryColor);
+        tintButton(btnUserManual, btnPrimaryColor);
     }
 
     private void applyTheme() {

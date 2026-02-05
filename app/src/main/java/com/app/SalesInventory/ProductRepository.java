@@ -439,8 +439,10 @@ public class ProductRepository {
                 if (existing.floorLevel > 0 && clamped <= existing.floorLevel) {
                     createFloorLevelAlert(existing);
                 }
+                if (listener != null) {
+                    listener.onProductUpdated();
+                }
                 checkExpiryForEntity(existing);
-                listener.onProductUpdated();
             } else {
                 listener.onError("Product not found locally");
             }
@@ -690,6 +692,21 @@ public class ProductRepository {
                 productDao.setSyncInfo(localId, e.productId, "PENDING");
                 SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
             }
+        });
+    }
+
+    public void refreshProducts() {
+        LiveData<List<ProductEntity>> source = productDao.getAllProductsLive();
+        allProducts.removeSource(source);
+        allProducts.addSource(source, entities -> {
+            List<Product> list = new ArrayList<>();
+            if (entities != null) {
+                for (ProductEntity e : entities) {
+                    Product p = mapEntityToProduct(e);
+                    list.add(p);
+                }
+            }
+            allProducts.setValue(list);
         });
     }
     private int computeDefaultCeiling(int quantity, int reorderLevel) {

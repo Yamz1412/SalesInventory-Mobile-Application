@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@color/white">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="HanZai Application"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textColor="@color/black" />
+
+    <TextView
+        android:id="@+id/tvReceiptOrderId"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Order ID: #"
+        android:textSize="12sp"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/tvReceiptDateTime"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Date &amp; Time: --/--/---- 00:00:00"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:textColor="@color/textColorSecondary"
+        android:layout_marginBottom="16dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/lightGray" />
+
+    <LinearLayout
+        android:id="@+id/receiptItemsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/lightGray" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Amount:" android:textStyle="bold" />
+        <TextView android:id="@+id/tvReceiptTotal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" android:textStyle="bold" android:textColor="@color/colorPrimary" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/layoutReceiptCash"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cash Given:" />
+        <TextView android:id="@+id/tvReceiptCash" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:id="@+id/layoutReceiptChange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Change:" />
+        <TextView android:id="@+id/tvReceiptChange" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" />
+    </RelativeLayout>
+
+    <Button
+        android:id="@+id/btnFinalizeSale"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Finalize &amp; Save"
+        android:layout_marginTop="20dp"
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="@color/white" />
+</LinearLayout>

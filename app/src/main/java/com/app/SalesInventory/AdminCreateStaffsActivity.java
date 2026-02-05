@@ -3,9 +3,11 @@ package com.app.SalesInventory;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -13,13 +15,10 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.Nullable;
-
 import com.google.firebase.functions.FirebaseFunctions;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
-
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,7 +31,6 @@ public class AdminCreateStaffsActivity extends BaseActivity {
     private Button btnCreateStaffAccount;
     private ProgressBar progressBarCreateStaff;
     private TextView tvCreateStaffMessage;
-
     private FirebaseFunctions functions;
     private FirebaseFirestore fStore;
     private AuthManager authManager;
@@ -61,7 +59,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         etStaffPhone.setSelection(etStaffPhone.getText().length());
 
         InputFilter filter = (source, start, end, dest, dstart, dend) -> {
-            if (dstart < 3) return "";
+            if (dstart < 3) return dest.subSequence(dstart, dend);
             for (int i = start; i < end; i++) {
                 if (!Character.isDigit(source.charAt(i))) {
                     return "";
@@ -73,6 +71,20 @@ public class AdminCreateStaffsActivity extends BaseActivity {
             return null;
         };
         etStaffPhone.setFilters(new InputFilter[]{filter});
+
+        etStaffPhone.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (!s.toString().startsWith("+63")) {
+                    etStaffPhone.setText("+63");
+                    etStaffPhone.setSelection(etStaffPhone.getText().length());
+                }
+            }
+        });
 
         functions = FirebaseFunctions.getInstance();
         fStore = FirebaseFirestore.getInstance();
@@ -94,7 +106,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         }
 
         if (phone.length() != 13) {
-            showMessage("Please enter a valid 10-digit number after +63");
+            showMessage("Please enter exactly 10 digits after +63");
             return;
         }
 
@@ -108,8 +120,8 @@ public class AdminCreateStaffsActivity extends BaseActivity {
             return;
         }
 
-        progressBarCreateStaff.setVisibility(android.view.View.VISIBLE);
-        tvCreateStaffMessage.setVisibility(android.view.View.GONE);
+        progressBarCreateStaff.setVisibility(View.VISIBLE);
+        tvCreateStaffMessage.setVisibility(View.GONE);
 
         Map<String, Object> data = new HashMap<>();
         data.put("email", email);
@@ -169,7 +181,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
 
     private void showMessage(String msg) {
         tvCreateStaffMessage.setText(msg);
-        tvCreateStaffMessage.setVisibility(android.view.View.VISIBLE);
+        tvCreateStaffMessage.setVisibility(View.VISIBLE);
     }
 
     public interface UpdateCallback {

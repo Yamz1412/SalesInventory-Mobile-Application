@@ -31,7 +31,7 @@ public class SalesRepository {
         recentSales = new MutableLiveData<>();
         loadAllSales();
         loadTodaySales();
-        loadMonthlySales();
+        loadOverallRevenue();
         loadRecentSales();
     }
 
@@ -178,6 +178,26 @@ public class SalesRepository {
         return sale;
     }
 
+    private void loadOverallRevenue() {
+        firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Error loading overall revenue", error);
+                        return;
+                    }
+                    double totalLifetime = 0.0;
+                    if (snapshot != null) {
+                        for (DocumentSnapshot document : snapshot.getDocuments()) {
+                            Sales sale = createSalesFromSnapshot(document);
+                            if (sale != null) {
+                                totalLifetime += sale.getTotalPrice();
+                            }
+                        }
+                    }
+                    totalMonthlyRevenue.postValue(totalLifetime);
+                });
+    }
+
     private void loadAllSales() {
         firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
@@ -212,7 +232,7 @@ public class SalesRepository {
                 .whereLessThanOrEqualTo("timestamp", endOfDay)
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
-                        Log.e(TAG, "Error loading today sales", error);
+                        Log.e(TAG, "Error loading today's sales", error);
                         return;
                     }
                     double total = 0.0;
@@ -285,6 +305,34 @@ public class SalesRepository {
                         recentSales.postValue(salesList);
                     }
                 });
+    }
+
+    /**
+     * Force reload all sales data - call this to refresh the dashboard
+     */
+    public void reloadAllSales() {
+        loadAllSales();
+    }
+
+    /**
+     * Force reload today's sales - call this after a new sale completes
+     */
+    public void reloadTodaySales() {
+        loadTodaySales();
+    }
+
+    /**
+     * Force reload monthly sales - call this after a new sale completes
+     */
+    public void reloadMonthlySales() {
+        loadMonthlySales();
+    }
+
+    /**
+     * Force reload recent sales - call this to refresh activity feed
+     */
+    public void reloadRecentSales() {
+        loadRecentSales();
     }
 
     public MutableLiveData<List<Sales>> getAllSales() {

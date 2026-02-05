@@ -173,22 +173,6 @@
                     android:textColor="?attr/colorOnBackground"
                     android:hint="Unit (e.g. pcs)" />
             </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="15dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/floorLevelET"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:textColor="?attr/colorOnBackground"
-                    android:hint="Floor Level (optional)" />
-            </com.google.android.material.textfield.TextInputLayout>
-
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout

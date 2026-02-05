@@ -49,18 +49,6 @@
             android:gravity="center"
             android:layout_marginTop="2dp" />
 
-        <TextView
-            android:id="@+id/tvFloorLevel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="11sp"
-            android:text="Floor: 0"
-            android:textColor="?attr/colorOnBackground"
-            android:alpha="0.7"
-            android:gravity="center"
-            android:layout_marginTop="2dp"
-            android:visibility="gone" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
