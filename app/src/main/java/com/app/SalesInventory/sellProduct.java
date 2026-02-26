@@ -34,7 +34,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.File;
@@ -99,6 +101,10 @@ public class sellProduct extends BaseActivity {
 
     private ActivityResultLauncher<String> galleryReceiptLauncher;
     private Uri galleryReceiptUri;
+    private MaterialButton btnDiscountSC, btnDiscountPWD, btnDiscountEmp;
+    private TextInputLayout manualDiscountTIL;
+    private TextInputEditText etManualDiscount, etReferenceNumber;
+    private double currentDiscountPercentage = 0.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,7 +131,12 @@ public class sellProduct extends BaseActivity {
     }
 
     private void initViews() {
-        etDiscount = findViewById(R.id.DiscountInput);
+        etReferenceNumber = findViewById(R.id.etReferenceNumber);
+        btnDiscountSC = findViewById(R.id.btnDiscountSC);
+        btnDiscountPWD = findViewById(R.id.btnDiscountPWD);
+        btnDiscountEmp = findViewById(R.id.btnDiscountEmp);
+        manualDiscountTIL = findViewById(R.id.manual_discount_TIL);
+        etManualDiscount = findViewById(R.id.et_manual_discount);
         tvTotalPrice = findViewById(R.id.TotalPriceTV);
         btnConfirmSale = findViewById(R.id.BtnConfirmSale);
         btnEditCart = findViewById(R.id.BtnEditCart);
@@ -166,6 +177,41 @@ public class sellProduct extends BaseActivity {
         builder.setView(new android.widget.ProgressBar(this));
         builder.setMessage("Processing Sale... Please wait.");
         loadingDialog = builder.create();
+
+        btnDiscountSC.setOnClickListener(v -> applyPresetDiscount(20.0));
+        btnDiscountPWD.setOnClickListener(v -> applyPresetDiscount(20.0));
+        btnDiscountEmp.setOnClickListener(v -> {
+            findViewById(R.id.discount_buttons_layout).setVisibility(View.GONE);
+            manualDiscountTIL.setVisibility(View.VISIBLE);
+            etManualDiscount.requestFocus();
+            currentDiscountPercentage = 0.0;
+        });
+
+        etManualDiscount.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void afterTextChanged(Editable s) {
+                String input = s.toString();
+                if (!input.isEmpty()) {
+                    try {
+                        currentDiscountPercentage = Double.parseDouble(input);
+                    } catch (NumberFormatException e) {
+                        currentDiscountPercentage = 0.0;
+                    }
+                } else {
+                    currentDiscountPercentage = 0.0;
+                }
+                calculateTotalFromCart();
+            }
+        });
+    }
+
+    private void applyPresetDiscount(double percentage) {
+        currentDiscountPercentage = percentage;
+        manualDiscountTIL.setVisibility(View.GONE);
+        findViewById(R.id.discount_buttons_layout).setVisibility(View.VISIBLE);
+        calculateTotalFromCart();
     }
 
     private void initGalleryLauncher() {
@@ -187,16 +233,50 @@ public class sellProduct extends BaseActivity {
     }
 
     private void setupListeners() {
-        etDiscount.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateTotalFromCart(); }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
         etCashGiven.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateChange(); }
-            @Override public void afterTextChanged(Editable s) {}
+            private String current = "";
+
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (!s.toString().equals(current)) {
+                    etCashGiven.removeTextChangedListener(this);
+                    String cleanString = s.toString().replaceAll("[^\\d.]", "");
+
+                    if (!cleanString.isEmpty()) {
+                        try {
+                            double parsed = Double.parseDouble(cleanString);
+
+                            if (parsed > 1000000) {
+                                parsed = 1000000;
+                                Toast.makeText(sellProduct.this, "Maximum cash limit is ₱1,000,000", Toast.LENGTH_SHORT).show();
+                            }
+
+                            String formatted;
+                            if (cleanString.contains(".")) {
+                                formatted = cleanString;
+                            } else {
+                                formatted = String.format(Locale.US, "%,d", (long) parsed);
+                            }
+
+                            current = formatted;
+                            etCashGiven.setText(formatted);
+                            etCashGiven.setSelection(formatted.length());
+                        } catch (NumberFormatException e) {
+                        }
+                    } else {
+                        current = "";
+                    }
+
+                    etCashGiven.addTextChangedListener(this);
+                    calculateChange();
+                }
+            }
         });
 
         spinnerPaymentMethod.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -289,21 +369,13 @@ public class sellProduct extends BaseActivity {
 
     private void calculateTotalFromCart() {
         double subtotal = cartManager.getSubtotal();
-        String discountStr = etDiscount.getText() != null ? etDiscount.getText().toString().trim() : "";
-        try {
-            discountPercent = discountStr.isEmpty() ? 0 : Double.parseDouble(discountStr);
-            if (discountPercent < 0 || discountPercent > 100) {
-                discountPercent = 0;
-                // Only reset text if logic requires, but better to just clamp internal value
-                // etDiscount.setText("0");
-            }
-        } catch (NumberFormatException e) {
-            discountPercent = 0;
-        }
-        double discountAmount = subtotal * (discountPercent / 100.0);
+
+        double discountAmount = subtotal * (currentDiscountPercentage / 100.0);
         finalTotal = subtotal - discountAmount;
+
         if (finalTotal < 0) finalTotal = 0;
-        tvTotalPrice.setText("₱" + String.format(Locale.US, "%.2f", finalTotal));
+        tvTotalPrice.setText(String.format(Locale.US, "₱%.2f", finalTotal));
+
         BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
         if (finalBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
             btnConfirmSale.setEnabled(false);
@@ -312,7 +384,6 @@ public class sellProduct extends BaseActivity {
             calculateChange();
         }
     }
-
     private void calculateChange() {
         String method = (String) spinnerPaymentMethod.getSelectedItem();
 
@@ -322,7 +393,7 @@ public class sellProduct extends BaseActivity {
             return;
         }
 
-        String cashStr = etCashGiven.getText().toString().trim();
+        String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
         if (cashStr.isEmpty()) {
             tvChange.setText("Change: ₱0.00");
             btnConfirmSale.setEnabled(false);
@@ -676,8 +747,9 @@ public class sellProduct extends BaseActivity {
         }
 
         String method = (String) spinnerPaymentMethod.getSelectedItem();
+        String paymentDetails = method;
         if ("Cash".equals(method)) {
-            String cashStr = etCashGiven.getText().toString().trim();
+            String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
             if (cashStr.isEmpty()) {
                 etCashGiven.setError("Enter cash amount");
                 return;
@@ -693,17 +765,23 @@ public class sellProduct extends BaseActivity {
                 return;
             }
         } else {
+            String refNum = etReferenceNumber.getText().toString().trim();
+            if (refNum.isEmpty()) {
+                etReferenceNumber.setError("Reference number is required");
+                return;
+            }
             if (!receiptCaptured) {
                 Toast.makeText(this, "Please attach payment receipt first", Toast.LENGTH_SHORT).show();
                 return;
             }
+            paymentDetails = "E-Payment (Ref: " + refNum + ")";
         }
 
         String orderId = java.util.UUID.randomUUID().toString();
 
         showReceiptDialog(
                 orderId,
-                method,
+                paymentDetails,
                 isDelivery,
                 deliveryName,
                 deliveryPhone,

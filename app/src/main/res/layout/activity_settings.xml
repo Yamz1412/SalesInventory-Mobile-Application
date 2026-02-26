@@ -1,32 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="?android:colorBackground">
+    android:background="#FAFAFA"> <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
 
-    <LinearLayout
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:text="Settings"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#212121"
+        android:layout_marginBottom="24dp" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Settings"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground"
-            android:layout_marginBottom="24dp" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnUserManual"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="USER MANUAL"
+        app:cornerRadius="8dp"
+        android:backgroundTint="#4CAF50"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="20dp" />
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="2dp"
+        android:layout_marginBottom="20dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:background="#FFFFFF">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -34,183 +50,86 @@
                 android:text="Select Theme"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnBackground"
+                android:textColor="#212121"
                 android:layout_marginBottom="12dp" />
 
-            <Spinner
-                android:id="@+id/themeSpinner"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:background="@drawable/spinner_background" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:background="@drawable/card_background"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:text="Customize Colors"
-                android:textColor="?attr/colorOnBackground"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp"
-                android:orientation="horizontal">
+                android:layout_height="50dp"
+                android:background="@drawable/spinner_background"
+                android:padding="2dp">
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Primary Color:"
-                    android:textColor="?attr/colorPrimary"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/primaryColorTV"
-                    android:layout_width="90dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/color_picker_bg"
-                    android:gravity="center"
-                    android:text="#000000"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="8dp"/>
-
-                <Button
-                    android:id="@+id/customPrimaryBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
-                    android:text="Pick" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Secondary Color:"
-                    android:textColor="@color/textColorSecondary"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/secondaryColorTV"
-                    android:layout_width="90dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/color_picker_bg"
-                    android:gravity="center"
-                    android:text="#000000"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="8dp"/>
-
-                <Button
-                    android:id="@+id/customSecondaryBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
-                    android:text="Pick" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Accent Color:"
-                    android:textColor="@color/colorAccent"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/accentColorTV"
-                    android:layout_width="90dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/color_picker_bg"
-                    android:gravity="center"
-                    android:text="#000000"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="8dp"/>
-
-                <Button
-                    android:id="@+id/customAccentBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minHeight="40dp"
-                    android:text="Pick" />
+                <Spinner
+                    android:id="@+id/themeSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
             </LinearLayout>
         </LinearLayout>
+    </androidx.cardview.widget.CardView>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-            <Button
-                android:id="@+id/resetThemeBtn"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="5dp"
-                android:text="Reset" />
-            <Button
-                android:id="@+id/applyBtn"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="5dp"
-                android:text="Apply Theme" />
-        </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
 
-        <Button
-            android:id="@+id/btnBackup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Backup Data"
-            android:layout_marginBottom="8dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/resetThemeBtn"
+            android:layout_width="0dp"
+            android:layout_height="55dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="RESET"
+            app:cornerRadius="8dp"
+            android:backgroundTint="#00796B"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btnUserManual"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="User Manual"
-            android:layout_marginBottom="8dp" />
-
-        <Button
-            android:id="@+id/btnRestore"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Restore Data"
-            android:layout_marginBottom="8dp" />
-
-<!--        <Button-->
-<!--            android:id="@+id/btnCleanupDuplicates"-->
-<!--            android:layout_width="match_parent"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:text="Cleanup Duplicate Products"-->
-<!--            android:backgroundTint="@color/errorRed"-->
-<!--            android:textColor="@color/white"-->
-<!--            android:layout_marginBottom="16dp"/>-->
-
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/applyBtn"
+            android:layout_width="0dp"
+            android:layout_height="55dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="APPLY THEME"
+            app:cornerRadius="8dp"
+            android:backgroundTint="#2196F3"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClearCache"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="CLEAR CACHE"
+        app:cornerRadius="8dp"
+        android:backgroundTint="#F44336"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnBackup"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="BACKUP DATA"
+        app:cornerRadius="8dp"
+        android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnRestore"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="RESTORE DATA"
+        app:cornerRadius="8dp"
+        android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp" />
+
+</LinearLayout>
 </ScrollView>

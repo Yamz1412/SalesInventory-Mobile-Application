@@ -57,53 +57,22 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         progressBarCreateStaff = findViewById(R.id.progressBarCreateStaff);
         tvCreateStaffMessage = findViewById(R.id.tvCreateStaffMessage);
 
-        etStaffPhone.setInputType(InputType.TYPE_CLASS_PHONE);
-        etStaffPhone.setText("+63");
-        etStaffPhone.setSelection(etStaffPhone.getText().length());
-
-        InputFilter filter = new InputFilter() {
-            @Override
+        InputFilter nameFilter = new InputFilter() {
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-                if (source.toString().startsWith("+")) {
-                    return null;
-                }
-                if (dstart < 3 && dest.length() >= 3) {
-                    return dest.subSequence(dstart, dend);
-                }
                 for (int i = start; i < end; i++) {
-                    if (!Character.isDigit(source.charAt(i))) {
+                    char c = source.charAt(i);
+                    if (!Character.isLetter(c) && c != ' ' && c != '.') {
                         return "";
                     }
-                }
-                if (dest.length() + (end - start) - (dend - dstart) > 13) {
-                    return "";
                 }
                 return null;
             }
         };
-        etStaffPhone.setFilters(new InputFilter[]{filter});
+        etStaffName.setFilters(new InputFilter[]{nameFilter});
 
-        etStaffPhone.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (!s.toString().startsWith("+63")) {
-                    etStaffPhone.removeTextChangedListener(this);
-                    String current = s.toString();
-                    String digits = current.replaceAll("[^\\d]", "");
-                    if (digits.startsWith("63")) {
-                        etStaffPhone.setText("+" + digits);
-                    } else {
-                        etStaffPhone.setText("+63");
-                    }
-                    etStaffPhone.setSelection(etStaffPhone.getText().length());
-                    etStaffPhone.addTextChangedListener(this);
-                }
-            }
-        });
+        etStaffPhone.setInputType(InputType.TYPE_CLASS_NUMBER);
+        InputFilter phoneFilter = new InputFilter.LengthFilter(11);
+        etStaffPhone.setFilters(new InputFilter[]{phoneFilter});
 
         functions = FirebaseFunctions.getInstance();
         fStore = FirebaseFirestore.getInstance();
@@ -114,7 +83,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
 
     private void createStaffAccount() {
         String name = etStaffName.getText().toString().trim();
-        String email = etStaffEmail.getText().toString().trim();
+        String email = etStaffEmail.getText().toString().trim().toLowerCase(); // Convert to lowercase for checking
         String phone = etStaffPhone.getText().toString().trim();
         String password = etStaffPassword.getText().toString();
         String confirm = etStaffConfirmPassword.getText().toString();
@@ -124,8 +93,14 @@ public class AdminCreateStaffsActivity extends BaseActivity {
             return;
         }
 
-        if (phone.length() != 13) {
-            showMessage("Please enter exactly 10 digits after +63");
+        if (!phone.matches("^09\\d{9}$")) {
+            showMessage("Phone number must be exactly 11 digits and start with 09 (e.g., 09123456789)");
+            return;
+        }
+
+        String emailPattern = "^[a-zA-Z0-9._%+-]+@(gmail\\.com|yahoo\\.com|outlook\\.com|hotmail\\.com|live\\.com)$";
+        if (!email.matches(emailPattern)) {
+            showMessage("Please use a recognized email provider (Gmail, Yahoo, Outlook, Hotmail).");
             return;
         }
 
@@ -154,12 +129,10 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         data.put("name", name);
         data.put("phone", phone);
 
-        // --- FIX: Force refresh the ID token to ensure Admin claims are present ---
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user != null) {
             user.getIdToken(true).addOnCompleteListener(tokenTask -> {
                 if (tokenTask.isSuccessful()) {
-                    // Token refreshed, now proceed with Cloud Function call
                     functions.getHttpsCallable("adminCreateStaffUser").call(data)
                             .addOnCompleteListener(task -> {
                                 progressBarCreateStaff.setVisibility(View.GONE);
@@ -215,8 +188,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
     private void clearForm() {
         etStaffName.setText("");
         etStaffEmail.setText("");
-        etStaffPhone.removeTextChangedListener(null);
-        etStaffPhone.setText("+63");
+        etStaffPhone.setText("");
         etStaffPassword.setText("");
         etStaffConfirmPassword.setText("");
     }

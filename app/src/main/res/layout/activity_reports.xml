@@ -21,7 +21,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:weightSum="4">
+        android:weightSum="3">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -92,33 +92,6 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="LOW STOCK"
-                android:textColor="@color/red"
-                android:textStyle="bold"/>
-
-            <TextView
-                android:id="@+id/lowStockTV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0.00"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="@color/errorRed"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="100dp"
-            android:background="@android:color/white"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:elevation="4dp"
-            android:layout_marginRight="5dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
                 android:text="TOTAL REVENUE"
                 android:gravity="center_horizontal"
                 android:textColor="#4CAF50"
@@ -143,31 +116,14 @@
         android:weightSum="2">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/BtnSalesReport"
-            android:layout_width="30dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Sales Journal (SJE)"
-            style="@style/CustomButton" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/BtnInventoryReport"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="Inventory"
             android:layout_marginStart="8dp"
             style="@style/CustomButton" />
     </LinearLayout>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/BtnComprehensiveReports"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="📊 Comprehensive Reports (CSV)"
-        android:layout_marginTop="10dp"
-        android:textStyle="bold"
-        style="@style/CustomButton" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/BtnOverallPdf"
@@ -178,14 +134,45 @@
         android:textStyle="bold"
         style="@style/CustomButtonOutlined" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/BtnSampleData"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🧪 Sample Data (Admin)"
-        android:layout_marginTop="8dp"
-        android:textStyle="bold"
-        style="@style/CustomButtonOutlined" />
+        android:orientation="horizontal"
+        android:layout_marginTop="15dp"
+        android:weightSum="2">
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:hint="From Date">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etFromDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="false"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:hint="To Date">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etToDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="false"
+                android:inputType="none" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

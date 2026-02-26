@@ -88,6 +88,23 @@ public class SalesRepository {
                 });
     }
 
+    public void getSalesByDateRange(long startTime, long endTime, MutableLiveData<List<Sales>> targetLiveData) {
+        firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
+                .whereGreaterThanOrEqualTo("timestamp", startTime)
+                .whereLessThanOrEqualTo("timestamp", endTime)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<Sales> list = new ArrayList<>();
+                    for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
+                        Sales s = createSalesFromSnapshot(doc);
+                        if (s != null) list.add(s);
+                    }
+                    targetLiveData.postValue(list);
+                })
+                .addOnFailureListener(e -> Log.e("SalesRepository", "Range query failed", e));
+    }
+
     private void loadAllSales() {
         firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)

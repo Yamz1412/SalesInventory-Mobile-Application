@@ -56,7 +56,7 @@ public class AuthManager {
 
     public String getCurrentUserId() {
         FirebaseUser u = auth.getCurrentUser();
-        return u == null ? null : u.getUid();
+        return u == null ? "" : u.getUid();
     }
 
     public FirebaseFirestore getFirestore() {

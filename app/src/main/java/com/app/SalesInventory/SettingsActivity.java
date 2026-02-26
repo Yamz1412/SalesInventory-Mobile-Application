@@ -8,7 +8,6 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,18 +32,10 @@ public class SettingsActivity extends BaseActivity {
     private static final String TAG = "SettingsActivity";
 
     private Spinner themeSpinner;
-    private Button customPrimaryBtn, customSecondaryBtn, customAccentBtn;
-    private Button resetThemeBtn, applyBtn;
-    private LinearLayout colorPreviewLayout;
-    private TextView primaryColorTV, secondaryColorTV, accentColorTV;
+    private Button resetThemeBtn, applyBtn, btnClearCache;
     private Button btnBackup, btnRestore, btnUserManual;
-    // Added Button for cleanup
-    private Button btnCleanupDuplicates;
-    private View previewPrimary, previewSecondary, previewAccent;
 
     private ThemeManager themeManager;
-    private ProductRepository productRepository;
-    private int currentPrimary, currentSecondary, currentAccent;
     private ThemeManager.Theme[] allThemes;
     private ThemeManager.Theme selectedTheme;
 
@@ -57,30 +48,20 @@ public class SettingsActivity extends BaseActivity {
         setContentView(R.layout.activity_settings);
 
         themeManager = ThemeManager.getInstance(this);
-        // Initialize repository
-        productRepository = SalesInventoryApplication.getProductRepository();
 
         initializeUI();
         initBackupLaunchers();
-        loadCurrentTheme();
         setupListeners();
     }
 
     private void initializeUI() {
         themeSpinner = findViewById(R.id.themeSpinner);
-        customPrimaryBtn = findViewById(R.id.customPrimaryBtn);
-        customSecondaryBtn = findViewById(R.id.customSecondaryBtn);
-        customAccentBtn = findViewById(R.id.customAccentBtn);
         resetThemeBtn = findViewById(R.id.resetThemeBtn);
         applyBtn = findViewById(R.id.applyBtn);
-        primaryColorTV = findViewById(R.id.primaryColorTV);
-        secondaryColorTV = findViewById(R.id.secondaryColorTV);
-        accentColorTV = findViewById(R.id.accentColorTV);
         btnBackup = findViewById(R.id.btnBackup);
         btnRestore = findViewById(R.id.btnRestore);
         btnUserManual = findViewById(R.id.btnUserManual);
-        // Initialize the new button
-//        btnCleanupDuplicates = findViewById(R.id.btnCleanupDuplicates);
+        btnClearCache = findViewById(R.id.btnClearCache);
 
         setupThemeSpinner();
     }
@@ -130,10 +111,12 @@ public class SettingsActivity extends BaseActivity {
             public View getView(int position, View convertView, android.view.ViewGroup parent) {
                 View v = super.getView(position, convertView, parent);
                 TextView tv = v.findViewById(R.id.tvThemeName);
-                int bg = themeManager.getPrimaryColor();
-                int textColor = getReadableTextColor(bg);
-                v.setBackgroundColor(bg);
-                tv.setTextColor(textColor);
+                if (tv != null) {
+                    int bg = themeManager.getPrimaryColor();
+                    int textColor = getReadableTextColor(bg);
+                    v.setBackgroundColor(bg);
+                    tv.setTextColor(textColor);
+                }
                 return v;
             }
 
@@ -141,11 +124,13 @@ public class SettingsActivity extends BaseActivity {
             public View getDropDownView(int position, View convertView, android.view.ViewGroup parent) {
                 View v = getLayoutInflater().inflate(R.layout.item_theme_spinner_dropdown, parent, false);
                 TextView tv = v.findViewById(R.id.tvThemeName);
-                tv.setText(getItem(position));
-                int bg = themeManager.getSecondaryColor();
-                int textColor = getReadableTextColor(bg);
-                v.setBackgroundColor(bg);
-                tv.setTextColor(textColor);
+                if (tv != null) {
+                    tv.setText(getItem(position));
+                    int bg = themeManager.getSecondaryColor();
+                    int textColor = getReadableTextColor(bg);
+                    v.setBackgroundColor(bg);
+                    tv.setTextColor(textColor);
+                }
                 return v;
             }
         };
@@ -164,96 +149,103 @@ public class SettingsActivity extends BaseActivity {
         themeSpinner.setSelection(position);
     }
 
-    private void loadCurrentTheme() {
-        currentPrimary = themeManager.getPrimaryColor();
-        currentSecondary = themeManager.getSecondaryColor();
-        currentAccent = themeManager.getAccentColor();
-        updateColorPreview();
-    }
-
     private void setupListeners() {
         themeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedTheme = allThemes[position];
-                currentPrimary = selectedTheme.primaryColor;
-                currentSecondary = selectedTheme.secondaryColor;
-                currentAccent = selectedTheme.accentColor;
-                updateColorPreview();
-                Log.d(TAG, "Theme selected (preview): " + selectedTheme.name);
+                updateButtonTints();
             }
 
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        customPrimaryBtn.setOnClickListener(v -> openColorPicker(color -> {
-            currentPrimary = color;
-            updateColorPreview();
-        }));
-
-        customSecondaryBtn.setOnClickListener(v -> openColorPicker(color -> {
-            currentSecondary = color;
-            updateColorPreview();
-        }));
-
-        customAccentBtn.setOnClickListener(v -> openColorPicker(color -> {
-            currentAccent = color;
-            updateColorPreview();
-        }));
-
         resetThemeBtn.setOnClickListener(v -> {
-            ThemeManager.Theme current = themeManager.getCurrentTheme();
-            currentPrimary = current.primaryColor;
-            currentSecondary = current.secondaryColor;
-            currentAccent = current.accentColor;
-            updateColorPreview();
-            Toast.makeText(this, "Theme reset", Toast.LENGTH_SHORT).show();
+            ThemeManager.Theme currentTheme = themeManager.getCurrentTheme();
+            for (int i = 0; i < allThemes.length; i++) {
+                if (allThemes[i].name.equals(currentTheme.name)) {
+                    themeSpinner.setSelection(i);
+                    break;
+                }
+            }
+            Toast.makeText(this, "Theme selection reset", Toast.LENGTH_SHORT).show();
         });
 
         applyBtn.setOnClickListener(v -> applyTheme());
-
         btnBackup.setOnClickListener(v -> backupLauncher.launch("sales_inventory_backup.db"));
-
         btnRestore.setOnClickListener(v -> restoreLauncher.launch("*/*"));
-
         btnUserManual.setOnClickListener(v -> openUserManual());
+        btnClearCache.setOnClickListener(v -> showClearCacheConfirmation());
+    }
 
-        if (btnCleanupDuplicates != null) {
-            btnCleanupDuplicates.setOnClickListener(v -> showCleanupConfirmation());
+    private void updateButtonTints() {
+        if (selectedTheme == null) return;
+
+        int primary = selectedTheme.primaryColor;
+        int secondary = ContextCompat.getColor(this, R.color.colorPrimary);
+
+        tintButton(applyBtn, primary);
+        tintButton(btnBackup, primary);
+        tintButton(btnRestore, primary);
+        tintButton(btnUserManual, primary);
+        tintButton(resetThemeBtn, secondary);
+        // Note: btnClearCache is intentionally ignored here so it keeps its red background from XML
+    }
+
+    private void applyTheme() {
+        if (selectedTheme != null) {
+            themeManager.setCurrentTheme(selectedTheme.name);
+
+            String uid = AuthManager.getInstance().getCurrentUserId();
+            if (uid != null) {
+                FirebaseFirestore db = FirebaseFirestore.getInstance();
+                Map<String, Object> data = new HashMap<>();
+                data.put("themeName", selectedTheme.name);
+                db.collection("users").document(uid).set(data, SetOptions.merge());
+            }
+
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
         }
     }
 
-    private void showCleanupConfirmation() {
+    private void showClearCacheConfirmation() {
         new AlertDialog.Builder(this)
-                .setTitle("Cleanup Duplicates")
-                .setMessage("This will scan for products with identical names.\n\nFor each duplicate set, it will KEEP the one with the highest stock (or most recently updated) and DELETE the others.\n\nProceed?")
-                .setPositiveButton("Cleanup", (dialog, which) -> performCleanup())
+                .setTitle("Clear Local Cache")
+                .setMessage("Are you sure you want to clear the app's local cache? This frees up storage space (like temporary PDFs and images) but may briefly slow down the app the next time it loads files.")
+                .setPositiveButton("Clear", (dialog, which) -> clearAppCache())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void performCleanup() {
-        Toast.makeText(this, "Scanning for duplicates...", Toast.LENGTH_SHORT).show();
-        if (productRepository != null) {
-            productRepository.cleanupDuplicates(new ProductRepository.OnCleanupListener() {
-                @Override
-                public void onCleanupComplete(int count) {
-                    runOnUiThread(() -> {
-                        if (count > 0) {
-                            Toast.makeText(SettingsActivity.this, "Cleanup complete. Removed " + count + " duplicates.", Toast.LENGTH_LONG).show();
-                        } else {
-                            Toast.makeText(SettingsActivity.this, "No duplicates found.", Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() -> Toast.makeText(SettingsActivity.this, "Error: " + error, Toast.LENGTH_LONG).show());
-                }
-            });
+    private void clearAppCache() {
+        try {
+            File cacheDir = getCacheDir();
+            if (cacheDir != null && cacheDir.isDirectory()) {
+                deleteDir(cacheDir);
+            }
+            Toast.makeText(this, "Cache cleared successfully", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to clear cache", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error clearing cache", e);
         }
+    }
+
+    private boolean deleteDir(File dir) {
+        if (dir != null && dir.isDirectory()) {
+            String[] children = dir.list();
+            if (children != null) {
+                for (String child : children) {
+                    boolean success = deleteDir(new File(dir, child));
+                    if (!success) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return dir != null && dir.delete();
     }
 
     private void openUserManual() {
@@ -284,11 +276,6 @@ public class SettingsActivity extends BaseActivity {
         }
     }
 
-    private void openColorPicker(ThemeColorPicker.OnColorSelectedListener listener) {
-        ThemeColorPicker colorPicker = new ThemeColorPicker(this, listener);
-        colorPicker.show();
-    }
-
     private int getReadableTextColor(int bg) {
         double r = android.graphics.Color.red(bg) / 255.0;
         double g = android.graphics.Color.green(bg) / 255.0;
@@ -301,63 +288,5 @@ public class SettingsActivity extends BaseActivity {
         if (b == null) return;
         b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(bgColor));
         b.setTextColor(getReadableTextColor(bgColor));
-    }
-
-    private void updateColorPreview() {
-        primaryColorTV.setBackgroundColor(currentPrimary);
-        secondaryColorTV.setBackgroundColor(currentSecondary);
-        accentColorTV.setBackgroundColor(currentAccent);
-        primaryColorTV.setText(String.format("#%06X", currentPrimary & 0xFFFFFF));
-        secondaryColorTV.setText(String.format("#%06X", currentSecondary & 0xFFFFFF));
-        accentColorTV.setText(String.format("#%06X", currentAccent & 0xFFFFFF));
-        primaryColorTV.setTextColor(getReadableTextColor(currentPrimary));
-        secondaryColorTV.setTextColor(getReadableTextColor(currentSecondary));
-        accentColorTV.setTextColor(getReadableTextColor(currentAccent));
-
-        if (previewPrimary != null) previewPrimary.setBackgroundColor(currentPrimary);
-        if (previewSecondary != null) previewSecondary.setBackgroundColor(currentSecondary);
-        if (previewAccent != null) previewAccent.setBackgroundColor(currentAccent);
-
-        int btnPrimaryColor = currentPrimary;
-        int btnSecondaryColor = ContextCompat.getColor(this, R.color.colorPrimary);
-
-        tintButton(customPrimaryBtn, btnPrimaryColor);
-        tintButton(customSecondaryBtn, btnPrimaryColor);
-        tintButton(customAccentBtn, btnPrimaryColor);
-        tintButton(resetThemeBtn, btnSecondaryColor);
-        tintButton(applyBtn, btnPrimaryColor);
-        tintButton(btnBackup, btnPrimaryColor);
-        tintButton(btnRestore, btnPrimaryColor);
-        tintButton(btnUserManual, btnPrimaryColor);
-        // Tint new button if necessary, or let it stick to its XML style (Red)
-        // tintButton(btnCleanupDuplicates, btnPrimaryColor);
-    }
-
-    private void applyTheme() {
-        if (selectedTheme == ThemeManager.Theme.DARK ||
-                selectedTheme == ThemeManager.Theme.LIGHT ||
-                selectedTheme == ThemeManager.Theme.OCEAN ||
-                selectedTheme == ThemeManager.Theme.FOREST ||
-                selectedTheme == ThemeManager.Theme.SUNSET ||
-                selectedTheme == ThemeManager.Theme.PURPLE) {
-            themeManager.setCurrentTheme(selectedTheme.name);
-        } else {
-            themeManager.setCustomColors(currentPrimary, currentSecondary, currentAccent);
-        }
-
-        String uid = AuthManager.getInstance().getCurrentUserId();
-        if (uid != null) {
-            FirebaseFirestore db = FirebaseFirestore.getInstance();
-            Map<String, Object> data = new HashMap<>();
-            data.put("themeName", themeManager.getCurrentTheme().name);
-            data.put("primaryColor", currentPrimary);
-            data.put("secondaryColor", currentSecondary);
-            data.put("accentColor", currentAccent);
-            db.collection("users").document(uid).set(data, SetOptions.merge());
-        }
-
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
     }
 }

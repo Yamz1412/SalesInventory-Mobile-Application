@@ -39,8 +39,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
         purchaseOrderList = new ArrayList<>();
 
-        // Pass 'this::showCancelOptions' as the second listener for long clicks
-        adapter = new PurchaseOrderAdapter(this, purchaseOrderList, this::viewPurchaseOrder, this::showCancelOptions);
+        adapter = new PurchaseOrderAdapter(this, purchaseOrderList, this::viewPurchaseOrder, this::showManageOptions);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
@@ -83,18 +82,24 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         startActivity(intent);
     }
 
-    // New method to handle long click functionality
-    private void showCancelOptions(PurchaseOrder po) {
-        if (!"Pending".equalsIgnoreCase(po.getStatus())) {
-            Toast.makeText(this, "Only pending orders can be cancelled or modified.", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    private void showManageOptions(PurchaseOrder po) {
+        CharSequence[] options = {"Cancel Order", "Delete Order", "Close"};
 
         new AlertDialog.Builder(this)
-                .setTitle("Manage Purchase Order")
-                .setMessage("Do you want to cancel this order: " + po.getPoNumber() + "?")
-                .setPositiveButton("Cancel Order", (dialog, which) -> cancelOrder(po))
-                .setNegativeButton("Close", null)
+                .setTitle("Manage Purchase Order: " + po.getPoNumber())
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        if (!"Pending".equalsIgnoreCase(po.getStatus())) {
+                            Toast.makeText(this, "Only pending orders can be cancelled.", Toast.LENGTH_SHORT).show();
+                        } else {
+                            cancelOrder(po);
+                        }
+                    } else if (which == 1) {
+                        confirmDelete(po);
+                    } else {
+                        dialog.dismiss();
+                    }
+                })
                 .show();
     }
 
@@ -102,5 +107,20 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         poRef.child(po.getPoId()).child("status").setValue("Cancelled")
                 .addOnSuccessListener(aVoid -> Toast.makeText(PurchaseOrderListActivity.this, "Order Cancelled Successfully", Toast.LENGTH_SHORT).show())
                 .addOnFailureListener(e -> Toast.makeText(PurchaseOrderListActivity.this, "Failed to cancel order: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    private void confirmDelete(PurchaseOrder po) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Purchase Order")
+                .setMessage("Are you sure you want to permanently delete this order: " + po.getPoNumber() + "?")
+                .setPositiveButton("Delete", (dialog, which) -> deleteOrder(po))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteOrder(PurchaseOrder po) {
+        poRef.child(po.getPoId()).removeValue()
+                .addOnSuccessListener(aVoid -> Toast.makeText(PurchaseOrderListActivity.this, "Order Deleted Successfully", Toast.LENGTH_SHORT).show())
+                .addOnFailureListener(e -> Toast.makeText(PurchaseOrderListActivity.this, "Failed to delete order: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 }

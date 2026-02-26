@@ -157,7 +157,7 @@
                     android:layout_height="wrap_content"
                     android:inputType="number"
                     android:textColor="?attr/colorOnBackground"
-                    android:hint="Initial Quantity" />
+                    android:hint="Quantity" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout

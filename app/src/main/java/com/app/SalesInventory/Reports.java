@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.lifecycle.MutableLiveData;
 
 import android.Manifest;
 import android.content.Intent;
@@ -37,8 +38,8 @@ public class Reports extends BaseActivity  {
 
     private static final int REQUEST_WRITE_STORAGE = 1001;
 
-    private TextView totalProductsTV, lowStockTV, totalRevenueTV, totalSalesTV;
-    private Button btnSalesReport, btnInventoryReport, btnComprehensiveReports, btnSampleData, btnOverallPdf;
+    private TextView totalProductsTV, totalRevenueTV, totalSalesTV;
+    private Button btnInventoryReport, btnOverallPdf;
     private ListView reportsListView;
 
     private ProductRepository productRepository;
@@ -54,6 +55,8 @@ public class Reports extends BaseActivity  {
     private String lastGeneratedMimeType;
 
     private ActivityResultLauncher<Intent> saveFileLauncher;
+    private long startDate = 0, endDate = System.currentTimeMillis();
+    private com.google.android.material.textfield.TextInputEditText etFromDate, etToDate;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,17 +74,15 @@ public class Reports extends BaseActivity  {
     private void initializeUI() {
         totalSalesTV = findViewById(R.id.TotalSalesTV);
         totalProductsTV = findViewById(R.id.totalProductsTV);
-        lowStockTV = findViewById(R.id.lowStockTV);
         totalRevenueTV = findViewById(R.id.totalRevenueTV);
-        btnSalesReport = findViewById(R.id.BtnSalesReport);
         btnInventoryReport = findViewById(R.id.BtnInventoryReport);
-        btnComprehensiveReports = findViewById(R.id.BtnComprehensiveReports);
-        btnSampleData = findViewById(R.id.BtnSampleData);
         btnOverallPdf = findViewById(R.id.BtnOverallPdf);
         reportsListView = findViewById(R.id.ReportsListView);
         reportItems = new ArrayList<>();
         adapter = new ReportAdapter(this, reportItems);
         reportsListView.setAdapter(adapter);
+        etFromDate = findViewById(R.id.etFromDate);
+        etToDate = findViewById(R.id.etToDate);
     }
 
     private void setupSaveLauncher() {
@@ -99,19 +100,43 @@ public class Reports extends BaseActivity  {
     }
 
     private void setupListeners() {
-        btnSalesReport.setOnClickListener(v -> showSalesReport());
+        etFromDate.setOnClickListener(v -> showDatePicker(true));
+        etToDate.setOnClickListener(v -> showDatePicker(false));
         btnInventoryReport.setOnClickListener(v -> startActivity(new Intent(Reports.this, InventoryReportsActivity.class)));
-        btnComprehensiveReports.setOnClickListener(v -> {
-            if (ensureWritePermission()) {
-                exportComprehensiveReports();
-            }
-        });
-        btnSampleData.setOnClickListener(v -> loadSampleData());
         btnOverallPdf.setOnClickListener(v -> {
             if (ensureWritePermission()) {
                 exportOverallSummaryPdf();
             }
         });
+    }
+
+    private void showDatePicker(boolean isStart) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        new android.app.DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            cal.set(year, month, dayOfMonth);
+            if (isStart) {
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+                startDate = cal.getTimeInMillis();
+                etFromDate.setText(new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.getTime()));
+            } else {
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 23);
+                endDate = cal.getTimeInMillis();
+                etToDate.setText(new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(cal.getTime()));
+            }
+            filterDataByRange();
+        }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void filterDataByRange() {
+        if (startDate == 0) return;
+
+        MutableLiveData<List<Sales>> filteredSales = new MutableLiveData<>();
+        filteredSales.observe(this, sales -> {
+            this.salesList = sales;
+            updateSalesStats();
+            showSalesReport();
+        });
+        salesRepository.getSalesByDateRange(startDate, endDate, filteredSales);
     }
 
     private void loadData() {
@@ -133,12 +158,7 @@ public class Reports extends BaseActivity  {
     private void updateProductStats() {
         if (productList == null) return;
         int total = productList.size();
-        int lowStock = 0;
-        for (Product p : productList) {
-            if (p.isLowStock() || p.isCriticalStock()) lowStock++;
-        }
         totalProductsTV.setText(String.valueOf(total));
-        lowStockTV.setText(String.valueOf(lowStock));
     }
 
     private void updateSalesStats() {
@@ -151,36 +171,37 @@ public class Reports extends BaseActivity  {
         totalRevenueTV.setText("₱" + df.format(revenue));
     }
 
+    private void showIndividualProductTransactions() {
+        reportItems.clear();
+        SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+
+        for (Sales s : salesList) {
+            String name = s.getProductName() != null ? s.getProductName() : "Unknown Product";
+            String timeStr = timeFormat.format(new Date(s.getTimestamp()));
+            String type = s.getDeliveryType() != null ? s.getDeliveryType() : "WALK_IN";
+            String payment = s.getPaymentMethod() != null ? s.getPaymentMethod() : "Cash";
+            String detailStr = "x" + s.getQuantity() + " | " + type + " | " + payment;
+            String amountStr = String.format(Locale.getDefault(), "₱%.2f", s.getTotalPrice());
+
+            reportItems.add(new ReportItem(name, timeStr, detailStr, amountStr));
+        }
+        adapter.notifyDataSetChanged();
+    }
+
     private void showSalesReport() {
         reportItems.clear();
         if (salesList != null && !salesList.isEmpty()) {
-            SimpleDateFormat dayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-            Map<String, DailySummary> dailyMap = new HashMap<>();
+            SimpleDateFormat timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+
             for (Sales s : salesList) {
-                long ts = s.getDate() > 0 ? s.getDate() : s.getTimestamp();
-                String dayKey = dayFormat.format(new Date(ts));
-                DailySummary ds = dailyMap.get(dayKey);
-                if (ds == null) {
-                    ds = new DailySummary(dayKey);
-                    dailyMap.put(dayKey, ds);
+                long ts = s.getTimestamp() > 0 ? s.getTimestamp() : s.getDate();
+                if (ts >= startDate && ts <= endDate) {
+                    String name = s.getProductName() != null ? s.getProductName() : "Unknown Product";
+                    String dateStr = timeFormat.format(new Date(ts));
+                    String qtyStr = "x " + s.getQuantity();
+                    String amountStr = String.format(Locale.getDefault(), "₱%.2f", s.getTotalPrice());
+                    reportItems.add(new ReportItem(name, dateStr, qtyStr, amountStr));
                 }
-                ds.transactionCount++;
-                ds.netSales += s.getTotalPrice();
-                if ("DELIVERY".equals(s.getDeliveryType())) {
-                    ds.deliveryCount++;
-                    ds.deliverySales += s.getTotalPrice();
-                }
-            }
-            List<String> keys = new ArrayList<>(dailyMap.keySet());
-            java.util.Collections.sort(keys);
-            for (String day : keys) {
-                DailySummary ds = dailyMap.get(day);
-                if (ds == null) continue;
-                String name = "Sales Journal";
-                String dateStr = day;
-                String qtyStr = "Txns: " + ds.transactionCount + " | Deliveries: " + ds.deliveryCount;
-                String amountStr = String.format(Locale.getDefault(), "₱%.2f", ds.netSales);
-                reportItems.add(new ReportItem(name, dateStr, qtyStr, amountStr));
             }
         }
         adapter.notifyDataSetChanged();
@@ -614,11 +635,18 @@ public class Reports extends BaseActivity  {
             TextView rowDate = convertView.findViewById(R.id.RowDate);
             TextView rowQty = convertView.findViewById(R.id.RowQty);
             TextView rowTotal = convertView.findViewById(R.id.RowTotal);
+
             ReportItem item = items.get(position);
             rowName.setText(item.name);
             rowDate.setText(item.date);
             rowQty.setText(item.quantity);
             rowTotal.setText(item.amount);
+
+            if (item.quantity.contains("DELIVERY")) {
+                rowQty.setTextColor(ContextCompat.getColor(Reports.this, R.color.primaryBlue));
+            } else {
+                rowQty.setTextColor(ContextCompat.getColor(Reports.this, R.color.secondaryGreen));
+            }
             return convertView;
         }
     }
