@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="@color/backgroundColor">
+
+    <TextView
+        android:id="@+id/tvNoDataDelivery"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No delivery orders found"
+        android:gravity="center"
+        android:visibility="gone"
+        android:textSize="14sp"
+        android:textColor="@color/textColorSecondary"
+        android:layout_marginBottom="8dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewDelivery"
+        android:layout_width="match_parent"
+        tools:listitem="@layout/item_delivery_order"
+        tools:itemCount="3"
+        android:layout_height="match_parent" />
+
+</LinearLayout>

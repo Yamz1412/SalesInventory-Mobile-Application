@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@color/backgroundColor">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Sales"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:padding="8dp"
+        android:textColor="@color/textColorPrimary" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etSaleProductId"
+            android:layout_width="0dp"
+            android:layout_weight="2"
+            android:layout_height="48dp"
+            android:hint="Product ID"
+            android:padding="10dp"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/etSaleQuantity"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:hint="Qty"
+            android:inputType="number"
+            android:layout_marginStart="8dp"
+            android:padding="10dp" />
+
+        <EditText
+            android:id="@+id/etSalePrice"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:hint="Price"
+            android:inputType="numberDecimal"
+            android:layout_marginStart="8dp"
+            android:padding="10dp" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnAddSale"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Add Sale"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="@color/white" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/lightGray"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <ListView
+        android:id="@+id/salesListView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/lightGray"
+        android:dividerHeight="1dp"
+        android:paddingBottom="8dp" />
+
+</LinearLayout>
