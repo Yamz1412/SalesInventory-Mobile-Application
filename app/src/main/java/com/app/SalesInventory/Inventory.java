@@ -13,6 +13,7 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -38,10 +39,7 @@ public class Inventory extends BaseActivity {
     private List<Product> filteredProducts = new ArrayList<>();
     private ProductRepository productRepository;
     private AuthManager authManager;
-    private Button btnAdjustStock;
-    private Button btnAdjustmentHistory;
-    private Button btnAdjustmentSummary;
-    private Button btnDeleteProduct;
+    private Button btnAddProduct, btnAdjustStock;
     private Spinner spinnerCategoryFilter;
     private String currentSearchQuery = "";
     private String currentCategoryFilter = "All";
@@ -49,12 +47,15 @@ public class Inventory extends BaseActivity {
     private ProductRepository.OnCriticalStockListener criticalListener;
     private boolean showLowStockOnly = false;
     private boolean showNearExpiryOnly = false;
-    private TextView tvTotalCount;
-    private TextView tvLowStockWarning;
-    private View bottomButtonLayout;
+    private TextView tvTotalCount, tvLowStockWarning;
     private View rootView;
-    private boolean buttonsHidden = false;
     private int keyboardThresholdPx;
+
+    // Expandable FAB Variables
+    private FloatingActionButton fabMain;
+    private View llFabHistory, llFabSummary, llFabDeleted, fabBgDimmer;
+    private boolean isFabMenuOpen = false;
+    private boolean isFabHidden = false;
 
     private DatabaseReference categoryRef;
     private ValueEventListener categoryListener;
@@ -70,15 +71,19 @@ public class Inventory extends BaseActivity {
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
+        btnAddProduct = findViewById(R.id.btn_add_product);
         btnAdjustStock = findViewById(R.id.btn_adjust_stock);
-        btnAdjustmentHistory = findViewById(R.id.btn_adjustment_history);
-        btnAdjustmentSummary = findViewById(R.id.btn_adjustment_summary);
-        btnDeleteProduct = findViewById(R.id.btn_delete_product);
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
         tvTotalCount = findViewById(R.id.TotalCountTV);
         tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
-        bottomButtonLayout = findViewById(R.id.bottom_button_layout);
         rootView = findViewById(android.R.id.content);
+
+        // FAB Menu hooks
+        fabMain = findViewById(R.id.fab_main);
+        llFabHistory = findViewById(R.id.ll_fab_history);
+        llFabSummary = findViewById(R.id.ll_fab_summary);
+        llFabDeleted = findViewById(R.id.ll_fab_deleted);
+        fabBgDimmer = findViewById(R.id.fab_bg_dimmer);
 
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
@@ -92,19 +97,17 @@ public class Inventory extends BaseActivity {
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isAdmin = authManager.isCurrentUserAdmin();
             if (isAdmin) {
+                if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
-                if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.VISIBLE);
-                if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.VISIBLE);
-                if (btnDeleteProduct != null) btnDeleteProduct.setVisibility(View.VISIBLE);
+                if (fabMain != null) fabMain.setVisibility(View.VISIBLE);
             } else {
+                if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
-                if (btnAdjustmentHistory != null) btnAdjustmentHistory.setVisibility(View.GONE);
-                if (btnAdjustmentSummary != null) btnAdjustmentSummary.setVisibility(View.GONE);
-                if (btnDeleteProduct != null) btnDeleteProduct.setVisibility(View.GONE);
+                if (fabMain != null) fabMain.setVisibility(View.GONE);
             }
         }));
 
-        setupAdjustmentButtons();
+        setupActionButtons();
 
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
 
@@ -129,10 +132,10 @@ public class Inventory extends BaseActivity {
         productsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView rv, int dx, int dy) {
-                if (dy > 10) {
-                    hideBottomButtons();
-                } else if (dy < -10) {
-                    showBottomButtons();
+                if (dy > 15) {
+                    hideFab();
+                } else if (dy < -15) {
+                    showFab();
                 }
             }
         });
@@ -141,18 +144,15 @@ public class Inventory extends BaseActivity {
     }
 
     private void setupSearchView() {
-        // Find the inner EditText of the SearchView to restrict its input
         int id = searchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
         android.widget.TextView searchEditText = searchView.findViewById(id);
 
         if (searchEditText != null) {
             searchEditText.setFilters(new android.text.InputFilter[]{
                     (source, start, end, dest, dstart, dend) -> {
-                        // Only allow letters (a-z, A-Z) and spaces
                         if (source.toString().matches("^[a-zA-Z\\s]*$")) {
-                            return null; // Accept the input
+                            return null;
                         }
-                        // Reject numbers and symbols by replacing them with nothing
                         return source.toString().replaceAll("[^a-zA-Z\\s]", "");
                     }
             });
@@ -188,31 +188,80 @@ public class Inventory extends BaseActivity {
             if (lastVisibleHeight == 0) lastVisibleHeight = visibleHeight;
             int diff = lastVisibleHeight - visibleHeight;
             if (diff > keyboardThresholdPx) {
-                hideBottomButtons();
+                hideFab();
             } else if (diff < -keyboardThresholdPx) {
-                showBottomButtons();
+                showFab();
             }
             lastVisibleHeight = visibleHeight;
         }
     };
 
-    private void setupAdjustmentButtons() {
+    private void setupActionButtons() {
+        // Top static buttons
+        if (btnAddProduct != null) {
+            btnAddProduct.setOnClickListener(v -> startActivity(new Intent(Inventory.this, AddProductActivity.class)));
+        }
         if (btnAdjustStock != null) {
-            btnAdjustStock.setOnClickListener(v ->
-                    startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
+            btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
         }
-        if (btnAdjustmentHistory != null) {
-            btnAdjustmentHistory.setOnClickListener(v ->
-                    startActivity(new Intent(Inventory.this, AdjustmentHistoryActivity.class)));
+
+        // FAB Menu Logic
+        fabMain.setOnClickListener(v -> toggleFabMenu());
+        fabBgDimmer.setOnClickListener(v -> toggleFabMenu());
+
+        llFabHistory.setOnClickListener(v -> {
+            toggleFabMenu();
+            startActivity(new Intent(Inventory.this, AdjustmentHistoryActivity.class));
+        });
+
+        llFabSummary.setOnClickListener(v -> {
+            toggleFabMenu();
+            startActivity(new Intent(Inventory.this, AdjustmentSummaryReportActivity.class));
+        });
+
+        llFabDeleted.setOnClickListener(v -> {
+            toggleFabMenu();
+            startActivity(new Intent(Inventory.this, DeleteProductActivity.class));
+        });
+    }
+
+    private void toggleFabMenu() {
+        if (!isFabMenuOpen) {
+            fabBgDimmer.setVisibility(View.VISIBLE);
+            llFabHistory.setVisibility(View.VISIBLE);
+            llFabSummary.setVisibility(View.VISIBLE);
+            llFabDeleted.setVisibility(View.VISIBLE);
+            // Animate '+' to 'x'
+            fabMain.animate().rotation(45f).setDuration(300).start();
+        } else {
+            fabBgDimmer.setVisibility(View.GONE);
+            llFabHistory.setVisibility(View.GONE);
+            llFabSummary.setVisibility(View.GONE);
+            llFabDeleted.setVisibility(View.GONE);
+            // Animate 'x' to '+'
+            fabMain.animate().rotation(0f).setDuration(300).start();
         }
-        if (btnAdjustmentSummary != null) {
-            btnAdjustmentSummary.setOnClickListener(v ->
-                    startActivity(new Intent(Inventory.this, AdjustmentSummaryReportActivity.class)));
-        }
-        if (btnDeleteProduct != null) {
-            btnDeleteProduct.setOnClickListener(v ->
-                    startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
-        }
+        isFabMenuOpen = !isFabMenuOpen;
+    }
+
+    private void hideFab() {
+        if (isFabHidden || fabMain == null) return;
+        if (isFabMenuOpen) toggleFabMenu();
+
+        fabMain.animate()
+                .translationY(fabMain.getHeight() + 100)
+                .setDuration(300)
+                .start();
+        isFabHidden = true;
+    }
+
+    private void showFab() {
+        if (!isFabHidden || fabMain == null) return;
+        fabMain.animate()
+                .translationY(0)
+                .setDuration(300)
+                .start();
+        isFabHidden = false;
     }
 
     private void listenToCategoriesForFilter() {
@@ -227,8 +276,7 @@ public class Inventory extends BaseActivity {
                 if (snapshot != null) {
                     for (DataSnapshot child : snapshot.getChildren()) {
                         Category c = child.getValue(Category.class);
-                        if (c == null) continue;
-                        if (!c.isActive()) continue;
+                        if (c == null || !c.isActive()) continue;
                         String type = c.getType();
                         if (type == null || type.isEmpty()) type = "Inventory";
                         if ("Menu".equalsIgnoreCase(type)) continue;
@@ -254,9 +302,7 @@ public class Inventory extends BaseActivity {
                 for (Category c : inventoryCategories) {
                     String name = c.getCategoryName();
                     if (name == null || name.isEmpty()) continue;
-                    if (!productCategoryNames.isEmpty()) {
-                        if (!productCategoryNames.contains(name)) continue;
-                    }
+                    if (!productCategoryNames.isEmpty() && !productCategoryNames.contains(name)) continue;
                     if (added.add(name)) options.add(name);
                 }
 
@@ -269,10 +315,7 @@ public class Inventory extends BaseActivity {
                 }
 
                 android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
-                        Inventory.this,
-                        android.R.layout.simple_spinner_item,
-                        options
-                );
+                        Inventory.this, android.R.layout.simple_spinner_item, options);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 spinnerCategoryFilter.setAdapter(adapter);
 
@@ -287,8 +330,7 @@ public class Inventory extends BaseActivity {
                         currentCategoryFilter = selected == null ? "All" : selected;
                         applyFilters();
                     }
-                    @Override
-                    public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+                    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
                 });
             }
 
@@ -307,19 +349,14 @@ public class Inventory extends BaseActivity {
             String type = p.getProductType() == null ? "" : p.getProductType();
             if ("Menu".equalsIgnoreCase(type)) continue;
             String c = p.getCategoryName();
-            if (c != null && !c.isEmpty()) {
-                categories.add(c);
-            }
+            if (c != null && !c.isEmpty()) categories.add(c);
         }
         List<String> options = new ArrayList<>();
         options.add("All");
         options.addAll(categories);
 
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_item,
-                options
-        );
+                this, android.R.layout.simple_spinner_item, options);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategoryFilter.setAdapter(adapter);
 
@@ -334,8 +371,7 @@ public class Inventory extends BaseActivity {
                 currentCategoryFilter = selected == null ? "All" : selected;
                 applyFilters();
             }
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
         });
     }
 
@@ -350,21 +386,17 @@ public class Inventory extends BaseActivity {
             String type = p.getProductType() == null ? "" : p.getProductType();
             if ("Menu".equalsIgnoreCase(type)) continue;
 
-            boolean matchesSearch =
-                    q.isEmpty()
-                            || p.getProductName().toLowerCase().contains(q)
-                            || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q));
+            boolean matchesSearch = q.isEmpty()
+                    || p.getProductName().toLowerCase().contains(q)
+                    || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q));
 
-            boolean matchesCategory =
-                    "All".equalsIgnoreCase(cat)
-                            || (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(cat));
+            boolean matchesCategory = "All".equalsIgnoreCase(cat)
+                    || (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(cat));
 
             if (!matchesSearch || !matchesCategory) continue;
 
             if (showLowStockOnly) {
-                boolean isCritical = p.isCriticalStock();
-                boolean isLow = p.isLowStock();
-                if (!isCritical && !isLow) continue;
+                if (!p.isCriticalStock() && !p.isLowStock()) continue;
             }
 
             if (showNearExpiryOnly) {
@@ -372,21 +404,16 @@ public class Inventory extends BaseActivity {
                 if (expiry <= 0) continue;
                 long now = System.currentTimeMillis();
                 long days = (expiry - now) / (24L * 60L * 60L * 1000L);
-                if (expiry - now > 0 && days > 7) {
-                    continue;
-                }
+                if (expiry - now > 0 && days > 7) continue;
             }
 
             filteredProducts.add(p);
         }
 
-        Collections.sort(filteredProducts, new Comparator<Product>() {
-            @Override
-            public int compare(Product p1, Product p2) {
-                String n1 = p1.getProductName() != null ? p1.getProductName() : "";
-                String n2 = p2.getProductName() != null ? p2.getProductName() : "";
-                return n1.compareToIgnoreCase(n2);
-            }
+        Collections.sort(filteredProducts, (p1, p2) -> {
+            String n1 = p1.getProductName() != null ? p1.getProductName() : "";
+            String n2 = p2.getProductName() != null ? p2.getProductName() : "";
+            return n1.compareToIgnoreCase(n2);
         });
 
         productAdapter.updateProducts(filteredProducts);
@@ -405,9 +432,7 @@ public class Inventory extends BaseActivity {
                 lowOrCritical++;
             }
         }
-        if (tvTotalCount != null) {
-            tvTotalCount.setText(String.valueOf(total));
-        }
+        if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(total));
         if (tvLowStockWarning != null) {
             if (lowOrCritical > 0) {
                 tvLowStockWarning.setText(lowOrCritical + " alerts");
@@ -420,53 +445,20 @@ public class Inventory extends BaseActivity {
 
     private void updateEmptyState() {
         if (filteredProducts.isEmpty()) {
-            if (showLowStockOnly) {
-                emptyStateTV.setText("No low stock products found");
-            } else if (showNearExpiryOnly) {
-                emptyStateTV.setText("No near-expiry products found");
-            } else {
-                emptyStateTV.setText("No products found");
-            }
+            if (showLowStockOnly) emptyStateTV.setText("No low stock products found");
+            else if (showNearExpiryOnly) emptyStateTV.setText("No near-expiry products found");
+            else emptyStateTV.setText("No products found");
             emptyStateTV.setVisibility(View.VISIBLE);
         } else {
             emptyStateTV.setVisibility(View.GONE);
         }
     }
 
-    private void hideBottomButtons() {
-        if (bottomButtonLayout == null || buttonsHidden) return;
-        int height = bottomButtonLayout.getHeight();
-        if (height == 0) return;
-
-        bottomButtonLayout.animate()
-                .translationY(height)
-                .setDuration(300)
-                .withEndAction(() -> bottomButtonLayout.setVisibility(View.GONE))
-                .start();
-        buttonsHidden = true;
-    }
-
-    private void showBottomButtons() {
-        if (bottomButtonLayout == null || !buttonsHidden) return;
-        bottomButtonLayout.setVisibility(View.VISIBLE);
-        bottomButtonLayout.animate()
-                .translationY(0)
-                .setDuration(300)
-                .start();
-        buttonsHidden = false;
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (categoryListener != null && categoryRef != null) {
-            categoryRef.removeEventListener(categoryListener);
-        }
-        if (productRepository != null && criticalListener != null) {
-            productRepository.unregisterCriticalStockListener(criticalListener);
-        }
-        if (rootView != null && keyboardLayoutListener != null) {
-            rootView.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayoutListener);
-        }
+        if (categoryListener != null && categoryRef != null) categoryRef.removeEventListener(categoryListener);
+        if (productRepository != null && criticalListener != null) productRepository.unregisterCriticalStockListener(criticalListener);
+        if (rootView != null && keyboardLayoutListener != null) rootView.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayoutListener);
     }
 }

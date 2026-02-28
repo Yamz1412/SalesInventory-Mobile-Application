@@ -59,36 +59,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         notifyDataSetChanged();
     }
 
-    public void addOrUpdate(Product p) {
-        if (p == null) return;
-        for (int i = 0; i < items.size(); i++) {
-            Product ex = items.get(i);
-            if (ex.getProductId().equals(p.getProductId())) {
-                items.set(i, p);
-                notifyItemChanged(i);
-                return;
-            }
-        }
-        items.add(0, p);
-        notifyItemInserted(0);
-    }
-
-    public void removeByProductId(String productId) {
-        if (productId == null) return;
-        for (int i = 0; i < items.size(); i++) {
-            if (productId.equals(items.get(i).getProductId())) {
-                items.remove(i);
-                notifyItemRemoved(i);
-                return;
-            }
-        }
-    }
-
-    public void clear() {
-        items.clear();
-        notifyDataSetChanged();
-    }
-
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -120,54 +90,46 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             holder.costPriceText.setText("Cost: ₱" + String.format(Locale.US, "%.2f", p.getCostPrice()));
         }
 
-        // Set selling price (if applicable)
-        String type = p.getProductType() == null ? "" : p.getProductType();
-        double sellingPrice = p.getSellingPrice();
+        loadProductImage(holder.productImage, p);
 
-        if (holder.sellingPriceText != null) {
-            if ("Raw".equalsIgnoreCase(type) || sellingPrice <= 0) {
-                holder.sellingPriceText.setVisibility(View.GONE);
+        // --- ADMIN ONLY: Show the EDIT Word Box ---
+        if (holder.btnEdit != null) {
+            if (authManager.isCurrentUserAdmin()) {
+                holder.btnEdit.setVisibility(View.VISIBLE);
+                holder.btnEdit.setOnClickListener(v -> {
+                    Intent intent = new Intent(ctx, EditProduct.class);
+                    intent.putExtra("productId", p.getProductId());
+                    ctx.startActivity(intent);
+                });
             } else {
-                holder.sellingPriceText.setVisibility(View.VISIBLE);
-                holder.sellingPriceText.setText("Selling: ₱" + String.format(Locale.US, "%.2f", sellingPrice));
+                holder.btnEdit.setVisibility(View.GONE);
             }
         }
 
-        // --- LOAD PRODUCT IMAGE (LOCAL + ONLINE) ---
-        loadProductImage(holder.productImage, p);
-        // ------------------------------------------
-
-        // --- PRODUCT ITEM CLICK LISTENER ---
+        // --- SHORT CLICK (VIEW DETAILS) ---
         holder.itemView.setOnClickListener(v -> {
             Intent i = new Intent(ctx, ProductDetailActivity.class);
             i.putExtra("productId", p.getProductId());
             ctx.startActivity(i);
         });
-        // -----------------------------------
 
-        // --- LONG CLICK TO DELETE (ADMIN ONLY) ---
+        // --- LONG CLICK (DELETE ONLY - ADMIN ONLY) ---
         holder.itemView.setOnLongClickListener(v -> {
             if (!authManager.isCurrentUserAdmin()) return true;
             new AlertDialog.Builder(ctx)
                     .setTitle("Delete Product")
-                    .setMessage("Delete " + p.getProductName() + "?")
+                    .setMessage("Are you sure you want to delete " + p.getProductName() + "?")
                     .setPositiveButton("Delete", (dialog, which) ->
                             repository.deleteProduct(p.getProductId(), new ProductRepository.OnProductDeletedListener() {
-                                @Override
-                                public void onProductDeleted(String archiveFilename) {
-                                }
-
-                                @Override
-                                public void onError(String error) {
-                                }
+                                @Override public void onProductDeleted(String archiveFilename) {}
+                                @Override public void onError(String error) {}
                             }))
                     .setNegativeButton("Cancel", null)
                     .show();
             return true;
         });
-        // ----------------------------------------
 
-        // --- INCREASE BUTTON (WITH NULL CHECK) ---
+        // --- PLUS BUTTON (INCREASE STOCK) ---
         if (holder.btnIncrease != null) {
             holder.btnIncrease.setOnClickListener(v -> {
                 int newQty = p.getQuantity() + 1;
@@ -177,24 +139,17 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                         p.setQuantity(newQty);
                         if (ctx instanceof Activity) {
                             ((Activity) ctx).runOnUiThread(() -> {
-                                if (holder.stockText != null) {
-                                    holder.stockText.setText(String.valueOf(newQty));
-                                }
-                                if (holder.quantityText != null) {
-                                    holder.quantityText.setText("Stock: " + newQty);
-                                }
+                                if (holder.stockText != null) holder.stockText.setText(String.valueOf(newQty));
+                                if (holder.quantityText != null) holder.quantityText.setText("Stock: " + newQty);
                             });
                         }
                     }
-
-                    @Override
-                    public void onError(String error) {
-                    }
+                    @Override public void onError(String error) {}
                 });
             });
         }
-        // ----------------------------------------
 
+        // --- MINUS BUTTON (DECREASE STOCK) ---
         if (holder.btnDecrease != null) {
             holder.btnDecrease.setOnClickListener(v -> {
                 int current = p.getQuantity();
@@ -206,70 +161,37 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                         p.setQuantity(newQty);
                         if (ctx instanceof Activity) {
                             ((Activity) ctx).runOnUiThread(() -> {
-                                if (holder.stockText != null) {
-                                    holder.stockText.setText(String.valueOf(newQty));
-                                }
-                                if (holder.quantityText != null) {
-                                    holder.quantityText.setText("Stock: " + newQty);
-                                }
+                                if (holder.stockText != null) holder.stockText.setText(String.valueOf(newQty));
+                                if (holder.quantityText != null) holder.quantityText.setText("Stock: " + newQty);
                             });
                         }
                     }
-
-                    @Override
-                    public void onError(String error) {
-                    }
+                    @Override public void onError(String error) {}
                 });
             });
         }
-        // ----------------------------------------
     }
 
-    /**
-     * Load product image with dual-source strategy
-     * Priority: 1. Local file (if exists) → 2. Online URL → 3. Placeholder
-     */
     private void loadProductImage(ImageView imageView, Product product) {
-        if (imageView == null || product == null) {
-            return;
-        }
-
+        if (imageView == null || product == null) return;
         String localPath = product.getImagePath();
         String onlineUrl = product.getImageUrl();
 
-        // Try local storage first
         if (localPath != null && !localPath.isEmpty()) {
             File localFile = new File(localPath);
             if (localFile.exists() && localFile.canRead()) {
-                // Local file exists and is readable
-                Glide.with(ctx)
-                        .load(localFile)
-                        .thumbnail(0.1f)
-                        .override(300, 300)
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .placeholder(R.drawable.ic_image_placeholder)
-                        .error(R.drawable.ic_image_placeholder)
-                        .centerCrop()
-                        .into(imageView);
+                Glide.with(ctx).load(localFile).thumbnail(0.1f).override(300, 300)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL).placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_placeholder).centerCrop().into(imageView);
                 return;
             }
         }
-
-        // Fall back to online database URL
         if (onlineUrl != null && !onlineUrl.isEmpty()) {
-            Glide.with(ctx)
-                    .load(onlineUrl)
-                    .thumbnail(0.1f)
-                    .override(300, 300)
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .placeholder(R.drawable.ic_image_placeholder)
-                    .error(R.drawable.ic_image_placeholder)
-                    .centerCrop()
-                    .into(imageView);
+            Glide.with(ctx).load(onlineUrl).thumbnail(0.1f).override(300, 300)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL).placeholder(R.drawable.ic_image_placeholder)
+                    .error(R.drawable.ic_image_placeholder).centerCrop().into(imageView);
             return;
         }
-
-        // Show placeholder if no image available
         imageView.setImageResource(R.drawable.ic_image_placeholder);
     }
 
@@ -279,7 +201,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name, quantityText, costPriceText, stockText, sellingPriceText, floorText;
+        TextView name, quantityText, costPriceText, stockText, btnEdit; // btnEdit mapped as TextView box
         ImageView productImage;
         ImageButton btnIncrease, btnDecrease;
 
@@ -290,10 +212,11 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             quantityText = itemView.findViewById(R.id.tvQuantity);
             costPriceText = itemView.findViewById(R.id.tvCostPrice);
             stockText = itemView.findViewById(R.id.tvStock);
-            sellingPriceText = itemView.findViewById(R.id.tvSellingPrice);
-            floorText = itemView.findViewById(R.id.tvStatus);
-            btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
 
+            // Connect to XML Buttons
+            btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
+            btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
+            btnEdit = itemView.findViewById(R.id.btnEdit); // Text Box
         }
     }
 }

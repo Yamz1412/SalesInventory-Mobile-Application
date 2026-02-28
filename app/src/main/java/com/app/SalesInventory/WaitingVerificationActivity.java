@@ -48,9 +48,9 @@ public class WaitingVerificationActivity extends BaseActivity {
                 if (user != null) {
                     user.reload().addOnSuccessListener(aVoid -> {
                         if (user.isEmailVerified()) {
-                            checkVerification(); // Proceed to profile creation/Main
+                            checkVerification();
                         } else {
-                            autoCheckHandler.postDelayed(this, 3000); // Check again in 3s
+                            autoCheckHandler.postDelayed(this, 3000);
                         }
                     });
                 }
@@ -72,7 +72,7 @@ public class WaitingVerificationActivity extends BaseActivity {
             String uid = user.getUid();
             firestore.collection("users").document(uid).get().addOnCompleteListener(task -> {
                 if (task.isSuccessful() && task.getResult() != null && task.getResult().exists()) {
-                    goToMain();
+                    goToBusinessSetup(); // <--- Redirects to Business Setup properly
                 } else {
                     createAdminProfile(user);
                 }
@@ -97,9 +97,10 @@ public class WaitingVerificationActivity extends BaseActivity {
         profile.put("createdAt", System.currentTimeMillis());
 
         firestore.collection("users").document(user.getUid()).set(profile)
-                .addOnSuccessListener(aVoid -> goToMain())
+                .addOnSuccessListener(aVoid -> goToBusinessSetup()) // <--- Redirects to Business Setup properly
                 .addOnFailureListener(e -> Toast.makeText(this, "Profile Error: " + e.getMessage(), Toast.LENGTH_LONG).show());
     }
+
     private void resendVerification() {
         FirebaseUser user = auth.getCurrentUser();
         if (user != null) {
@@ -108,8 +109,8 @@ public class WaitingVerificationActivity extends BaseActivity {
         }
     }
 
-    private void goToMain() {
-        Intent i = new Intent(this, MainActivity.class);
+    private void goToBusinessSetup() {
+        Intent i = new Intent(this, BusinessSetupActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(i);
         finish();

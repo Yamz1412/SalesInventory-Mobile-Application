@@ -70,12 +70,15 @@
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPhone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:textColorHint="#757575"
             app:hintTextColor="@color/colorPrimary"
             app:boxStrokeColor="@color/colorPrimary"
+            app:prefixText="+63 "
+            app:prefixTextColor="#000000"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -84,14 +87,14 @@
                 android:layout_height="wrap_content"
                 android:hint="Phone Number"
                 android:textColor="#000000"
-                android:inputType="phone"/>
+                android:inputType="phone"
+                android:maxLength="10"/>
         </com.google.android.material.textfield.TextInputLayout>
-
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="4dp"
             android:textColorHint="#757575"
             app:hintTextColor="@color/colorPrimary"
             app:boxStrokeColor="@color/colorPrimary"
@@ -108,7 +111,32 @@
                 android:inputType="textPassword"/>
         </com.google.android.material.textfield.TextInputLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Password must include:"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#666666"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView android:id="@+id/reqLength" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✗ At least 8 characters" android:textSize="12sp" android:textColor="#757575"/>
+            <TextView android:id="@+id/reqUpper" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✗ At least one uppercase letter" android:textSize="12sp" android:textColor="#757575"/>
+            <TextView android:id="@+id/reqLower" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✗ At least one lowercase letter" android:textSize="12sp" android:textColor="#757575"/>
+            <TextView android:id="@+id/reqNumber" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✗ At least one number" android:textSize="12sp" android:textColor="#757575"/>
+            <TextView android:id="@+id/reqSpecial" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✗ At least one special character (@#$%^&amp;+=!)" android:textSize="12sp" android:textColor="#757575"/>
+        </LinearLayout>
+
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilCPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"

@@ -8,6 +8,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,6 +27,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -42,7 +44,13 @@ public class MainActivity extends BaseActivity {
     private LineChart salesTrendChart;
     private BarChart topProductsChart;
     private PieChart inventoryStatusChart;
-    private MaterialButton btnCreateSale, btnAddProduct, btnCreatePO, btnViewReports, btnInventory, btnCustomers, btnManageUsers;
+
+    // --- FIXED VARIABLE TYPES HERE ---
+    private LinearLayout btnCreateSale, btnCreatePO, btnViewReports, btnInventory;
+    private FloatingActionButton btnAddProduct;
+    private MaterialButton btnCustomers, btnManageUsers;
+    // ---------------------------------
+
     private MaterialButtonToggleGroup toggleTimeFilter;
     private RecyclerView rvRecentActivity;
     private RecentActivityAdapter activityAdapter;
@@ -70,42 +78,33 @@ public class MainActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize Repositories
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
         productRepository.runExpirySweep();
 
-        // Setup UI and Logic
         initializeUI();
         setupNearExpiryCard();
         setupViewModel();
-        setupSalesObserver(); // NEW: Listen to sales for filtering
+        setupSalesObserver();
         setupCharts();
         setupClickListeners();
         resolveUserRoleAndConfigureUI();
 
-        // Start Badge Manager
         notificationBadgeManager = new NotificationBadgeManager(this);
         notificationBadgeManager.start();
 
-        // Trigger Entry Animation
         startEntryAnimation();
-
-        // Load Initial Data
         loadDashboardData();
     }
 
     private void initializeUI() {
         swipeRefresh = findViewById(R.id.swipe_refresh);
-
-        // Cards
         cardSalesAmount = findViewById(R.id.card_sales_amount);
         cardTransactions = findViewById(R.id.card_transactions);
         cardLowStock = findViewById(R.id.card_low_stock);
         cardPendingOrders = findViewById(R.id.card_pending_orders);
         cardNearExpiry = findViewById(R.id.card_near_expiry);
 
-        // Text Views
         tvSalesAmount = findViewById(R.id.tv_sales_amount);
         tvTransactionCount = findViewById(R.id.tv_transaction_count);
         tvLowStockCount = findViewById(R.id.tv_low_stock_count);
@@ -114,15 +113,12 @@ public class MainActivity extends BaseActivity {
         tvOverviewLabel = findViewById(R.id.tv_overview_label);
         tvLastUpdated = findViewById(R.id.tv_last_updated);
 
-        // Filters
         toggleTimeFilter = findViewById(R.id.toggle_time_filter);
 
-        // Charts
         salesTrendChart = findViewById(R.id.chart_sales_trend);
         topProductsChart = findViewById(R.id.chart_top_products);
         inventoryStatusChart = findViewById(R.id.chart_inventory_status);
 
-        // Buttons
         btnCreateSale = findViewById(R.id.btn_create_sale);
         btnAddProduct = findViewById(R.id.btn_add_product);
         btnCreatePO = findViewById(R.id.btn_create_po);
@@ -133,18 +129,15 @@ public class MainActivity extends BaseActivity {
         btnSettings = findViewById(R.id.btn_settings);
         btnProfile = findViewById(R.id.btn_profile);
 
-        // Layouts
         statsGrid = findViewById(R.id.stats_grid);
         quickActionsGrid = findViewById(R.id.quick_actions_grid);
         progressBar = findViewById(R.id.progress_bar);
 
-        // RecyclerView
         rvRecentActivity = findViewById(R.id.rv_recent_activity);
         activityAdapter = new RecentActivityAdapter(this);
         rvRecentActivity.setAdapter(activityAdapter);
         rvRecentActivity.setLayoutManager(new LinearLayoutManager(this));
 
-        // Setup Filter Listener
         if (toggleTimeFilter != null) {
             toggleTimeFilter.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
                 if (isChecked) {
@@ -185,7 +178,6 @@ public class MainActivity extends BaseActivity {
                 .start();
     }
 
-    // --- Filter Logic ---
     private void setupSalesObserver() {
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales != null) {
@@ -212,21 +204,21 @@ public class MainActivity extends BaseActivity {
         String label = "Overview";
 
         switch (mode) {
-            case 0: // Daily
+            case 0:
                 startTime = cal.getTimeInMillis();
                 label = "Overview (Today)";
                 break;
-            case 1: // Weekly
+            case 1:
                 cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
                 startTime = cal.getTimeInMillis();
                 label = "Overview (This Week)";
                 break;
-            case 2: // Monthly
+            case 2:
                 cal.set(Calendar.DAY_OF_MONTH, 1);
                 startTime = cal.getTimeInMillis();
                 label = "Overview (This Month)";
                 break;
-            case 3: // All Time
+            case 3:
                 startTime = 0;
                 label = "Overview (All Time)";
                 break;
@@ -269,8 +261,6 @@ public class MainActivity extends BaseActivity {
             if (count > 0) {
                 tvNearExpiryCount.setText(String.valueOf(count));
                 cardNearExpiry.setVisibility(View.VISIBLE);
-                cardNearExpiry.setAlpha(0f);
-                cardNearExpiry.animate().alpha(1f).setDuration(300).start();
             } else {
                 cardNearExpiry.setVisibility(View.GONE);
             }
@@ -368,7 +358,6 @@ public class MainActivity extends BaseActivity {
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
 
-        // Card Clicks
         if (cardSalesAmount != null) cardSalesAmount.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
         if (cardTransactions != null) cardTransactions.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
         if (cardLowStock != null) cardLowStock.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class)));
@@ -434,7 +423,6 @@ public class MainActivity extends BaseActivity {
         salesRepository.reloadAllSales();
     }
 
-    // --- REPLACED: New Notification Logic ---
     public void onNotificationsClicked(View view) {
         showNotificationBottomSheet();
     }
@@ -444,17 +432,13 @@ public class MainActivity extends BaseActivity {
         View sheetView = LayoutInflater.from(this).inflate(R.layout.layout_notifications_sheet, null);
         bottomSheetDialog.setContentView(sheetView);
 
-        // --- FIXED: Force Full Expanded State ---
         FrameLayout bottomSheet = bottomSheetDialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
         if (bottomSheet != null) {
             BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(bottomSheet);
             behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             behavior.setSkipCollapsed(true);
-
-            // Set height to match parent to allow full screen
             bottomSheet.getLayoutParams().height = android.view.ViewGroup.LayoutParams.MATCH_PARENT;
         }
-        // ----------------------------------------
 
         RecyclerView rvNotifications = sheetView.findViewById(R.id.rv_notifications);
         View emptyState = sheetView.findViewById(R.id.layout_empty_state);
@@ -467,11 +451,30 @@ public class MainActivity extends BaseActivity {
             repo.markAlertAsRead(alert.getId(), null);
             bottomSheetDialog.dismiss();
 
-            Intent intent = new Intent(MainActivity.this, StockAlertsActivity.class);
+            String type = alert.getType() != null ? alert.getType() : "";
+            Intent intent;
+
+            // Routes dynamically based on alert type!
+            if (type.equals("LOW_STOCK") || type.equals("CRITICAL_STOCK")) {
+                intent = new Intent(MainActivity.this, LowStockItemsActivity.class);
+            } else if (type.contains("EXPIRY") || type.equals("EXPIRED")) {
+                intent = new Intent(MainActivity.this, NearExpiryItemsActivity.class);
+            } else if (type.equals("PO_RECEIVED")) {
+                intent = new Intent(MainActivity.this, PurchaseOrderListActivity.class);
+            } else {
+                intent = new Intent(MainActivity.this, StockAlertsActivity.class);
+            }
+
             intent.putExtra("alertId", alert.getId());
             startActivity(intent);
         });
+
         rvNotifications.setAdapter(adapter);
+
+        // Fetch products so the adapter can inject rich data into your custom XMLs!
+        productRepository.getAllProducts().observe(this, products -> {
+            adapter.setProducts(products);
+        });
 
         repo.getAllAlerts().observe(this, alerts -> {
             if (alerts == null || alerts.isEmpty()) {
