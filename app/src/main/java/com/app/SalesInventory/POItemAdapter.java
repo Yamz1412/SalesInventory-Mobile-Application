@@ -16,7 +16,7 @@ import java.util.Locale;
 public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ItemViewHolder> {
 
     private Context context;
-    private List<POItem> itemsList; // Now uses the new POItem class
+    private List<POItem> itemsList;
     private OnItemRemoveListener removeListener;
     private OnItemChangeListener changeListener;
 
@@ -28,8 +28,8 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ItemViewHo
         void onChange();
     }
 
-    public POItemAdapter(Context context, List<POItem> itemsList,
-                         OnItemRemoveListener removeListener, OnItemChangeListener changeListener) {
+    // FIX: Properly formatted constructor taking all 4 arguments
+    public POItemAdapter(Context context, List<POItem> itemsList, OnItemRemoveListener removeListener, OnItemChangeListener changeListener) {
         this.context = context;
         this.itemsList = itemsList;
         this.removeListener = removeListener;
@@ -54,12 +54,13 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ItemViewHo
         holder.tvUnitPrice.setText(String.format(Locale.getDefault(), "₱%.2f", item.getUnitPrice()));
         holder.tvSubtotal.setText(String.format(Locale.getDefault(), "₱%.2f", item.getSubtotal()));
 
-        // Handle delete button click
-        holder.btnRemove.setOnClickListener(v -> {
-            if (removeListener != null) {
-                removeListener.onRemove(position);
-            }
-        });
+        // Hide delete button if there is no listener (like in the Details Screen)
+        if (removeListener == null) {
+            holder.btnRemove.setVisibility(View.GONE);
+        } else {
+            holder.btnRemove.setVisibility(View.VISIBLE);
+            holder.btnRemove.setOnClickListener(v -> removeListener.onRemove(position));
+        }
     }
 
     @Override

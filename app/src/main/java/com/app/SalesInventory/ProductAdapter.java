@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -100,11 +101,26 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         Product p = items.get(position);
         if (p == null) return;
 
-        holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
+        // Set product name
+        if (holder.name != null) {
+            holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
+        }
+
+        // Set quantity info
         int qty = p.getQuantity();
-        holder.quantityText.setText("Stock: " + qty);
-        holder.stockText.setText(String.valueOf(qty));
-        holder.costPriceText.setText("Cost: ₱" + String.format(Locale.US, "%.2f", p.getCostPrice()));
+        if (holder.quantityText != null) {
+            holder.quantityText.setText("Stock: " + qty);
+        }
+        if (holder.stockText != null) {
+            holder.stockText.setText(String.valueOf(qty));
+        }
+
+        // Set cost price
+        if (holder.costPriceText != null) {
+            holder.costPriceText.setText("Cost: ₱" + String.format(Locale.US, "%.2f", p.getCostPrice()));
+        }
+
+        // Set selling price (if applicable)
         String type = p.getProductType() == null ? "" : p.getProductType();
         double sellingPrice = p.getSellingPrice();
 
@@ -117,32 +133,19 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             }
         }
 
-        // --- OPTIMIZED IMAGE LOADING ---
-        String toLoad = null;
-        if (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) toLoad = p.getImageUrl();
-        else if (p.getImagePath() != null && !p.getImagePath().isEmpty()) toLoad = p.getImagePath();
+        // --- LOAD PRODUCT IMAGE (LOCAL + ONLINE) ---
+        loadProductImage(holder.productImage, p);
+        // ------------------------------------------
 
-        if (toLoad != null && !toLoad.isEmpty()) {
-            Glide.with(ctx)
-                    .load(toLoad)
-                    .thumbnail(0.1f) // Load a blurry thumbnail instantly
-                    .override(300, 300) // Resize image to 300x300 pixels to save memory/time
-                    .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache both original and resized versions
-                    .placeholder(R.drawable.ic_image_placeholder)
-                    .error(R.drawable.ic_image_placeholder)
-                    .centerCrop()
-                    .into(holder.productImage);
-        } else {
-            holder.productImage.setImageResource(R.drawable.ic_image_placeholder);
-        }
-        // -------------------------------
-
+        // --- PRODUCT ITEM CLICK LISTENER ---
         holder.itemView.setOnClickListener(v -> {
             Intent i = new Intent(ctx, ProductDetailActivity.class);
             i.putExtra("productId", p.getProductId());
             ctx.startActivity(i);
         });
+        // -----------------------------------
 
+        // --- LONG CLICK TO DELETE (ADMIN ONLY) ---
         holder.itemView.setOnLongClickListener(v -> {
             if (!authManager.isCurrentUserAdmin()) return true;
             new AlertDialog.Builder(ctx)
@@ -162,49 +165,112 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                     .show();
             return true;
         });
+        // ----------------------------------------
 
-        holder.btnIncrease.setOnClickListener(v -> {
-            int newQty = p.getQuantity() + 1;
-            repository.updateProductQuantity(p.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
-                @Override
-                public void onProductUpdated() {
-                    p.setQuantity(newQty);
-                    if (ctx instanceof Activity) {
-                        ((Activity) ctx).runOnUiThread(() -> {
-                            holder.stockText.setText(String.valueOf(newQty));
-                            holder.quantityText.setText("Stock: " + newQty);
-                            // Visual feedback only; Inventory.java observer will handle the real refresh
-                        });
+        // --- INCREASE BUTTON (WITH NULL CHECK) ---
+        if (holder.btnIncrease != null) {
+            holder.btnIncrease.setOnClickListener(v -> {
+                int newQty = p.getQuantity() + 1;
+                repository.updateProductQuantity(p.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
+                    @Override
+                    public void onProductUpdated() {
+                        p.setQuantity(newQty);
+                        if (ctx instanceof Activity) {
+                            ((Activity) ctx).runOnUiThread(() -> {
+                                if (holder.stockText != null) {
+                                    holder.stockText.setText(String.valueOf(newQty));
+                                }
+                                if (holder.quantityText != null) {
+                                    holder.quantityText.setText("Stock: " + newQty);
+                                }
+                            });
+                        }
                     }
-                }
 
-                @Override
-                public void onError(String error) {
-                }
-            });
-        });
-
-        holder.btnDecrease.setOnClickListener(v -> {
-            int current = p.getQuantity();
-            if (current <= 0) return; // Prevent negative stock
-            int newQty = current - 1;
-            repository.updateProductQuantity(p.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
-                @Override
-                public void onProductUpdated() {
-                    p.setQuantity(newQty);
-                    if (ctx instanceof Activity) {
-                        ((Activity) ctx).runOnUiThread(() -> {
-                            holder.stockText.setText(String.valueOf(newQty));
-                            holder.quantityText.setText("Stock: " + newQty);
-                        });
+                    @Override
+                    public void onError(String error) {
                     }
-                }
-
-                @Override
-                public void onError(String error) {
-                }
+                });
             });
-        });
+        }
+        // ----------------------------------------
+
+        if (holder.btnDecrease != null) {
+            holder.btnDecrease.setOnClickListener(v -> {
+                int current = p.getQuantity();
+                if (current <= 0) return; // Prevent negative stock
+                int newQty = current - 1;
+                repository.updateProductQuantity(p.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
+                    @Override
+                    public void onProductUpdated() {
+                        p.setQuantity(newQty);
+                        if (ctx instanceof Activity) {
+                            ((Activity) ctx).runOnUiThread(() -> {
+                                if (holder.stockText != null) {
+                                    holder.stockText.setText(String.valueOf(newQty));
+                                }
+                                if (holder.quantityText != null) {
+                                    holder.quantityText.setText("Stock: " + newQty);
+                                }
+                            });
+                        }
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                    }
+                });
+            });
+        }
+        // ----------------------------------------
+    }
+
+    /**
+     * Load product image with dual-source strategy
+     * Priority: 1. Local file (if exists) → 2. Online URL → 3. Placeholder
+     */
+    private void loadProductImage(ImageView imageView, Product product) {
+        if (imageView == null || product == null) {
+            return;
+        }
+
+        String localPath = product.getImagePath();
+        String onlineUrl = product.getImageUrl();
+
+        // Try local storage first
+        if (localPath != null && !localPath.isEmpty()) {
+            File localFile = new File(localPath);
+            if (localFile.exists() && localFile.canRead()) {
+                // Local file exists and is readable
+                Glide.with(ctx)
+                        .load(localFile)
+                        .thumbnail(0.1f)
+                        .override(300, 300)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_placeholder)
+                        .centerCrop()
+                        .into(imageView);
+                return;
+            }
+        }
+
+        // Fall back to online database URL
+        if (onlineUrl != null && !onlineUrl.isEmpty()) {
+            Glide.with(ctx)
+                    .load(onlineUrl)
+                    .thumbnail(0.1f)
+                    .override(300, 300)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.ic_image_placeholder)
+                    .error(R.drawable.ic_image_placeholder)
+                    .centerCrop()
+                    .into(imageView);
+            return;
+        }
+
+        // Show placeholder if no image available
+        imageView.setImageResource(R.drawable.ic_image_placeholder);
     }
 
     @Override
@@ -226,8 +292,8 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             stockText = itemView.findViewById(R.id.tvStock);
             sellingPriceText = itemView.findViewById(R.id.tvSellingPrice);
             floorText = itemView.findViewById(R.id.tvStatus);
-            btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
             btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
+
         }
     }
 }

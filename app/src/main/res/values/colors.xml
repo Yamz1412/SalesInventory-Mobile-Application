@@ -39,4 +39,5 @@
     <color name="primaryBlue">#2196F3</color>
     <color name="secondaryGreen">#4CAF50</color>
     <color name="dirtyWhite">#A0EFCE</color>
+    <color name="defaultColor">#FFC107</color>
 </resources>

@@ -91,13 +91,6 @@
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground" />
 
-            <ImageButton
-                android:id="@+id/btnIncreaseQty"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="increase_quantity"
-                android:src="@drawable/ic_add" />
         </LinearLayout>
 
         <TextView

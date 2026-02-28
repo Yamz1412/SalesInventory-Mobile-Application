@@ -237,13 +237,13 @@ public class SellList extends BaseActivity {
             } else if (checkedId == R.id.rbSizeLarge) {
                 size = "Large";
             } else {
-                size = "Medium";
+                size = "Regular";
             }
 
             List<String> addonList = new ArrayList<>();
-            if (cbExtraShot.isChecked()) addonList.add("Extra Shot");
-            if (cbWhipped.isChecked()) addonList.add("Whipped Cream");
-            if (cbSyrup.isChecked()) addonList.add("Syrup");
+            if (cbExtraShot.isChecked()) addonList.add("Extra Espresso Shot + 10");
+            if (cbWhipped.isChecked()) addonList.add("Whipped Cream + 10");
+            if (cbSyrup.isChecked()) addonList.add("Syrup + 10");
             String addon = "";
             if (!addonList.isEmpty()) {
                 StringBuilder sb = new StringBuilder();

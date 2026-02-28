@@ -19,9 +19,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
-import android.net.Uri;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 public class ProductRepository {
     private static ProductRepository instance;
@@ -51,7 +48,6 @@ public class ProductRepository {
             if (entities != null) {
                 for (ProductEntity e : entities) {
                     Product p = mapEntityToProduct(e);
-                    // DEDUPLICATION: Only add if we haven't seen this Product ID before
                     if (p.getProductId() != null && !seenIds.contains(p.getProductId())) {
                         list.add(p);
                         seenIds.add(p.getProductId());
@@ -71,6 +67,39 @@ public class ProductRepository {
             instance = new ProductRepository(application);
         }
         return instance;
+    }
+
+    public void syncProductImageFromFirestore(String productId, String imageUrl) {
+        if (productId == null || imageUrl == null || imageUrl.isEmpty()) return;
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                ProductEntity entity = productDao.getByProductIdSync(productId);
+                if (entity != null) {
+                    entity.imageUrl = imageUrl;
+                    entity.lastUpdated = System.currentTimeMillis();
+                    productDao.update(entity);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    public void updateProductImage(String productId, String imagePath, String imageUrl, OnProductUpdatedListener listener) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                ProductEntity entity = productDao.getByProductIdSync(productId);
+                if (entity != null) {
+                    if (imagePath != null && !imagePath.isEmpty()) entity.imagePath = imagePath;
+                    if (imageUrl != null && !imageUrl.isEmpty()) entity.imageUrl = imageUrl;
+                    entity.lastUpdated = System.currentTimeMillis();
+                    productDao.update(entity);
+                    if (listener != null) listener.onProductUpdated();
+                }
+            } catch (Exception e) {
+                if (listener != null) listener.onError(e.getMessage());
+            }
+        });
     }
 
     public void registerCriticalStockListener(OnCriticalStockListener listener) {
@@ -155,14 +184,15 @@ public class ProductRepository {
             if (e.criticalLevel < 1) e.criticalLevel = 1;
             if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
             if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-            if (e.quantity > e.ceilingLevel) e.quantity = e.ceilingLevel;
-            // Removed: if (e.quantity < e.floorLevel) e.quantity = e.floorLevel; // Allow adding with low stock if needed
+
+            // FIX: Auto-adjust ceiling level instead of destroying quantity
+            if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
+
             e.dateAdded = now;
             e.lastUpdated = now;
             e.syncState = "PENDING";
-            if (imagePath != null && !imagePath.isEmpty()) {
-                e.imagePath = imagePath;
-            }
+            if (imagePath != null && !imagePath.isEmpty()) e.imagePath = imagePath;
+
             long localId = productDao.insert(e);
             checkExpiryForEntity(e);
             checkFloorForEntity(e);
@@ -207,9 +237,8 @@ public class ProductRepository {
                 if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                 if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
-                // Allow direct updates to set any quantity within 0 and ceiling
-                if (existing.quantity > existing.ceilingLevel) existing.quantity = existing.ceilingLevel;
-                // Removed: if (existing.quantity < existing.floorLevel) existing.quantity = existing.floorLevel;
+                // FIX: Auto-adjust ceiling level instead of destroying quantity
+                if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
 
                 existing.lastUpdated = now;
                 existing.syncState = "PENDING";
@@ -231,15 +260,12 @@ public class ProductRepository {
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
                 if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
 
-                // Allow direct updates to set any quantity within 0 and ceiling
-                if (e.quantity > e.ceilingLevel) e.quantity = e.ceilingLevel;
-                // Removed: if (e.quantity < e.floorLevel) e.quantity = e.floorLevel;
+                // FIX: Auto-adjust ceiling level instead of destroying quantity
+                if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
 
                 e.lastUpdated = now;
                 e.syncState = "PENDING";
-                if (imagePath != null && !imagePath.isEmpty()) {
-                    e.imagePath = imagePath;
-                }
+                if (imagePath != null && !imagePath.isEmpty()) e.imagePath = imagePath;
                 productDao.insert(e);
                 checkExpiryForEntity(e);
                 checkFloorForEntity(e);
@@ -263,9 +289,7 @@ public class ProductRepository {
                 String name = p.productName != null ? p.productName.trim().toLowerCase() : "";
                 if (name.isEmpty()) continue;
 
-                if (!map.containsKey(name)) {
-                    map.put(name, new ArrayList<>());
-                }
+                if (!map.containsKey(name)) map.put(name, new ArrayList<>());
                 map.get(name).add(p);
             }
 
@@ -298,13 +322,8 @@ public class ProductRepository {
                 }
             }
 
-            if (deletedCount > 0) {
-                SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
-            }
-
-            if (listener != null) {
-                listener.onCleanupComplete(deletedCount);
-            }
+            if (deletedCount > 0) SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
+            if (listener != null) listener.onCleanupComplete(deletedCount);
         });
     }
 
@@ -429,12 +448,15 @@ public class ProductRepository {
                 e.productType = o.optString("productType", null);
                 e.lastUpdated = System.currentTimeMillis();
                 e.syncState = "PENDING";
+
                 if (e.floorLevel < 1) e.floorLevel = 1;
                 if (e.criticalLevel < 1) e.criticalLevel = 1;
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
                 if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
+
                 ProductEntity existing = null;
                 if (e.productId != null && !e.productId.isEmpty()) existing = productDao.getByProductIdSync(e.productId);
+
                 if (existing != null) {
                     existing.productName = e.productName;
                     existing.categoryId = e.categoryId;
@@ -442,11 +464,13 @@ public class ProductRepository {
                     existing.description = e.description;
                     existing.costPrice = e.costPrice;
                     existing.sellingPrice = e.sellingPrice;
-                    existing.quantity = Math.min(e.quantity, e.ceilingLevel);
-                    // Removed floor check during restore to be safe
+
+                    // FIX: Allow restored quantity to bypass and raise ceiling
+                    existing.quantity = e.quantity;
+                    if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
+
                     existing.reorderLevel = e.reorderLevel;
                     existing.criticalLevel = e.criticalLevel;
-                    existing.ceilingLevel = e.ceilingLevel;
                     existing.floorLevel = e.floorLevel;
                     existing.unit = e.unit;
                     existing.barcode = e.barcode;
@@ -536,9 +560,12 @@ public class ProductRepository {
                     if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                     if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
-                    // FIXED: Allow stock to drop to 0. Do NOT clamp to floorLevel for sales/updates.
-                    // We only clamp to 0 (min) and ceilingLevel (max).
-                    int clamped = Math.max(0, Math.min(existing.ceilingLevel, newQuantity));
+                    // FIX: Allow stock to bypass ceiling during adjustments. If it's higher, raise the ceiling automatically.
+                    int clamped = Math.max(0, newQuantity);
+                    if (clamped > 99999) clamped = 99999;
+                    if (clamped > existing.ceilingLevel) {
+                        existing.ceilingLevel = clamped;
+                    }
 
                     existing.quantity = clamped;
                     existing.lastUpdated = System.currentTimeMillis();
@@ -722,9 +749,6 @@ public class ProductRepository {
                 if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                 if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
-                // Allow sync to overwrite even if low stock
-                // if (existing.quantity > existing.ceilingLevel) existing.quantity = existing.ceilingLevel;
-
                 productDao.update(existing);
                 checkExpiryForEntity(existing);
                 checkFloorForEntity(existing);
@@ -748,8 +772,6 @@ public class ProductRepository {
                 e.dateAdded = p.getDateAdded();
                 e.addedBy = p.getAddedBy();
                 e.isActive = p.isActive();
-                e.imageUrl = p.getImageUrl();
-                e.imagePath = p.getImagePath();
                 e.expiryDate = p.getExpiryDate();
                 e.productType = p.getProductType();
                 e.lastUpdated = now;
@@ -759,7 +781,8 @@ public class ProductRepository {
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
                 if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
 
-                // if (e.quantity > e.ceilingLevel) e.quantity = e.ceilingLevel;
+                if (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) e.imageUrl = p.getImageUrl();
+                if (p.getImagePath() != null && !p.getImagePath().isEmpty()) e.imagePath = p.getImagePath();
 
                 productDao.insert(e);
                 checkExpiryForEntity(e);
@@ -767,6 +790,79 @@ public class ProductRepository {
             }
         });
     }
+
+    public static String getValidImageSourceForProduct(Product product) {
+        if (product == null) return null;
+
+        String localPath = product.getImagePath();
+        String onlineUrl = product.getImageUrl();
+
+        if (localPath != null && !localPath.isEmpty()) {
+            File localFile = new File(localPath);
+            if (localFile.exists() && localFile.canRead() && localFile.length() > 0) {
+                return localPath;
+            }
+        }
+
+        if (onlineUrl != null && !onlineUrl.isEmpty()) {
+            return onlineUrl;
+        }
+
+        return null;
+    }
+
+    public void verifyAndUpdateProductImages(OnCleanupListener listener) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                List<ProductEntity> allProducts = productDao.getPendingProductsSync();
+                int imagesVerified = 0;
+
+                for (ProductEntity entity : allProducts) {
+                    if (entity != null) {
+                        String localPath = entity.imagePath;
+
+                        if (localPath != null && !localPath.isEmpty()) {
+                            File localFile = new File(localPath);
+                            if (!localFile.exists() || !localFile.canRead()) {
+                                entity.imagePath = null;
+                                productDao.update(entity);
+                                imagesVerified++;
+                            }
+                        }
+                    }
+                }
+
+                if (listener != null) {
+                    listener.onCleanupComplete(imagesVerified);
+                }
+            } catch (Exception e) {
+                if (listener != null) {
+                    listener.onError(e.getMessage());
+                }
+            }
+        });
+    }
+
+    public static Product mapFirestoreProductWithImages(Map<String, Object> data) {
+        Product p = Product.fromMap(data);
+
+        if (data.containsKey("imageUrl")) {
+            Object imageUrlObj = data.get("imageUrl");
+            if (imageUrlObj != null) {
+                p.setImageUrl(String.valueOf(imageUrlObj));
+            }
+        }
+
+        if (data.containsKey("imagePath")) {
+            Object imagePathObj = data.get("imagePath");
+            if (imagePathObj != null) {
+                p.setImagePath(String.valueOf(imagePathObj));
+            }
+        }
+
+        return p;
+    }
+
 
     private ProductEntity mapProductToEntity(Product p) {
         ProductEntity e = new ProductEntity();

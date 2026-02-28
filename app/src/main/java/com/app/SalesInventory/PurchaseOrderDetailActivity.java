@@ -1,6 +1,8 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.os.Bundle;
 import android.widget.Button;
@@ -27,11 +29,20 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     private String poId;
     private PurchaseOrder currentPo;
     private ProductRepository productRepository;
+    private RecyclerView recyclerViewOrderItems;
+    private POItemAdapter itemsAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 1. THIS MUST BE FIRST! Load the layout before finding views.
         setContentView(R.layout.activity_purchase_order_detail);
+
+        // 2. Now find all the views
+        recyclerViewOrderItems = findViewById(R.id.recyclerViewOrderItems);
+        recyclerViewOrderItems.setLayoutManager(new LinearLayoutManager(this));
+
         tvPONumber = findViewById(R.id.tvPONumber);
         tvSupplier = findViewById(R.id.tvSupplier);
         tvStatus = findViewById(R.id.tvStatus);
@@ -39,7 +50,9 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         tvTotal = findViewById(R.id.tvTotal);
         btnMarkReceived = findViewById(R.id.btnMarkReceived);
         btnCancelOrder = findViewById(R.id.btnCancelOrder);
+
         productRepository = SalesInventoryApplication.getProductRepository();
+
         poId = getIntent().getStringExtra("poId");
         if (poId != null) {
             poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders").child(poId);
@@ -58,13 +71,23 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 PurchaseOrder po = snapshot.getValue(PurchaseOrder.class);
                 if (po != null) {
                     currentPo = po;
+
+                    if (po.getItems() != null) {
+                        // FIX: Pass the Activity context, the items, and null for the two edit/delete listeners
+                        itemsAdapter = new POItemAdapter(PurchaseOrderDetailActivity.this, po.getItems(), null, null);
+                        recyclerViewOrderItems.setAdapter(itemsAdapter);
+                    }
+
                     tvPONumber.setText(po.getPoNumber());
                     tvSupplier.setText(po.getSupplierName());
                     tvStatus.setText(po.getStatus());
+
                     SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
                     tvDate.setText(sdf.format(new Date(po.getOrderDate())));
+
                     NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
                     tvTotal.setText(format.format(po.getTotalAmount()));
+
                     updateButtonState(po.getStatus());
                 }
             }

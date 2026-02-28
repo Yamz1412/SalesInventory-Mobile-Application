@@ -18,8 +18,15 @@ public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustment
     private List<StockAdjustment> adjustmentList;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
 
-    public StockAdjustmentAdapter(List<StockAdjustment> adjustmentList) {
+    private OnItemLongClickListener longClickListener;
+
+    public interface OnItemLongClickListener {
+        void onItemLongClick(StockAdjustment adjustment);
+    }
+
+    public StockAdjustmentAdapter(List<StockAdjustment> adjustmentList, OnItemLongClickListener longClickListener) {
         this.adjustmentList = adjustmentList;
+        this.longClickListener = longClickListener;
     }
 
     @NonNull
@@ -54,13 +61,21 @@ public class StockAdjustmentAdapter extends RecyclerView.Adapter<StockAdjustment
         holder.tvAdjustedBy.setText("By: " + adjustment.getAdjustedBy());
 
         // Set color based on adjustment type
-        if (adjustment.getAdjustmentType().equals("Add Stock")) {
+        if ("Add Stock".equals(adjustment.getAdjustmentType())) {
             holder.tvAdjustmentType.setTextColor(holder.itemView.getContext()
                     .getResources().getColor(R.color.successGreen));
         } else {
             holder.tvAdjustmentType.setTextColor(holder.itemView.getContext()
                     .getResources().getColor(R.color.errorRed));
         }
+
+        // Attach the long click listener to the entire row/item
+        holder.itemView.setOnLongClickListener(v -> {
+            if (longClickListener != null) {
+                longClickListener.onItemLongClick(adjustment);
+            }
+            return true; // Return true to indicate the long click is consumed
+        });
     }
 
     @Override

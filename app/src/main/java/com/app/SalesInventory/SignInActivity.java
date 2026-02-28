@@ -37,6 +37,11 @@ public class SignInActivity extends BaseActivity {
     private SharedPreferences prefs;
     private static final String PREFS_NAME = "app_prefs";
     private static final String KEY_REMEMBER = "remember";
+    private static final String KEY_USER_EMAIL = "user_email";
+    private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_USER_ROLE = "user_role";
+    private static final String KEY_BUSINESS_OWNER = "business_owner";
+    private static final String KEY_LAST_LOGIN = "last_login";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,43 +56,84 @@ public class SignInActivity extends BaseActivity {
         fAuth = FirebaseAuth.getInstance();
         fStore = FirebaseFirestore.getInstance();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        // Check if user has "Remember Me" enabled
+        checkRememberedUser();
+    }
+
+    /**
+     * Check if user previously enabled "Remember Me"
+     * If yes and local data exists, automatically open dashboard (offline capable)
+     */
+    private void checkRememberedUser() {
         boolean remembered = prefs.getBoolean(KEY_REMEMBER, false);
-        FirebaseUser currentUser = fAuth.getCurrentUser();
-        if (remembered && currentUser != null) {
-            progressBar.setVisibility(View.VISIBLE);
-            currentUser.reload().addOnCompleteListener(new OnCompleteListener<Void>() {
-                @Override
-                public void onComplete(@NonNull Task<Void> task) {
-                    FirebaseUser reloaded = fAuth.getCurrentUser();
-                    progressBar.setVisibility(View.INVISIBLE);
-                    if (reloaded == null) {
-                        prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
-                        return;
-                    }
-                    checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
-                        @Override
-                        public void onProceed(boolean allowed) {
-                            if (!allowed) {
-                                prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
-                            } else {
-                                String owner = FirestoreManager.getInstance().getBusinessOwnerId();
-                                if (owner != null && !owner.isEmpty()) {
-                                    ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
-                                    syncer.startRealtimeSync(owner);
-                                    FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
+        String cachedUserId = prefs.getString(KEY_USER_ID, null);
+        String cachedBusinessOwner = prefs.getString(KEY_BUSINESS_OWNER, null);
+
+        if (remembered && cachedUserId != null) {
+            // User has "Remember Me" enabled and local data cached
+            FirebaseUser currentUser = fAuth.getCurrentUser();
+
+            if (currentUser != null && currentUser.getUid().equals(cachedUserId)) {
+                // User is already signed in with same account - proceed directly
+                proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
+            } else if (currentUser != null) {
+                // Different user signed in - reload to check
+                progressBar.setVisibility(View.VISIBLE);
+                currentUser.reload().addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        FirebaseUser reloaded = fAuth.getCurrentUser();
+                        progressBar.setVisibility(View.INVISIBLE);
+                        if (reloaded != null) {
+                            checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
+                                @Override
+                                public void onProceed(boolean allowed) {
+                                    if (allowed) {
+                                        cacheUserData(reloaded.getUid(),
+                                                FirestoreManager.getInstance().getBusinessOwnerId());
+                                    } else {
+                                        clearRememberedUser();
+                                    }
                                 }
-                            }
+                            });
                         }
-                    });
-                }
-            });
+                    }
+                });
+            } else {
+                // No active Firebase session but local data exists
+                // User can access dashboard with cached offline data
+                proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
+            }
         }
+    }
+
+    /**
+     * Open dashboard using cached offline data
+     * No internet required if "Remember Me" was checked
+     */
+    private void proceedToMainActivityOffline(String userId, String businessOwner) {
+        // Restore cached user data
+        FirestoreManager.getInstance().updateCurrentUserId(userId);
+        if (businessOwner != null && !businessOwner.isEmpty()) {
+            FirestoreManager.getInstance().setBusinessOwnerId(businessOwner);
+        }
+
+        Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra("offline_mode", true); // Flag for offline mode
+        startActivity(intent);
+        finish();
     }
 
     private interface RoleCheckCallback {
         void onProceed(boolean allowed);
     }
 
+    /**
+     * Verify user role and proceed with login
+     * Called when user signs in with internet connection
+     */
     private void checkUserRoleAndProceedAfterReload(@NonNull final FirebaseUser reloaded, @NonNull final RoleCheckCallback cb) {
         final String uid = reloaded.getUid();
         fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
@@ -153,10 +199,16 @@ public class SignInActivity extends BaseActivity {
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
                                 syncer.startRealtimeSync(uid);
-                                Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                startActivity(intent);
-                                finish();
+
+                                // Cache user data for offline access if "Remember Me" is checked
+                                if (rememberCheck != null && rememberCheck.isChecked()) {
+                                    cacheUserData(uid, uid);
+                                    prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
+                                } else {
+                                    clearRememberedUser();
+                                }
+
+                                proceedToMainActivityOffline(uid, uid);
                                 cb.onProceed(true);
                                 return;
                             } else {
@@ -175,10 +227,16 @@ public class SignInActivity extends BaseActivity {
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
                                 syncer.startRealtimeSync(owner);
                             }
-                            Intent intent = new Intent(getApplicationContext(), MainActivity.class);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(intent);
-                            finish();
+
+                            // Cache user data for offline access if "Remember Me" is checked
+                            if (rememberCheck != null && rememberCheck.isChecked()) {
+                                cacheUserData(uid, owner);
+                                prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
+                            } else {
+                                clearRememberedUser();
+                            }
+
+                            proceedToMainActivityOffline(uid, owner);
                             cb.onProceed(true);
                         }
                     }
@@ -235,9 +293,41 @@ public class SignInActivity extends BaseActivity {
         }
     }
 
+    /**
+     * Cache user data locally for offline dashboard access
+     * This allows "Remember Me" functionality to work without internet
+     */
+    private void cacheUserData(String userId, String businessOwner) {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(KEY_USER_ID, userId);
+        editor.putString(KEY_USER_EMAIL, Email.getText().toString().trim());
+        editor.putString(KEY_BUSINESS_OWNER, businessOwner != null ? businessOwner : userId);
+        editor.putLong(KEY_LAST_LOGIN, System.currentTimeMillis());
+        editor.apply();
+    }
+
+    /**
+     * Clear all cached user data and disable "Remember Me"
+     */
+    private void clearRememberedUser() {
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean(KEY_REMEMBER, false);
+        editor.remove(KEY_USER_ID);
+        editor.remove(KEY_USER_EMAIL);
+        editor.remove(KEY_BUSINESS_OWNER);
+        editor.remove(KEY_LAST_LOGIN);
+        editor.apply();
+    }
+
+    /**
+     * Sign in button click handler
+     * Validates credentials and attempts login with internet
+     * If "Remember Me" is checked, caches user data for offline access
+     */
     public void SingInB(View view) {
         String email = Email.getText().toString().trim();
         String password = Password.getText().toString().trim();
+
         if (TextUtils.isEmpty(email)) {
             Email.setError("Email is Required");
             return;
@@ -250,7 +340,10 @@ public class SignInActivity extends BaseActivity {
             Password.setError("Password Must be 6 Characters or More");
             return;
         }
+
         progressBar.setVisibility(View.VISIBLE);
+
+        // Attempt sign in with Firebase
         fAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
@@ -269,12 +362,12 @@ public class SignInActivity extends BaseActivity {
                                 checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
                                     @Override
                                     public void onProceed(boolean success) {
-                                        if (!success) {
-                                        } else {
+                                        if (success) {
+                                            // Update "Remember Me" preference based on checkbox
                                             if (rememberCheck != null && rememberCheck.isChecked()) {
                                                 prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
                                             } else {
-                                                prefs.edit().putBoolean(KEY_REMEMBER, false).apply();
+                                                clearRememberedUser();
                                             }
                                         }
                                     }

@@ -1,8 +1,5 @@
 package com.app.SalesInventory;
 
-import com.google.firebase.firestore.ServerTimestamp;
-import java.util.Date;
-
 public class StockAdjustment {
     private String adjustmentId;
     private String productId;
@@ -13,13 +10,11 @@ public class StockAdjustment {
     private int quantityAfter;
     private String reason;
     private String remarks;
-
-    @ServerTimestamp
-    public Date timestamp;
-
+    private long timestamp;
     private String adjustedBy;
 
     public StockAdjustment() {
+        // Default constructor required for calls to DataSnapshot.getValue(StockAdjustment.class)
     }
 
     public StockAdjustment(String adjustmentId, String productId, String productName,
@@ -35,7 +30,7 @@ public class StockAdjustment {
         this.quantityAfter = quantityAfter;
         this.reason = reason;
         this.remarks = remarks;
-        this.timestamp = new Date(timestamp);
+        this.timestamp = timestamp;
         this.adjustedBy = adjustedBy;
     }
 
@@ -66,8 +61,8 @@ public class StockAdjustment {
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }
 
-    public long getTimestamp() { return timestamp != null ? timestamp.getTime() : 0L; }
-    public void setTimestamp(long timestamp) { this.timestamp = new Date(timestamp); }
+    public long getTimestamp() { return timestamp; }
+    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
 
     public String getAdjustedBy() { return adjustedBy; }
     public void setAdjustedBy(String adjustedBy) { this.adjustedBy = adjustedBy; }

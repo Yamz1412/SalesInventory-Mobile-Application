@@ -141,6 +141,23 @@ public class Inventory extends BaseActivity {
     }
 
     private void setupSearchView() {
+        // Find the inner EditText of the SearchView to restrict its input
+        int id = searchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
+        android.widget.TextView searchEditText = searchView.findViewById(id);
+
+        if (searchEditText != null) {
+            searchEditText.setFilters(new android.text.InputFilter[]{
+                    (source, start, end, dest, dstart, dend) -> {
+                        // Only allow letters (a-z, A-Z) and spaces
+                        if (source.toString().matches("^[a-zA-Z\\s]*$")) {
+                            return null; // Accept the input
+                        }
+                        // Reject numbers and symbols by replacing them with nothing
+                        return source.toString().replaceAll("[^a-zA-Z\\s]", "");
+                    }
+            });
+        }
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -363,7 +380,6 @@ public class Inventory extends BaseActivity {
             filteredProducts.add(p);
         }
 
-        // --- FIXED: SORT BY NAME TO PREVENT SHUFFLING ---
         Collections.sort(filteredProducts, new Comparator<Product>() {
             @Override
             public int compare(Product p1, Product p2) {
@@ -372,7 +388,6 @@ public class Inventory extends BaseActivity {
                 return n1.compareToIgnoreCase(n2);
             }
         });
-        // ------------------------------------------------
 
         productAdapter.updateProducts(filteredProducts);
         updateEmptyState();
