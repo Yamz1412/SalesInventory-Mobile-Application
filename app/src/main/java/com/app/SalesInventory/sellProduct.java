@@ -44,6 +44,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;          // FIXED: Imported Map
+import java.util.HashMap;      // FIXED: Imported HashMap
 import java.util.concurrent.ExecutionException;
 
 public class sellProduct extends BaseActivity {
@@ -235,13 +237,8 @@ public class sellProduct extends BaseActivity {
     private void setupListeners() {
         etCashGiven.addTextChangedListener(new TextWatcher() {
             private String current = "";
-
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override
             public void afterTextChanged(Editable s) {
                 if (!s.toString().equals(current)) {
@@ -287,7 +284,6 @@ public class sellProduct extends BaseActivity {
                 setPaymentSections(isCash);
                 calculateChange();
             }
-
             @Override
             public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
@@ -311,20 +307,9 @@ public class sellProduct extends BaseActivity {
     private void initCart() {
         cartItems = cartManager.getItems();
         cartAdapter = new android.widget.BaseAdapter() {
-            @Override
-            public int getCount() {
-                return cartItems.size();
-            }
-
-            @Override
-            public Object getItem(int position) {
-                return cartItems.get(position);
-            }
-
-            @Override
-            public long getItemId(int position) {
-                return position;
-            }
+            @Override public int getCount() { return cartItems.size(); }
+            @Override public Object getItem(int position) { return cartItems.get(position); }
+            @Override public long getItemId(int position) { return position; }
 
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -457,20 +442,9 @@ public class sellProduct extends BaseActivity {
         final android.widget.BaseAdapter[] editAdapter = new android.widget.BaseAdapter[1];
 
         editAdapter[0] = new android.widget.BaseAdapter() {
-            @Override
-            public int getCount() {
-                return editItems.size();
-            }
-
-            @Override
-            public Object getItem(int position) {
-                return editItems.get(position);
-            }
-
-            @Override
-            public long getItemId(int position) {
-                return position;
-            }
+            @Override public int getCount() { return editItems.size(); }
+            @Override public Object getItem(int position) { return editItems.get(position); }
+            @Override public long getItemId(int position) { return position; }
 
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -497,7 +471,6 @@ public class sellProduct extends BaseActivity {
                 tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.getLineTotal()));
 
                 convertView.setOnClickListener(v -> showEditSingleItemDialog(item, editAdapter[0]));
-
                 return convertView;
             }
         };
@@ -713,7 +686,6 @@ public class sellProduct extends BaseActivity {
                 if (cameraDialog != null) cameraDialog.dismiss();
                 Toast.makeText(sellProduct.this, "Receipt Captured", Toast.LENGTH_SHORT).show();
             }
-
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
                 Toast.makeText(sellProduct.this, "Capture failed: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
@@ -778,16 +750,7 @@ public class sellProduct extends BaseActivity {
         }
 
         String orderId = java.util.UUID.randomUUID().toString();
-
-        showReceiptDialog(
-                orderId,
-                paymentDetails,
-                isDelivery,
-                deliveryName,
-                deliveryPhone,
-                deliveryAddress,
-                deliveryPayment
-        );
+        showReceiptDialog(orderId, paymentDetails, isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
     }
 
     private void showReceiptDialog(String orderId, String paymentMethod, boolean isDelivery,
@@ -950,20 +913,38 @@ public class sellProduct extends BaseActivity {
                 productRepository.updateProductQuantity(item.productId, Math.max(0, item.stock - item.quantity), new ProductRepository.OnProductUpdatedListener() {
                     @Override
                     public void onProductUpdated() {
-                        saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
-                    }
+                        // --- AUTOMATED MATERIAL DEDUCTION ---
+                        productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
+                            @Override
+                            public void onProductFetched(Product p) {
+                                Map<String, Integer> materials = p.getLinkedMaterials();
+                                if (materials != null && !materials.isEmpty()) {
+                                    for (Map.Entry<String, Integer> entry : materials.entrySet()) {
+                                        String materialId = entry.getKey();
+                                        int deductPerItem = entry.getValue();
+                                        int totalDeduction = deductPerItem * item.quantity;
 
-                    @Override
-                    public void onError(String error) {
-                        handleSaveError("Stock update failed for " + item.productName + ": " + error);
+                                        productRepository.getProductById(materialId, new ProductRepository.OnProductFetchedListener() {
+                                            @Override
+                                            public void onProductFetched(Product material) {
+                                                int newMaterialQty = Math.max(0, material.getQuantity() - totalDeduction);
+                                                productRepository.updateProductQuantity(materialId, newMaterialQty, null);
+                                            }
+                                            @Override public void onError(String error) {}
+                                        });
+                                    }
+                                }
+                                saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
+                            }
+                            @Override public void onError(String error) {
+                                saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
+                            }
+                        });
                     }
+                    @Override public void onError(String error) { handleSaveError(error); }
                 });
             }
-
-            @Override
-            public void onError(String error) {
-                handleSaveError("Sale record failed: " + error);
-            }
+            @Override public void onError(String error) { handleSaveError(error); }
         });
     }
 

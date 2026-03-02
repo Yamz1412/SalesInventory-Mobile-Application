@@ -37,6 +37,8 @@ public class Product {
 
     private String imagePath;
     private String imageUrl;
+    private Map<String, Integer> linkedMaterials;
+
 
     public Product() {
         this.productType = "Raw";
@@ -67,6 +69,13 @@ public class Product {
         this.isActive = isActive;
         this.productType = "Raw";
         this.expiryDate = null;
+    }
+
+    public Map<String, Integer> getLinkedMaterials() {
+        return linkedMaterials == null ? new HashMap<>() : linkedMaterials;
+    }
+    public void setLinkedMaterials(Map<String, Integer> linkedMaterials) {
+        this.linkedMaterials = linkedMaterials;
     }
 
     public long getLocalId() { return localId; }
@@ -191,6 +200,7 @@ public class Product {
         m.put("expiryDate", expiryDate); // Firestore handles Date objects
         m.put("imagePath", imagePath);
         m.put("imageUrl", imageUrl);
+        m.put("linkedMaterials", linkedMaterials); // NEW: Save links to Firestore
         return m;
     }
 
@@ -253,6 +263,11 @@ public class Product {
         } else if (o instanceof Number) {
             long val = ((Number) o).longValue();
             p.expiryDate = val > 0 ? new Date(val) : null;
+        }
+
+        Object lm = m.get("linkedMaterials");
+        if (lm instanceof Map) {
+            p.linkedMaterials = (Map<String, Integer>) lm; // NEW: Load links from Firestore
         }
 
         o = m.get("imagePath"); if (o != null) p.imagePath = String.valueOf(o);

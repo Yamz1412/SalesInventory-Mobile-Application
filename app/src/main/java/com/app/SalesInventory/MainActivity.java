@@ -45,11 +45,11 @@ public class MainActivity extends BaseActivity {
     private BarChart topProductsChart;
     private PieChart inventoryStatusChart;
 
-    // --- FIXED VARIABLE TYPES HERE ---
+    // --- EXACT VIEW TYPES DEFINED BY YOUR XML ---
     private LinearLayout btnCreateSale, btnCreatePO, btnViewReports, btnInventory;
     private FloatingActionButton btnAddProduct;
     private MaterialButton btnCustomers, btnManageUsers;
-    // ---------------------------------
+    // --------------------------------------------
 
     private MaterialButtonToggleGroup toggleTimeFilter;
     private RecyclerView rvRecentActivity;
