@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -7,17 +8,30 @@
     android:layout_marginBottom="8dp"
     android:background="@android:color/white">
 
-    <!-- Name -->
-    <TextView
-        android:id="@+id/tvStaffName"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Staff Name"
-        android:textStyle="bold"
-        android:textColor="@color/black"
-        android:textSize="16sp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <!-- Email -->
+        <TextView
+            android:id="@+id/tvStaffName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Staff Name"
+            android:textStyle="bold"
+            android:textColor="@color/black"
+            android:textSize="16sp" />
+
+        <View
+            android:id="@+id/statusIndicator"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginStart="8dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
     <TextView
         android:id="@+id/tvStaffEmail"
         android:layout_width="match_parent"
@@ -27,7 +41,6 @@
         android:layout_marginTop="2dp"
         android:textSize="14sp" />
 
-    <!-- Phone -->
     <TextView
         android:id="@+id/tvStaffPhone"
         android:layout_width="match_parent"
@@ -37,23 +50,32 @@
         android:layout_marginTop="2dp"
         android:textSize="14sp" />
 
-    <!-- Optional: Role / status row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="6dp"
-        android:gravity="left">
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/tvStaffRole"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Role: Cashier"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnViewAs"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Staff"
-            android:textColor="@color/black"
-            android:textStyle="italic" />
-
-        <!-- Optional: more actions later (edit, deactivate, etc.) -->
+            android:minHeight="36dp"
+            android:text="View As"
+            android:textSize="12sp"
+            android:textColor="?attr/colorPrimary"
+            app:strokeColor="?attr/colorPrimary" />
     </LinearLayout>
-
 </LinearLayout>

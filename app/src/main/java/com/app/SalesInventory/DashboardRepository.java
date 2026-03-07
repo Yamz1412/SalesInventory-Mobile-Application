@@ -33,12 +33,31 @@ public class DashboardRepository {
     private final FirebaseFirestore firestore;
     private int pendingPOCount = 0;
 
+    private static DashboardRepository instance;
+
     public DashboardRepository() {
         salesRepository = SalesRepository.getInstance();
         productRepository = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
         alertRepository = AlertRepository.getInstance(SalesInventoryApplication.getInstance());
         firestore = FirestoreManager.getInstance().getDb();
     }
+
+    public static synchronized DashboardRepository getInstance() {
+        if (instance == null) {
+            instance = new DashboardRepository();
+        }
+        return instance;
+    }
+
+    // =========================================================================
+    // NEW: CLEAR DATA FOR MULTI-TENANCY LOGOUT
+    // =========================================================================
+    public void clearData() {
+        pendingPOCount = 0;
+        metricsLiveData.postValue(new DashboardMetrics(0.0, 0.0, 0, 0, 0, 0.0));
+        metricsSourcesAdded = false;
+    }
+    // =========================================================================
 
     public void getDashboardMetrics(OnMetricsLoadedListener listener) {
         metricsListener = listener;

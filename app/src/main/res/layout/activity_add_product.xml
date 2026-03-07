@@ -79,8 +79,7 @@
                     android:id="@+id/existingGroupSpinner"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:spinnerMode="dropdown"
-                    android:prompt="category_selection" />
+                    android:spinnerMode="dropdown"/>
             </LinearLayout>
         </LinearLayout>
 
@@ -249,6 +248,51 @@
             </LinearLayout>
 
             <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp"
+                android:padding="12dp"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="#F8F9FA">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Product Configurations"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="12dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:weightSum="4">
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes" android:textSize="12sp"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -267,9 +311,9 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Variants" android:textSize="12sp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textSize="12sp"/>
                 <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchVariants"
+                    android:id="@+id/switchBOM"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </LinearLayout>

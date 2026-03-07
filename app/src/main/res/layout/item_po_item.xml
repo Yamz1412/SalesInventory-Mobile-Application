@@ -1,92 +1,119 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
-    android:layout_marginBottom="4dp"
-    app:cardElevation="2dp"
+    android:layout_marginBottom="8dp"
     app:cardCornerRadius="8dp"
-    app:strokeColor="@color/lightGray"
-    app:strokeWidth="1dp"
-    app:cardBackgroundColor="@color/white">
+    app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:padding="12dp">
 
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tvProductName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Product Name"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@color/textColorPrimary" />
+            android:orientation="horizontal">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp">
+                android:layout_weight="1"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/tvQuantity"
+                    android:id="@+id/tvProductName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Qty: 0"
-                    android:textSize="14sp"
-                    android:textColor="@color/textColorSecondary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=" × "
-                    android:textSize="14sp"
-                    android:textColor="@color/textColorSecondary" />
+                    android:text="Product Name"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <TextView
                     android:id="@+id/tvUnitPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="₱0.00"
-                    android:textSize="14sp"
-                    android:textColor="@color/textColorSecondary" />
-
+                    android:text="₱0.00 / unit"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
             </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnRemove"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_delete"
+                app:tint="@color/errorRed"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tvQuantity"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Ordered: 0"
+                android:textSize="14sp"
+                android:textColor="@color/text_primary" />
+
+            <TextView
+                android:id="@+id/tvReceivedQty"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Received: 0"
+                android:textSize="14sp"
+                android:textColor="@color/success_primary" />
 
             <TextView
                 android:id="@+id/tvSubtotal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="₱0.00"
-                android:textSize="16sp"
+                android:text="Total: ₱0.00"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/colorPrimary" />
-
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/btnRemove"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_gravity="center_vertical"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@android:drawable/ic_delete"
-            android:contentDescription="Remove"
-            android:padding="8dp"
-            app:tint="@color/errorRed" />
+        <LinearLayout
+            android:id="@+id/layoutReceiveInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Newly Received Now:"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <EditText
+                android:id="@+id/etReceiveNow"
+                android:layout_width="80dp"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:hint="Qty"
+                android:gravity="center"
+                android:background="@drawable/edite_round"
+                android:padding="8dp" />
+        </LinearLayout>
 
     </LinearLayout>
-
-</com.google.android.material.card.MaterialCardView>
+</androidx.cardview.widget.CardView>

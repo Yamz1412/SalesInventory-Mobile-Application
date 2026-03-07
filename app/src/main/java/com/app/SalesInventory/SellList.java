@@ -8,9 +8,11 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class SellList extends BaseActivity {
@@ -31,19 +34,28 @@ public class SellList extends BaseActivity {
     private List<Product> allMenuProducts;
     private List<Product> filteredProducts;
     private ProductRepository productRepository;
-    private Button btnCheckout;
+
+    // Buttons & Search
+    private Button btnCheckout; // This is now your top-right button
+    private EditText etSearchProduct;
+
     private CartManager cartManager;
     private LinearLayout layoutCategoryChips;
+
     private String selectedCategory = "All";
+    private String currentSearchQuery = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sell_list);
+
         productRepository = SalesInventoryApplication.getProductRepository();
         cartManager = CartManager.getInstance();
+
         sellListView = findViewById(R.id.SellListD);
         btnCheckout = findViewById(R.id.btnCheckout);
+        etSearchProduct = findViewById(R.id.etSearchProduct);
         layoutCategoryChips = findViewById(R.id.layoutCategoryChips);
 
         allMenuProducts = new ArrayList<>();
@@ -58,6 +70,7 @@ public class SellList extends BaseActivity {
 
         loadProducts();
         setupCheckoutButton();
+        setupSearchBar();
     }
 
     @Override
@@ -79,7 +92,7 @@ public class SellList extends BaseActivity {
                 }
             }
             buildCategoryChips();
-            applyCategoryFilter();
+            applyFilters();
         });
     }
 
@@ -104,11 +117,13 @@ public class SellList extends BaseActivity {
             chip.setAllCaps(false);
             chip.setBackgroundResource(R.drawable.chip_background);
             chip.setTextColor(getResources().getColor(cat.equals(selectedCategory) ? android.R.color.white : android.R.color.black));
+
             chip.setOnClickListener(v -> {
                 selectedCategory = cat;
-                buildCategoryChips();
-                applyCategoryFilter();
+                buildCategoryChips(); // Refresh chip colors
+                applyFilters();       // Re-filter products
             });
+
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -118,30 +133,55 @@ public class SellList extends BaseActivity {
         }
     }
 
-    private void applyCategoryFilter() {
+    // ====================================================================
+    // SEARCH & FILTER LOGIC
+    // ====================================================================
+    private void setupSearchBar() {
+        if (etSearchProduct != null) {
+            etSearchProduct.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    currentSearchQuery = s.toString().toLowerCase().trim();
+                    applyFilters();
+                }
+
+                @Override public void afterTextChanged(Editable s) {}
+            });
+        }
+    }
+
+    private void applyFilters() {
         filteredProducts.clear();
         for (Product p : allMenuProducts) {
-            if ("All".equalsIgnoreCase(selectedCategory)) {
+
+            // Check Category Filter
+            boolean matchesCategory = "All".equalsIgnoreCase(selectedCategory) ||
+                    (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(selectedCategory));
+
+            // Check Search Text Filter
+            boolean matchesSearch = currentSearchQuery.isEmpty() ||
+                    (p.getProductName() != null && p.getProductName().toLowerCase().contains(currentSearchQuery));
+
+            if (matchesCategory && matchesSearch) {
                 filteredProducts.add(p);
-            } else {
-                String c = p.getCategoryName() == null ? "" : p.getCategoryName();
-                if (c.equalsIgnoreCase(selectedCategory)) {
-                    filteredProducts.add(p);
-                }
             }
         }
         sellAdapter.updateProducts(new ArrayList<>(filteredProducts));
     }
 
     private void setupCheckoutButton() {
-        btnCheckout.setOnClickListener(v -> {
-            if (cartManager.getItems().isEmpty()) {
-                Toast.makeText(this, "Cart is empty", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Intent intent = new Intent(SellList.this, sellProduct.class);
-            startActivity(intent);
-        });
+        if (btnCheckout != null) {
+            btnCheckout.setOnClickListener(v -> {
+                if (cartManager.getItems().isEmpty()) {
+                    Toast.makeText(this, "Cart is empty", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent intent = new Intent(SellList.this, sellProduct.class);
+                startActivity(intent);
+            });
+        }
     }
 
     private void handleProductLongClick(Product product) {
@@ -157,137 +197,215 @@ public class SellList extends BaseActivity {
         }));
     }
 
+    // ====================================================================
+    // FULLY DYNAMIC DIALOG GENERATOR FOR POS SELECTION
+    // ====================================================================
     private void showProductOptionsDialog(Product product) {
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_product_options, null, false);
-        TextView tvName = dialogView.findViewById(R.id.tvOptionProductName);
-        TextView tvPrice = dialogView.findViewById(R.id.tvOptionProductPrice);
-        RadioGroup rgSize = dialogView.findViewById(R.id.rgSize);
-        RadioButton rbSmall = dialogView.findViewById(R.id.rbSizeSmall);
-        RadioButton rbMedium = dialogView.findViewById(R.id.rbSizeMedium);
-        RadioButton rbLarge = dialogView.findViewById(R.id.rbSizeLarge);
-        CheckBox cbExtraShot = dialogView.findViewById(R.id.cbAddonExtraShot);
-        CheckBox cbWhipped = dialogView.findViewById(R.id.cbAddonWhippedCream);
-        CheckBox cbSyrup = dialogView.findViewById(R.id.cbAddonSyrup);
-        TextInputEditText etQty = dialogView.findViewById(R.id.etOptionQty);
-        Button btnCancel = dialogView.findViewById(R.id.btnOptionCancel);
-        Button btnAddToCart = dialogView.findViewById(R.id.btnOptionAddToCart);
-
-        tvName.setText(product.getProductName());
-        double basePrice = product.getSellingPrice();
-        // Initialize price display for 1 item
-        updatePriceDisplay(tvPrice, basePrice, false, false, false, false, false, "1");
-
-        rbMedium.setChecked(true);
-        etQty.setText("1");
-
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null, false);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setView(dialogView)
                 .setCancelable(false)
                 .create();
 
-        // Listeners to update the displayed TOTAL price (visual only)
-        rgSize.setOnCheckedChangeListener((group, checkedId) -> updatePriceDisplay(
-                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
-                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
-                etQty.getText().toString()
-        ));
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
-        cbExtraShot.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
-                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
-                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
-                etQty.getText().toString()
-        ));
+        TextView tvName = dialogView.findViewById(R.id.tvOptionProductName);
+        TextView tvPrice = dialogView.findViewById(R.id.tvOptionProductPrice);
 
-        cbWhipped.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
-                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
-                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
-                etQty.getText().toString()
-        ));
+        TextView tvSizeHeader = dialogView.findViewById(R.id.tvSizeHeader);
+        RadioGroup rgSize = dialogView.findViewById(R.id.rgSize);
 
-        cbSyrup.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay(
-                tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
-                cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
-                etQty.getText().toString()
-        ));
+        TextView tvAddonsHeader = dialogView.findViewById(R.id.tvAddonsHeader);
+        LinearLayout containerAddons = dialogView.findViewById(R.id.containerAddons);
 
-        etQty.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        TextView tvNotesHeader = dialogView.findViewById(R.id.tvNotesHeader);
+        LinearLayout containerNotes = dialogView.findViewById(R.id.containerNotes);
 
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                updatePriceDisplay(
-                        tvPrice, basePrice, rbSmall.isChecked(), rbLarge.isChecked(),
-                        cbExtraShot.isChecked(), cbWhipped.isChecked(), cbSyrup.isChecked(),
-                        s.toString()
-                );
+        TextInputEditText etQty = dialogView.findViewById(R.id.etOptionQty);
+        Button btnCancel = dialogView.findViewById(R.id.btnOptionCancel);
+        Button btnAdd = dialogView.findViewById(R.id.btnOptionAddToCart);
+
+        tvName.setText(product.getProductName());
+
+        // Helper function to calculate and update the live Total Price text
+        Runnable updatePriceDisplay = () -> {
+            double currentPrice = product.getSellingPrice();
+
+            // Add selected size price
+            int selectedSizeId = rgSize.getCheckedRadioButtonId();
+            if (selectedSizeId != -1) {
+                RadioButton selectedRb = dialogView.findViewById(selectedSizeId);
+                if (selectedRb != null && selectedRb.getTag() != null) {
+                    Map<String, Object> sizeMap = (Map<String, Object>) selectedRb.getTag();
+                    currentPrice += Double.parseDouble(String.valueOf(sizeMap.get("price")));
+                }
             }
 
-            @Override
-            public void afterTextChanged(Editable s) {}
+            // Add selected addons price
+            for (int i = 0; i < containerAddons.getChildCount(); i++) {
+                View child = containerAddons.getChildAt(i);
+                if (child instanceof CheckBox) {
+                    CheckBox cb = (CheckBox) child;
+                    if (cb.isChecked() && cb.getTag() != null) {
+                        Map<String, Object> addonMap = (Map<String, Object>) cb.getTag();
+                        currentPrice += Double.parseDouble(String.valueOf(addonMap.get("price")));
+                    }
+                }
+            }
+
+            // Multiply by quantity
+            int qty = 1;
+            String qtyStr = etQty.getText() != null ? etQty.getText().toString() : "1";
+            try { qty = Integer.parseInt(qtyStr.isEmpty() ? "1" : qtyStr); } catch (Exception e) { qty = 1; }
+            if (qty <= 0) qty = 1;
+
+            double totalPrice = currentPrice * qty;
+            tvPrice.setText("Total: ₱" + String.format(Locale.US, "%.2f", totalPrice));
+        };
+
+        // 1. GENERATE SIZES DYNAMICALLY
+        if (product.getSizesList() != null && !product.getSizesList().isEmpty()) {
+            tvSizeHeader.setVisibility(View.VISIBLE);
+            rgSize.setVisibility(View.VISIBLE);
+
+            for (int i = 0; i < product.getSizesList().size(); i++) {
+                Map<String, Object> size = product.getSizesList().get(i);
+                RadioButton rb = new RadioButton(this);
+                rb.setId(View.generateViewId());
+
+                String sizeName = (String) size.get("name");
+                double priceDiff = Double.parseDouble(String.valueOf(size.get("price")));
+
+                rb.setText(sizeName + " (+₱" + priceDiff + ")");
+                rb.setTag(size);
+                rgSize.addView(rb);
+
+                rb.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    if (isChecked) updatePriceDisplay.run();
+                });
+
+                if (i == 0) rb.setChecked(true); // Select first size automatically
+            }
+        }
+
+        // 2. GENERATE ADD-ONS DYNAMICALLY
+        if (product.getAddonsList() != null && !product.getAddonsList().isEmpty()) {
+            tvAddonsHeader.setVisibility(View.VISIBLE);
+            containerAddons.setVisibility(View.VISIBLE);
+
+            for (Map<String, Object> addon : product.getAddonsList()) {
+                CheckBox cb = new CheckBox(this);
+                String addonName = (String) addon.get("name");
+                double addonPrice = Double.parseDouble(String.valueOf(addon.get("price")));
+
+                cb.setText(addonName + " (+₱" + addonPrice + ")");
+                cb.setTag(addon);
+                containerAddons.addView(cb);
+
+                cb.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay.run());
+            }
+        }
+
+        // 3. GENERATE NOTES DYNAMICALLY
+        if (product.getNotesList() != null && !product.getNotesList().isEmpty()) {
+            tvNotesHeader.setVisibility(View.VISIBLE);
+            containerNotes.setVisibility(View.VISIBLE);
+
+            for (Map<String, String> note : product.getNotesList()) {
+                com.google.android.material.textfield.TextInputLayout til = new com.google.android.material.textfield.TextInputLayout(this);
+                til.setHint(note.get("type") + " (e.g. " + note.get("value") + ")");
+
+                TextInputEditText et = new TextInputEditText(til.getContext());
+                et.setTag(note.get("type"));
+                til.addView(et);
+
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                params.setMargins(0, 0, 0, 16);
+                til.setLayoutParams(params);
+
+                containerNotes.addView(til);
+            }
+        }
+
+        // Trigger price display change when typing quantity
+        etQty.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updatePriceDisplay.run(); }
+            @Override public void afterTextChanged(Editable s) {}
         });
+
+        // Initial setup for the price
+        updatePriceDisplay.run();
 
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
-        btnAddToCart.setOnClickListener(v -> {
-            String size;
-            int checkedId = rgSize.getCheckedRadioButtonId();
-            if (checkedId == R.id.rbSizeSmall) {
-                size = "Small";
-            } else if (checkedId == R.id.rbSizeLarge) {
-                size = "Large";
-            } else {
-                size = "Regular";
-            }
+        btnAdd.setOnClickListener(v -> {
+            double calculatedUnitPrice = product.getSellingPrice();
+            String finalSizeStr = "";
+            StringBuilder finalExtrasStr = new StringBuilder();
 
-            List<String> addonList = new ArrayList<>();
-            if (cbExtraShot.isChecked()) addonList.add("Extra Espresso Shot + 10");
-            if (cbWhipped.isChecked()) addonList.add("Whipped Cream + 10");
-            if (cbSyrup.isChecked()) addonList.add("Syrup + 10");
-            String addon = "";
-            if (!addonList.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (int i = 0; i < addonList.size(); i++) {
-                    if (i > 0) sb.append(", ");
-                    sb.append(addonList.get(i));
+            // Extract selected size
+            int selectedSizeId = rgSize.getCheckedRadioButtonId();
+            if (selectedSizeId != -1) {
+                RadioButton selectedRb = dialogView.findViewById(selectedSizeId);
+                if (selectedRb != null && selectedRb.getTag() != null) {
+                    Map<String, Object> sizeMap = (Map<String, Object>) selectedRb.getTag();
+                    finalSizeStr = (String) sizeMap.get("name");
+                    calculatedUnitPrice += Double.parseDouble(String.valueOf(sizeMap.get("price")));
                 }
-                addon = sb.toString();
             }
 
-            String qtyStr = etQty.getText() != null ? etQty.getText().toString().trim() : "";
-            int q;
-            try {
-                q = Integer.parseInt(qtyStr.isEmpty() ? "0" : qtyStr);
-            } catch (Exception e) {
-                Toast.makeText(this, "Invalid quantity", Toast.LENGTH_SHORT).show();
-                return;
+            // Extract checked add-ons
+            for (int i = 0; i < containerAddons.getChildCount(); i++) {
+                View child = containerAddons.getChildAt(i);
+                if (child instanceof CheckBox) {
+                    CheckBox cb = (CheckBox) child;
+                    if (cb.isChecked() && cb.getTag() != null) {
+                        Map<String, Object> addonMap = (Map<String, Object>) cb.getTag();
+                        finalExtrasStr.append(addonMap.get("name")).append(", ");
+                        calculatedUnitPrice += Double.parseDouble(String.valueOf(addonMap.get("price")));
+                    }
+                }
             }
-            if (q <= 0) {
+
+            // Extract typed notes
+            for (int i = 0; i < containerNotes.getChildCount(); i++) {
+                com.google.android.material.textfield.TextInputLayout til = (com.google.android.material.textfield.TextInputLayout) containerNotes.getChildAt(i);
+                TextInputEditText et = (TextInputEditText) til.getEditText();
+                if (et != null && et.getText() != null && !et.getText().toString().isEmpty()) {
+                    String noteType = (String) et.getTag();
+                    String noteValue = et.getText().toString();
+                    finalExtrasStr.append(noteType).append(": ").append(noteValue).append(", ");
+                }
+            }
+
+            String extraDetails = finalExtrasStr.toString();
+            if (extraDetails.endsWith(", ")) {
+                extraDetails = extraDetails.substring(0, extraDetails.length() - 2);
+            }
+
+            String qtyStr = etQty.getText() != null ? etQty.getText().toString() : "1";
+            int quantity = 1;
+            try { quantity = Integer.parseInt(qtyStr); } catch (Exception ignored) {}
+            if (quantity <= 0) {
                 Toast.makeText(this, "Quantity must be at least 1", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            String displayName = product.getProductName() + " (" + size + ")";
-
-            // --- FIX START: Calculate Unit Price (Price for 1 item), NOT Total Price ---
-            double unitPrice = calculateItemPrice(
-                    product.getSellingPrice(),
-                    rbSmall.isChecked(),
-                    rbLarge.isChecked(),
-                    cbExtraShot.isChecked(),
-                    cbWhipped.isChecked(),
-                    cbSyrup.isChecked()
-            );
-            // --- FIX END ---
+            String displayName = product.getProductName();
+            if (!finalSizeStr.isEmpty()) {
+                displayName += " (" + finalSizeStr + ")";
+            }
 
             cartManager.addItem(
                     product.getProductId(),
                     displayName,
-                    unitPrice, // Pass UNIT price
-                    q,         // Pass Quantity separately
+                    calculatedUnitPrice,
+                    quantity,
                     product.getQuantity(),
-                    size,
-                    addon
+                    finalSizeStr,
+                    extraDetails
             );
 
             Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
@@ -295,41 +413,5 @@ public class SellList extends BaseActivity {
         });
 
         dialog.show();
-    }
-
-    // Calculates the price for ONE item based on modifiers
-    private double calculateItemPrice(double basePrice, boolean isSmall, boolean isLarge,
-                                      boolean extraShot, boolean whipped, boolean syrup) {
-        double price = basePrice;
-
-        if (isSmall) {
-            price *= 0.8; // Small is 80% of base
-        } else if (isLarge) {
-            price *= 1.2; // Large is 120% of base
-        }
-        // Medium is 100% (no change)
-
-        if (extraShot) price += 15;
-        if (whipped) price += 10;
-        if (syrup) price += 10;
-
-        return price;
-    }
-
-    // Updates the TextView to show the Total Price (Unit Price * Quantity) for user visibility only
-    private void updatePriceDisplay(TextView tvPrice, double basePrice, boolean isSmall, boolean isLarge,
-                                    boolean extraShot, boolean whipped, boolean syrup, String qtyStr) {
-        double itemPrice = calculateItemPrice(basePrice, isSmall, isLarge, extraShot, whipped, syrup);
-
-        int qty = 1;
-        try {
-            qty = Integer.parseInt(qtyStr.isEmpty() ? "1" : qtyStr);
-            if (qty <= 0) qty = 1;
-        } catch (Exception e) {
-            qty = 1;
-        }
-
-        double totalPrice = itemPrice * qty;
-        tvPrice.setText("₱" + String.format(Locale.US, "%.2f", totalPrice));
     }
 }

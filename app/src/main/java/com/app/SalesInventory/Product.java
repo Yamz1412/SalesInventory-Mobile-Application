@@ -2,8 +2,10 @@ package com.app.SalesInventory;
 
 import com.google.firebase.firestore.ServerTimestamp;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,6 +40,10 @@ public class Product {
     private String imagePath;
     private String imageUrl;
     private Map<String, Integer> linkedMaterials;
+    private List<Map<String, Object>> addonsList = new ArrayList<>();
+    private List<Map<String, String>> notesList = new ArrayList<>();
+    private List<Map<String, Object>> bomList = new ArrayList<>();
+    private List<Map<String, Object>> sizesList = new ArrayList<>();
 
 
     public Product() {
@@ -140,6 +146,17 @@ public class Product {
     public void setExpiryDate(long expiryDate) {
         this.expiryDate = (expiryDate > 0) ? new Date(expiryDate) : null;
     }
+    public List<Map<String, Object>> getSizesList() { return sizesList; }
+    public void setSizesList(List<Map<String, Object>> sizesList) { this.sizesList = sizesList; }
+    public List<Map<String, Object>> getAddonsList() { return addonsList; }
+    public void setAddonsList(List<Map<String, Object>> addonsList) { this.addonsList = addonsList; }
+
+    public List<Map<String, String>> getNotesList() { return notesList; }
+    public void setNotesList(List<Map<String, String>> notesList) { this.notesList = notesList; }
+
+    public List<Map<String, Object>> getBomList() { return bomList; }
+    public void setBomList(List<Map<String, Object>> bomList) { this.bomList = bomList; }
+
     public void setExpiryDate(Date expiryDate) { this.expiryDate = expiryDate; }
 
     public String getAddedBy() { return addedBy == null ? "" : addedBy; }

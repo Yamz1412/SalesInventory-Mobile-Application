@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="?android:colorBackground">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Select Inventory Item"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:layout_marginBottom="12dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="8dp"
+        android:weightSum="3">
+
+        <EditText
+            android:id="@+id/etSearchInventory"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.8"
+            android:hint="Search item..."
+            android:background="@drawable/edite_round"
+            android:padding="10dp"
+            android:layout_marginEnd="4dp"
+            android:singleLine="true"/>
+
+        <Spinner
+            android:id="@+id/spinnerFilterCategory"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.2"
+            android:background="@drawable/edite_round"
+            android:layout_marginStart="4dp"/>
+    </LinearLayout>
+
+    <ListView
+        android:id="@+id/lvInventoryItems"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="250dp"
+        android:divider="#EEEEEE"
+        android:dividerHeight="1dp" />
+
+    <Button
+        android:id="@+id/btnCloseSelection"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Close"
+        android:layout_gravity="end"
+        android:layout_marginTop="8dp" />
+</LinearLayout>

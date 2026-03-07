@@ -1,9 +1,11 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -85,6 +87,28 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
             }
             return false;
         });
+
+        // Hook up the View As button
+        Button btnViewAs = holder.itemView.findViewById(R.id.btnViewAs);
+        if (btnViewAs != null) {
+            // Hide the button if the user is looking at another Admin
+            if ("Admin".equalsIgnoreCase(role) || "Owner".equalsIgnoreCase(role)) {
+                btnViewAs.setVisibility(View.GONE);
+            } else {
+                btnViewAs.setVisibility(View.VISIBLE);
+
+                // Need effectively final copy for lambda
+                final String finalName = name != null ? name : "Staff";
+
+                btnViewAs.setOnClickListener(v -> {
+                    // Launch MainActivity in Impersonation Mode
+                    Intent intent = new Intent(ctx, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    intent.putExtra("IMPERSONATE_STAFF_NAME", finalName);
+                    ctx.startActivity(intent);
+                });
+            }
+        }
     }
 
     private String extract(Object obj, String fieldName, String getterName) {

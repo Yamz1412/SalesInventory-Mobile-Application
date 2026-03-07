@@ -85,6 +85,13 @@ public class ProductRepository {
         });
     }
 
+    public void clearLocalData() {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            db.clearAllTables();
+            allProducts.postValue(new ArrayList<>());
+        });
+    }
+
     public void updateProductImage(String productId, String imagePath, String imageUrl, OnProductUpdatedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {

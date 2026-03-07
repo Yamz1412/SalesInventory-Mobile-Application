@@ -1,5 +1,7 @@
 package com.app.SalesInventory;
 
+import android.app.Application;
+
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
@@ -27,7 +29,7 @@ public class AuthManager {
     private volatile Boolean cachedIsAdmin = null;
     private volatile Boolean cachedIsApproved = null;
     private volatile String cachedRole = null;
-
+    private Application application;
     public interface UsersCallback {
         void onComplete(List<AdminUserItem> users);
     }
@@ -79,6 +81,10 @@ public class AuthManager {
 
     public String getCurrentUserRole() {
         return cachedRole != null ? cachedRole : "Unknown";
+    }
+
+    public void init(Application app) {
+        this.application = app;
     }
 
     public void refreshCurrentUserStatus(@NonNull final SimpleCallback callback) {
@@ -433,6 +439,19 @@ public class AuthManager {
     public void signOutAndCleanup(final Runnable onComplete) {
         final String uid = getCurrentUserId();
         final String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+
+        // NEW: Wipe all Singleton Data from memory and Local SQLite DBs
+        if (application != null) {
+            ProductRepository.getInstance(application).clearLocalData();
+            SalesRepository.getInstance(application).clearData();
+            DashboardRepository.getInstance().clearData();
+        }
+
+        // Clear caching
+        cachedIsAdmin = null;
+        cachedIsApproved = null;
+        cachedRole = null;
+
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             String token = null;
             if (task.isSuccessful()) token = task.getResult();

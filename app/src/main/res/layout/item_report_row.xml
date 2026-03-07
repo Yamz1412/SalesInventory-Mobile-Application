@@ -1,65 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="5dp"
-    android:layout_marginVertical="3dp"
-    app:cardCornerRadius="5dp"
-    app:cardElevation="1dp"
-    app:cardBackgroundColor="#FFFFFF">
+    android:orientation="horizontal"
+    android:padding="8dp"
+    android:gravity="center_vertical">
 
     <LinearLayout
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
+        android:layout_weight="1.5"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1.5"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/RowName"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Product Name"
-                android:textStyle="bold"
-                android:textColor="#333"
-                android:textSize="14sp"/>
-
-            <TextView
-                android:id="@+id/RowDate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="2025-11-23"
-                android:textSize="11sp"
-                android:textColor="#888"/>
-        </LinearLayout>
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/RowQty"
-            android:layout_width="0dp"
-            android:layout_weight="0.8"
+            android:id="@+id/RowName"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="x 5"
-            android:textAlignment="center"
-            android:textColor="#00695C"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:id="@+id/RowTotal"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="1,500.00"
-            android:textAlignment="viewEnd"
+            android:text="Product Name"
             android:textStyle="bold"
-            android:textColor="#2E7D32"
+            android:textColor="?attr/colorOnBackground"
             android:textSize="14sp"/>
 
+        <TextView
+            android:id="@+id/RowDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Details"
+            android:textColor="#666666"
+            android:textSize="11sp"
+            android:visibility="gone"/>
+
+        <TextView
+            android:id="@+id/RowDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="12/25/2025 | Cash"
+            android:textSize="11sp"
+            android:textColor="#888888"/>
+
+        <TextView
+            android:id="@+id/RowDiscount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Discount: ₱0.00"
+            android:textSize="11sp"
+            android:textColor="#EF6C00"
+            android:visibility="gone"/>
     </LinearLayout>
-</androidx.cardview.widget.CardView>
+
+    <TextView
+        android:id="@+id/RowQty"
+        android:layout_width="0dp"
+        android:layout_weight="0.8"
+        android:layout_height="wrap_content"
+        android:text="x 5"
+        android:textAlignment="center"
+        android:textColor="?attr/colorPrimary"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/RowTotal"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:text="1,500.00"
+        android:textAlignment="viewEnd"
+        android:textStyle="bold"
+        android:textColor="#2E7D32"
+        android:textSize="14sp"/>
+
+</LinearLayout>

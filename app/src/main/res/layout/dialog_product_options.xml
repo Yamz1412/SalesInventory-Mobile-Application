@@ -4,22 +4,22 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:cardCornerRadius="12dp"
-    app:cardElevation="4dp"
-    android:padding="16dp">
+    app:cardElevation="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="20dp">
 
         <TextView
             android:id="@+id/tvOptionProductName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Product"
-            android:textSize="18sp"
+            android:text="Product Name"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorPrimary"
+            android:textColor="?attr/colorPrimary"
             android:layout_marginBottom="4dp" />
 
         <TextView
@@ -27,47 +27,32 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="₱0.00"
-            android:textSize="14sp"
+            android:textSize="16sp"
+            android:textStyle="bold"
             android:textColor="@color/textColorSecondary"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="16dp" />
 
         <TextView
+            android:id="@+id/tvSizeHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Size"
+            android:text="Select Size"
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="@color/textColorPrimary"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
 
         <RadioGroup
             android:id="@+id/rgSize"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <RadioButton
-                android:id="@+id/rbSizeSmall"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Small" />
-
-            <RadioButton
-                android:id="@+id/rbSizeMedium"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Medium"
-                android:layout_marginStart="8dp" />
-
-            <RadioButton
-                android:id="@+id/rbSizeLarge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Large"
-                android:layout_marginStart="8dp" />
+            android:orientation="vertical"
+            android:visibility="gone">
         </RadioGroup>
 
         <TextView
+            android:id="@+id/tvAddonsHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Add-ons"
@@ -75,30 +60,35 @@
             android:textStyle="bold"
             android:textColor="@color/textColorPrimary"
             android:layout_marginTop="12dp"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
 
         <LinearLayout
+            android:id="@+id/containerAddons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:visibility="gone">
+        </LinearLayout>
 
-            <CheckBox
-                android:id="@+id/cbAddonExtraShot"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Extra Shot" />
+        <TextView
+            android:id="@+id/tvNotesHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Special Instructions"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/textColorPrimary"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
 
-            <CheckBox
-                android:id="@+id/cbAddonWhippedCream"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Whipped Cream" />
-
-            <CheckBox
-                android:id="@+id/cbAddonSyrup"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Syrup" />
+        <LinearLayout
+            android:id="@+id/containerNotes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -106,13 +96,14 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:hint="Quantity">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etOptionQty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:inputType="number"
+                android:text="1" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
@@ -120,10 +111,11 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="end"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="20dp">
 
             <Button
                 android:id="@+id/btnOptionCancel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Cancel" />

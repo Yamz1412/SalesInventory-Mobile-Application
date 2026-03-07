@@ -2,14 +2,25 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     android:padding="20dp"
     android:background="@color/white">
 
+    <ImageView
+        android:id="@+id/ivReceiptBusinessLogo"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:layout_marginBottom="8dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
     <TextView
+        android:id="@+id/tvReceiptBusinessName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="HanZai Application"
+        android:text="Store Name"
         android:textSize="20sp"
         android:textStyle="bold"
         android:gravity="center"
@@ -36,51 +47,105 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/lightGray" />
+        android:background="#EEEEEE"
+        android:layout_marginBottom="8dp" />
 
-    <LinearLayout
-        android:id="@+id/receiptItemsContainer"
+    <ListView
+        android:id="@+id/lvReceiptItems"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp" />
+        android:layout_height="490dp"
+        android:layout_marginBottom="8dp"
+        tools:listitem="@layout/item_cart_product" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/lightGray" />
+        android:background="#EEEEEE"
+        android:layout_marginBottom="8dp" />
 
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Amount:" android:textStyle="bold" />
-        <TextView android:id="@+id/tvReceiptTotal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" android:textStyle="bold" android:textColor="@color/colorPrimary" />
+        android:layout_marginBottom="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Total:"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvReceiptTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="₱0.00"
+            android:textStyle="bold" />
     </RelativeLayout>
 
     <RelativeLayout
-        android:id="@+id/layoutReceiptCash"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cash Given:" />
-        <TextView android:id="@+id/tvReceiptCash" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" />
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Amount Paid:" />
+        <TextView
+            android:id="@+id/tvReceiptAmountPaid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="₱0.00" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Payment Method:" />
+        <TextView
+            android:id="@+id/tvReceiptPaymentMethod"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="Cash" />
     </RelativeLayout>
 
     <RelativeLayout
         android:id="@+id/layoutReceiptChange"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
-        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Change:" />
-        <TextView android:id="@+id/tvReceiptChange" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱0.00" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Change:" />
+        <TextView
+            android:id="@+id/tvReceiptChange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:text="₱0.00" />
     </RelativeLayout>
+
+    <Button
+        android:id="@+id/btnPrintReceipt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🖨 Print Receipt"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="?attr/colorPrimary"
+        android:textColor="@color/white"
+        android:visibility="gone"
+        android:contentDescription="Print the receipt using a connected printer" />
 
     <Button
         android:id="@+id/btnFinalizeSale"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Finalize &amp; Save"
-        android:layout_marginTop="20dp"
-        android:backgroundTint="@color/colorPrimary"
-        android:textColor="@color/white" />
+        android:layout_marginTop="8dp" />
+
 </LinearLayout>

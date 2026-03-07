@@ -11,6 +11,7 @@ public class Sales {
     private int quantity;
     private double price;
     private double totalPrice;
+    private double totalCost; // NEW: For calculating Gross Profit
     private String paymentMethod;
 
     @ServerTimestamp
@@ -55,19 +56,21 @@ public class Sales {
     public double getTotalPrice() { return totalPrice; }
     public void setTotalPrice(double totalPrice) { this.totalPrice = totalPrice; }
 
+    // NEW: Getters and Setters for Cost
+    public double getTotalCost() { return totalCost; }
+    public void setTotalCost(double totalCost) { this.totalCost = totalCost; }
+
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
 
-    // Logic: Return time in millis for UI, but keep Date object for Firestore
     public long getDate() {
         return date != null ? date.getTime() : 0L;
     }
 
     public void setDate(long date) {
-        this.date = (date > 0) ? new Date(date) : new Date();
+        this.date = (date > 0) ? new Date(date) : null;
     }
 
-    // Direct setter for Firestore serialization if needed
     public void setDate(Date date) {
         this.date = date;
     }
@@ -77,7 +80,7 @@ public class Sales {
     }
 
     public void setTimestamp(long timestamp) {
-        this.timestamp = (timestamp > 0) ? new Date(timestamp) : new Date();
+        this.timestamp = (timestamp > 0) ? new Date(timestamp) : null;
     }
 
     public void setTimestamp(Date timestamp) {

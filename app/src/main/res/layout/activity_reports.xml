@@ -1,216 +1,358 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
-    android:background="?android:colorBackground"
-    android:padding="10dp">
+    android:background="#F5F5F5">
 
-    <TextView
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Reports &amp; Analytics"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="?attr/colorOnBackground"
-        android:gravity="center"
-        android:layout_marginBottom="15dp"/>
+        android:elevation="0dp"
+        android:background="@android:color/white">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:weightSum="3">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="100dp"
-            android:background="@android:color/white"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:elevation="4dp"
-            android:layout_marginRight="5dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="TOTAL SALES"
-                android:gravity="center"
-                android:textColor="#FF9800"
-                android:textStyle="bold"/>
-
-            <TextView
-                android:id="@+id/TotalSalesTV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0.00"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="#FF9800"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="100dp"
-            android:background="@android:color/white"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:elevation="4dp"
-            android:layout_marginRight="5dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="TOTAL PRODUCTS"
-                android:gravity="center"
-                android:textColor="#2E7D32"
-                android:textStyle="bold"/>
-
-            <TextView
-                android:id="@+id/totalProductsTV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0.00"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="#2E7D32"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="100dp"
-            android:background="@android:color/white"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:elevation="4dp"
-            android:layout_marginRight="5dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="TOTAL REVENUE"
-                android:gravity="center_horizontal"
-                android:textColor="#4CAF50"
-                android:textStyle="bold"/>
-
-            <TextView
-                android:id="@+id/totalRevenueTV"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="0.00"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="#4CAF50"/>
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="20dp"
-        android:weightSum="2">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/BtnInventoryReport"
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Inventory"
-            android:layout_marginStart="8dp"
-            style="@style/CustomButton" />
-    </LinearLayout>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/BtnOverallPdf"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="📝 Overall Summary PDF"
-        android:layout_marginTop="8dp"
-        android:textStyle="bold"
-        style="@style/CustomButtonOutlined" />
+            android:layout_height="?attr/actionBarSize"
+            app:title="Financial Reports"
+            app:titleTextColor="@color/black"
+            app:navigationIcon="@drawable/ic_arrow_back_black_24dp">
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="15dp"
-        android:weightSum="2">
+        android:background="@android:color/white"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="16dp"
+        android:orientation="vertical">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:id="@+id/layoutCustomDates"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:hint="From Date">
-            <com.google.android.material.textfield.TextInputEditText
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp"
+            android:visibility="visible"
+            android:weightSum="2">
+
+            <EditText
                 android:id="@+id/etFromDate"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clickable="true"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="45dp"
+                android:hint="From Date"
+                android:background="#F0F0F0"
+                android:paddingHorizontal="12dp"
+                android:layout_marginEnd="4dp"
                 android:focusable="false"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:clickable="true"
+                android:textSize="14sp"/>
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:hint="To Date">
-            <com.google.android.material.textfield.TextInputEditText
+            <EditText
                 android:id="@+id/etToDate"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="45dp"
+                android:hint="To Date"
+                android:background="#F0F0F0"
+                android:paddingHorizontal="12dp"
+                android:layout_marginStart="4dp"
+                android:focusable="false"
+                android:clickable="true"
+                android:textSize="14sp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="45dp"
+            android:background="#F0F0F0"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_today"
+                app:tint="#757575" />
+
+            <Spinner
+                android:id="@+id/spinnerDateFilter"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:background="@null" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:clickable="true"
-                android:focusable="false"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
-    </LinearLayout>
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                android:layout_marginBottom="16dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="10dp"
-        android:background="#DDD"
-        android:layout_marginTop="10dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@android:color/white"
+                    android:padding="16dp">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_weight="1.5"
-            android:layout_height="wrap_content"
-            android:text="Item / Date"
-            android:textStyle="bold"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Summary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/black"
+                        android:layout_marginBottom="16dp"/>
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Qty / Count"
-            android:textAlignment="center"
-            android:textStyle="bold"/>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Gross Revenue"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvGrossRevenue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="@color/black"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Amount"
-            android:textAlignment="viewEnd"
-            android:textStyle="bold"/>
-    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Cost of Goods Sold"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvCogs"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="#D32F2F"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
 
-    <ListView
-        android:id="@+id/ReportsListView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:listitem="@layout/item_report_row"
-        android:dividerHeight="1dp"/>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Gross Profit"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvGrossProfit"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="#388E3C"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Discounts"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvDiscounts"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="#F57C00"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Cash In Hand"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvCashSales"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="#1976D2"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="E-Payments"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvEPaymentSales"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="#7B1FA2"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="12dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Total Stock Asset"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvInventoryValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="₱0.00"
+                            android:textStyle="bold"
+                            android:textColor="@color/black"/>
+                    </LinearLayout>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:text="Transactions"
+                            android:textColor="#757575"/>
+                        <TextView
+                            android:id="@+id/tvTransactions"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textStyle="bold"
+                            android:textColor="@color/black"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnExportAccounting"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Export Accounting Report"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="8dp"
+                app:backgroundTint="?attr/colorPrimary"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp"
+                android:weightSum="2">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnInventoryReport"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:text="Inventory"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginEnd="4dp"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOverallSummary"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="50dp"
+                    android:layout_weight="1"
+                    android:text="Overall Summary"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginStart="4dp"
+                    app:strokeColor="?attr/colorPrimary"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recent Transactions"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:layout_marginBottom="8dp"/>
+
+            <ListView
+                android:id="@+id/ReportsListView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:divider="@null"
+                android:dividerHeight="0dp"
+                android:nestedScrollingEnabled="true"/>
+
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>

@@ -37,6 +37,11 @@
         </activity>
 
         <activity
+            android:name=".BusinessSetupActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
             android:name=".CategoryManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
@@ -53,6 +58,11 @@
 
         <activity
             android:name=".ReceivingReportActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
+            android:name=".CashManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 

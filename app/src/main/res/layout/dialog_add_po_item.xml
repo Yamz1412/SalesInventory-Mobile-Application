@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@color/white">
+    android:padding="20dp"
+    android:background="?android:colorBackground">
 
     <TextView
         android:layout_width="wrap_content"
@@ -14,104 +13,111 @@
         android:text="Add Item"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="@color/textColorPrimary"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="20dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Product Name"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etProduct"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textCapWords" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <ImageButton
+            android:id="@+id/btnSearchInventory"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorPrimary"
+            android:src="@android:drawable/ic_menu_search"
+            app:tint="@android:color/white" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        android:layout_marginBottom="10dp">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="5dp"
+            android:hint="Quantity"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etQuantity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:hint="Unit Cost (₱)"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etUnitPrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Product Name"
-        android:textSize="14sp"
-        android:textColor="@color/textColorPrimary"
-        android:layout_marginBottom="4dp" />
+        android:text="Measurement Unit"
+        android:layout_marginBottom="5dp"/>
 
-    <com.google.android.material.textfield.TextInputLayout
+    <Spinner
+        android:id="@+id/spinnerUnit"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Product Name"
-        style="@style/CustomTextInputLayout"
-        app:boxStrokeColor="@color/colorPrimary"
-        app:hintTextColor="@color/colorPrimary">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etProductName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/textColorPrimary"
-            android:textSize="16sp" />
-
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="Quantity"
-        style="@style/CustomTextInputLayout"
-        app:boxStrokeColor="@color/colorPrimary"
-        app:hintTextColor="@color/colorPrimary">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etQuantity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="number"
-            android:textColor="@color/textColorPrimary"
-            android:textSize="16sp" />
-
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:hint="Unit Price"
-        style="@style/CustomTextInputLayout"
-        app:boxStrokeColor="@color/colorPrimary"
-        app:hintTextColor="@color/colorPrimary"
-        app:prefixText="₱ ">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etUnitPrice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="numberDecimal"
-            android:textColor="@color/textColorPrimary"
-            android:textSize="16sp" />
-
-    </com.google.android.material.textfield.TextInputLayout>
+        android:layout_height="48dp"
+        android:background="@drawable/edite_round"
+        android:layout_marginBottom="20dp"/>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="end"
-        android:layout_marginTop="24dp">
+        android:layout_marginTop="10dp">
 
         <Button
             android:id="@+id/btnCancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="CANCEL"
-            android:textColor="@color/colorPrimary"
-            android:paddingStart="24dp"
-            android:paddingEnd="24dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            app:strokeColor="@color/colorPrimary"
-            app:strokeWidth="2dp" />
+            android:layout_marginEnd="16dp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
 
         <Button
             android:id="@+id/btnAdd"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="ADD"
-            android:layout_marginStart="16dp"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@color/white"
-            android:paddingStart="32dp"
-            android:paddingEnd="32dp"
-            style="@style/CustomButton" />
-
+            android:text="ADD TO LIST" />
     </LinearLayout>
-
 </LinearLayout>

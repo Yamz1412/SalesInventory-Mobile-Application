@@ -1,10 +1,8 @@
 package com.app.SalesInventory;
 
 import android.content.Intent;
-import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.View;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.Spinner;
@@ -13,7 +11,6 @@ import android.widget.TextView;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -22,7 +19,6 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,7 +35,7 @@ public class Inventory extends BaseActivity {
     private List<Product> filteredProducts = new ArrayList<>();
     private ProductRepository productRepository;
     private AuthManager authManager;
-    private Button btnAddProduct, btnAdjustStock;
+    private Button btnAddProduct;
     private Spinner spinnerCategoryFilter;
     private String currentSearchQuery = "";
     private String currentCategoryFilter = "All";
@@ -48,17 +44,12 @@ public class Inventory extends BaseActivity {
     private boolean showLowStockOnly = false;
     private boolean showNearExpiryOnly = false;
     private TextView tvTotalCount, tvLowStockWarning;
-    private View rootView;
-    private int keyboardThresholdPx;
-
-    // Expandable FAB Variables
-    private FloatingActionButton fabMain;
-    private View llFabHistory, llFabSummary, llFabDeleted, fabBgDimmer;
-    private boolean isFabMenuOpen = false;
-    private boolean isFabHidden = false;
 
     private DatabaseReference categoryRef;
     private ValueEventListener categoryListener;
+
+    // Tracks if we are viewing as a restricted staff
+    private boolean isReadOnly = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,38 +63,32 @@ public class Inventory extends BaseActivity {
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
         btnAddProduct = findViewById(R.id.btn_add_product);
-        btnAdjustStock = findViewById(R.id.btn_adjust_stock);
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
         tvTotalCount = findViewById(R.id.TotalCountTV);
         tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
-        rootView = findViewById(android.R.id.content);
-
-        // FAB Menu hooks
-        fabMain = findViewById(R.id.fab_main);
-        llFabHistory = findViewById(R.id.ll_fab_history);
-        llFabSummary = findViewById(R.id.ll_fab_summary);
-        llFabDeleted = findViewById(R.id.ll_fab_deleted);
-        fabBgDimmer = findViewById(R.id.fab_bg_dimmer);
 
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
 
+        // Grab ReadOnly Signal from MainActivity Impersonation
+        isReadOnly = getIntent().getBooleanExtra("readonly", false);
+
         productAdapter = new ProductAdapter(filteredProducts, this);
+
+        // Let adapter know about read-only so it hides the specific item edit/qty buttons
+        productAdapter.setReadOnly(isReadOnly);
+
         productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
         productsRecyclerView.setAdapter(productAdapter);
 
-        keyboardThresholdPx = (int)(150 * getResources().getDisplayMetrics().density);
-
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
-            boolean isAdmin = authManager.isCurrentUserAdmin();
-            if (isAdmin) {
-                if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
-                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
-                if (fabMain != null) fabMain.setVisibility(View.VISIBLE);
-            } else {
+            boolean isRealAdmin = authManager.isCurrentUserAdmin();
+
+            // Hide buttons if Staff or viewing as Impersonated Staff
+            if (!isRealAdmin || isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
-                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
-                if (fabMain != null) fabMain.setVisibility(View.GONE);
+            } else {
+                if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
             }
         }));
 
@@ -128,19 +113,6 @@ public class Inventory extends BaseActivity {
                 criticalNotifier.showCriticalDialog(this, product)
         );
         productRepository.registerCriticalStockListener(criticalListener);
-
-        productsRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(RecyclerView rv, int dx, int dy) {
-                if (dy > 15) {
-                    hideFab();
-                } else if (dy < -15) {
-                    showFab();
-                }
-            }
-        });
-
-        rootView.getViewTreeObserver().addOnGlobalLayoutListener(keyboardLayoutListener);
     }
 
     private void setupSearchView() {
@@ -178,90 +150,11 @@ public class Inventory extends BaseActivity {
         searchView.setOnClickListener(v -> searchView.setIconified(false));
     }
 
-    private final ViewTreeObserver.OnGlobalLayoutListener keyboardLayoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
-        private int lastVisibleHeight = 0;
-        @Override
-        public void onGlobalLayout() {
-            Rect r = new Rect();
-            rootView.getWindowVisibleDisplayFrame(r);
-            int visibleHeight = r.height();
-            if (lastVisibleHeight == 0) lastVisibleHeight = visibleHeight;
-            int diff = lastVisibleHeight - visibleHeight;
-            if (diff > keyboardThresholdPx) {
-                hideFab();
-            } else if (diff < -keyboardThresholdPx) {
-                showFab();
-            }
-            lastVisibleHeight = visibleHeight;
-        }
-    };
-
     private void setupActionButtons() {
         // Top static buttons
         if (btnAddProduct != null) {
             btnAddProduct.setOnClickListener(v -> startActivity(new Intent(Inventory.this, AddProductActivity.class)));
         }
-        if (btnAdjustStock != null) {
-            btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
-        }
-
-        // FAB Menu Logic
-        fabMain.setOnClickListener(v -> toggleFabMenu());
-        fabBgDimmer.setOnClickListener(v -> toggleFabMenu());
-
-        llFabHistory.setOnClickListener(v -> {
-            toggleFabMenu();
-            startActivity(new Intent(Inventory.this, AdjustmentHistoryActivity.class));
-        });
-
-        llFabSummary.setOnClickListener(v -> {
-            toggleFabMenu();
-            startActivity(new Intent(Inventory.this, AdjustmentSummaryReportActivity.class));
-        });
-
-        llFabDeleted.setOnClickListener(v -> {
-            toggleFabMenu();
-            startActivity(new Intent(Inventory.this, DeleteProductActivity.class));
-        });
-    }
-
-    private void toggleFabMenu() {
-        if (!isFabMenuOpen) {
-            fabBgDimmer.setVisibility(View.VISIBLE);
-            llFabHistory.setVisibility(View.VISIBLE);
-            llFabSummary.setVisibility(View.VISIBLE);
-            llFabDeleted.setVisibility(View.VISIBLE);
-            // Animate '+' to 'x'
-            fabMain.animate().rotation(45f).setDuration(300).start();
-        } else {
-            fabBgDimmer.setVisibility(View.GONE);
-            llFabHistory.setVisibility(View.GONE);
-            llFabSummary.setVisibility(View.GONE);
-            llFabDeleted.setVisibility(View.GONE);
-            // Animate 'x' to '+'
-            fabMain.animate().rotation(0f).setDuration(300).start();
-        }
-        isFabMenuOpen = !isFabMenuOpen;
-    }
-
-    private void hideFab() {
-        if (isFabHidden || fabMain == null) return;
-        if (isFabMenuOpen) toggleFabMenu();
-
-        fabMain.animate()
-                .translationY(fabMain.getHeight() + 100)
-                .setDuration(300)
-                .start();
-        isFabHidden = true;
-    }
-
-    private void showFab() {
-        if (!isFabHidden || fabMain == null) return;
-        fabMain.animate()
-                .translationY(0)
-                .setDuration(300)
-                .start();
-        isFabHidden = false;
     }
 
     private void listenToCategoriesForFilter() {
@@ -459,6 +352,5 @@ public class Inventory extends BaseActivity {
         super.onDestroy();
         if (categoryListener != null && categoryRef != null) categoryRef.removeEventListener(categoryListener);
         if (productRepository != null && criticalListener != null) productRepository.unregisterCriticalStockListener(criticalListener);
-        if (rootView != null && keyboardLayoutListener != null) rootView.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardLayoutListener);
     }
 }

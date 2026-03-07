@@ -7,9 +7,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
-import androidx.camera.core.ImageCaptureException;
-import androidx.camera.core.Preview;
-import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 
@@ -20,9 +17,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -34,19 +33,23 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.common.util.concurrent.ListenableFuture;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.io.File;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;          // FIXED: Imported Map
-import java.util.HashMap;      // FIXED: Imported HashMap
-import java.util.concurrent.ExecutionException;
+import java.util.Map;
 
 public class sellProduct extends BaseActivity {
 
@@ -59,43 +62,39 @@ public class sellProduct extends BaseActivity {
     private double discountPercent;
 
     private TextInputEditText etDiscount;
-    private TextView tvTotalPrice;
-    private Button btnConfirmSale;
-    private Button btnEditCart;
+    // IDs from activity_sell_product.xml
+    private TextView tvTotalPrice;       // @+id/TotalPriceTV
+    private Button btnConfirmSale;       // @+id/BtnConfirmSale
+    private Button btnEditCart;          // @+id/BtnEditCart
 
-    private Spinner spinnerPaymentMethod;
-    private View layoutCashSection;
-    private TextInputEditText etCashGiven;
-    private TextView tvChange;
-    private View layoutEPaymentSection;
-    private Button btnCaptureReceipt;
-    private TextView tvReceiptStatus;
+    private Spinner spinnerPaymentMethod;       // @+id/spinnerPaymentMethod
+    private View layoutCashSection;             // @+id/layoutCashSection
+    private TextInputEditText etCashGiven;      // @+id/etCashGiven
+    private TextView tvChange;                  // @+id/tvChange
+    private View layoutEPaymentSection;         // @+id/layoutEPaymentSection
+    private Button btnCaptureReceipt;           // @+id/btnCaptureReceipt
+    private TextView tvReceiptStatus;           // @+id/tvReceiptStatus
+    private ImageView imgReceiptPreview;        // @+id/imgReceiptPreview
 
-    private RadioGroup rgDeliveryType;
-    private RadioButton rbWalkIn;
-    private RadioButton rbDelivery;
-    private View layoutDeliveryDetails;
-    private TextInputEditText etDeliveryName;
-    private TextInputEditText etDeliveryPhone;
-    private TextInputEditText etDeliveryAddress;
-    private RadioGroup rgDeliveryPayment;
-    private RadioButton rbDeliveryCOD;
-    private RadioButton rbDeliveryEPayment;
+    private RadioGroup rgDeliveryType;          // @+id/rgDeliveryType
+    private RadioButton rbWalkIn;               // @+id/rbWalkIn
+    private RadioButton rbDelivery;             // @+id/rbDelivery
+    private View layoutDeliveryDetails;         // @+id/layoutDeliveryDetails
+    private TextInputEditText etDeliveryName;   // @+id/etDeliveryName
+    private TextInputEditText etDeliveryPhone;  // @+id/etDeliveryPhone
+    private TextInputEditText etDeliveryAddress;// @+id/etDeliveryAddress
+    private RadioGroup rgDeliveryPayment;       // @+id/rgDeliveryPayment
+    private RadioButton rbDeliveryCOD;          // @+id/rbDeliveryCOD
+    private RadioButton rbDeliveryEPayment;     // @+id/rbDeliveryEPayment
 
-    private ListView cartListView;
-    private List<CartManager.CartItem> cartItems;
-    private android.widget.BaseAdapter cartAdapter;
+    private ListView cartListView;              // @+id/cartListView
 
     private boolean receiptCaptured = false;
 
-    private AlertDialog cameraDialog;
     private AlertDialog loadingDialog;
-    private PreviewView previewView;
     private ImageCapture imageCapture;
-    private ImageView imgReceiptPreview;
     private CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
     private Camera camera;
-    private boolean flashOn = false;
 
     private CartManager cartManager;
     private CriticalStockNotifier criticalNotifier;
@@ -103,21 +102,30 @@ public class sellProduct extends BaseActivity {
 
     private ActivityResultLauncher<String> galleryReceiptLauncher;
     private Uri galleryReceiptUri;
-    private MaterialButton btnDiscountSC, btnDiscountPWD, btnDiscountEmp;
-    private TextInputLayout manualDiscountTIL;
-    private TextInputEditText etManualDiscount, etReferenceNumber;
+    private MaterialButton btnDiscountSC;       // @+id/btnDiscountSC
+    private MaterialButton btnDiscountPWD;      // @+id/btnDiscountPWD
+    private MaterialButton btnDiscountEmp;      // @+id/btnDiscountEmp
+    private TextInputLayout manualDiscountTIL;  // @+id/manual_discount_TIL
+    private TextInputEditText etManualDiscount; // @+id/et_manual_discount
+    private TextInputEditText etReferenceNumber;// @+id/etReferenceNumber
     private double currentDiscountPercentage = 0.0;
+
+    // BUSINESS CACHE FOR RECEIPT
+    private String cachedBusinessName = "Store Name";
+    private String cachedBusinessLogoUrl = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sell_product);
         cartManager = CartManager.getInstance();
+
         initRepositories();
+        loadBusinessProfile();
         initViews();
         initGalleryLauncher();
         setupListeners();
-        initCart();
+        updateCartUI();
         calculateTotalFromCart();
     }
 
@@ -132,42 +140,91 @@ public class sellProduct extends BaseActivity {
         productRepository.registerCriticalStockListener(criticalListener);
     }
 
+    private void loadBusinessProfile() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId != null && !ownerId.isEmpty()) {
+            FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            String bName = documentSnapshot.getString("businessName");
+                            String bLogo = documentSnapshot.getString("businessLogoUrl");
+                            if (bName != null && !bName.isEmpty()) cachedBusinessName = bName;
+                            if (bLogo != null && !bLogo.isEmpty()) cachedBusinessLogoUrl = bLogo;
+                        }
+                    });
+        }
+    }
+
     private void initViews() {
+        // -- activity_sell_product.xml IDs --
         etReferenceNumber = findViewById(R.id.etReferenceNumber);
-        btnDiscountSC = findViewById(R.id.btnDiscountSC);
-        btnDiscountPWD = findViewById(R.id.btnDiscountPWD);
-        btnDiscountEmp = findViewById(R.id.btnDiscountEmp);
-        manualDiscountTIL = findViewById(R.id.manual_discount_TIL);
-        etManualDiscount = findViewById(R.id.et_manual_discount);
-        tvTotalPrice = findViewById(R.id.TotalPriceTV);
-        btnConfirmSale = findViewById(R.id.BtnConfirmSale);
-        btnEditCart = findViewById(R.id.BtnEditCart);
 
-        spinnerPaymentMethod = findViewById(R.id.spinnerPaymentMethod);
-        layoutCashSection = findViewById(R.id.layoutCashSection);
-        etCashGiven = findViewById(R.id.etCashGiven);
-        tvChange = findViewById(R.id.tvChange);
+        try {
+            btnDiscountSC  = findViewById(R.id.btnDiscountSC);
+            btnDiscountPWD = findViewById(R.id.btnDiscountPWD);
+            btnDiscountEmp = findViewById(R.id.btnDiscountEmp);
+            manualDiscountTIL  = findViewById(R.id.manual_discount_TIL);
+            etManualDiscount   = findViewById(R.id.et_manual_discount);
+
+            if (btnDiscountSC != null) {
+                btnDiscountSC.setOnClickListener(v -> applyPresetDiscount(20.0));
+                btnDiscountPWD.setOnClickListener(v -> applyPresetDiscount(20.0));
+                btnDiscountEmp.setOnClickListener(v -> {
+                    View buttonsLayout = findViewById(R.id.discount_buttons_layout);
+                    if (buttonsLayout != null) buttonsLayout.setVisibility(View.GONE);
+                    if (manualDiscountTIL != null) manualDiscountTIL.setVisibility(View.VISIBLE);
+                    if (etManualDiscount != null) etManualDiscount.requestFocus();
+                    currentDiscountPercentage = 0.0;
+                });
+            }
+            if (etManualDiscount != null) {
+                etManualDiscount.addTextChangedListener(new TextWatcher() {
+                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                    @Override
+                    public void afterTextChanged(Editable s) {
+                        String input = s.toString();
+                        if (!input.isEmpty()) {
+                            try { currentDiscountPercentage = Double.parseDouble(input); }
+                            catch (NumberFormatException e) { currentDiscountPercentage = 0.0; }
+                        } else {
+                            currentDiscountPercentage = 0.0;
+                        }
+                        calculateTotalFromCart();
+                    }
+                });
+            }
+        } catch (Exception ignored) {}
+
+        tvTotalPrice    = findViewById(R.id.TotalPriceTV);
+        btnConfirmSale  = findViewById(R.id.BtnConfirmSale);
+        btnEditCart     = findViewById(R.id.BtnEditCart);
+
+        spinnerPaymentMethod  = findViewById(R.id.spinnerPaymentMethod);
+        layoutCashSection     = findViewById(R.id.layoutCashSection);
+        etCashGiven           = findViewById(R.id.etCashGiven);
+        tvChange              = findViewById(R.id.tvChange);
         layoutEPaymentSection = findViewById(R.id.layoutEPaymentSection);
-        btnCaptureReceipt = findViewById(R.id.btnCaptureReceipt);
-        tvReceiptStatus = findViewById(R.id.tvReceiptStatus);
-        imgReceiptPreview = findViewById(R.id.imgReceiptPreview);
+        btnCaptureReceipt     = findViewById(R.id.btnCaptureReceipt);
+        tvReceiptStatus       = findViewById(R.id.tvReceiptStatus);
+        imgReceiptPreview     = findViewById(R.id.imgReceiptPreview);
 
-        rgDeliveryType = findViewById(R.id.rgDeliveryType);
-        rbWalkIn = findViewById(R.id.rbWalkIn);
-        rbDelivery = findViewById(R.id.rbDelivery);
-
+        rgDeliveryType      = findViewById(R.id.rgDeliveryType);
+        rbWalkIn            = findViewById(R.id.rbWalkIn);
+        rbDelivery          = findViewById(R.id.rbDelivery);
         layoutDeliveryDetails = findViewById(R.id.layoutDeliveryDetails);
-        etDeliveryName = findViewById(R.id.etDeliveryName);
-        etDeliveryPhone = findViewById(R.id.etDeliveryPhone);
-        etDeliveryAddress = findViewById(R.id.etDeliveryAddress);
-        rgDeliveryPayment = findViewById(R.id.rgDeliveryPayment);
-        rbDeliveryCOD = findViewById(R.id.rbDeliveryCOD);
-        rbDeliveryEPayment = findViewById(R.id.rbDeliveryEPayment);
+        etDeliveryName      = findViewById(R.id.etDeliveryName);
+        etDeliveryPhone     = findViewById(R.id.etDeliveryPhone);
+        etDeliveryAddress   = findViewById(R.id.etDeliveryAddress);
+        rgDeliveryPayment   = findViewById(R.id.rgDeliveryPayment);
+        rbDeliveryCOD       = findViewById(R.id.rbDeliveryCOD);
+        rbDeliveryEPayment  = findViewById(R.id.rbDeliveryEPayment);
 
         cartListView = findViewById(R.id.cartListView);
 
         String[] methods = new String[]{"Cash", "E-Payment"};
-        android.widget.ArrayAdapter<String> pmAdapter = new android.widget.ArrayAdapter<>(
+        ArrayAdapter<String> pmAdapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, methods);
         pmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerPaymentMethod.setAdapter(pmAdapter);
@@ -179,40 +236,13 @@ public class sellProduct extends BaseActivity {
         builder.setView(new android.widget.ProgressBar(this));
         builder.setMessage("Processing Sale... Please wait.");
         loadingDialog = builder.create();
-
-        btnDiscountSC.setOnClickListener(v -> applyPresetDiscount(20.0));
-        btnDiscountPWD.setOnClickListener(v -> applyPresetDiscount(20.0));
-        btnDiscountEmp.setOnClickListener(v -> {
-            findViewById(R.id.discount_buttons_layout).setVisibility(View.GONE);
-            manualDiscountTIL.setVisibility(View.VISIBLE);
-            etManualDiscount.requestFocus();
-            currentDiscountPercentage = 0.0;
-        });
-
-        etManualDiscount.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override
-            public void afterTextChanged(Editable s) {
-                String input = s.toString();
-                if (!input.isEmpty()) {
-                    try {
-                        currentDiscountPercentage = Double.parseDouble(input);
-                    } catch (NumberFormatException e) {
-                        currentDiscountPercentage = 0.0;
-                    }
-                } else {
-                    currentDiscountPercentage = 0.0;
-                }
-                calculateTotalFromCart();
-            }
-        });
     }
 
     private void applyPresetDiscount(double percentage) {
         currentDiscountPercentage = percentage;
-        manualDiscountTIL.setVisibility(View.GONE);
-        findViewById(R.id.discount_buttons_layout).setVisibility(View.VISIBLE);
+        if (manualDiscountTIL != null) manualDiscountTIL.setVisibility(View.GONE);
+        View buttonsLayout = findViewById(R.id.discount_buttons_layout);
+        if (buttonsLayout != null) buttonsLayout.setVisibility(View.VISIBLE);
         calculateTotalFromCart();
     }
 
@@ -223,7 +253,7 @@ public class sellProduct extends BaseActivity {
                     if (uri != null) {
                         galleryReceiptUri = uri;
                         receiptCaptured = true;
-                        tvReceiptStatus.setText("Receipt selected from gallery");
+                        tvReceiptStatus.setText("Receipt selected");
                         if (imgReceiptPreview != null) {
                             imgReceiptPreview.setVisibility(View.VISIBLE);
                             imgReceiptPreview.setImageURI(uri);
@@ -248,44 +278,33 @@ public class sellProduct extends BaseActivity {
                     if (!cleanString.isEmpty()) {
                         try {
                             double parsed = Double.parseDouble(cleanString);
-
                             if (parsed > 1000000) {
                                 parsed = 1000000;
                                 Toast.makeText(sellProduct.this, "Maximum cash limit is ₱1,000,000", Toast.LENGTH_SHORT).show();
                             }
-
-                            String formatted;
-                            if (cleanString.contains(".")) {
-                                formatted = cleanString;
-                            } else {
-                                formatted = String.format(Locale.US, "%,d", (long) parsed);
-                            }
-
+                            String formatted = cleanString.contains(".") ? cleanString : String.format(Locale.US, "%,d", (long) parsed);
                             current = formatted;
                             etCashGiven.setText(formatted);
                             etCashGiven.setSelection(formatted.length());
-                        } catch (NumberFormatException e) {
-                        }
+                        } catch (NumberFormatException ignored) {}
                     } else {
                         current = "";
                     }
-
                     etCashGiven.addTextChangedListener(this);
                     calculateChange();
                 }
             }
         });
 
-        spinnerPaymentMethod.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+        spinnerPaymentMethod.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String method = (String) spinnerPaymentMethod.getSelectedItem();
                 boolean isCash = "Cash".equals(method);
                 setPaymentSections(isCash);
                 calculateChange();
             }
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
         btnCaptureReceipt.setOnClickListener(v -> checkCameraPermissionAndShowDialog());
@@ -304,11 +323,12 @@ public class sellProduct extends BaseActivity {
         });
     }
 
-    private void initCart() {
-        cartItems = cartManager.getItems();
-        cartAdapter = new android.widget.BaseAdapter() {
-            @Override public int getCount() { return cartItems.size(); }
-            @Override public Object getItem(int position) { return cartItems.get(position); }
+    private void updateCartUI() {
+        List<CartManager.CartItem> currentItems = new ArrayList<>(cartManager.getItems());
+
+        android.widget.BaseAdapter freshAdapter = new android.widget.BaseAdapter() {
+            @Override public int getCount() { return currentItems.size(); }
+            @Override public Object getItem(int position) { return currentItems.get(position); }
             @Override public long getItemId(int position) { return position; }
 
             @Override
@@ -316,24 +336,23 @@ public class sellProduct extends BaseActivity {
                 if (convertView == null) {
                     convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
                 }
-                CartManager.CartItem item = cartItems.get(position);
-                TextView tvName = convertView.findViewById(R.id.tvCartName);
-                TextView tvDetails = convertView.findViewById(R.id.tvCartDetails);
-                TextView tvQty = convertView.findViewById(R.id.tvCartQty);
+                CartManager.CartItem item = currentItems.get(position);
+                // IDs from item_cart_product.xml
+                TextView tvName      = convertView.findViewById(R.id.tvCartName);
+                TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
+                TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
                 TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
                 ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
 
                 btnRemove.setOnClickListener(v -> {
                     cartManager.removeItemById(item.productId);
-                    refreshCart();
+                    updateCartUI();
                     calculateTotalFromCart();
                 });
 
                 tvName.setText(item.productName);
                 String detailText = "";
-                if (item.size != null && !item.size.isEmpty()) {
-                    detailText += item.size;
-                }
+                if (item.size != null && !item.size.isEmpty()) detailText += item.size;
                 if (item.addon != null && !item.addon.isEmpty()) {
                     if (!detailText.isEmpty()) detailText += " / ";
                     detailText += item.addon;
@@ -344,31 +363,28 @@ public class sellProduct extends BaseActivity {
                 return convertView;
             }
         };
-        cartListView.setAdapter(cartAdapter);
-    }
 
-    private void refreshCart() {
-        cartItems = cartManager.getItems();
-        cartAdapter.notifyDataSetChanged();
+        if (cartListView != null) {
+            cartListView.setAdapter(freshAdapter);
+        }
     }
 
     private void calculateTotalFromCart() {
         double subtotal = cartManager.getSubtotal();
-
         double discountAmount = subtotal * (currentDiscountPercentage / 100.0);
         finalTotal = subtotal - discountAmount;
 
         if (finalTotal < 0) finalTotal = 0;
         tvTotalPrice.setText(String.format(Locale.US, "₱%.2f", finalTotal));
 
-        BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
-        if (finalBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+        if (finalTotal > 1000000.0) {
             btnConfirmSale.setEnabled(false);
             Toast.makeText(this, "Total exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
         } else {
             calculateChange();
         }
     }
+
     private void calculateChange() {
         String method = (String) spinnerPaymentMethod.getSelectedItem();
 
@@ -386,8 +402,8 @@ public class sellProduct extends BaseActivity {
         }
 
         try {
-            BigDecimal cashBD = new BigDecimal(cashStr);
-            BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
+            BigDecimal cashBD   = new BigDecimal(cashStr);
+            BigDecimal finalBD  = BigDecimal.valueOf(finalTotal);
             BigDecimal changeBD = cashBD.subtract(finalBD);
 
             if (changeBD.compareTo(BigDecimal.ZERO) >= 0) {
@@ -421,21 +437,16 @@ public class sellProduct extends BaseActivity {
         }
 
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_edit_cart, null, false);
-        ListView editListView = dialogView.findViewById(R.id.editCartListView);
-        Button btnChangeProduct = dialogView.findViewById(R.id.btnEditChangeProduct);
-        Button btnCancel = dialogView.findViewById(R.id.btnEditCancel);
-        Button btnSave = dialogView.findViewById(R.id.btnEditSave);
+        ListView editListView      = dialogView.findViewById(R.id.editCartListView);
+        Button btnChangeProduct    = dialogView.findViewById(R.id.btnEditChangeProduct);
+        Button btnCancel           = dialogView.findViewById(R.id.btnEditCancel);
+        Button btnSave             = dialogView.findViewById(R.id.btnEditSave);
 
         List<CartManager.CartItem> editItems = new ArrayList<>();
         for (CartManager.CartItem it : items) {
             editItems.add(new CartManager.CartItem(
-                    it.productId,
-                    it.productName,
-                    it.unitPrice,
-                    it.quantity,
-                    it.stock,
-                    it.size,
-                    it.addon
+                    it.productId, it.productName, it.unitPrice,
+                    it.quantity, it.stock, it.size, it.addon
             ));
         }
 
@@ -452,16 +463,15 @@ public class sellProduct extends BaseActivity {
                     convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
                 }
                 CartManager.CartItem item = editItems.get(position);
-                TextView tvName = convertView.findViewById(R.id.tvCartName);
-                TextView tvDetails = convertView.findViewById(R.id.tvCartDetails);
-                TextView tvQty = convertView.findViewById(R.id.tvCartQty);
+                // IDs from item_cart_product.xml
+                TextView tvName      = convertView.findViewById(R.id.tvCartName);
+                TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
+                TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
                 TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
 
                 tvName.setText(item.productName);
                 String detailText = "";
-                if (item.size != null && !item.size.isEmpty()) {
-                    detailText += item.size;
-                }
+                if (item.size != null && !item.size.isEmpty()) detailText += item.size;
                 if (item.addon != null && !item.addon.isEmpty()) {
                     if (!detailText.isEmpty()) detailText += " / ";
                     detailText += item.addon;
@@ -476,14 +486,9 @@ public class sellProduct extends BaseActivity {
         };
 
         editListView.setAdapter(editAdapter[0]);
-
-        AlertDialog editDialog = new AlertDialog.Builder(this)
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
+        AlertDialog editDialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create();
 
         btnCancel.setOnClickListener(v -> editDialog.dismiss());
-
         btnChangeProduct.setOnClickListener(v -> {
             editDialog.dismiss();
             Intent intent = new Intent(sellProduct.this, SellList.class);
@@ -497,17 +502,12 @@ public class sellProduct extends BaseActivity {
             for (CartManager.CartItem item : editItems) {
                 if (item.quantity > 0) {
                     cartManager.addItem(
-                            item.productId,
-                            item.productName,
-                            item.unitPrice,
-                            item.quantity,
-                            item.stock,
-                            item.size,
-                            item.addon
+                            item.productId, item.productName, item.unitPrice,
+                            item.quantity, item.stock, item.size, item.addon
                     );
                 }
             }
-            refreshCart();
+            updateCartUI();
             calculateTotalFromCart();
             editDialog.dismiss();
         });
@@ -517,8 +517,8 @@ public class sellProduct extends BaseActivity {
 
     private void showEditSingleItemDialog(CartManager.CartItem item, android.widget.BaseAdapter parentAdapter) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
-        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
         int padding = (int) (16 * getResources().getDisplayMetrics().density);
         layout.setPadding(padding, padding, padding, padding);
 
@@ -537,9 +537,8 @@ public class sellProduct extends BaseActivity {
             String qStr = etQty.getText() != null ? etQty.getText().toString().trim() : "";
             try {
                 int q = Integer.parseInt(qStr);
-                if (q <= 0 || q > item.stock) {
-                    Toast.makeText(this, "Quantity must be between 1 and " + item.stock, Toast.LENGTH_SHORT).show();
-                } else {
+                if (q <= 0 || q > item.stock) Toast.makeText(this, "Quantity must be between 1 and " + item.stock, Toast.LENGTH_SHORT).show();
+                else {
                     item.quantity = q;
                     parentAdapter.notifyDataSetChanged();
                 }
@@ -556,141 +555,11 @@ public class sellProduct extends BaseActivity {
     }
 
     private void checkCameraPermissionAndShowDialog() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-            showReceiptDialog();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            galleryReceiptLauncher.launch("image/*");
         } else {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_CAMERA_PERMISSION);
         }
-    }
-
-    private void showReceiptDialog() {
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_capture_receipt, null, false);
-        previewView = dialogView.findViewById(R.id.previewView);
-        android.widget.ImageButton btnFlash = dialogView.findViewById(R.id.btnFlash);
-        android.widget.ImageButton btnSwitchCamera = dialogView.findViewById(R.id.btnSwitchCamera);
-        android.widget.ImageButton btnCapture = dialogView.findViewById(R.id.btnCapture);
-        Button btnClose = dialogView.findViewById(R.id.btnClose);
-        Button btnGallery = dialogView.findViewById(R.id.btnGallery);
-
-        cameraDialog = new AlertDialog.Builder(this)
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
-
-        btnFlash.setOnClickListener(v -> toggleFlash());
-        btnSwitchCamera.setOnClickListener(v -> switchCamera());
-        btnCapture.setOnClickListener(v -> captureReceipt());
-        btnClose.setOnClickListener(v -> cameraDialog.dismiss());
-        btnGallery.setOnClickListener(v -> {
-            if (cameraDialog != null) {
-                cameraDialog.dismiss();
-            }
-            openReceiptGallery();
-        });
-
-        cameraDialog.setOnShowListener(dialog -> startCamera());
-        cameraDialog.show();
-    }
-
-    private void openReceiptGallery() {
-        galleryReceiptLauncher.launch("image/*");
-    }
-
-    private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
-                ProcessCameraProvider.getInstance(this);
-        cameraProviderFuture.addListener(() -> {
-            try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                bindCameraUseCases(cameraProvider);
-            } catch (ExecutionException | InterruptedException e) {
-                Toast.makeText(this, "Error starting camera", Toast.LENGTH_SHORT).show();
-            }
-        }, ContextCompat.getMainExecutor(this));
-    }
-
-    private void bindCameraUseCases(@NonNull ProcessCameraProvider cameraProvider) {
-        cameraProvider.unbindAll();
-
-        Preview preview = new Preview.Builder().build();
-        preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
-        imageCapture = new ImageCapture.Builder()
-                .setFlashMode(ImageCapture.FLASH_MODE_OFF)
-                .build();
-
-        camera = cameraProvider.bindToLifecycle(
-                this,
-                cameraSelector,
-                preview,
-                imageCapture
-        );
-
-        flashOn = false;
-        updateFlashUi();
-    }
-
-    private void toggleFlash() {
-        if (camera == null || imageCapture == null) return;
-        if (!camera.getCameraInfo().hasFlashUnit()) {
-            Toast.makeText(this, "No flash available", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        flashOn = !flashOn;
-        imageCapture.setFlashMode(flashOn
-                ? ImageCapture.FLASH_MODE_ON
-                : ImageCapture.FLASH_MODE_OFF);
-        updateFlashUi();
-    }
-
-    private void updateFlashUi() {
-        if (cameraDialog == null) return;
-        android.widget.ImageButton btnFlash = cameraDialog.findViewById(R.id.btnFlash);
-        if (btnFlash == null) return;
-        int color = flashOn
-                ? android.R.color.holo_orange_light
-                : android.R.color.white;
-        btnFlash.setColorFilter(ContextCompat.getColor(this, color));
-    }
-
-    private void switchCamera() {
-        cameraSelector = cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA
-                ? CameraSelector.DEFAULT_FRONT_CAMERA
-                : CameraSelector.DEFAULT_BACK_CAMERA;
-        startCamera();
-    }
-
-    private void captureReceipt() {
-        if (imageCapture == null) {
-            Toast.makeText(this, "Camera not ready", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        File photoFile = new File(getCacheDir(), "receipt_" + System.currentTimeMillis() + ".jpg");
-        ImageCapture.OutputFileOptions outputOptions = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
-
-        imageCapture.takePicture(outputOptions, ContextCompat.getMainExecutor(this), new ImageCapture.OnImageSavedCallback() {
-            @Override
-            public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
-                Uri savedUri = Uri.fromFile(photoFile);
-                galleryReceiptUri = savedUri;
-                receiptCaptured = true;
-
-                tvReceiptStatus.setText("Receipt captured");
-                if (imgReceiptPreview != null) {
-                    imgReceiptPreview.setVisibility(View.VISIBLE);
-                    imgReceiptPreview.setImageURI(savedUri);
-                }
-                calculateChange();
-                if (cameraDialog != null) cameraDialog.dismiss();
-                Toast.makeText(sellProduct.this, "Receipt Captured", Toast.LENGTH_SHORT).show();
-            }
-            @Override
-            public void onError(@NonNull ImageCaptureException exception) {
-                Toast.makeText(sellProduct.this, "Capture failed: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 
     private void confirmSale() {
@@ -699,27 +568,30 @@ public class sellProduct extends BaseActivity {
             return;
         }
 
-        BigDecimal finalBD = BigDecimal.valueOf(finalTotal);
-        if (finalBD.compareTo(PaymentUtils.PAYMENT_MAX) > 0) {
+        if (finalTotal > 1000000.0) {
             Toast.makeText(this, "Total exceeds maximum allowed payment of ₱1,000,000.00", Toast.LENGTH_LONG).show();
             return;
         }
 
         int deliveryChecked = rgDeliveryType.getCheckedRadioButtonId();
         boolean isDelivery = deliveryChecked == R.id.rbDelivery;
-        String deliveryName = etDeliveryName.getText().toString().trim();
-        String deliveryPhone = etDeliveryPhone.getText().toString().trim();
+        String deliveryName    = etDeliveryName.getText().toString().trim();
+        String deliveryPhone   = etDeliveryPhone.getText().toString().trim();
         String deliveryAddress = etDeliveryAddress.getText().toString().trim();
-        String deliveryPayment = (rgDeliveryPayment.getCheckedRadioButtonId() == R.id.rbDeliveryEPayment) ? "E-Payment" : "COD";
+
+        String deliveryPayment = "COD";
+        int selectedDelPayment = rgDeliveryPayment.getCheckedRadioButtonId();
+        if (selectedDelPayment == R.id.rbDeliveryEPayment) deliveryPayment = "E-Payment";
 
         if (isDelivery) {
-            if (deliveryName.isEmpty()) { etDeliveryName.setError("Required"); return; }
-            if (deliveryPhone.isEmpty()) { etDeliveryPhone.setError("Required"); return; }
+            if (deliveryName.isEmpty())    { etDeliveryName.setError("Required"); return; }
+            if (deliveryPhone.isEmpty())   { etDeliveryPhone.setError("Required"); return; }
             if (deliveryAddress.isEmpty()) { etDeliveryAddress.setError("Required"); return; }
         }
 
         String method = (String) spinnerPaymentMethod.getSelectedItem();
         String paymentDetails = method;
+
         if ("Cash".equals(method)) {
             String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
             if (cashStr.isEmpty()) {
@@ -750,84 +622,187 @@ public class sellProduct extends BaseActivity {
         }
 
         String orderId = java.util.UUID.randomUUID().toString();
-        showReceiptDialog(orderId, paymentDetails, isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
+        prepareReceiptData(orderId, paymentDetails, isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
     }
 
-    private void showReceiptDialog(String orderId, String paymentMethod, boolean isDelivery,
-                                   String dName, String dPhone, String dAddr, String dPay) {
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_receipt, null);
-        AlertDialog receiptDialog = new AlertDialog.Builder(this).setView(dialogView).create();
+    private void prepareReceiptData(String orderId, String paymentMethod, boolean isDelivery,
+                                    String dName, String dPhone, String dAddr, String dPay) {
+        if (loadingDialog != null && !loadingDialog.isShowing()) loadingDialog.show();
 
-        TextView tvOrderId = dialogView.findViewById(R.id.tvReceiptOrderId);
-        TextView tvDateTime = dialogView.findViewById(R.id.tvReceiptDateTime);
-        LinearLayout itemsContainer = dialogView.findViewById(R.id.receiptItemsContainer);
-        TextView tvTotal = dialogView.findViewById(R.id.tvReceiptTotal);
-        TextView tvCash = dialogView.findViewById(R.id.tvReceiptCash);
-        TextView tvChange = dialogView.findViewById(R.id.tvReceiptChange);
-        Button btnFinalize = dialogView.findViewById(R.id.btnFinalizeSale);
-        TextView tvMethodLabel = new TextView(this);
-        View layoutCash = dialogView.findViewById(R.id.layoutReceiptCash);
-        View layoutChange = dialogView.findViewById(R.id.layoutReceiptChange);
+        Map<String, String> enrichedNames = new HashMap<>();
+        fetchCartItemDetails(0, new ArrayList<>(cartManager.getItems()), enrichedNames,
+                orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
+    }
 
-        tvOrderId.setText("Order ID: " + orderId.substring(0, 8).toUpperCase());
-        tvTotal.setText(String.format("₱%.2f", finalTotal));
+    private void fetchCartItemDetails(int index, List<CartManager.CartItem> items, Map<String, String> enrichedNames,
+                                      String orderId, String paymentMethod, boolean isDelivery,
+                                      String dName, String dPhone, String dAddr, String dPay) {
 
-        android.os.Handler clockHandler = new android.os.Handler();
-        Runnable clockRunnable = new Runnable() {
+        if (index >= items.size()) {
+            runOnUiThread(() -> {
+                if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+                showReceiptDialogWithFetch(orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay, enrichedNames);
+            });
+            return;
+        }
+
+        CartManager.CartItem item = items.get(index);
+
+        productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
             @Override
-            public void run() {
-                String currentDateTime = new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
-                tvDateTime.setText("Date & Time: " + currentDateTime);
-                clockHandler.postDelayed(this, 1000);
+            public void onProductFetched(Product p) {
+                StringBuilder detailsStr = new StringBuilder();
+
+                if (p != null) {
+                    if (p.getAddonsList() != null && !p.getAddonsList().isEmpty()) {
+                        detailsStr.append("Add-ons: ");
+                        for (Map<String, Object> addon : p.getAddonsList()) {
+                            detailsStr.append(addon.get("name")).append(", ");
+                        }
+                        detailsStr.setLength(detailsStr.length() - 2);
+                        detailsStr.append(" | ");
+                    }
+
+                    if (p.getNotesList() != null && !p.getNotesList().isEmpty()) {
+                        detailsStr.append("Notes: ");
+                        for (Map<String, String> note : p.getNotesList()) {
+                            detailsStr.append(note.get("type")).append(" ").append(note.get("value")).append(", ");
+                        }
+                        detailsStr.setLength(detailsStr.length() - 2);
+                        detailsStr.append(" | ");
+                    }
+
+                    if (p.getBomList() != null && !p.getBomList().isEmpty()) {
+                        detailsStr.append("BOM: ");
+                        for (Map<String, Object> b : p.getBomList()) {
+                            detailsStr.append(b.get("quantity")).append(b.get("unit")).append(" ").append(b.get("materialName")).append(", ");
+                        }
+                        detailsStr.setLength(detailsStr.length() - 2);
+                    }
+                }
+
+                String finalDetails = detailsStr.toString();
+                if (finalDetails.endsWith(" | ")) finalDetails = finalDetails.substring(0, finalDetails.length() - 3);
+
+                enrichedNames.put(item.productId, finalDetails.trim());
+                fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
             }
-        };
-        clockHandler.post(clockRunnable);
-        receiptDialog.setOnDismissListener(dialog -> clockHandler.removeCallbacks(clockRunnable));
 
-        itemsContainer.removeAllViews();
-        for (CartManager.CartItem item : cartManager.getItems()) {
-            TextView row = new TextView(this);
-            row.setText(String.format(Locale.US, "%dx %s - ₱%.2f", item.quantity, item.productName, item.getLineTotal()));
-            row.setTextColor(getColor(R.color.black));
-            itemsContainer.addView(row);
-        }
-
-        if ("Cash".equals(paymentMethod)) {
-            layoutCash.setVisibility(View.VISIBLE);
-            layoutChange.setVisibility(View.VISIBLE);
-            String cashInput = etCashGiven.getText().toString();
-            double cashValue = cashInput.isEmpty() ? 0 : Double.parseDouble(cashInput);
-            tvCash.setText(String.format("₱%.2f", cashValue));
-            tvChange.setText(String.format("₱%.2f", cashValue - finalTotal));
-        } else {
-            layoutCash.setVisibility(View.GONE);
-            layoutChange.setVisibility(View.GONE);
-            tvMethodLabel.setText("Paid via: E-Payment (Receipt Attached)");
-            tvMethodLabel.setGravity(Gravity.CENTER);
-            tvMethodLabel.setPadding(0, 10, 0, 10);
-            itemsContainer.addView(tvMethodLabel);
-        }
-
-        btnFinalize.setOnClickListener(v -> {
-            receiptDialog.dismiss();
-            saveSale(paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
+            @Override
+            public void onError(String error) {
+                enrichedNames.put(item.productId, "");
+                fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
+            }
         });
+    }
+
+    private void showReceiptDialogWithFetch(String orderId, String paymentMethod, boolean isDelivery,
+                                            String dName, String dPhone, String dAddr, String dPay,
+                                            Map<String, String> enrichedNames) {
+
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_receipt, null);
+        AlertDialog receiptDialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create();
+
+        // IDs from dialog_receipt.xml
+        TextView tvBusinessName   = dialogView.findViewById(R.id.tvReceiptBusinessName);
+        ImageView ivBusinessLogo  = dialogView.findViewById(R.id.ivReceiptBusinessLogo);
+        TextView tvOrderId        = dialogView.findViewById(R.id.tvReceiptOrderId);
+        TextView tvDateTime       = dialogView.findViewById(R.id.tvReceiptDateTime);
+        ListView lvItems          = dialogView.findViewById(R.id.lvReceiptItems);   // ListView in dialog_receipt.xml
+        TextView tvTotal          = dialogView.findViewById(R.id.tvReceiptTotal);
+        TextView tvAmountPaid     = dialogView.findViewById(R.id.tvReceiptAmountPaid);
+        TextView tvPaymentMethod  = dialogView.findViewById(R.id.tvReceiptPaymentMethod);
+        View layoutChange         = dialogView.findViewById(R.id.layoutReceiptChange);
+        TextView tvReceiptChange  = dialogView.findViewById(R.id.tvReceiptChange);
+        Button btnFinalize        = dialogView.findViewById(R.id.btnFinalizeSale);
+        Button btnPrint           = dialogView.findViewById(R.id.btnPrintReceipt);
+
+        if (tvBusinessName != null) tvBusinessName.setText(cachedBusinessName);
+        if (ivBusinessLogo != null) {
+            if (cachedBusinessLogoUrl != null && !cachedBusinessLogoUrl.isEmpty()) {
+                ivBusinessLogo.setVisibility(View.VISIBLE);
+                Glide.with(this).load(cachedBusinessLogoUrl).into(ivBusinessLogo);
+            } else {
+                ivBusinessLogo.setVisibility(View.GONE);
+            }
+        }
+
+        if (tvOrderId != null) tvOrderId.setText("Order ID: " + orderId.substring(0, 8).toUpperCase());
+        if (tvTotal != null) tvTotal.setText(String.format("₱%.2f", finalTotal));
+
+        if (tvDateTime != null) {
+            String currentDateTime = new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
+            tvDateTime.setText("Date & Time: " + currentDateTime);
+        }
+
+        // FIX: Use a proper ArrayAdapter on the ListView instead of the non-existent setList() method.
+        if (lvItems != null) {
+            List<CartManager.CartItem> receiptItems = new ArrayList<>(cartManager.getItems());
+
+            android.widget.BaseAdapter receiptAdapter = new android.widget.BaseAdapter() {
+                @Override public int getCount() { return receiptItems.size(); }
+                @Override public Object getItem(int position) { return receiptItems.get(position); }
+                @Override public long getItemId(int position) { return position; }
+
+                @Override
+                public View getView(int position, View convertView, ViewGroup parent) {
+                    if (convertView == null) {
+                        convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
+                    }
+                    CartManager.CartItem item = receiptItems.get(position);
+                    // IDs from item_cart_product.xml
+                    TextView tvName      = convertView.findViewById(R.id.tvCartName);
+                    TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
+                    TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
+                    TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
+                    ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
+
+                    // Receipt is read-only — hide the remove button
+                    if (btnRemove != null) btnRemove.setVisibility(View.GONE);
+
+                    tvName.setText(item.productName);
+
+                    String extraDetails = enrichedNames.get(item.productId);
+                    if (extraDetails == null) extraDetails = "";
+                    tvDetails.setText(extraDetails.isEmpty() ? "" : extraDetails.replace(" | ", "\n"));
+
+                    tvQty.setText("x" + item.quantity);
+                    tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.getLineTotal()));
+                    return convertView;
+                }
+            };
+
+            lvItems.setAdapter(receiptAdapter);
+        }
+
+        if (tvPaymentMethod != null) tvPaymentMethod.setText(paymentMethod);
+
+        if ("Cash".equals(paymentMethod) || paymentMethod.startsWith("Cash")) {
+            String cashInput = etCashGiven.getText().toString().replace(",", "");
+            double cashValue = cashInput.isEmpty() ? 0 : Double.parseDouble(cashInput);
+            if (tvAmountPaid != null) tvAmountPaid.setText(String.format("₱%.2f", cashValue));
+            if (layoutChange != null) layoutChange.setVisibility(View.VISIBLE);
+            if (tvReceiptChange != null) tvReceiptChange.setText(String.format("₱%.2f", cashValue - finalTotal));
+        } else {
+            if (tvAmountPaid != null) tvAmountPaid.setText(String.format("₱%.2f", finalTotal));
+            if (layoutChange != null) layoutChange.setVisibility(View.GONE);
+        }
+
+        if (btnPrint != null) btnPrint.setVisibility(View.GONE);
+
+        if (btnFinalize != null) {
+            btnFinalize.setOnClickListener(v -> {
+                receiptDialog.dismiss();
+                saveSale(paymentMethod, isDelivery, dName, dPhone, dAddr, dPay, enrichedNames);
+            });
+        }
 
         receiptDialog.show();
     }
 
-    private void saveSale(String paymentMethod,
-                          boolean isDelivery,
-                          String dName,
-                          String dPhone,
-                          String dAddr,
-                          String dPay) {
-
-        runOnUiThread(() -> {
-            if (loadingDialog != null && !loadingDialog.isShowing()) {
-                loadingDialog.show();
-            }
-        });
+    private void saveSale(String paymentMethod, boolean isDelivery, String dName, String dPhone,
+                          String dAddr, String dPay, Map<String, String> enrichedNames) {
+        runOnUiThread(() -> { if (loadingDialog != null && !loadingDialog.isShowing()) loadingDialog.show(); });
 
         List<CartManager.CartItem> items = new ArrayList<>(cartManager.getItems());
         if (items.isEmpty()) {
@@ -837,45 +812,29 @@ public class sellProduct extends BaseActivity {
         }
 
         AuthManager.getInstance().refreshCurrentUserStatus(success -> {
-            if (!success && !AuthManager.getInstance().isCurrentUserAdmin()) {
-                runOnUiThread(() -> {
-                    if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
-                    Toast.makeText(this, "Authentication check failed. Please check internet or re-login.", Toast.LENGTH_LONG).show();
-                });
-                return;
-            }
-
             double subtotal = cartManager.getSubtotal();
             long now = System.currentTimeMillis();
             String orderId = java.util.UUID.randomUUID().toString();
-
-            String deliveryType = isDelivery ? "DELIVERY" : "WALK_IN";
+            String deliveryType   = isDelivery ? "DELIVERY" : "WALK_IN";
             String deliveryStatus = isDelivery ? "PENDING" : "DELIVERED";
-            long deliveryDate = isDelivery ? 0 : now;
+            long deliveryDate     = isDelivery ? 0 : now;
 
-            saveCartItemRecursively(0, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
+            saveCartItemRecursively(0, items, orderId, subtotal, now, paymentMethod,
+                    deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
         });
     }
 
-    private void saveCartItemRecursively(int index,
-                                         List<CartManager.CartItem> items,
-                                         String orderId,
-                                         double subtotal,
-                                         long now,
-                                         String paymentMethod,
-                                         String deliveryType,
-                                         String deliveryStatus,
-                                         long deliveryDate,
-                                         String dName, String dPhone, String dAddr, String dPay) {
+    private void saveCartItemRecursively(int index, List<CartManager.CartItem> items, String orderId,
+                                         double subtotal, long now, String paymentMethod,
+                                         String deliveryType, String deliveryStatus, long deliveryDate,
+                                         String dName, String dPhone, String dAddr, String dPay,
+                                         Map<String, String> enrichedNames) {
 
         if (index >= items.size()) {
             runOnUiThread(() -> {
-                if (loadingDialog != null && loadingDialog.isShowing()) {
-                    loadingDialog.dismiss();
-                }
+                if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
                 cartManager.clear();
                 Toast.makeText(sellProduct.this, "Sale Recorded Successfully!", Toast.LENGTH_LONG).show();
-
                 Intent intent = new Intent(sellProduct.this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -886,60 +845,98 @@ public class sellProduct extends BaseActivity {
 
         CartManager.CartItem item = items.get(index);
         double lineTotal = item.getLineTotal();
-        double ratio = subtotal == 0 ? 0 : lineTotal / subtotal;
+        double ratio     = subtotal == 0 ? 0 : lineTotal / subtotal;
         double lineFinal = finalTotal * ratio;
 
-        Sales sale = new Sales();
-        sale.setOrderId(orderId);
-        sale.setProductId(item.productId);
-        sale.setProductName(item.productName);
-        sale.setQuantity(item.quantity);
-        sale.setPrice(item.unitPrice);
-        sale.setTotalPrice(lineFinal);
-        sale.setPaymentMethod(paymentMethod);
-        sale.setDate(now);
-        sale.setTimestamp(now);
-        sale.setDeliveryType(deliveryType);
-        sale.setDeliveryStatus(deliveryStatus);
-        sale.setDeliveryDate(deliveryDate);
-        sale.setDeliveryName(dName);
-        sale.setDeliveryPhone(dPhone);
-        sale.setDeliveryAddress(dAddr);
-        sale.setDeliveryPaymentMethod(dPay);
+        String tempProductName = item.productName;
+        String extras = enrichedNames.get(item.productId);
+        if (extras != null && !extras.isEmpty()) {
+            tempProductName += " | " + extras;
+        }
 
-        salesRepository.addSale(sale, new SalesRepository.OnSaleAddedListener() {
+        final String finalDbProductName = tempProductName;
+
+        productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
             @Override
-            public void onSaleAdded(String saleId) {
-                productRepository.updateProductQuantity(item.productId, Math.max(0, item.stock - item.quantity), new ProductRepository.OnProductUpdatedListener() {
-                    @Override
-                    public void onProductUpdated() {
-                        // --- AUTOMATED MATERIAL DEDUCTION ---
-                        productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
-                            @Override
-                            public void onProductFetched(Product p) {
-                                Map<String, Integer> materials = p.getLinkedMaterials();
-                                if (materials != null && !materials.isEmpty()) {
-                                    for (Map.Entry<String, Integer> entry : materials.entrySet()) {
-                                        String materialId = entry.getKey();
-                                        int deductPerItem = entry.getValue();
-                                        int totalDeduction = deductPerItem * item.quantity;
+            public void onProductFetched(Product p) {
+                Sales sale = new Sales();
+                sale.setOrderId(orderId);
+                sale.setProductId(item.productId);
+                sale.setProductName(finalDbProductName);
+                sale.setQuantity(item.quantity);
+                sale.setPrice(item.unitPrice);
+                sale.setTotalPrice(lineFinal);
 
-                                        productRepository.getProductById(materialId, new ProductRepository.OnProductFetchedListener() {
-                                            @Override
-                                            public void onProductFetched(Product material) {
-                                                int newMaterialQty = Math.max(0, material.getQuantity() - totalDeduction);
-                                                productRepository.updateProductQuantity(materialId, newMaterialQty, null);
+                if (p != null) {
+                    sale.setTotalCost(p.getCostPrice() * item.quantity);
+                } else {
+                    sale.setTotalCost(0.0);
+                }
+
+                sale.setPaymentMethod(paymentMethod);
+                sale.setDate(now);
+                sale.setTimestamp(now);
+                sale.setDeliveryType(deliveryType);
+                sale.setDeliveryStatus(deliveryStatus);
+                sale.setDeliveryDate(deliveryDate);
+                sale.setDeliveryName(dName);
+                sale.setDeliveryPhone(dPhone);
+                sale.setDeliveryAddress(dAddr);
+                sale.setDeliveryPaymentMethod(dPay);
+
+                salesRepository.addSale(sale, new SalesRepository.OnSaleAddedListener() {
+                    @Override
+                    public void onSaleAdded(String saleId) {
+                        productRepository.updateProductQuantity(item.productId,
+                                Math.max(0, item.stock - item.quantity),
+                                new ProductRepository.OnProductUpdatedListener() {
+                                    @Override
+                                    public void onProductUpdated() {
+                                        if (p != null) {
+                                            List<Map<String, Object>> bomList = p.getBomList();
+                                            if (bomList != null && !bomList.isEmpty()) {
+                                                for (Map<String, Object> bomItem : bomList) {
+                                                    String materialName = (String) bomItem.get("materialName");
+                                                    double deductQty = 0;
+
+                                                    if (bomItem.get("quantity") instanceof Number) {
+                                                        deductQty = ((Number) bomItem.get("quantity")).doubleValue();
+                                                    } else if (bomItem.get("quantity") instanceof String) {
+                                                        try { deductQty = Double.parseDouble((String) bomItem.get("quantity")); } catch (Exception ignored) {}
+                                                    }
+
+                                                    if (materialName != null && !materialName.isEmpty() && deductQty > 0) {
+                                                        double totalDeduction = deductQty * item.quantity;
+                                                        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Products");
+                                                        ref.orderByChild("productName").equalTo(materialName)
+                                                                .addListenerForSingleValueEvent(new ValueEventListener() {
+                                                                    @Override
+                                                                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                                                        for (DataSnapshot ds : snapshot.getChildren()) {
+                                                                            Product material = ds.getValue(Product.class);
+                                                                            if (material != null) {
+                                                                                int currentQty = material.getQuantity();
+                                                                                int newQty = Math.max(0, currentQty - (int) Math.ceil(totalDeduction));
+                                                                                ds.getRef().child("quantity").setValue(newQty);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    @Override public void onCancelled(@NonNull DatabaseError error) {}
+                                                                });
+                                                    }
+                                                }
                                             }
-                                            @Override public void onError(String error) {}
-                                        });
+                                        }
+                                        saveCartItemRecursively(index + 1, items, orderId, subtotal, now,
+                                                paymentMethod, deliveryType, deliveryStatus, deliveryDate,
+                                                dName, dPhone, dAddr, dPay, enrichedNames);
                                     }
-                                }
-                                saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
-                            }
-                            @Override public void onError(String error) {
-                                saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay);
-                            }
-                        });
+                                    @Override public void onError(String error) {
+                                        saveCartItemRecursively(index + 1, items, orderId, subtotal, now,
+                                                paymentMethod, deliveryType, deliveryStatus, deliveryDate,
+                                                dName, dPhone, dAddr, dPay, enrichedNames);
+                                    }
+                                });
                     }
                     @Override public void onError(String error) { handleSaveError(error); }
                 });
@@ -950,26 +947,9 @@ public class sellProduct extends BaseActivity {
 
     private void handleSaveError(String msg) {
         runOnUiThread(() -> {
-            if (loadingDialog != null && loadingDialog.isShowing()) {
-                loadingDialog.dismiss();
-            }
+            if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
             Toast.makeText(sellProduct.this, "Error: " + msg, Toast.LENGTH_LONG).show();
         });
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults.length > 0 &&
-                    grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                showReceiptDialog();
-            } else {
-                Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show();
-            }
-        }
     }
 
     @Override

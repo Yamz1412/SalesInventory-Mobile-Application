@@ -29,6 +29,9 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     private final ProductRepository repository;
     private final AuthManager authManager;
 
+    // Identifies if we are locked in Impersonation/Staff mode
+    private boolean isReadOnly = false;
+
     public ProductAdapter(Context ctx) {
         this.ctx = ctx;
         this.repository = ProductRepository.getInstance((Application) ctx.getApplicationContext());
@@ -41,6 +44,11 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             this.items.clear();
             this.items.addAll(initialList);
         }
+    }
+
+    public void setReadOnly(boolean readOnly) {
+        this.isReadOnly = readOnly;
+        notifyDataSetChanged();
     }
 
     public void setItems(List<Product> list) {
@@ -92,18 +100,27 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
         loadProductImage(holder.productImage, p);
 
-        // --- ADMIN ONLY: Show the EDIT Word Box ---
+        boolean isRealAdmin = authManager.isCurrentUserAdmin();
+        boolean hasEditPowers = isRealAdmin && !isReadOnly;
+
+        // --- HIDE EDIT AND MANUAL ADJUST BUTTONS FOR STAFF ---
         if (holder.btnEdit != null) {
-            if (authManager.isCurrentUserAdmin()) {
-                holder.btnEdit.setVisibility(View.VISIBLE);
+            holder.btnEdit.setVisibility(hasEditPowers ? View.VISIBLE : View.GONE);
+            if (hasEditPowers) {
                 holder.btnEdit.setOnClickListener(v -> {
                     Intent intent = new Intent(ctx, EditProduct.class);
                     intent.putExtra("productId", p.getProductId());
                     ctx.startActivity(intent);
                 });
-            } else {
-                holder.btnEdit.setVisibility(View.GONE);
             }
+        }
+
+        if (holder.btnIncrease != null) {
+            holder.btnIncrease.setVisibility(hasEditPowers ? View.VISIBLE : View.GONE);
+        }
+
+        if (holder.btnDecrease != null) {
+            holder.btnDecrease.setVisibility(hasEditPowers ? View.VISIBLE : View.GONE);
         }
 
         // --- SHORT CLICK (VIEW DETAILS) ---
@@ -115,7 +132,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
         // --- LONG CLICK (DELETE ONLY - ADMIN ONLY) ---
         holder.itemView.setOnLongClickListener(v -> {
-            if (!authManager.isCurrentUserAdmin()) return true;
+            if (!hasEditPowers) return true;
             new AlertDialog.Builder(ctx)
                     .setTitle("Delete Product")
                     .setMessage("Are you sure you want to delete " + p.getProductName() + "?")
@@ -130,7 +147,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         });
 
         // --- PLUS BUTTON (INCREASE STOCK) ---
-        if (holder.btnIncrease != null) {
+        if (holder.btnIncrease != null && hasEditPowers) {
             holder.btnIncrease.setOnClickListener(v -> {
                 int newQty = p.getQuantity() + 1;
                 repository.updateProductQuantity(p.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
@@ -150,7 +167,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         }
 
         // --- MINUS BUTTON (DECREASE STOCK) ---
-        if (holder.btnDecrease != null) {
+        if (holder.btnDecrease != null && hasEditPowers) {
             holder.btnDecrease.setOnClickListener(v -> {
                 int current = p.getQuantity();
                 if (current <= 0) return; // Prevent negative stock
@@ -201,7 +218,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name, quantityText, costPriceText, stockText, btnEdit; // btnEdit mapped as TextView box
+        TextView name, quantityText, costPriceText, stockText, btnEdit;
         ImageView productImage;
         ImageButton btnIncrease, btnDecrease;
 
@@ -213,10 +230,9 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             costPriceText = itemView.findViewById(R.id.tvCostPrice);
             stockText = itemView.findViewById(R.id.tvStock);
 
-            // Connect to XML Buttons
             btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
             btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
-            btnEdit = itemView.findViewById(R.id.btnEdit); // Text Box
+            btnEdit = itemView.findViewById(R.id.btnEdit);
         }
     }
 }

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="12dp"
+    android:paddingHorizontal="8dp"
+    android:background="?attr/selectableItemBackground">
+
+    <FrameLayout
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_circle_light"
+        android:backgroundTint="#F0F0F0">
+
+        <ImageView
+            android:id="@+id/ivTransIcon"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_receipt"
+            app:tint="?attr/colorPrimary" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="16dp">
+
+        <TextView
+            android:id="@+id/tvTransTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="POS Sale (Cash)"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground" />
+
+        <TextView
+            android:id="@+id/tvTransDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mar 03, 2026 - 10:30 AM"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvTransAmount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="+ ₱ 150.00"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/success_primary" />
+
+</LinearLayout>

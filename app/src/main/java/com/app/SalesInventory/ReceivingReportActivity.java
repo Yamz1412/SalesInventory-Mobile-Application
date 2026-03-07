@@ -19,7 +19,6 @@ import com.google.firebase.database.ValueEventListener;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -100,7 +99,7 @@ public class ReceivingReportActivity extends BaseActivity {
                     tvNoData.setVisibility(View.GONE);
                     String summary = "Received: " + receivedCount +
                             "   Pending: " + pendingCount +
-                            "   Total Received Amount: " + currencyFormat.format(totalReceivedAmount);
+                            "   Total Amount: " + currencyFormat.format(totalReceivedAmount);
                     tvSummary.setText(summary);
                 }
             }
@@ -108,9 +107,7 @@ public class ReceivingReportActivity extends BaseActivity {
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(ReceivingReportActivity.this,
-                        "Error loading receiving report: " + error.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(ReceivingReportActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -127,9 +124,7 @@ public class ReceivingReportActivity extends BaseActivity {
         private SimpleDateFormat dateFormat;
         private NumberFormat currencyFormat;
 
-        public ReceivingReportAdapter(List<PurchaseOrder> data,
-                                      SimpleDateFormat dateFormat,
-                                      NumberFormat currencyFormat) {
+        public ReceivingReportAdapter(List<PurchaseOrder> data, SimpleDateFormat dateFormat, NumberFormat currencyFormat) {
             this.data = data;
             this.dateFormat = dateFormat;
             this.currencyFormat = currencyFormat;
@@ -138,15 +133,17 @@ public class ReceivingReportActivity extends BaseActivity {
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
-            android.view.View view = android.view.LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_receiving_report_row, parent, false);
+            android.view.View view = android.view.LayoutInflater.from(parent.getContext()).inflate(R.layout.item_receiving_report_row, parent, false);
             return new ViewHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             PurchaseOrder po = data.get(position);
-            String dateStr = dateFormat.format(new Date(po.getOrderDate()));
+
+            // FIXED: getOrderDate() is already a Date object
+            String dateStr = po.getOrderDate() != null ? dateFormat.format(po.getOrderDate()) : "Unknown";
+
             holder.tvPoNumber.setText(po.getPoNumber());
             holder.tvSupplier.setText(po.getSupplierName());
             holder.tvDate.setText(dateStr);

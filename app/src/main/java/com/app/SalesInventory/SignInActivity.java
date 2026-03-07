@@ -57,28 +57,20 @@ public class SignInActivity extends BaseActivity {
         fStore = FirebaseFirestore.getInstance();
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // Check if user has "Remember Me" enabled
         checkRememberedUser();
     }
 
-    /**
-     * Check if user previously enabled "Remember Me"
-     * If yes and local data exists, automatically open dashboard (offline capable)
-     */
     private void checkRememberedUser() {
         boolean remembered = prefs.getBoolean(KEY_REMEMBER, false);
         String cachedUserId = prefs.getString(KEY_USER_ID, null);
         String cachedBusinessOwner = prefs.getString(KEY_BUSINESS_OWNER, null);
 
         if (remembered && cachedUserId != null) {
-            // User has "Remember Me" enabled and local data cached
             FirebaseUser currentUser = fAuth.getCurrentUser();
 
             if (currentUser != null && currentUser.getUid().equals(cachedUserId)) {
-                // User is already signed in with same account - proceed directly
                 proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
             } else if (currentUser != null) {
-                // Different user signed in - reload to check
                 progressBar.setVisibility(View.VISIBLE);
                 currentUser.reload().addOnCompleteListener(new OnCompleteListener<Void>() {
                     @Override
@@ -101,19 +93,12 @@ public class SignInActivity extends BaseActivity {
                     }
                 });
             } else {
-                // No active Firebase session but local data exists
-                // User can access dashboard with cached offline data
                 proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
             }
         }
     }
 
-    /**
-     * Open dashboard using cached offline data
-     * No internet required if "Remember Me" was checked
-     */
     private void proceedToMainActivityOffline(String userId, String businessOwner) {
-        // Restore cached user data
         FirestoreManager.getInstance().updateCurrentUserId(userId);
         if (businessOwner != null && !businessOwner.isEmpty()) {
             FirestoreManager.getInstance().setBusinessOwnerId(businessOwner);
@@ -121,7 +106,7 @@ public class SignInActivity extends BaseActivity {
 
         Intent intent = new Intent(getApplicationContext(), MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        intent.putExtra("offline_mode", true); // Flag for offline mode
+        intent.putExtra("offline_mode", true);
         startActivity(intent);
         finish();
     }
@@ -130,42 +115,35 @@ public class SignInActivity extends BaseActivity {
         void onProceed(boolean allowed);
     }
 
-    /**
-     * Verify user role and proceed with login
-     * Called when user signs in with internet connection
-     */
     private void checkUserRoleAndProceedAfterReload(@NonNull final FirebaseUser reloaded, @NonNull final RoleCheckCallback cb) {
         final String uid = reloaded.getUid();
         fStore.collection("admin").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
             @Override
             public void onComplete(@NonNull Task<DocumentSnapshot> adminTask) {
-                DocumentSnapshot adminSnap;
+                DocumentSnapshot adminSnap = null;
                 if (adminTask.isSuccessful() && adminTask.getResult() != null && adminTask.getResult().exists()) {
                     adminSnap = adminTask.getResult();
-                } else {
-                    adminSnap = null;
                 }
+
+                final DocumentSnapshot finalAdminSnap = adminSnap;
                 fStore.collection("users").document(uid).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<DocumentSnapshot> userTask) {
-                        DocumentSnapshot userSnap;
+                        DocumentSnapshot userSnap = null;
                         if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
                             userSnap = userTask.getResult();
-                        } else {
-                            userSnap = null;
                         }
+
                         boolean approved = false;
                         String role = "Unknown";
-                        if (adminSnap != null && adminSnap.exists()) {
-                            Boolean adminApproved = adminSnap.getBoolean("approved");
-                            if (adminApproved == null) adminApproved = false;
-                            approved = adminApproved;
-                            String adminRole = adminSnap.getString("role");
+                        if (finalAdminSnap != null && finalAdminSnap.exists()) {
+                            Boolean adminApproved = finalAdminSnap.getBoolean("approved");
+                            approved = adminApproved != null ? adminApproved : false;
+                            String adminRole = finalAdminSnap.getString("role");
                             if (adminRole != null) role = adminRole;
                         } else if (userSnap != null && userSnap.exists()) {
                             Boolean userApproved = userSnap.getBoolean("approved");
-                            if (userApproved == null) userApproved = false;
-                            approved = userApproved;
+                            approved = userApproved != null ? userApproved : false;
                             String userRole = userSnap.getString("role");
                             if (userRole == null) userRole = userSnap.getString("Role");
                             if (userRole != null) role = userRole;
@@ -182,6 +160,7 @@ public class SignInActivity extends BaseActivity {
                             FirestoreManager.getInstance().setBusinessOwnerId(uid);
                             FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                         }
+
                         if (!approved) {
                             cb.onProceed(false);
                             Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
@@ -190,6 +169,11 @@ public class SignInActivity extends BaseActivity {
                             finish();
                             return;
                         }
+
+                        // CLEAR SINGLETON & LOCAL CACHES BEFORE LOADING TO PREVENT DATA LEAKS ACROSS ACCOUNTS
+                        ProductRepository.getInstance(getApplication()).clearLocalData();
+                        SalesRepository.getInstance(getApplication()).clearData();
+
                         if ("Admin".equalsIgnoreCase(role)) {
                             if (reloaded.isEmailVerified()) {
                                 applyRemoteTheme(userSnap);
@@ -200,7 +184,6 @@ public class SignInActivity extends BaseActivity {
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
                                 syncer.startRealtimeSync(uid);
 
-                                // Cache user data for offline access if "Remember Me" is checked
                                 if (rememberCheck != null && rememberCheck.isChecked()) {
                                     cacheUserData(uid, uid);
                                     prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
@@ -208,14 +191,24 @@ public class SignInActivity extends BaseActivity {
                                     clearRememberedUser();
                                 }
 
+                                // -------------------------------------------------------------
+                                // CHECK IF BUSINESS SETUP IS COMPLETE (Routes to Business Setup)
+                                // -------------------------------------------------------------
+                                String businessName = finalAdminSnap != null ? finalAdminSnap.getString("businessName") : null;
+                                if (businessName == null || businessName.isEmpty()) {
+                                    Intent intent = new Intent(getApplicationContext(), BusinessSetupActivity.class);
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                    startActivity(intent);
+                                    finish();
+                                    return;
+                                }
+
                                 proceedToMainActivityOffline(uid, uid);
                                 cb.onProceed(true);
-                                return;
                             } else {
-                                Toast.makeText(SignInActivity.this, "Please verify your email before logging in. Check your inbox.", Toast.LENGTH_LONG).show();
+                                Toast.makeText(SignInActivity.this, "Please verify your email before logging in.", Toast.LENGTH_LONG).show();
                                 FirebaseAuth.getInstance().signOut();
                                 cb.onProceed(false);
-                                return;
                             }
                         } else {
                             applyRemoteTheme(userSnap);
@@ -228,7 +221,6 @@ public class SignInActivity extends BaseActivity {
                                 syncer.startRealtimeSync(owner);
                             }
 
-                            // Cache user data for offline access if "Remember Me" is checked
                             if (rememberCheck != null && rememberCheck.isChecked()) {
                                 cacheUserData(uid, owner);
                                 prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
@@ -252,12 +244,8 @@ public class SignInActivity extends BaseActivity {
         Long secondary = doc.getLong("secondaryColor");
         Long accent = doc.getLong("accentColor");
         ThemeManager tm = ThemeManager.getInstance(this);
-        if (themeName != null && !themeName.isEmpty()) {
-            tm.setCurrentThemeLocalOnly(themeName);
-        }
-        if (primary != null && secondary != null && accent != null) {
-            tm.setCustomColors(primary.intValue(), secondary.intValue(), accent.intValue());
-        }
+        if (themeName != null && !themeName.isEmpty()) tm.setCurrentThemeLocalOnly(themeName);
+        if (primary != null && secondary != null && accent != null) tm.setCustomColors(primary.intValue(), secondary.intValue(), accent.intValue());
     }
 
     private void updateUserProfileFromAuth(com.google.firebase.auth.FirebaseUser user, DocumentSnapshot existingDoc) {
@@ -268,35 +256,20 @@ public class SignInActivity extends BaseActivity {
         String phone = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
         String photoUrl = user.getPhotoUrl() != null ? user.getPhotoUrl().toString() : "";
         Map<String, Object> data = new HashMap<>();
-        if (!email.isEmpty()) {
-            data.put("email", email);
-            data.put("Email", email);
-        }
-        if (!name.isEmpty()) {
-            data.put("name", name);
-            data.put("Name", name);
-        }
-        if (!phone.isEmpty()) {
-            data.put("phone", phone);
-            data.put("Phone", phone);
-        }
+        if (!email.isEmpty()) { data.put("email", email); data.put("Email", email); }
+        if (!name.isEmpty()) { data.put("name", name); data.put("Name", name); }
+        if (!phone.isEmpty()) { data.put("phone", phone); data.put("Phone", phone); }
         if (!photoUrl.isEmpty()) {
             data.put("photoUrl", photoUrl);
         } else if (existingDoc != null) {
             String existingPhoto = existingDoc.getString("photoUrl");
-            if (existingPhoto != null && !existingPhoto.isEmpty()) {
-                data.put("photoUrl", existingPhoto);
-            }
+            if (existingPhoto != null && !existingPhoto.isEmpty()) data.put("photoUrl", existingPhoto);
         }
         if (!data.isEmpty()) {
             FirebaseFirestore.getInstance().collection("users").document(uid).set(data, SetOptions.merge());
         }
     }
 
-    /**
-     * Cache user data locally for offline dashboard access
-     * This allows "Remember Me" functionality to work without internet
-     */
     private void cacheUserData(String userId, String businessOwner) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString(KEY_USER_ID, userId);
@@ -306,9 +279,6 @@ public class SignInActivity extends BaseActivity {
         editor.apply();
     }
 
-    /**
-     * Clear all cached user data and disable "Remember Me"
-     */
     private void clearRememberedUser() {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putBoolean(KEY_REMEMBER, false);
@@ -319,31 +289,16 @@ public class SignInActivity extends BaseActivity {
         editor.apply();
     }
 
-    /**
-     * Sign in button click handler
-     * Validates credentials and attempts login with internet
-     * If "Remember Me" is checked, caches user data for offline access
-     */
     public void SingInB(View view) {
         String email = Email.getText().toString().trim();
         String password = Password.getText().toString().trim();
 
-        if (TextUtils.isEmpty(email)) {
-            Email.setError("Email is Required");
-            return;
-        }
-        if (TextUtils.isEmpty(password)) {
-            Password.setError("Password is Required");
-            return;
-        }
-        if (password.length() < 6) {
-            Password.setError("Password Must be 6 Characters or More");
-            return;
-        }
+        if (TextUtils.isEmpty(email)) { Email.setError("Email is Required"); return; }
+        if (TextUtils.isEmpty(password)) { Password.setError("Password is Required"); return; }
+        if (password.length() < 6) { Password.setError("Password Must be 6 Characters or More"); return; }
 
         progressBar.setVisibility(View.VISIBLE);
 
-        // Attempt sign in with Firebase
         fAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
@@ -363,12 +318,8 @@ public class SignInActivity extends BaseActivity {
                                     @Override
                                     public void onProceed(boolean success) {
                                         if (success) {
-                                            // Update "Remember Me" preference based on checkbox
-                                            if (rememberCheck != null && rememberCheck.isChecked()) {
-                                                prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
-                                            } else {
-                                                clearRememberedUser();
-                                            }
+                                            if (rememberCheck != null && rememberCheck.isChecked()) prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
+                                            else clearRememberedUser();
                                         }
                                     }
                                 });
@@ -387,12 +338,6 @@ public class SignInActivity extends BaseActivity {
         });
     }
 
-    public void resetPW(View view) {
-        Intent i = new Intent(this, resetPassWord.class);
-        startActivity(i);
-    }
-
-    public void GoTo(View view) {
-        startActivity(new Intent(getApplicationContext(), SignUpActivity.class));
-    }
+    public void resetPW(View view) { startActivity(new Intent(this, resetPassWord.class)); }
+    public void GoTo(View view) { startActivity(new Intent(getApplicationContext(), SignUpActivity.class)); }
 }

@@ -55,7 +55,10 @@ public class PurchaseOrderListActivity extends BaseActivity  {
     }
 
     private void loadPurchaseOrders() {
-        poRef.addValueEventListener(new ValueEventListener() {
+        // FIXED MULTI-TENANCY LEAK: Retrieve ONLY the current admin's POs
+        String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
+
+        poRef.orderByChild("ownerAdminId").equalTo(currentAdminId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 purchaseOrderList.clear();

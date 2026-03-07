@@ -9,9 +9,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
@@ -20,18 +18,23 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
     private Context context;
     private List<PurchaseOrder> poList;
     private OnPOClickListener clickListener;
-    private OnPOLongClickListener longClickListener; // Added Long Click Listener
+    private OnPOLongClickListener longClickListener;
 
     public interface OnPOClickListener {
         void onPOClick(PurchaseOrder po);
     }
 
-    // New Interface for Long Clicks
     public interface OnPOLongClickListener {
         void onPOLongClick(PurchaseOrder po);
     }
 
-    // Updated Constructor to accept longClickListener
+    public PurchaseOrderAdapter(Context context, List<PurchaseOrder> poList, OnPOClickListener clickListener) {
+        this.context = context;
+        this.poList = poList;
+        this.clickListener = clickListener;
+        this.longClickListener = null;
+    }
+
     public PurchaseOrderAdapter(Context context, List<PurchaseOrder> poList, OnPOClickListener clickListener, OnPOLongClickListener longClickListener) {
         this.context = context;
         this.poList = poList;
@@ -52,42 +55,45 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
 
         holder.tvPONumber.setText(po.getPoNumber());
         holder.tvSupplier.setText(po.getSupplierName());
-        holder.tvStatus.setText(po.getStatus());
+        holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%.2f", po.getTotalAmount()));
 
-        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-        holder.tvOrderDate.setText(sdf.format(new Date(po.getOrderDate())));
-
-        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
-        holder.tvTotalAmount.setText(currencyFormat.format(po.getTotalAmount()));
-
-        int statusColor;
-        switch (po.getStatus()) {
-            case "Pending":
-                statusColor = context.getResources().getColor(R.color.warningYellow);
-                break;
-            case "Received":
-                statusColor = context.getResources().getColor(R.color.successGreen);
-                break;
-            case "Cancelled":
-                statusColor = context.getResources().getColor(R.color.errorRed);
-                break;
-            default:
-                statusColor = context.getResources().getColor(R.color.textColorSecondary);
+        // FIXED: getOrderDate() is already a Date object, no need for "new Date()"
+        if (po.getOrderDate() != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+            holder.tvOrderDate.setText(sdf.format(po.getOrderDate()));
+        } else {
+            holder.tvOrderDate.setText("Unknown Date");
         }
-        holder.tvStatus.setTextColor(statusColor);
 
-        // Regular Click
-        holder.itemView.setOnClickListener(v -> {
-            if (clickListener != null) {
-                clickListener.onPOClick(po);
+        if (holder.tvStatus != null) {
+            String status = po.getStatus() != null ? po.getStatus() : "PENDING";
+            holder.tvStatus.setText(status);
+
+            int statusColor;
+            switch (status) {
+                case "RECEIVED":
+                    statusColor = context.getResources().getColor(R.color.success_primary);
+                    break;
+                case "PARTIAL":
+                    statusColor = context.getResources().getColor(R.color.warning_primary);
+                    break;
+                case "CANCELLED":
+                    statusColor = context.getResources().getColor(R.color.errorRed);
+                    break;
+                default:
+                    statusColor = context.getResources().getColor(R.color.colorPrimary);
             }
+            holder.tvStatus.setTextColor(statusColor);
+        }
+
+        holder.itemView.setOnClickListener(v -> {
+            if (clickListener != null) clickListener.onPOClick(po);
         });
 
-        // Long Click to Cancel
         holder.itemView.setOnLongClickListener(v -> {
             if (longClickListener != null) {
                 longClickListener.onPOLongClick(po);
-                return true; // Consume the click
+                return true;
             }
             return false;
         });
@@ -106,8 +112,9 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
             tvPONumber = itemView.findViewById(R.id.tvPONumber);
             tvSupplier = itemView.findViewById(R.id.tvSupplier);
             tvOrderDate = itemView.findViewById(R.id.tvOrderDate);
-            tvStatus = itemView.findViewById(R.id.tvStatus);
             tvTotalAmount = itemView.findViewById(R.id.tvTotalAmount);
+            // FIXED: Look strictly for tvStatus.
+            tvStatus = itemView.findViewById(R.id.tvStatus);
         }
     }
 }

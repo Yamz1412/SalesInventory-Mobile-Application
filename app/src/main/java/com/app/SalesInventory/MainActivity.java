@@ -8,6 +8,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -20,6 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.bumptech.glide.Glide;
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
@@ -28,6 +30,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -38,19 +41,23 @@ import java.util.Locale;
 
 public class MainActivity extends BaseActivity {
     // UI Components
-    private CardView cardSalesAmount, cardTransactions, cardLowStock, cardPendingOrders, cardNearExpiry;
-    private TextView tvSalesAmount, tvTransactionCount, tvLowStockCount, tvPendingOrdersCount, tvNearExpiryCount;
+    private CardView cardSalesAmount, cardGrossProfit, cardLowStock, cardPendingOrders, cardNearExpiry;
+    private TextView tvSalesAmount, tvGrossProfit, tvLowStockCount, tvPendingOrdersCount, tvNearExpiryCount;
     private TextView tvOverviewLabel;
     private LineChart salesTrendChart;
     private BarChart topProductsChart;
     private PieChart inventoryStatusChart;
-
-    // --- EXACT VIEW TYPES DEFINED BY YOUR XML ---
     private LinearLayout btnCreateSale, btnCreatePO, btnViewReports, btnInventory;
-    private FloatingActionButton btnAddProduct;
-    private MaterialButton btnCustomers, btnManageUsers;
-    // --------------------------------------------
 
+    private FloatingActionButton btnAddProduct;
+
+    // FAB MENU VARIABLES
+    private FloatingActionButton btnButtons, fabCashMenu, fabPoMenu;
+    private View dimOverlay;
+    private LinearLayout layoutFabMenu;
+    private boolean isFabOpen = false;
+
+    private MaterialButton btnCustomers, btnManageUsers;
     private MaterialButtonToggleGroup toggleTimeFilter;
     private RecyclerView rvRecentActivity;
     private RecentActivityAdapter activityAdapter;
@@ -58,6 +65,10 @@ public class MainActivity extends BaseActivity {
     private TextView tvLastUpdated;
     private View btnSettings, btnProfile;
     private SwipeRefreshLayout swipeRefresh;
+
+    // DYNAMIC BUSINESS PROFILE COMPONENTS
+    private ImageView ivBusinessLogo;
+    private TextView tvBusinessName;
 
     // Layout Containers for Animation
     private GridLayout statsGrid, quickActionsGrid;
@@ -73,10 +84,17 @@ public class MainActivity extends BaseActivity {
     // Data Cache for Filtering
     private List<Sales> cachedSalesList = new ArrayList<>();
 
+    private LinearLayout layoutImpersonationBanner;
+    private TextView tvImpersonationText;
+    private Button btnExitImpersonation;
+    private boolean isImpersonating = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        AuthManager.getInstance().init(getApplication());
 
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
@@ -88,7 +106,6 @@ public class MainActivity extends BaseActivity {
         setupSalesObserver();
         setupCharts();
         setupClickListeners();
-        resolveUserRoleAndConfigureUI();
 
         notificationBadgeManager = new NotificationBadgeManager(this);
         notificationBadgeManager.start();
@@ -100,18 +117,22 @@ public class MainActivity extends BaseActivity {
     private void initializeUI() {
         swipeRefresh = findViewById(R.id.swipe_refresh);
         cardSalesAmount = findViewById(R.id.card_sales_amount);
-        cardTransactions = findViewById(R.id.card_transactions);
+        cardGrossProfit = findViewById(R.id.card_gross_profit);
         cardLowStock = findViewById(R.id.card_low_stock);
         cardPendingOrders = findViewById(R.id.card_pending_orders);
         cardNearExpiry = findViewById(R.id.card_near_expiry);
 
         tvSalesAmount = findViewById(R.id.tv_sales_amount);
-        tvTransactionCount = findViewById(R.id.tv_transaction_count);
+        tvGrossProfit = findViewById(R.id.tv_gross_profit);
         tvLowStockCount = findViewById(R.id.tv_low_stock_count);
         tvPendingOrdersCount = findViewById(R.id.tv_pending_orders_count);
         tvNearExpiryCount = findViewById(R.id.tv_near_expiry_count);
         tvOverviewLabel = findViewById(R.id.tv_overview_label);
         tvLastUpdated = findViewById(R.id.tv_last_updated);
+
+        // Map Business UI
+        ivBusinessLogo = findViewById(R.id.ivBusinessLogo);
+        tvBusinessName = findViewById(R.id.tvBusinessName);
 
         toggleTimeFilter = findViewById(R.id.toggle_time_filter);
 
@@ -121,6 +142,13 @@ public class MainActivity extends BaseActivity {
 
         btnCreateSale = findViewById(R.id.btn_create_sale);
         btnAddProduct = findViewById(R.id.btn_add_product);
+
+        btnButtons = findViewById(R.id.btnButtons);
+        dimOverlay = findViewById(R.id.dim_overlay);
+        layoutFabMenu = findViewById(R.id.layout_fab_menu);
+        fabCashMenu = findViewById(R.id.fab_cash_menu);
+        fabPoMenu = findViewById(R.id.fab_po_menu);
+
         btnCreatePO = findViewById(R.id.btn_create_po);
         btnViewReports = findViewById(R.id.btn_view_reports);
         btnInventory = findViewById(R.id.btn_inventory);
@@ -138,6 +166,14 @@ public class MainActivity extends BaseActivity {
         rvRecentActivity.setAdapter(activityAdapter);
         rvRecentActivity.setLayoutManager(new LinearLayoutManager(this));
 
+        layoutImpersonationBanner = findViewById(R.id.layout_impersonation_banner);
+        tvImpersonationText = findViewById(R.id.tv_impersonation_text);
+        btnExitImpersonation = findViewById(R.id.btn_exit_impersonation);
+
+        if (btnExitImpersonation != null) {
+            btnExitImpersonation.setOnClickListener(v -> exitImpersonation());
+        }
+
         if (toggleTimeFilter != null) {
             toggleTimeFilter.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
                 if (isChecked) {
@@ -153,6 +189,34 @@ public class MainActivity extends BaseActivity {
 
         if (swipeRefresh != null) {
             swipeRefresh.setOnRefreshListener(this::onSwipeRefresh);
+        }
+    }
+
+    // =========================================================================
+    // NEW: FETCH BUSINESS PROFILE
+    // =========================================================================
+    private void loadBusinessProfile() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId != null && !ownerId.isEmpty()) {
+            FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            String bName = documentSnapshot.getString("businessName");
+                            String bLogo = documentSnapshot.getString("businessLogoUrl");
+
+                            if (bName != null && !bName.isEmpty()) {
+                                tvBusinessName.setText(bName);
+                            }
+
+                            if (bLogo != null && !bLogo.isEmpty()) {
+                                ivBusinessLogo.setVisibility(View.VISIBLE);
+                                Glide.with(MainActivity.this).load(bLogo).into(ivBusinessLogo);
+                            } else {
+                                ivBusinessLogo.setVisibility(View.GONE);
+                            }
+                        }
+                    });
         }
     }
 
@@ -176,6 +240,55 @@ public class MainActivity extends BaseActivity {
                 .setDuration(500)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
+    }
+
+    private void resolveUserRoleAndConfigureUI() {
+        authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
+            boolean isRealAdmin = authManager.isCurrentUserAdmin();
+            if (isImpersonating) {
+                isAdminFlag = false;
+            } else {
+                isAdminFlag = isRealAdmin;
+            }
+            applyRoleVisibility();
+        }));
+    }
+
+    private void applyRoleVisibility() {
+        if (isAdminFlag) {
+            if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
+            if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
+            if (btnCreatePO != null) btnCreatePO.setVisibility(View.VISIBLE);
+            if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
+            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
+            if (btnCustomers != null) btnCustomers.setVisibility(View.VISIBLE);
+            if (btnManageUsers != null) btnManageUsers.setVisibility(View.VISIBLE);
+            if (btnButtons != null) btnButtons.setVisibility(View.VISIBLE);
+        } else {
+            if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
+            if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
+            if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
+            if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
+            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
+            if (btnCustomers != null) btnCustomers.setVisibility(View.GONE);
+            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
+            if (btnButtons != null) btnButtons.setVisibility(View.GONE);
+
+            if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
+            if (dimOverlay != null) dimOverlay.setVisibility(View.GONE);
+            isFabOpen = false;
+        }
+        arrangeQuickActions();
+    }
+
+    private void exitImpersonation() {
+        isImpersonating = false;
+        getIntent().removeExtra("IMPERSONATE_STAFF_NAME");
+        if (layoutImpersonationBanner != null) {
+            layoutImpersonationBanner.setVisibility(View.GONE);
+        }
+        resolveUserRoleAndConfigureUI();
+        Toast.makeText(this, "Restored Admin View", Toast.LENGTH_SHORT).show();
     }
 
     private void setupSalesObserver() {
@@ -227,17 +340,20 @@ public class MainActivity extends BaseActivity {
         if (tvOverviewLabel != null) tvOverviewLabel.setText(label);
 
         double totalSales = 0.0;
-        int transactionCount = 0;
+        double totalCost = 0.0;
 
         for (Sales sale : cachedSalesList) {
             if (sale.getTimestamp() >= startTime) {
                 totalSales += sale.getTotalPrice();
-                transactionCount++;
+                totalCost += sale.getTotalCost();
             }
         }
 
         if (tvSalesAmount != null) tvSalesAmount.setText(String.format("₱%,.2f", totalSales));
-        if (tvTransactionCount != null) tvTransactionCount.setText(String.valueOf(transactionCount));
+        if (tvGrossProfit != null) {
+            double grossProfit = totalSales - totalCost;
+            tvGrossProfit.setText(String.format("₱%,.2f", grossProfit));
+        }
     }
 
     private void setupNearExpiryCard() {
@@ -339,27 +455,45 @@ public class MainActivity extends BaseActivity {
         if (btnSettings != null) btnSettings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
         if (btnProfile != null) btnProfile.setOnClickListener(v -> startActivity(new Intent(this, Profile.class)));
         if (btnCreateSale != null) btnCreateSale.setOnClickListener(v -> startActivity(new Intent(this, SellList.class)));
+
         if (btnAddProduct != null) btnAddProduct.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(this, AddProductActivity.class));
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
+
+        if (btnButtons != null) btnButtons.setOnClickListener(v -> toggleFabMenu());
+        if (dimOverlay != null) dimOverlay.setOnClickListener(v -> closeFabMenu());
+
+        if (fabCashMenu != null) fabCashMenu.setOnClickListener(v -> {
+            closeFabMenu();
+            startActivity(new Intent(MainActivity.this, CashManagementActivity.class));
+        });
+
+        if (fabPoMenu != null) fabPoMenu.setOnClickListener(v -> {
+            closeFabMenu();
+            if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
+            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
+        });
+
         if (btnCreatePO != null) btnCreatePO.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
         if (btnViewReports != null) btnViewReports.setOnClickListener(v -> startActivity(new Intent(this, Reports.class)));
+
         if (btnInventory != null) btnInventory.setOnClickListener(v -> {
             Intent i = new Intent(this, Inventory.class);
             i.putExtra("readonly", !isAdminFlag);
             startActivity(i);
         });
+
         if (btnCustomers != null) btnCustomers.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(MainActivity.this, CategoryManagementActivity.class));
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
 
         if (cardSalesAmount != null) cardSalesAmount.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
-        if (cardTransactions != null) cardTransactions.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
+        if (cardGrossProfit != null) cardGrossProfit.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
         if (cardLowStock != null) cardLowStock.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class)));
         if (cardPendingOrders != null) cardPendingOrders.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, PurchaseOrderListActivity.class)));
 
@@ -373,35 +507,31 @@ public class MainActivity extends BaseActivity {
         if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::loadDashboardData);
     }
 
-    private void resolveUserRoleAndConfigureUI() {
-        String businessOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        String currentUserId = FirestoreManager.getInstance().getCurrentUserId();
-
-        if (businessOwnerId != null && currentUserId != null && businessOwnerId.equals(currentUserId)) {
-            isAdminFlag = true;
-        }
-        applyRoleVisibility();
+    private void toggleFabMenu() {
+        if (isFabOpen) closeFabMenu();
+        else openFabMenu();
     }
 
-    private void applyRoleVisibility() {
-        if (isAdminFlag) {
-            if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
-            if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
-            if (btnCreatePO != null) btnCreatePO.setVisibility(View.VISIBLE);
-            if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
-            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnCustomers != null) btnCustomers.setVisibility(View.VISIBLE);
-            if (btnManageUsers != null) btnManageUsers.setVisibility(View.VISIBLE);
-        } else {
-            if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
-            if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
-            if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
-            if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
-            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnCustomers != null) btnCustomers.setVisibility(View.GONE);
-            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
-        }
-        arrangeQuickActions();
+    private void openFabMenu() {
+        isFabOpen = true;
+        dimOverlay.setVisibility(View.VISIBLE);
+        layoutFabMenu.setVisibility(View.VISIBLE);
+
+        dimOverlay.setAlpha(0f);
+        dimOverlay.animate().alpha(1f).setDuration(200).start();
+
+        layoutFabMenu.setAlpha(0f);
+        layoutFabMenu.setTranslationY(50f);
+        layoutFabMenu.animate().alpha(1f).translationY(0f).setDuration(200).start();
+
+        btnButtons.animate().rotation(45f).setDuration(200).start();
+    }
+
+    private void closeFabMenu() {
+        isFabOpen = false;
+        dimOverlay.animate().alpha(0f).setDuration(200).withEndAction(() -> dimOverlay.setVisibility(View.GONE)).start();
+        layoutFabMenu.animate().alpha(0f).translationY(50f).setDuration(200).withEndAction(() -> layoutFabMenu.setVisibility(View.GONE)).start();
+        btnButtons.animate().rotation(0f).setDuration(200).start();
     }
 
     private void arrangeQuickActions() {
@@ -454,7 +584,6 @@ public class MainActivity extends BaseActivity {
             String type = alert.getType() != null ? alert.getType() : "";
             Intent intent;
 
-            // Routes dynamically based on alert type!
             if (type.equals("LOW_STOCK") || type.equals("CRITICAL_STOCK")) {
                 intent = new Intent(MainActivity.this, LowStockItemsActivity.class);
             } else if (type.contains("EXPIRY") || type.equals("EXPIRED")) {
@@ -471,7 +600,6 @@ public class MainActivity extends BaseActivity {
 
         rvNotifications.setAdapter(adapter);
 
-        // Fetch products so the adapter can inject rich data into your custom XMLs!
         productRepository.getAllProducts().observe(this, products -> {
             adapter.setProducts(products);
         });
@@ -506,8 +634,22 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("IMPERSONATE_STAFF_NAME")) {
+            isImpersonating = true;
+            String staffName = intent.getStringExtra("IMPERSONATE_STAFF_NAME");
+            if (layoutImpersonationBanner != null) {
+                layoutImpersonationBanner.setVisibility(View.VISIBLE);
+                tvImpersonationText.setText("👀 Viewing layout as: " + staffName);
+            }
+        }
+
         resolveUserRoleAndConfigureUI();
         loadDashboardData();
+
+        // REFRESH BUSINESS PROFILE EVERY TIME DASHBOARD IS OPENED
+        loadBusinessProfile();
     }
 
     @Override
