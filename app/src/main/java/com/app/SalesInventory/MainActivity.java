@@ -52,7 +52,7 @@ public class MainActivity extends BaseActivity {
     private FloatingActionButton btnAddProduct;
 
     // FAB MENU VARIABLES
-    private FloatingActionButton btnButtons, fabCashMenu, fabPoMenu;
+    private FloatingActionButton btnButtons, fabCashMenu, fabHistory;
     private View dimOverlay;
     private LinearLayout layoutFabMenu;
     private boolean isFabOpen = false;
@@ -83,6 +83,7 @@ public class MainActivity extends BaseActivity {
 
     // Data Cache for Filtering
     private List<Sales> cachedSalesList = new ArrayList<>();
+    private List<Product> cachedProductList = new ArrayList<>(); // NEW: Needed to verify accurate costs
 
     private LinearLayout layoutImpersonationBanner;
     private TextView tvImpersonationText;
@@ -102,6 +103,7 @@ public class MainActivity extends BaseActivity {
 
         initializeUI();
         setupNearExpiryCard();
+        setupProductObserver(); // NEW: Fetch inventory to calculate accurate costs
         setupViewModel();
         setupSalesObserver();
         setupCharts();
@@ -142,12 +144,7 @@ public class MainActivity extends BaseActivity {
 
         btnCreateSale = findViewById(R.id.btn_create_sale);
         btnAddProduct = findViewById(R.id.btn_add_product);
-
-        btnButtons = findViewById(R.id.btnButtons);
         dimOverlay = findViewById(R.id.dim_overlay);
-        layoutFabMenu = findViewById(R.id.layout_fab_menu);
-        fabCashMenu = findViewById(R.id.fab_cash_menu);
-        fabPoMenu = findViewById(R.id.fab_po_menu);
 
         btnCreatePO = findViewById(R.id.btn_create_po);
         btnViewReports = findViewById(R.id.btn_view_reports);
@@ -192,12 +189,10 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    // =========================================================================
-    // NEW: FETCH BUSINESS PROFILE
-    // =========================================================================
     private void loadBusinessProfile() {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId != null && !ownerId.isEmpty()) {
+
+        if (ownerId != null && !ownerId.isEmpty() && com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
             FirebaseFirestore.getInstance().collection("users").document(ownerId)
                     .get()
                     .addOnSuccessListener(documentSnapshot -> {
@@ -205,10 +200,7 @@ public class MainActivity extends BaseActivity {
                             String bName = documentSnapshot.getString("businessName");
                             String bLogo = documentSnapshot.getString("businessLogoUrl");
 
-                            if (bName != null && !bName.isEmpty()) {
-                                tvBusinessName.setText(bName);
-                            }
-
+                            if (bName != null && !bName.isEmpty()) tvBusinessName.setText(bName);
                             if (bLogo != null && !bLogo.isEmpty()) {
                                 ivBusinessLogo.setVisibility(View.VISIBLE);
                                 Glide.with(MainActivity.this).load(bLogo).into(ivBusinessLogo);
@@ -291,6 +283,27 @@ public class MainActivity extends BaseActivity {
         Toast.makeText(this, "Restored Admin View", Toast.LENGTH_SHORT).show();
     }
 
+    // =========================================================================
+    // NEW: FETCH PRODUCTS TO ENSURE ACCURATE HISTORICAL COSTS
+    // =========================================================================
+    private void setupProductObserver() {
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                cachedProductList = products;
+
+                // Reapply filters to update Gross Profit if sales were loaded before products
+                if (!cachedSalesList.isEmpty() && toggleTimeFilter != null) {
+                    int checkedId = toggleTimeFilter.getCheckedButtonId();
+                    if (checkedId == R.id.btn_filter_daily) applyFilter(0);
+                    else if (checkedId == R.id.btn_filter_weekly) applyFilter(1);
+                    else if (checkedId == R.id.btn_filter_monthly) applyFilter(2);
+                    else if (checkedId == R.id.btn_filter_all_time) applyFilter(3);
+                    else applyFilter(0);
+                }
+            }
+        });
+    }
+
     private void setupSalesObserver() {
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales != null) {
@@ -305,6 +318,9 @@ public class MainActivity extends BaseActivity {
         });
     }
 
+    // =========================================================================
+    // FIXED: GROSS PROFIT CALCULATION MATCHES REPORT.JAVA
+    // =========================================================================
     private void applyFilter(int mode) {
         long startTime = 0;
         Calendar cal = Calendar.getInstance();
@@ -343,16 +359,44 @@ public class MainActivity extends BaseActivity {
         double totalCost = 0.0;
 
         for (Sales sale : cachedSalesList) {
-            if (sale.getTimestamp() >= startTime) {
-                totalSales += sale.getTotalPrice();
-                totalCost += sale.getTotalCost();
+            long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : sale.getDate();
+            if (ts >= startTime) {
+                double netPrice = sale.getTotalPrice();
+                double cost = sale.getTotalCost();
+
+                // SMART FALLBACK: Look up the product cost locally if the sale missed it (Just like Reports)
+                if (cost <= 0) {
+                    String rawName = sale.getProductName() != null ? sale.getProductName() : "";
+                    String baseName = rawName;
+
+                    int parenIdx = rawName.indexOf(" (");
+                    int bracketIdx = rawName.indexOf(" [");
+                    int minIdx = rawName.length();
+
+                    if (parenIdx != -1) minIdx = Math.min(minIdx, parenIdx);
+                    if (bracketIdx != -1) minIdx = Math.min(minIdx, bracketIdx);
+
+                    if (minIdx != rawName.length()) {
+                        baseName = rawName.substring(0, minIdx).trim();
+                    }
+
+                    for (Product p : cachedProductList) {
+                        if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(baseName)) {
+                            cost = p.getCostPrice() * sale.getQuantity();
+                            break;
+                        }
+                    }
+                }
+
+                totalSales += netPrice;
+                totalCost += cost;
             }
         }
 
-        if (tvSalesAmount != null) tvSalesAmount.setText(String.format("₱%,.2f", totalSales));
+        if (tvSalesAmount != null) tvSalesAmount.setText(String.format(Locale.US, "₱%,.2f", totalSales));
         if (tvGrossProfit != null) {
             double grossProfit = totalSales - totalCost;
-            tvGrossProfit.setText(String.format("₱%,.2f", grossProfit));
+            tvGrossProfit.setText(String.format(Locale.US, "₱%,.2f", grossProfit));
         }
     }
 
@@ -461,20 +505,6 @@ public class MainActivity extends BaseActivity {
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
 
-        if (btnButtons != null) btnButtons.setOnClickListener(v -> toggleFabMenu());
-        if (dimOverlay != null) dimOverlay.setOnClickListener(v -> closeFabMenu());
-
-        if (fabCashMenu != null) fabCashMenu.setOnClickListener(v -> {
-            closeFabMenu();
-            startActivity(new Intent(MainActivity.this, CashManagementActivity.class));
-        });
-
-        if (fabPoMenu != null) fabPoMenu.setOnClickListener(v -> {
-            closeFabMenu();
-            if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
-            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
-        });
-
         if (btnCreatePO != null) btnCreatePO.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
@@ -505,33 +535,6 @@ public class MainActivity extends BaseActivity {
             else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
         });
         if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::loadDashboardData);
-    }
-
-    private void toggleFabMenu() {
-        if (isFabOpen) closeFabMenu();
-        else openFabMenu();
-    }
-
-    private void openFabMenu() {
-        isFabOpen = true;
-        dimOverlay.setVisibility(View.VISIBLE);
-        layoutFabMenu.setVisibility(View.VISIBLE);
-
-        dimOverlay.setAlpha(0f);
-        dimOverlay.animate().alpha(1f).setDuration(200).start();
-
-        layoutFabMenu.setAlpha(0f);
-        layoutFabMenu.setTranslationY(50f);
-        layoutFabMenu.animate().alpha(1f).translationY(0f).setDuration(200).start();
-
-        btnButtons.animate().rotation(45f).setDuration(200).start();
-    }
-
-    private void closeFabMenu() {
-        isFabOpen = false;
-        dimOverlay.animate().alpha(0f).setDuration(200).withEndAction(() -> dimOverlay.setVisibility(View.GONE)).start();
-        layoutFabMenu.animate().alpha(0f).translationY(50f).setDuration(200).withEndAction(() -> layoutFabMenu.setVisibility(View.GONE)).start();
-        btnButtons.animate().rotation(0f).setDuration(200).start();
     }
 
     private void arrangeQuickActions() {

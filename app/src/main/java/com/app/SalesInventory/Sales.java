@@ -13,6 +13,7 @@ public class Sales {
     private double totalPrice;
     private double totalCost; // NEW: For calculating Gross Profit
     private String paymentMethod;
+    private String status = "COMPLETED";
 
     @ServerTimestamp
     private Date date;
@@ -34,6 +35,9 @@ public class Sales {
     public Sales() {
         // Default constructor required for Firestore
     }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

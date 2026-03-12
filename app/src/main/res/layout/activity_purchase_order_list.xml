@@ -1,55 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground">
+    android:orientation="vertical"
+    android:background="#F5F5F5">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:elevation="4dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:backgroundTint="?attr/colorPrimary"
+            app:title="Purchase Orders"
+            app:titleTextColor="?attr/colorOnPrimary" />
+    </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:weightSum="3"
+        android:background="@android:color/white"
+        android:elevation="2dp">
 
-        <com.google.android.material.appbar.AppBarLayout
-            android:layout_width="match_parent"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCreatePO"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:elevation="4dp">
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Create PO"
+            android:textSize="11sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="6dp"/>
 
-            <androidx.appcompat.widget.Toolbar
-                android:id="@+id/toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:backgroundTint="?attr/colorOnPrimary"
-                app:title="Purchase Orders"
-                app:titleTextColor="?attr/colorOnPrimary"
-                android:elevation="4dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnAddSupplier"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="2dp"
+            android:text="Add Supplier"
+            android:textSize="11sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:backgroundTint="#4CAF50"
+            app:cornerRadius="6dp"/>
 
-        </com.google.android.material.appbar.AppBarLayout>
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerViewPurchaseOrders"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="8dp"
-            android:clipToPadding="false"
-            tools:listitem="@layout/item_purchase_order"
-            tools:itemCount="3"
-            android:scrollbars="vertical" />
-
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReturnProduct"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Returns"
+            android:textSize="11sp"
+            app:backgroundTint="@color/errorRed"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="6dp"/>
     </LinearLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAddPO"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="24dp"
-        android:src="@android:drawable/ic_input_add"
-        android:contentDescription="Create Purchase Order"
-        app:backgroundTint="?attr/colorOnPrimary"
-        app:tint="?attr/colorPrimary"
-        app:elevation="6dp"
-        app:borderWidth="0dp" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerViewPurchaseOrders"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:clipToPadding="false"
+        tools:listitem="@layout/item_purchase_order"
+        android:scrollbars="vertical" />
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

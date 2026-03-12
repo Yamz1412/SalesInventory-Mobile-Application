@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/edite_round"
+    android:backgroundTint="@android:color/white"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Purchase Order Report"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:id="@+id/tvPODateRange"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Date Range: "
+        android:textSize="13sp"
+        android:textColor="#555555"
+        android:layout_marginBottom="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="3"
+        android:layout_marginBottom="16dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            app:cardBackgroundColor="#E8F5E9"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Orders" android:textSize="11sp" android:textColor="#2E7D32"/>
+                <TextView android:id="@+id/tvTotalPOCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="16sp" android:textColor="#1B5E20"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="2dp"
+            app:cardBackgroundColor="#E3F2FD"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Spent" android:textSize="11sp" android:textColor="#1565C0"/>
+                <TextView android:id="@+id/tvTotalPOSpent" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textStyle="bold" android:textSize="14sp" android:textColor="#0D47A1"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            app:cardBackgroundColor="#FFEBEE"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Returns/Issues" android:textSize="11sp" android:textColor="#C62828"/>
+                <TextView android:id="@+id/tvTotalReturns" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="16sp" android:textColor="#B71C1C"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="350dp"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Purchase Orders Overview"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tvDetailedPOs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#555555"
+                android:layout_marginBottom="16dp"/>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Supplier Returns &amp; Damages"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#C62828"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/tvDetailedReturns"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="#555555" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnClosePODetailed"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="Close Report"
+        app:cornerRadius="8dp" />
+</LinearLayout>

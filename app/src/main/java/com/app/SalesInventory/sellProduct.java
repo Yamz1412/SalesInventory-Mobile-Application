@@ -37,15 +37,14 @@ import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -59,36 +58,30 @@ public class sellProduct extends BaseActivity {
     private ProductRepository productRepository;
 
     private double finalTotal;
-    private double discountPercent;
 
-    private TextInputEditText etDiscount;
-    // IDs from activity_sell_product.xml
-    private TextView tvTotalPrice;       // @+id/TotalPriceTV
-    private Button btnConfirmSale;       // @+id/BtnConfirmSale
-    private Button btnEditCart;          // @+id/BtnEditCart
+    private TextView tvTotalPrice;
+    private Button btnConfirmSale;
+    private Button btnEditCart;
 
-    private Spinner spinnerPaymentMethod;       // @+id/spinnerPaymentMethod
-    private View layoutCashSection;             // @+id/layoutCashSection
-    private TextInputEditText etCashGiven;      // @+id/etCashGiven
-    private TextView tvChange;                  // @+id/tvChange
-    private View layoutEPaymentSection;         // @+id/layoutEPaymentSection
-    private Button btnCaptureReceipt;           // @+id/btnCaptureReceipt
-    private TextView tvReceiptStatus;           // @+id/tvReceiptStatus
-    private ImageView imgReceiptPreview;        // @+id/imgReceiptPreview
+    private Spinner spinnerPaymentMethod;
+    private View layoutCashSection;
+    private TextInputEditText etCashGiven;
+    private TextView tvChange;
 
-    private RadioGroup rgDeliveryType;          // @+id/rgDeliveryType
-    private RadioButton rbWalkIn;               // @+id/rbWalkIn
-    private RadioButton rbDelivery;             // @+id/rbDelivery
-    private View layoutDeliveryDetails;         // @+id/layoutDeliveryDetails
-    private TextInputEditText etDeliveryName;   // @+id/etDeliveryName
-    private TextInputEditText etDeliveryPhone;  // @+id/etDeliveryPhone
-    private TextInputEditText etDeliveryAddress;// @+id/etDeliveryAddress
-    private RadioGroup rgDeliveryPayment;       // @+id/rgDeliveryPayment
-    private RadioButton rbDeliveryCOD;          // @+id/rbDeliveryCOD
-    private RadioButton rbDeliveryEPayment;     // @+id/rbDeliveryEPayment
+    private View layoutEPaymentSection;
 
-    private ListView cartListView;              // @+id/cartListView
+    private Button btnCaptureReceipt;
+    private TextView tvReceiptStatus;
+    private ImageView imgReceiptPreview;
 
+    private RadioGroup rgDeliveryType;
+    private RadioButton rbDelivery;
+    private View layoutDeliveryDetails;
+    private TextInputEditText etDeliveryName;
+    private TextInputEditText etDeliveryPhone;
+    private TextInputEditText etDeliveryAddress;
+
+    private ListView cartListView;
     private boolean receiptCaptured = false;
 
     private AlertDialog loadingDialog;
@@ -102,17 +95,18 @@ public class sellProduct extends BaseActivity {
 
     private ActivityResultLauncher<String> galleryReceiptLauncher;
     private Uri galleryReceiptUri;
-    private MaterialButton btnDiscountSC;       // @+id/btnDiscountSC
-    private MaterialButton btnDiscountPWD;      // @+id/btnDiscountPWD
-    private MaterialButton btnDiscountEmp;      // @+id/btnDiscountEmp
-    private TextInputLayout manualDiscountTIL;  // @+id/manual_discount_TIL
-    private TextInputEditText etManualDiscount; // @+id/et_manual_discount
-    private TextInputEditText etReferenceNumber;// @+id/etReferenceNumber
-    private double currentDiscountPercentage = 0.0;
+    private MaterialButton btnDiscountSC, btnDiscountPWD, btnDiscountEmp;
+    private TextInputLayout manualDiscountTIL;
+    private TextInputEditText etManualDiscount, etReferenceNumber;
 
-    // BUSINESS CACHE FOR RECEIPT
+    private double currentDiscountPercentage = 0.0;
+    private String activeDiscountType = "";
+
     private String cachedBusinessName = "Store Name";
     private String cachedBusinessLogoUrl = null;
+
+    // NEW: Background cache of your inventory to deduct materials silently
+    private List<Product> cachedInventoryList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -134,10 +128,19 @@ public class sellProduct extends BaseActivity {
         productRepository = SalesInventoryApplication.getProductRepository();
         cartManager = CartManager.getInstance();
         criticalNotifier = CriticalStockNotifier.getInstance();
+
         criticalListener = product -> runOnUiThread(() ->
                 criticalNotifier.showCriticalDialog(this, product)
         );
         productRepository.registerCriticalStockListener(criticalListener);
+
+        // Cache inventory silently for quick offline BOM deductions
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                cachedInventoryList.clear();
+                cachedInventoryList.addAll(products);
+            }
+        });
     }
 
     private void loadBusinessProfile() {
@@ -157,7 +160,6 @@ public class sellProduct extends BaseActivity {
     }
 
     private void initViews() {
-        // -- activity_sell_product.xml IDs --
         etReferenceNumber = findViewById(R.id.etReferenceNumber);
 
         try {
@@ -168,14 +170,20 @@ public class sellProduct extends BaseActivity {
             etManualDiscount   = findViewById(R.id.et_manual_discount);
 
             if (btnDiscountSC != null) {
-                btnDiscountSC.setOnClickListener(v -> applyPresetDiscount(20.0));
-                btnDiscountPWD.setOnClickListener(v -> applyPresetDiscount(20.0));
+                btnDiscountSC.setOnClickListener(v -> togglePresetDiscount(20.0, "SC"));
+                btnDiscountPWD.setOnClickListener(v -> togglePresetDiscount(20.0, "PWD"));
+
                 btnDiscountEmp.setOnClickListener(v -> {
                     View buttonsLayout = findViewById(R.id.discount_buttons_layout);
                     if (buttonsLayout != null) buttonsLayout.setVisibility(View.GONE);
                     if (manualDiscountTIL != null) manualDiscountTIL.setVisibility(View.VISIBLE);
-                    if (etManualDiscount != null) etManualDiscount.requestFocus();
+                    if (etManualDiscount != null) {
+                        etManualDiscount.setText("");
+                        etManualDiscount.requestFocus();
+                    }
                     currentDiscountPercentage = 0.0;
+                    activeDiscountType = "MANUAL";
+                    calculateTotalFromCart();
                 });
             }
             if (etManualDiscount != null) {
@@ -186,10 +194,14 @@ public class sellProduct extends BaseActivity {
                     public void afterTextChanged(Editable s) {
                         String input = s.toString();
                         if (!input.isEmpty()) {
-                            try { currentDiscountPercentage = Double.parseDouble(input); }
+                            try {
+                                currentDiscountPercentage = Double.parseDouble(input);
+                                activeDiscountType = "MANUAL";
+                            }
                             catch (NumberFormatException e) { currentDiscountPercentage = 0.0; }
                         } else {
                             currentDiscountPercentage = 0.0;
+                            activeDiscountType = "";
                         }
                         calculateTotalFromCart();
                     }
@@ -205,25 +217,23 @@ public class sellProduct extends BaseActivity {
         layoutCashSection     = findViewById(R.id.layoutCashSection);
         etCashGiven           = findViewById(R.id.etCashGiven);
         tvChange              = findViewById(R.id.tvChange);
+
         layoutEPaymentSection = findViewById(R.id.layoutEPaymentSection);
+
         btnCaptureReceipt     = findViewById(R.id.btnCaptureReceipt);
         tvReceiptStatus       = findViewById(R.id.tvReceiptStatus);
         imgReceiptPreview     = findViewById(R.id.imgReceiptPreview);
 
         rgDeliveryType      = findViewById(R.id.rgDeliveryType);
-        rbWalkIn            = findViewById(R.id.rbWalkIn);
         rbDelivery          = findViewById(R.id.rbDelivery);
         layoutDeliveryDetails = findViewById(R.id.layoutDeliveryDetails);
         etDeliveryName      = findViewById(R.id.etDeliveryName);
         etDeliveryPhone     = findViewById(R.id.etDeliveryPhone);
         etDeliveryAddress   = findViewById(R.id.etDeliveryAddress);
-        rgDeliveryPayment   = findViewById(R.id.rgDeliveryPayment);
-        rbDeliveryCOD       = findViewById(R.id.rbDeliveryCOD);
-        rbDeliveryEPayment  = findViewById(R.id.rbDeliveryEPayment);
 
         cartListView = findViewById(R.id.cartListView);
 
-        String[] methods = new String[]{"Cash", "E-Payment"};
+        String[] methods = new String[]{"Cash", "GCash"};
         ArrayAdapter<String> pmAdapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, methods);
         pmAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -238,11 +248,17 @@ public class sellProduct extends BaseActivity {
         loadingDialog = builder.create();
     }
 
-    private void applyPresetDiscount(double percentage) {
-        currentDiscountPercentage = percentage;
-        if (manualDiscountTIL != null) manualDiscountTIL.setVisibility(View.GONE);
-        View buttonsLayout = findViewById(R.id.discount_buttons_layout);
-        if (buttonsLayout != null) buttonsLayout.setVisibility(View.VISIBLE);
+    private void togglePresetDiscount(double percentage, String type) {
+        if (activeDiscountType.equals(type)) {
+            currentDiscountPercentage = 0.0;
+            activeDiscountType = "";
+            Toast.makeText(this, type + " Discount Removed", Toast.LENGTH_SHORT).show();
+        } else {
+            currentDiscountPercentage = percentage;
+            activeDiscountType = type;
+            if (manualDiscountTIL != null) manualDiscountTIL.setVisibility(View.GONE);
+            Toast.makeText(this, type + " Discount Applied", Toast.LENGTH_SHORT).show();
+        }
         calculateTotalFromCart();
     }
 
@@ -337,7 +353,6 @@ public class sellProduct extends BaseActivity {
                     convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
                 }
                 CartManager.CartItem item = currentItems.get(position);
-                // IDs from item_cart_product.xml
                 TextView tvName      = convertView.findViewById(R.id.tvCartName);
                 TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
                 TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
@@ -351,13 +366,23 @@ public class sellProduct extends BaseActivity {
                 });
 
                 tvName.setText(item.productName);
-                String detailText = "";
-                if (item.size != null && !item.size.isEmpty()) detailText += item.size;
-                if (item.addon != null && !item.addon.isEmpty()) {
-                    if (!detailText.isEmpty()) detailText += " / ";
-                    detailText += item.addon;
+
+                StringBuilder detailBuilder = new StringBuilder();
+                if (item.size != null && !item.size.isEmpty()) {
+                    detailBuilder.append("Size: ").append(item.size);
                 }
-                tvDetails.setText(detailText);
+                if (item.addon != null && !item.addon.isEmpty()) {
+                    if (detailBuilder.length() > 0) detailBuilder.append("\n");
+                    detailBuilder.append(item.addon);
+                }
+
+                if (detailBuilder.length() > 0) {
+                    tvDetails.setVisibility(View.VISIBLE);
+                    tvDetails.setText(detailBuilder.toString());
+                } else {
+                    tvDetails.setVisibility(View.GONE);
+                }
+
                 tvQty.setText("x" + item.quantity);
                 tvLineTotal.setText("₱" + String.format(Locale.US, "%.2f", item.getLineTotal()));
                 return convertView;
@@ -388,7 +413,7 @@ public class sellProduct extends BaseActivity {
     private void calculateChange() {
         String method = (String) spinnerPaymentMethod.getSelectedItem();
 
-        if ("E-Payment".equals(method)) {
+        if ("GCash".equals(method)) {
             tvChange.setText("Change: ₱0.00");
             btnConfirmSale.setEnabled(finalTotal > 0 && receiptCaptured);
             return;
@@ -463,7 +488,6 @@ public class sellProduct extends BaseActivity {
                     convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
                 }
                 CartManager.CartItem item = editItems.get(position);
-                // IDs from item_cart_product.xml
                 TextView tvName      = convertView.findViewById(R.id.tvCartName);
                 TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
                 TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
@@ -579,10 +603,6 @@ public class sellProduct extends BaseActivity {
         String deliveryPhone   = etDeliveryPhone.getText().toString().trim();
         String deliveryAddress = etDeliveryAddress.getText().toString().trim();
 
-        String deliveryPayment = "COD";
-        int selectedDelPayment = rgDeliveryPayment.getCheckedRadioButtonId();
-        if (selectedDelPayment == R.id.rbDeliveryEPayment) deliveryPayment = "E-Payment";
-
         if (isDelivery) {
             if (deliveryName.isEmpty())    { etDeliveryName.setError("Required"); return; }
             if (deliveryPhone.isEmpty())   { etDeliveryPhone.setError("Required"); return; }
@@ -618,11 +638,11 @@ public class sellProduct extends BaseActivity {
                 Toast.makeText(this, "Please attach payment receipt first", Toast.LENGTH_SHORT).show();
                 return;
             }
-            paymentDetails = "E-Payment (Ref: " + refNum + ")";
+            paymentDetails = "GCash (Ref: " + refNum + ")";
         }
 
         String orderId = java.util.UUID.randomUUID().toString();
-        prepareReceiptData(orderId, paymentDetails, isDelivery, deliveryName, deliveryPhone, deliveryAddress, deliveryPayment);
+        prepareReceiptData(orderId, paymentDetails, isDelivery, deliveryName, deliveryPhone, deliveryAddress, method);
     }
 
     private void prepareReceiptData(String orderId, String paymentMethod, boolean isDelivery,
@@ -647,53 +667,15 @@ public class sellProduct extends BaseActivity {
         }
 
         CartManager.CartItem item = items.get(index);
+        String extra = "";
+        if (item.size != null && !item.size.isEmpty()) extra += item.size;
+        if (item.addon != null && !item.addon.isEmpty()) {
+            if (!extra.isEmpty()) extra += " | ";
+            extra += item.addon;
+        }
+        enrichedNames.put(item.productId, extra);
 
-        productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
-            @Override
-            public void onProductFetched(Product p) {
-                StringBuilder detailsStr = new StringBuilder();
-
-                if (p != null) {
-                    if (p.getAddonsList() != null && !p.getAddonsList().isEmpty()) {
-                        detailsStr.append("Add-ons: ");
-                        for (Map<String, Object> addon : p.getAddonsList()) {
-                            detailsStr.append(addon.get("name")).append(", ");
-                        }
-                        detailsStr.setLength(detailsStr.length() - 2);
-                        detailsStr.append(" | ");
-                    }
-
-                    if (p.getNotesList() != null && !p.getNotesList().isEmpty()) {
-                        detailsStr.append("Notes: ");
-                        for (Map<String, String> note : p.getNotesList()) {
-                            detailsStr.append(note.get("type")).append(" ").append(note.get("value")).append(", ");
-                        }
-                        detailsStr.setLength(detailsStr.length() - 2);
-                        detailsStr.append(" | ");
-                    }
-
-                    if (p.getBomList() != null && !p.getBomList().isEmpty()) {
-                        detailsStr.append("BOM: ");
-                        for (Map<String, Object> b : p.getBomList()) {
-                            detailsStr.append(b.get("quantity")).append(b.get("unit")).append(" ").append(b.get("materialName")).append(", ");
-                        }
-                        detailsStr.setLength(detailsStr.length() - 2);
-                    }
-                }
-
-                String finalDetails = detailsStr.toString();
-                if (finalDetails.endsWith(" | ")) finalDetails = finalDetails.substring(0, finalDetails.length() - 3);
-
-                enrichedNames.put(item.productId, finalDetails.trim());
-                fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
-            }
-
-            @Override
-            public void onError(String error) {
-                enrichedNames.put(item.productId, "");
-                fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
-            }
-        });
+        fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
     }
 
     private void showReceiptDialogWithFetch(String orderId, String paymentMethod, boolean isDelivery,
@@ -703,12 +685,11 @@ public class sellProduct extends BaseActivity {
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_receipt, null);
         AlertDialog receiptDialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create();
 
-        // IDs from dialog_receipt.xml
         TextView tvBusinessName   = dialogView.findViewById(R.id.tvReceiptBusinessName);
         ImageView ivBusinessLogo  = dialogView.findViewById(R.id.ivReceiptBusinessLogo);
         TextView tvOrderId        = dialogView.findViewById(R.id.tvReceiptOrderId);
         TextView tvDateTime       = dialogView.findViewById(R.id.tvReceiptDateTime);
-        ListView lvItems          = dialogView.findViewById(R.id.lvReceiptItems);   // ListView in dialog_receipt.xml
+        ListView lvItems          = dialogView.findViewById(R.id.lvReceiptItems);
         TextView tvTotal          = dialogView.findViewById(R.id.tvReceiptTotal);
         TextView tvAmountPaid     = dialogView.findViewById(R.id.tvReceiptAmountPaid);
         TextView tvPaymentMethod  = dialogView.findViewById(R.id.tvReceiptPaymentMethod);
@@ -735,7 +716,6 @@ public class sellProduct extends BaseActivity {
             tvDateTime.setText("Date & Time: " + currentDateTime);
         }
 
-        // FIX: Use a proper ArrayAdapter on the ListView instead of the non-existent setList() method.
         if (lvItems != null) {
             List<CartManager.CartItem> receiptItems = new ArrayList<>(cartManager.getItems());
 
@@ -750,14 +730,12 @@ public class sellProduct extends BaseActivity {
                         convertView = getLayoutInflater().inflate(R.layout.item_cart_product, parent, false);
                     }
                     CartManager.CartItem item = receiptItems.get(position);
-                    // IDs from item_cart_product.xml
                     TextView tvName      = convertView.findViewById(R.id.tvCartName);
                     TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
                     TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
                     TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
                     ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
 
-                    // Receipt is read-only — hide the remove button
                     if (btnRemove != null) btnRemove.setVisibility(View.GONE);
 
                     tvName.setText(item.productName);
@@ -824,6 +802,53 @@ public class sellProduct extends BaseActivity {
         });
     }
 
+    // --- HELPER: Handles internal material logic silently in the background ---
+    private void deductFromMaterial(String materialName, double deductAmt, String bUnit) {
+        if (materialName == null || materialName.isEmpty() || deductAmt <= 0) return;
+
+        Product material = null;
+        for (Product p : cachedInventoryList) {
+            if (p != null && materialName.equalsIgnoreCase(p.getProductName())) {
+                material = p;
+                break;
+            }
+        }
+
+        if (material == null) return;
+
+        String mUnit = material.getUnit() != null ? material.getUnit().toLowerCase(Locale.ROOT) : "";
+        bUnit = bUnit != null ? bUnit.toLowerCase(Locale.ROOT) : "";
+        double mQty = material.getQuantity();
+        boolean mUnitChanged = false;
+
+        // 1. Convert base if needed
+        if (mUnit.equals("l") && (bUnit.equals("ml") || bUnit.equals("oz"))) {
+            mQty *= 1000.0; mUnit = "ml"; mUnitChanged = true;
+        } else if (mUnit.equals("kg") && bUnit.equals("g")) {
+            mQty *= 1000.0; mUnit = "g"; mUnitChanged = true;
+        } else if ((mUnit.equals("box") || mUnit.equals("pack")) && bUnit.equals("pcs")) {
+            mQty *= material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
+            mUnit = "pcs"; mUnitChanged = true;
+        }
+
+        // 2. Adjust deduction amount mathematically
+        if (mUnit.equals("ml") && bUnit.equals("oz")) deductAmt *= 29.5735;
+        else if (mUnit.equals("ml") && bUnit.equals("l")) deductAmt *= 1000.0;
+        else if (mUnit.equals("g") && bUnit.equals("kg")) deductAmt *= 1000.0;
+        else if (mUnit.equals("pcs") && (bUnit.equals("box") || bUnit.equals("pack"))) {
+            deductAmt *= material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
+        } else if (mUnit.equals("oz") && bUnit.equals("ml")) deductAmt /= 29.5735;
+
+        int finalMQty = (int) Math.max(0, Math.ceil(mQty - deductAmt));
+
+        // 3. Save Unit & Quantity Updates silently
+        if (mUnitChanged) {
+            FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
+                    .document(material.getProductId()).update("unit", mUnit);
+        }
+        productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
+    }
+
     private void saveCartItemRecursively(int index, List<CartManager.CartItem> items, String orderId,
                                          double subtotal, long now, String paymentMethod,
                                          String deliveryType, String deliveryStatus, long deliveryDate,
@@ -831,13 +856,11 @@ public class sellProduct extends BaseActivity {
                                          Map<String, String> enrichedNames) {
 
         if (index >= items.size()) {
+            updateCashManagementWallet(paymentMethod, finalTotal, orderId);
             runOnUiThread(() -> {
                 if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
                 cartManager.clear();
                 Toast.makeText(sellProduct.this, "Sale Recorded Successfully!", Toast.LENGTH_LONG).show();
-                Intent intent = new Intent(sellProduct.this, MainActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
                 finish();
             });
             return;
@@ -848,13 +871,10 @@ public class sellProduct extends BaseActivity {
         double ratio     = subtotal == 0 ? 0 : lineTotal / subtotal;
         double lineFinal = finalTotal * ratio;
 
-        String tempProductName = item.productName;
-        String extras = enrichedNames.get(item.productId);
-        if (extras != null && !extras.isEmpty()) {
-            tempProductName += " | " + extras;
-        }
-
-        final String finalDbProductName = tempProductName;
+        StringBuilder nameBuilder = new StringBuilder(item.productName);
+        if (item.size != null && !item.size.isEmpty()) nameBuilder.append(" (").append(item.size).append(")");
+        if (item.addon != null && !item.addon.isEmpty()) nameBuilder.append(" [").append(item.addon).append("]");
+        final String finalDbProductName = nameBuilder.toString();
 
         productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
             @Override
@@ -866,13 +886,7 @@ public class sellProduct extends BaseActivity {
                 sale.setQuantity(item.quantity);
                 sale.setPrice(item.unitPrice);
                 sale.setTotalPrice(lineFinal);
-
-                if (p != null) {
-                    sale.setTotalCost(p.getCostPrice() * item.quantity);
-                } else {
-                    sale.setTotalCost(0.0);
-                }
-
+                sale.setTotalCost(p != null ? (p.getCostPrice() * item.quantity) : 0.0);
                 sale.setPaymentMethod(paymentMethod);
                 sale.setDate(now);
                 sale.setTimestamp(now);
@@ -887,61 +901,122 @@ public class sellProduct extends BaseActivity {
                 salesRepository.addSale(sale, new SalesRepository.OnSaleAddedListener() {
                     @Override
                     public void onSaleAdded(String saleId) {
-                        productRepository.updateProductQuantity(item.productId,
-                                Math.max(0, item.stock - item.quantity),
-                                new ProductRepository.OnProductUpdatedListener() {
-                                    @Override
-                                    public void onProductUpdated() {
-                                        if (p != null) {
-                                            List<Map<String, Object>> bomList = p.getBomList();
-                                            if (bomList != null && !bomList.isEmpty()) {
-                                                for (Map<String, Object> bomItem : bomList) {
-                                                    String materialName = (String) bomItem.get("materialName");
-                                                    double deductQty = 0;
+                        if (p != null) {
 
-                                                    if (bomItem.get("quantity") instanceof Number) {
-                                                        deductQty = ((Number) bomItem.get("quantity")).doubleValue();
-                                                    } else if (bomItem.get("quantity") instanceof String) {
-                                                        try { deductQty = Double.parseDouble((String) bomItem.get("quantity")); } catch (Exception ignored) {}
-                                                    }
+                            // 1. MAIN INVENTORY DEDUCTION
+                            String invUnit = p.getUnit() != null ? p.getUnit().toLowerCase(Locale.ROOT) : "";
+                            String sUnit = p.getSalesUnit() != null ? p.getSalesUnit().toLowerCase(Locale.ROOT) : "";
+                            double invQty = p.getQuantity();
+                            double deductAmt = (p.getDeductionAmount() > 0 ? p.getDeductionAmount() : 1.0) * item.quantity;
+                            boolean unitChanged = false;
 
-                                                    if (materialName != null && !materialName.isEmpty() && deductQty > 0) {
-                                                        double totalDeduction = deductQty * item.quantity;
-                                                        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Products");
-                                                        ref.orderByChild("productName").equalTo(materialName)
-                                                                .addListenerForSingleValueEvent(new ValueEventListener() {
-                                                                    @Override
-                                                                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                                                                        for (DataSnapshot ds : snapshot.getChildren()) {
-                                                                            Product material = ds.getValue(Product.class);
-                                                                            if (material != null) {
-                                                                                int currentQty = material.getQuantity();
-                                                                                int newQty = Math.max(0, currentQty - (int) Math.ceil(totalDeduction));
-                                                                                ds.getRef().child("quantity").setValue(newQty);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                    @Override public void onCancelled(@NonNull DatabaseError error) {}
-                                                                });
-                                                    }
-                                                }
+                            if (invUnit.equals("l") && (sUnit.equals("ml") || sUnit.equals("oz"))) {
+                                invQty *= 1000.0; invUnit = "ml"; unitChanged = true;
+                            } else if (invUnit.equals("kg") && sUnit.equals("g")) {
+                                invQty *= 1000.0; invUnit = "g"; unitChanged = true;
+                            } else if ((invUnit.equals("box") || invUnit.equals("pack")) && sUnit.equals("pcs")) {
+                                invQty *= p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
+                                invUnit = "pcs"; unitChanged = true;
+                            }
+
+                            if (invUnit.equals("ml") && sUnit.equals("oz")) deductAmt *= 29.5735;
+                            else if (invUnit.equals("ml") && sUnit.equals("l")) deductAmt *= 1000.0;
+                            else if (invUnit.equals("g") && sUnit.equals("kg")) deductAmt *= 1000.0;
+                            else if (invUnit.equals("pcs") && (sUnit.equals("box") || sUnit.equals("pack"))) {
+                                deductAmt *= p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
+                            } else if (invUnit.equals("oz") && sUnit.equals("ml")) deductAmt /= 29.5735;
+
+                            int newQty = (int) Math.max(0, Math.ceil(invQty - deductAmt));
+
+                            if (unitChanged) {
+                                FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
+                                        .document(p.getProductId()).update("unit", invUnit);
+                            }
+
+                            productRepository.updateProductQuantity(item.productId, newQty, new ProductRepository.OnProductUpdatedListener() {
+                                @Override
+                                public void onProductUpdated() {
+
+                                    // 2. DEDUCT BOM (Raw Materials) SILENTLY
+                                    if (p.getBomList() != null && !p.getBomList().isEmpty()) {
+                                        for (Map<String, Object> bomItem : p.getBomList()) {
+                                            String materialName = (String) bomItem.get("materialName");
+                                            double bQty = 0;
+                                            if (bomItem.get("quantity") instanceof Number) bQty = ((Number) bomItem.get("quantity")).doubleValue();
+                                            else if (bomItem.get("quantity") instanceof String) {
+                                                try { bQty = Double.parseDouble((String) bomItem.get("quantity")); } catch (Exception ignored) {}
+                                            }
+                                            String bUnit = (String) bomItem.get("unit");
+
+                                            if (bQty > 0) {
+                                                deductFromMaterial(materialName, bQty * item.quantity, bUnit);
                                             }
                                         }
-                                        saveCartItemRecursively(index + 1, items, orderId, subtotal, now,
-                                                paymentMethod, deliveryType, deliveryStatus, deliveryDate,
-                                                dName, dPhone, dAddr, dPay, enrichedNames);
                                     }
-                                    @Override public void onError(String error) {
-                                        saveCartItemRecursively(index + 1, items, orderId, subtotal, now,
-                                                paymentMethod, deliveryType, deliveryStatus, deliveryDate,
-                                                dName, dPhone, dAddr, dPay, enrichedNames);
-                                    }
-                                });
+
+                                    saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+                                }
+                                @Override public void onError(String error) {
+                                    saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+                                }
+                            });
+                        } else {
+                            saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+                        }
                     }
                     @Override public void onError(String error) { handleSaveError(error); }
                 });
             }
             @Override public void onError(String error) { handleSaveError(error); }
+        });
+    }
+
+    private void updateCashManagementWallet(String paymentMethod, double amount, String orderId) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) return;
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        String walletDocId = "CASH";
+        String methodLower = paymentMethod.toLowerCase();
+
+        if (methodLower.contains("gcash")) {
+            walletDocId = "GCASH";
+        }
+
+        DocumentReference walletRef = db.collection("users")
+                .document(ownerId)
+                .collection("wallets")
+                .document(walletDocId);
+
+        String finalWalletDocId = walletDocId;
+
+        db.runTransaction(transaction -> {
+            DocumentSnapshot snapshot = transaction.get(walletRef);
+            double newBalance = amount;
+
+            if (snapshot.exists() && snapshot.getDouble("balance") != null) {
+                newBalance += snapshot.getDouble("balance");
+                transaction.update(walletRef, "balance", newBalance);
+            } else {
+                Map<String, Object> newWallet = new HashMap<>();
+                newWallet.put("name", finalWalletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
+                newWallet.put("type", finalWalletDocId.equals("CASH") ? "Physical Cash" : "E-Wallet");
+                newWallet.put("balance", newBalance);
+                transaction.set(walletRef, newWallet);
+            }
+            return null;
+        }).addOnSuccessListener(aVoid -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault());
+            Map<String, Object> transLog = new HashMap<>();
+            transLog.put("title", "Sale: Order " + orderId.substring(0, 8).toUpperCase());
+            transLog.put("date", sdf.format(new Date()));
+            transLog.put("amount", amount);
+            transLog.put("isIncome", true);
+            transLog.put("timestamp", System.currentTimeMillis());
+
+            db.collection("users").document(ownerId).collection("cash_transactions").add(transLog);
+        }).addOnFailureListener(e -> {
         });
     }
 

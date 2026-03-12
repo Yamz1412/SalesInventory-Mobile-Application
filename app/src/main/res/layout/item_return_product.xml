@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="8dp"
+    android:weightSum="4">
+
+    <AutoCompleteTextView
+        android:id="@+id/actvReturnProductItem"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2"
+        android:hint="Select Product"
+        android:textSize="14sp"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:layout_marginEnd="4dp"
+        android:completionThreshold="1"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/etReturnQtyItem"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:hint="Qty"
+        android:textSize="14sp"
+        android:inputType="numberDecimal"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:layout_marginEnd="4dp"/>
+
+    <Spinner
+        android:id="@+id/spinnerReturnUnitItem"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_weight="1"
+        android:background="@drawable/edite_round"
+        android:layout_marginEnd="4dp"/>
+
+    <ImageButton
+        android:id="@+id/btnDeleteReturnItem"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@android:drawable/ic_menu_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:tint="@color/errorRed"/>
+</LinearLayout>

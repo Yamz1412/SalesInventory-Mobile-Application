@@ -4,6 +4,8 @@ import android.app.Application;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.Observer;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.io.BufferedReader;
@@ -69,11 +71,29 @@ public class ProductRepository {
         return instance;
     }
 
+    private ProductEntity findEntityByIdSafe(String id) {
+        if (id == null || id.isEmpty()) return null;
+        if (id.startsWith("local:")) {
+            try {
+                long localId = Long.parseLong(id.replace("local:", ""));
+                return productDao.getByLocalId(localId);
+            } catch (Exception e) { return null; }
+        }
+        ProductEntity e = productDao.getByProductIdSync(id);
+        if (e == null) {
+            try {
+                long localId = Long.parseLong(id);
+                e = productDao.getByLocalId(localId);
+            } catch (Exception ex) { }
+        }
+        return e;
+    }
+
     public void syncProductImageFromFirestore(String productId, String imageUrl) {
         if (productId == null || imageUrl == null || imageUrl.isEmpty()) return;
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                ProductEntity entity = productDao.getByProductIdSync(productId);
+                ProductEntity entity = findEntityByIdSafe(productId);
                 if (entity != null) {
                     entity.imageUrl = imageUrl;
                     entity.lastUpdated = System.currentTimeMillis();
@@ -95,7 +115,7 @@ public class ProductRepository {
     public void updateProductImage(String productId, String imagePath, String imageUrl, OnProductUpdatedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                ProductEntity entity = productDao.getByProductIdSync(productId);
+                ProductEntity entity = findEntityByIdSafe(productId);
                 if (entity != null) {
                     if (imagePath != null && !imagePath.isEmpty()) entity.imagePath = imagePath;
                     if (imageUrl != null && !imageUrl.isEmpty()) entity.imageUrl = imageUrl;
@@ -167,8 +187,9 @@ public class ProductRepository {
         source.observeForever(obs);
     }
 
-    public void addProduct(Product product, OnProductAddedListener listener) {
-        addProduct(product, null, listener);
+    public void addProduct(Product product, android.net.Uri imageUri, OnProductAddedListener listener) {
+        String path = (imageUri != null) ? imageUri.toString() : null;
+        addProduct(product, path, listener);
     }
 
     public void addProduct(Product product, String imagePath, OnProductAddedListener listener) {
@@ -178,7 +199,7 @@ public class ProductRepository {
                 return;
             }
             if (product.getProductId() != null && !product.getProductId().isEmpty()) {
-                ProductEntity existing = productDao.getByProductIdSync(product.getProductId());
+                ProductEntity existing = findEntityByIdSafe(product.getProductId());
                 if (existing != null) {
                     listener.onError("Product already exists.");
                     return;
@@ -191,8 +212,6 @@ public class ProductRepository {
             if (e.criticalLevel < 1) e.criticalLevel = 1;
             if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
             if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-
-            // FIX: Auto-adjust ceiling level instead of destroying quantity
             if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
 
             e.dateAdded = now;
@@ -218,10 +237,10 @@ public class ProductRepository {
                 listener.onError("User not approved");
                 return;
             }
-            ProductEntity existing = null;
-            if (product.getProductId() != null && !product.getProductId().isEmpty()) {
-                existing = productDao.getByProductIdSync(product.getProductId());
-            }
+            String searchId = product.getProductId() != null && !product.getProductId().isEmpty() ?
+                    product.getProductId() : "local:" + product.getLocalId();
+            ProductEntity existing = findEntityByIdSafe(searchId);
+
             long now = System.currentTimeMillis();
             if (existing != null) {
                 existing.productName = product.getProductName();
@@ -239,12 +258,17 @@ public class ProductRepository {
                 existing.dateAdded = product.getDateAdded();
                 existing.expiryDate = product.getExpiryDate();
                 existing.productType = product.getProductType();
+
+                existing.sizesListJson = serializeListObj(product.getSizesList());
+                existing.addonsListJson = serializeListObj(product.getAddonsList());
+                existing.variantsListJson = serializeListObj(product.getVariantsList());
+                existing.bomListJson = serializeListObj(product.getBomList());
+                existing.notesListJson = serializeListStr(product.getNotesList());
+
                 if (existing.floorLevel < 1) existing.floorLevel = 1;
                 if (existing.criticalLevel < 1) existing.criticalLevel = 1;
                 if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                 if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
-
-                // FIX: Auto-adjust ceiling level instead of destroying quantity
                 if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
 
                 existing.lastUpdated = now;
@@ -266,8 +290,6 @@ public class ProductRepository {
                 if (e.criticalLevel < 1) e.criticalLevel = 1;
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
                 if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-
-                // FIX: Auto-adjust ceiling level instead of destroying quantity
                 if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
 
                 e.lastUpdated = now;
@@ -340,7 +362,7 @@ public class ProductRepository {
                 listener.onError("Unauthorized");
                 return;
             }
-            ProductEntity existing = productDao.getByProductIdSync(productId);
+            ProductEntity existing = findEntityByIdSafe(productId);
             String archiveFilename = null;
             if (existing != null) {
                 archiveFilename = archiveEntityLocally(existing);
@@ -388,6 +410,11 @@ public class ProductRepository {
             o.put("productType", e.productType);
             o.put("lastUpdated", e.lastUpdated);
             o.put("syncState", e.syncState);
+            o.put("sizesListJson", e.sizesListJson);
+            o.put("addonsListJson", e.addonsListJson);
+            o.put("notesListJson", e.notesListJson);
+            o.put("variantsListJson", e.variantsListJson);
+            o.put("bomListJson", e.bomListJson);
             FileWriter fw = new FileWriter(out);
             fw.write(o.toString());
             fw.flush();
@@ -410,147 +437,6 @@ public class ProductRepository {
         return result;
     }
 
-    public void restoreArchived(String filename, OnProductRestoreListener listener) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            File dir = new File(application.getFilesDir(), "archives");
-            if (!dir.exists()) {
-                listener.onError("Archive not found");
-                return;
-            }
-            File f = new File(dir, filename);
-            if (!f.exists()) {
-                listener.onError("Archive file not found");
-                return;
-            }
-            try {
-                StringBuilder sb = new StringBuilder();
-                BufferedReader br = new BufferedReader(new FileReader(f));
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-                br.close();
-                JSONObject o = new JSONObject(sb.toString());
-                ProductEntity e = new ProductEntity();
-                e.localId = o.optLong("localId", 0);
-                e.productId = o.optString("productId", null);
-                e.productName = o.optString("productName", null);
-                e.categoryId = o.optString("categoryId", null);
-                e.categoryName = o.optString("categoryName", null);
-                e.description = o.optString("description", null);
-                e.costPrice = o.optDouble("costPrice", 0.0);
-                e.sellingPrice = o.optDouble("sellingPrice", 0.0);
-                e.quantity = o.optInt("quantity", 0);
-                e.reorderLevel = o.optInt("reorderLevel", 0);
-                e.criticalLevel = o.optInt("criticalLevel", 0);
-                e.ceilingLevel = o.optInt("ceilingLevel", 0);
-                e.floorLevel = o.optInt("floorLevel", 0);
-                e.unit = o.optString("unit", null);
-                e.barcode = o.optString("barcode", null);
-                e.supplier = o.optString("supplier", null);
-                e.dateAdded = o.optLong("dateAdded", System.currentTimeMillis());
-                e.addedBy = o.optString("addedBy", null);
-                e.isActive = true;
-                e.imagePath = o.optString("imagePath", null);
-                e.imageUrl = o.optString("imageUrl", null);
-                e.expiryDate = o.optLong("expiryDate", 0);
-                e.productType = o.optString("productType", null);
-                e.lastUpdated = System.currentTimeMillis();
-                e.syncState = "PENDING";
-
-                if (e.floorLevel < 1) e.floorLevel = 1;
-                if (e.criticalLevel < 1) e.criticalLevel = 1;
-                if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
-                if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-
-                ProductEntity existing = null;
-                if (e.productId != null && !e.productId.isEmpty()) existing = productDao.getByProductIdSync(e.productId);
-
-                if (existing != null) {
-                    existing.productName = e.productName;
-                    existing.categoryId = e.categoryId;
-                    existing.categoryName = e.categoryName;
-                    existing.description = e.description;
-                    existing.costPrice = e.costPrice;
-                    existing.sellingPrice = e.sellingPrice;
-
-                    // FIX: Allow restored quantity to bypass and raise ceiling
-                    existing.quantity = e.quantity;
-                    if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
-
-                    existing.reorderLevel = e.reorderLevel;
-                    existing.criticalLevel = e.criticalLevel;
-                    existing.floorLevel = e.floorLevel;
-                    existing.unit = e.unit;
-                    existing.barcode = e.barcode;
-                    existing.supplier = e.supplier;
-                    existing.dateAdded = e.dateAdded;
-                    existing.addedBy = e.addedBy;
-                    existing.isActive = true;
-                    existing.imagePath = e.imagePath;
-                    existing.imageUrl = e.imageUrl;
-                    existing.expiryDate = e.expiryDate;
-                    existing.productType = e.productType;
-                    existing.lastUpdated = e.lastUpdated;
-                    existing.syncState = "PENDING";
-                    productDao.update(existing);
-                } else {
-                    productDao.insert(e);
-                }
-                SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
-                boolean deleted = f.delete();
-                if (!deleted) {
-                    listener.onError("Failed to remove archive file");
-                    return;
-                }
-                listener.onProductRestored();
-            } catch (JSONException je) {
-                listener.onError("Invalid archive format");
-            } catch (Exception ex) {
-                listener.onError(ex.getMessage() == null ? "Error restoring" : ex.getMessage());
-            }
-        });
-    }
-
-    public void permanentlyDeleteArchive(String filename, OnPermanentDeleteListener listener) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                File dir = new File(application.getFilesDir(), "archives");
-                if (!dir.exists()) {
-                    listener.onError("Archive folder not found");
-                    return;
-                }
-                File f = new File(dir, filename);
-                if (!f.exists()) {
-                    listener.onError("Archive file not found");
-                    return;
-                }
-                StringBuilder sb = new StringBuilder();
-                BufferedReader br = new BufferedReader(new FileReader(f));
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-                br.close();
-                JSONObject o = new JSONObject(sb.toString());
-                String productId = o.optString("productId", null);
-                long localId = o.optLong("localId", 0);
-                if (productId != null && !productId.isEmpty()) {
-                    ProductEntity existing = productDao.getByProductIdSync(productId);
-                    if (existing != null) {
-                        productDao.deleteByLocalId(existing.localId);
-                    }
-                } else if (localId > 0) {
-                    productDao.deleteByLocalId(localId);
-                }
-                boolean deleted = f.delete();
-                if (!deleted) {
-                    listener.onError("Failed to remove archive file");
-                    return;
-                }
-                listener.onPermanentDeleted();
-            } catch (Exception ex) {
-                listener.onError(ex.getMessage() == null ? "Error deleting archive" : ex.getMessage());
-            }
-        });
-    }
-
     private String sanitizeFilename(String s) {
         if (s == null) return "x";
         return s.replaceAll("[^a-zA-Z0-9_-]", "_");
@@ -559,7 +445,7 @@ public class ProductRepository {
     public void updateProductQuantity(String productId, int newQuantity, OnProductUpdatedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                ProductEntity existing = productDao.getByProductIdSync(productId);
+                ProductEntity existing = findEntityByIdSafe(productId);
                 if (existing != null) {
                     int oldQuantity = existing.quantity;
                     if (existing.floorLevel < 1) existing.floorLevel = 1;
@@ -567,7 +453,6 @@ public class ProductRepository {
                     if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                     if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
-                    // FIX: Allow stock to bypass ceiling during adjustments. If it's higher, raise the ceiling automatically.
                     int clamped = Math.max(0, newQuantity);
                     if (clamped > 99999) clamped = 99999;
                     if (clamped > existing.ceilingLevel) {
@@ -711,7 +596,7 @@ public class ProductRepository {
 
     public void getProductById(String productId, OnProductFetchedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
-            ProductEntity e = productDao.getByProductIdSync(productId);
+            ProductEntity e = findEntityByIdSafe(productId);
             if (e != null) {
                 listener.onProductFetched(mapEntityToProduct(e));
             } else {
@@ -720,183 +605,67 @@ public class ProductRepository {
         });
     }
 
-    public void upsertFromRemote(Product p) {
-        if (p == null || p.getProductId() == null) return;
-        Executors.newSingleThreadExecutor().execute(() -> {
-            ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
-            long now = System.currentTimeMillis();
-            if (existing != null) {
-                existing.productName = p.getProductName();
-                existing.categoryId = p.getCategoryId();
-                existing.categoryName = p.getCategoryName();
-                existing.description = p.getDescription();
-                existing.costPrice = p.getCostPrice();
-                existing.sellingPrice = p.getSellingPrice();
-                existing.quantity = p.getQuantity();
-                existing.reorderLevel = p.getReorderLevel();
-                existing.criticalLevel = p.getCriticalLevel();
-                existing.ceilingLevel = p.getCeilingLevel();
-                existing.floorLevel = p.getFloorLevel();
-                existing.unit = p.getUnit();
-                existing.barcode = p.getBarcode();
-                existing.supplier = p.getSupplier();
-                existing.dateAdded = p.getDateAdded();
-                existing.addedBy = p.getAddedBy();
-                existing.isActive = p.isActive();
-                existing.imageUrl = p.getImageUrl();
-                if (p.getImagePath() != null && !p.getImagePath().isEmpty()) {
-                    existing.imagePath = p.getImagePath();
-                }
-                existing.expiryDate = p.getExpiryDate();
-                existing.productType = p.getProductType();
-                existing.lastUpdated = now;
-                existing.syncState = "SYNCED";
-                if (existing.floorLevel < 1) existing.floorLevel = 1;
-                if (existing.criticalLevel < 1) existing.criticalLevel = 1;
-                if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
-                if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
-
-                productDao.update(existing);
-                checkExpiryForEntity(existing);
-                checkFloorForEntity(existing);
-            } else {
-                ProductEntity e = new ProductEntity();
-                e.productId = p.getProductId();
-                e.productName = p.getProductName();
-                e.categoryId = p.getCategoryId();
-                e.categoryName = p.getCategoryName();
-                e.description = p.getDescription();
-                e.costPrice = p.getCostPrice();
-                e.sellingPrice = p.getSellingPrice();
-                e.quantity = p.getQuantity();
-                e.reorderLevel = p.getReorderLevel();
-                e.criticalLevel = p.getCriticalLevel();
-                e.ceilingLevel = p.getCeilingLevel();
-                e.floorLevel = p.getFloorLevel();
-                e.unit = p.getUnit();
-                e.barcode = p.getBarcode();
-                e.supplier = p.getSupplier();
-                e.dateAdded = p.getDateAdded();
-                e.addedBy = p.getAddedBy();
-                e.isActive = p.isActive();
-                e.expiryDate = p.getExpiryDate();
-                e.productType = p.getProductType();
-                e.lastUpdated = now;
-                e.syncState = "SYNCED";
-                if (e.floorLevel < 1) e.floorLevel = 1;
-                if (e.criticalLevel < 1) e.criticalLevel = 1;
-                if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
-                if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-
-                if (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) e.imageUrl = p.getImageUrl();
-                if (p.getImagePath() != null && !p.getImagePath().isEmpty()) e.imagePath = p.getImagePath();
-
-                productDao.insert(e);
-                checkExpiryForEntity(e);
-                checkFloorForEntity(e);
-            }
-        });
-    }
-
-    public static String getValidImageSourceForProduct(Product product) {
-        if (product == null) return null;
-
-        String localPath = product.getImagePath();
-        String onlineUrl = product.getImageUrl();
-
-        if (localPath != null && !localPath.isEmpty()) {
-            File localFile = new File(localPath);
-            if (localFile.exists() && localFile.canRead() && localFile.length() > 0) {
-                return localPath;
-            }
+    // ===========================================================================
+    // JSON SERIALIZATION HELPERS
+    // ===========================================================================
+    private String serializeListObj(List<Map<String, Object>> list) {
+        if (list == null || list.isEmpty()) return null;
+        JSONArray array = new JSONArray();
+        for (Map<String, Object> map : list) {
+            JSONObject obj = new JSONObject(map);
+            array.put(obj);
         }
-
-        if (onlineUrl != null && !onlineUrl.isEmpty()) {
-            return onlineUrl;
-        }
-
-        return null;
+        return array.toString();
     }
 
-    public void verifyAndUpdateProductImages(OnCleanupListener listener) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                List<ProductEntity> allProducts = productDao.getPendingProductsSync();
-                int imagesVerified = 0;
-
-                for (ProductEntity entity : allProducts) {
-                    if (entity != null) {
-                        String localPath = entity.imagePath;
-
-                        if (localPath != null && !localPath.isEmpty()) {
-                            File localFile = new File(localPath);
-                            if (!localFile.exists() || !localFile.canRead()) {
-                                entity.imagePath = null;
-                                productDao.update(entity);
-                                imagesVerified++;
-                            }
-                        }
-                    }
+    private List<Map<String, Object>> deserializeListObj(String json) {
+        if (json == null || json.isEmpty()) return null;
+        List<Map<String, Object>> list = new ArrayList<>();
+        try {
+            JSONArray array = new JSONArray(json);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                Map<String, Object> map = new HashMap<>();
+                java.util.Iterator<String> keys = obj.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    map.put(key, obj.get(key));
                 }
-
-                if (listener != null) {
-                    listener.onCleanupComplete(imagesVerified);
-                }
-            } catch (Exception e) {
-                if (listener != null) {
-                    listener.onError(e.getMessage());
-                }
+                list.add(map);
             }
-        });
+        } catch (Exception e) { }
+        return list;
     }
 
-    public static Product mapFirestoreProductWithImages(Map<String, Object> data) {
-        Product p = Product.fromMap(data);
-
-        if (data.containsKey("imageUrl")) {
-            Object imageUrlObj = data.get("imageUrl");
-            if (imageUrlObj != null) {
-                p.setImageUrl(String.valueOf(imageUrlObj));
-            }
+    private String serializeListStr(List<Map<String, String>> list) {
+        if (list == null || list.isEmpty()) return null;
+        JSONArray array = new JSONArray();
+        for (Map<String, String> map : list) {
+            JSONObject obj = new JSONObject(map);
+            array.put(obj);
         }
+        return array.toString();
+    }
 
-        if (data.containsKey("imagePath")) {
-            Object imagePathObj = data.get("imagePath");
-            if (imagePathObj != null) {
-                p.setImagePath(String.valueOf(imagePathObj));
+    private List<Map<String, String>> deserializeListStr(String json) {
+        if (json == null || json.isEmpty()) return null;
+        List<Map<String, String>> list = new ArrayList<>();
+        try {
+            JSONArray array = new JSONArray(json);
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                Map<String, String> map = new HashMap<>();
+                java.util.Iterator<String> keys = obj.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    map.put(key, obj.getString(key));
+                }
+                list.add(map);
             }
-        }
-
-        return p;
+        } catch (Exception e) { }
+        return list;
     }
-
-
-    private ProductEntity mapProductToEntity(Product p) {
-        ProductEntity e = new ProductEntity();
-        if (p == null) return e;
-        e.productName = p.getProductName();
-        e.categoryId = p.getCategoryId();
-        e.categoryName = p.getCategoryName();
-        e.description = p.getDescription();
-        e.costPrice = p.getCostPrice();
-        e.sellingPrice = p.getSellingPrice();
-        e.quantity = p.getQuantity();
-        e.reorderLevel = p.getReorderLevel();
-        e.criticalLevel = p.getCriticalLevel();
-        e.ceilingLevel = p.getCeilingLevel();
-        e.floorLevel = p.getFloorLevel();
-        e.unit = p.getUnit();
-        e.barcode = p.getBarcode();
-        e.supplier = p.getSupplier();
-        e.dateAdded = p.getDateAdded();
-        e.addedBy = p.getAddedBy();
-        e.isActive = p.isActive();
-        e.imagePath = p.getImagePath();
-        e.imageUrl = p.getImageUrl();
-        e.expiryDate = p.getExpiryDate();
-        e.productType = p.getProductType();
-        return e;
-    }
+    // ===========================================================================
 
     private Product mapEntityToProduct(ProductEntity e) {
         Product p = new Product();
@@ -919,11 +688,62 @@ public class ProductRepository {
         p.setDateAdded(e.dateAdded);
         p.setAddedBy(e.addedBy);
         p.setActive(e.isActive);
+
         p.setImagePath(e.imagePath);
         p.setImageUrl(e.imageUrl);
-        p.setExpiryDate(e.expiryDate);
+
         p.setProductType(e.productType);
+        p.setOwnerAdminId(e.ownerAdminId);
+        p.setExpiryDate(e.expiryDate);
+
+        // MAP LISTS BACK TO PRODUCT
+        p.setSizesList(deserializeListObj(e.sizesListJson));
+        p.setAddonsList(deserializeListObj(e.addonsListJson));
+        p.setVariantsList(deserializeListObj(e.variantsListJson));
+        p.setBomList(deserializeListObj(e.bomListJson));
+        p.setNotesList(deserializeListStr(e.notesListJson));
+
         return p;
+    }
+
+    private ProductEntity mapProductToEntity(Product p) {
+        ProductEntity e = new ProductEntity();
+        e.localId = p.getLocalId();
+        e.productId = p.getProductId();
+        e.productName = p.getProductName();
+        e.categoryId = p.getCategoryId();
+        e.categoryName = p.getCategoryName();
+        e.description = p.getDescription();
+        e.costPrice = p.getCostPrice();
+        e.sellingPrice = p.getSellingPrice();
+        e.quantity = p.getQuantity();
+        e.reorderLevel = p.getReorderLevel();
+        e.criticalLevel = p.getCriticalLevel();
+        e.ceilingLevel = p.getCeilingLevel();
+        e.floorLevel = p.getFloorLevel();
+        e.unit = p.getUnit();
+        e.barcode = p.getBarcode();
+        e.supplier = p.getSupplier();
+        e.dateAdded = p.getDateAdded();
+        e.addedBy = p.getAddedBy();
+        e.isActive = p.isActive();
+        e.lastUpdated = System.currentTimeMillis();
+
+        e.imagePath = p.getImagePath();
+        e.imageUrl = p.getImageUrl();
+
+        e.productType = p.getProductType();
+        e.ownerAdminId = p.getOwnerAdminId();
+        e.expiryDate = p.getExpiryDate();
+
+        // MAP LISTS INTO ENTITY
+        e.sizesListJson = serializeListObj(p.getSizesList());
+        e.addonsListJson = serializeListObj(p.getAddonsList());
+        e.variantsListJson = serializeListObj(p.getVariantsList());
+        e.bomListJson = serializeListObj(p.getBomList());
+        e.notesListJson = serializeListStr(p.getNotesList());
+
+        return e;
     }
 
     public void retrySync(long localId) {
@@ -956,6 +776,180 @@ public class ProductRepository {
                 }
             }
             allProducts.setValue(list);
+        });
+    }
+
+    public void upsertFromRemote(Product p) {
+        if (p == null || p.getProductId() == null) return;
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
+                long now = System.currentTimeMillis();
+
+                if (existing != null) {
+                    ProductEntity updated = mapProductToEntity(p);
+                    updated.localId = existing.localId;
+                    updated.syncState = "SYNCED";
+                    updated.lastUpdated = now;
+                    productDao.update(updated);
+                } else {
+                    ProductEntity newEntity = mapProductToEntity(p);
+                    newEntity.syncState = "SYNCED";
+                    newEntity.lastUpdated = now;
+                    productDao.insert(newEntity);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    public void restoreArchived(String filename, OnProductRestoreListener listener) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            File dir = new File(application.getFilesDir(), "archives");
+            if (!dir.exists()) {
+                listener.onError("Archive not found");
+                return;
+            }
+            File f = new File(dir, filename);
+            if (!f.exists()) {
+                listener.onError("Archive file not found");
+                return;
+            }
+            try {
+                StringBuilder sb = new StringBuilder();
+                BufferedReader br = new BufferedReader(new FileReader(f));
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                br.close();
+                JSONObject o = new JSONObject(sb.toString());
+                ProductEntity e = new ProductEntity();
+                e.localId = o.optLong("localId", 0);
+                e.productId = o.optString("productId", null);
+                e.productName = o.optString("productName", null);
+                e.categoryId = o.optString("categoryId", null);
+                e.categoryName = o.optString("categoryName", null);
+                e.description = o.optString("description", null);
+                e.costPrice = o.optDouble("costPrice", 0.0);
+                e.sellingPrice = o.optDouble("sellingPrice", 0.0);
+                e.quantity = o.optInt("quantity", 0);
+                e.reorderLevel = o.optInt("reorderLevel", 0);
+                e.criticalLevel = o.optInt("criticalLevel", 0);
+                e.ceilingLevel = o.optInt("ceilingLevel", 0);
+                e.floorLevel = o.optInt("floorLevel", 0);
+                e.unit = o.optString("unit", null);
+                e.barcode = o.optString("barcode", null);
+                e.supplier = o.optString("supplier", null);
+                e.dateAdded = o.optLong("dateAdded", System.currentTimeMillis());
+                e.addedBy = o.optString("addedBy", null);
+                e.isActive = true;
+                e.imagePath = o.optString("imagePath", null);
+                e.imageUrl = o.optString("imageUrl", null);
+                e.expiryDate = o.optLong("expiryDate", 0);
+                e.productType = o.optString("productType", null);
+                e.lastUpdated = System.currentTimeMillis();
+                e.syncState = "PENDING";
+
+                e.sizesListJson = o.optString("sizesListJson", null);
+                e.addonsListJson = o.optString("addonsListJson", null);
+                e.notesListJson = o.optString("notesListJson", null);
+                e.variantsListJson = o.optString("variantsListJson", null);
+                e.bomListJson = o.optString("bomListJson", null);
+
+                if (e.floorLevel < 1) e.floorLevel = 1;
+                if (e.criticalLevel < 1) e.criticalLevel = 1;
+                if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
+                if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
+
+                ProductEntity existing = null;
+                if (e.productId != null && !e.productId.isEmpty()) existing = findEntityByIdSafe(e.productId);
+
+                if (existing != null) {
+                    existing.productName = e.productName;
+                    existing.categoryId = e.categoryId;
+                    existing.categoryName = e.categoryName;
+                    existing.description = e.description;
+                    existing.costPrice = e.costPrice;
+                    existing.sellingPrice = e.sellingPrice;
+                    existing.quantity = e.quantity;
+                    if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
+                    existing.reorderLevel = e.reorderLevel;
+                    existing.criticalLevel = e.criticalLevel;
+                    existing.floorLevel = e.floorLevel;
+                    existing.unit = e.unit;
+                    existing.barcode = e.barcode;
+                    existing.supplier = e.supplier;
+                    existing.dateAdded = e.dateAdded;
+                    existing.addedBy = e.addedBy;
+                    existing.isActive = true;
+                    existing.imagePath = e.imagePath;
+                    existing.imageUrl = e.imageUrl;
+                    existing.expiryDate = e.expiryDate;
+                    existing.productType = e.productType;
+                    existing.lastUpdated = e.lastUpdated;
+                    existing.syncState = "PENDING";
+                    existing.sizesListJson = e.sizesListJson;
+                    existing.addonsListJson = e.addonsListJson;
+                    existing.notesListJson = e.notesListJson;
+                    existing.variantsListJson = e.variantsListJson;
+                    existing.bomListJson = e.bomListJson;
+                    productDao.update(existing);
+                } else {
+                    productDao.insert(e);
+                }
+                SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
+                boolean deleted = f.delete();
+                if (!deleted) {
+                    listener.onError("Failed to remove archive file");
+                    return;
+                }
+                listener.onProductRestored();
+            } catch (JSONException je) {
+                listener.onError("Invalid archive format");
+            } catch (Exception ex) {
+                listener.onError(ex.getMessage() == null ? "Error restoring" : ex.getMessage());
+            }
+        });
+    }
+
+    public void permanentlyDeleteArchive(String filename, OnPermanentDeleteListener listener) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                File dir = new File(application.getFilesDir(), "archives");
+                if (!dir.exists()) {
+                    listener.onError("Archive folder not found");
+                    return;
+                }
+                File f = new File(dir, filename);
+                if (!f.exists()) {
+                    listener.onError("Archive file not found");
+                    return;
+                }
+                StringBuilder sb = new StringBuilder();
+                BufferedReader br = new BufferedReader(new FileReader(f));
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+                br.close();
+                JSONObject o = new JSONObject(sb.toString());
+                String productId = o.optString("productId", null);
+                long localId = o.optLong("localId", 0);
+                if (productId != null && !productId.isEmpty()) {
+                    ProductEntity existing = findEntityByIdSafe(productId);
+                    if (existing != null) {
+                        productDao.deleteByLocalId(existing.localId);
+                    }
+                } else if (localId > 0) {
+                    productDao.deleteByLocalId(localId);
+                }
+                boolean deleted = f.delete();
+                if (!deleted) {
+                    listener.onError("Failed to remove archive file");
+                    return;
+                }
+                listener.onPermanentDeleted();
+            } catch (Exception ex) {
+                listener.onError(ex.getMessage() == null ? "Error deleting archive" : ex.getMessage());
+            }
         });
     }
 

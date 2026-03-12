@@ -184,6 +184,60 @@ public class SalesRepository {
     public MutableLiveData<Double> getTotalMonthlyRevenue() { return totalMonthlyRevenue; }
     public MutableLiveData<List<Sales>> getRecentSales() { return recentSales; }
 
+    public interface OnSaleVoidedListener {
+        void onSuccess();
+        void onError(String error);
+    }
+
+    public void voidSale(Sales sale, OnSaleVoidedListener listener) {
+        String ownerId = firestoreManager.getBusinessOwnerId();
+        if (ownerId == null || sale.getId() == null) {
+            if (listener != null) listener.onError("Invalid user or sale ID");
+            return;
+        }
+
+        // 1. Mark as VOIDED in Firestore
+        firestoreManager.getDb().collection("users")
+                .document(ownerId)
+                .collection("sales")
+                .document(sale.getId())
+                .update("status", "VOIDED")
+                .addOnSuccessListener(aVoid -> {
+
+                    // 2. Return Stock to Inventory
+                    ProductRepository pr = SalesInventoryApplication.getProductRepository();
+                    pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
+                        @Override
+                        public void onProductFetched(Product p) {
+                            if (p != null) {
+                                int newQty = p.getQuantity() + sale.getQuantity();
+                                pr.updateProductQuantity(p.getProductId(), newQty, null);
+                            }
+                        }
+                        @Override public void onError(String error) {}
+                    });
+
+                    // 3. Deduct Money from Wallet
+                    String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
+                    DocumentReference walletRef = firestoreManager.getDb().collection("users")
+                            .document(ownerId).collection("wallets").document(walletId);
+
+                    firestoreManager.getDb().runTransaction(transaction -> {
+                        DocumentSnapshot snap = transaction.get(walletRef);
+                        if (snap.exists() && snap.getDouble("balance") != null) {
+                            double currentBal = snap.getDouble("balance");
+                            transaction.update(walletRef, "balance", currentBal - sale.getTotalPrice());
+                        }
+                        return null;
+                    });
+
+                    if (listener != null) listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    if (listener != null) listener.onError(e.getMessage());
+                });
+    }
+
     public interface OnSaleAddedListener {
         void onSaleAdded(String saleId);
         void onError(String error);

@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/info_primary"
+    android:background="?android:colorBackground"
     tools:context=".MainActivity">
 
     <LinearLayout
@@ -590,101 +590,6 @@
         android:background="#99000000"
         android:visibility="gone"
         android:elevation="6dp" />
-
-    <LinearLayout
-        android:id="@+id/layout_fab_menu"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginBottom="170dp"
-        android:layout_marginEnd="24dp"
-        android:orientation="vertical"
-        android:gravity="end"
-        android:clipToPadding="false"
-        android:visibility="gone"
-        android:elevation="8dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:cardBackgroundColor="@android:color/white"
-                app:cardCornerRadius="6dp"
-                app:cardElevation="2dp"
-                android:layout_marginEnd="12dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Cash Management"
-                    android:textColor="?attr/colorPrimary"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="6dp" />
-            </androidx.cardview.widget.CardView>
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_cash_menu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:fabSize="mini"
-                app:srcCompat="@drawable/ic_account_balance_wallet"
-                app:tint="@android:color/white"
-                app:backgroundTint="@color/successGreen" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:cardBackgroundColor="@android:color/white"
-                app:cardCornerRadius="6dp"
-                app:cardElevation="2dp"
-                android:layout_marginEnd="12dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Purchase Orders"
-                    android:textColor="?attr/colorPrimary"
-                    android:textStyle="bold"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="6dp" />
-            </androidx.cardview.widget.CardView>
-
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_po_menu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:fabSize="mini"
-                app:srcCompat="@drawable/ic_purchase_order"
-                app:tint="@android:color/white"
-                app:backgroundTint="@color/warningYellow" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btnButtons"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginBottom="100dp"
-        android:layout_marginEnd="16dp"
-        android:contentDescription="Open Menu"
-        app:srcCompat="@drawable/ic_add"
-        app:tint="@android:color/white"
-        app:backgroundTint="@color/colorPrimary"
-        android:elevation="8dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btn_add_product"

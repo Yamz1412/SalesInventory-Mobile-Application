@@ -23,6 +23,8 @@ public class Product {
     private int criticalLevel;
     private int ceilingLevel;
     private int floorLevel;
+
+    private double deductionAmount = 1.0;
     private String unit;
     private String barcode;
     private String supplier;
@@ -34,17 +36,25 @@ public class Product {
     private boolean isActive;
     private String productType;
 
+    private String ownerAdminId;
+
     @ServerTimestamp
     private Date expiryDate;
 
     private String imagePath;
     private String imageUrl;
+
+    private String salesUnit;
+    private int piecesPerUnit = 1;
     private Map<String, Integer> linkedMaterials;
+
+    // NEW: Added Variants List
+    private List<Map<String, Object>> variantsList = new ArrayList<>();
+
     private List<Map<String, Object>> addonsList = new ArrayList<>();
     private List<Map<String, String>> notesList = new ArrayList<>();
     private List<Map<String, Object>> bomList = new ArrayList<>();
     private List<Map<String, Object>> sizesList = new ArrayList<>();
-
 
     public Product() {
         this.productType = "Raw";
@@ -77,12 +87,20 @@ public class Product {
         this.expiryDate = null;
     }
 
+    public String getOwnerAdminId() { return ownerAdminId; }
+    public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
+
     public Map<String, Integer> getLinkedMaterials() {
         return linkedMaterials == null ? new HashMap<>() : linkedMaterials;
     }
     public void setLinkedMaterials(Map<String, Integer> linkedMaterials) {
         this.linkedMaterials = linkedMaterials;
     }
+    public String getSalesUnit() { return salesUnit; }
+    public void setSalesUnit(String salesUnit) { this.salesUnit = salesUnit; }
+
+    public int getPiecesPerUnit() { return piecesPerUnit; }
+    public void setPiecesPerUnit(int piecesPerUnit) { this.piecesPerUnit = piecesPerUnit; }
 
     public long getLocalId() { return localId; }
     public void setLocalId(long localId) { this.localId = localId; }
@@ -140,14 +158,26 @@ public class Product {
     public void setDateAdded(long dateAdded) {
         this.dateAdded = (dateAdded > 0) ? new Date(dateAdded) : null;
     }
-    public void setDateAdded(Date dateAdded) { this.dateAdded = dateAdded; }
-
     public long getExpiryDate() { return expiryDate != null ? expiryDate.getTime() : 0L; }
     public void setExpiryDate(long expiryDate) {
         this.expiryDate = (expiryDate > 0) ? new Date(expiryDate) : null;
     }
+
+    public double getDeductionAmount() {
+        return deductionAmount <= 0 ? 1.0 : deductionAmount;
+    }
+
+    public void setDeductionAmount(double deductionAmount) {
+        this.deductionAmount = deductionAmount;
+    }
+
+    // NEW: Variants Getter/Setter
+    public List<Map<String, Object>> getVariantsList() { return variantsList; }
+    public void setVariantsList(List<Map<String, Object>> variantsList) { this.variantsList = variantsList; }
+
     public List<Map<String, Object>> getSizesList() { return sizesList; }
     public void setSizesList(List<Map<String, Object>> sizesList) { this.sizesList = sizesList; }
+
     public List<Map<String, Object>> getAddonsList() { return addonsList; }
     public void setAddonsList(List<Map<String, Object>> addonsList) { this.addonsList = addonsList; }
 
@@ -174,7 +204,6 @@ public class Product {
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
-    // Logic Helpers
     public boolean isCriticalStock() {
         return quantity <= reorderLevel;
     }
@@ -210,17 +239,27 @@ public class Product {
         m.put("unit", unit);
         m.put("barcode", barcode);
         m.put("supplier", supplier);
-        m.put("dateAdded", dateAdded); // Firestore handles Date objects
+        m.put("dateAdded", dateAdded);
         m.put("addedBy", addedBy);
         m.put("isActive", isActive);
         m.put("productType", productType);
-        m.put("expiryDate", expiryDate); // Firestore handles Date objects
+        m.put("ownerAdminId", ownerAdminId);
+        m.put("expiryDate", expiryDate);
         m.put("imagePath", imagePath);
         m.put("imageUrl", imageUrl);
-        m.put("linkedMaterials", linkedMaterials); // NEW: Save links to Firestore
+        m.put("linkedMaterials", linkedMaterials);
+
+        // NEW: Added Variants List to mapping
+        m.put("variantsList", variantsList);
+        m.put("sizesList", sizesList);
+        m.put("addonsList", addonsList);
+        m.put("notesList", notesList);
+        m.put("bomList", bomList);
+
         return m;
     }
 
+    @SuppressWarnings("unchecked")
     public static Product fromMap(Map<String, Object> m) {
         Product p = new Product();
         if (m == null) return p;
@@ -254,7 +293,6 @@ public class Product {
         o = m.get("barcode"); if (o != null) p.barcode = String.valueOf(o);
         o = m.get("supplier"); if (o != null) p.supplier = String.valueOf(o);
 
-        // Handle Timestamps
         o = m.get("dateAdded");
         if (o instanceof com.google.firebase.Timestamp) {
             p.dateAdded = ((com.google.firebase.Timestamp) o).toDate();
@@ -271,6 +309,7 @@ public class Product {
         if (o instanceof Boolean) p.isActive = (Boolean) o;
 
         o = m.get("productType"); if (o != null) p.productType = String.valueOf(o);
+        o = m.get("ownerAdminId"); if (o != null) p.ownerAdminId = String.valueOf(o);
 
         o = m.get("expiryDate");
         if (o instanceof com.google.firebase.Timestamp) {
@@ -284,11 +323,28 @@ public class Product {
 
         Object lm = m.get("linkedMaterials");
         if (lm instanceof Map) {
-            p.linkedMaterials = (Map<String, Integer>) lm; // NEW: Load links from Firestore
+            p.linkedMaterials = (Map<String, Integer>) lm;
         }
 
         o = m.get("imagePath"); if (o != null) p.imagePath = String.valueOf(o);
         o = m.get("imageUrl"); if (o != null) p.imageUrl = String.valueOf(o);
+
+        // Extract lists
+        if (m.get("variantsList") instanceof List) {
+            p.variantsList = (List<Map<String, Object>>) m.get("variantsList");
+        }
+        if (m.get("sizesList") instanceof List) {
+            p.sizesList = (List<Map<String, Object>>) m.get("sizesList");
+        }
+        if (m.get("addonsList") instanceof List) {
+            p.addonsList = (List<Map<String, Object>>) m.get("addonsList");
+        }
+        if (m.get("notesList") instanceof List) {
+            p.notesList = (List<Map<String, String>>) m.get("notesList");
+        }
+        if (m.get("bomList") instanceof List) {
+            p.bomList = (List<Map<String, Object>>) m.get("bomList");
+        }
 
         return p;
     }

@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -57,7 +58,6 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
         holder.tvSupplier.setText(po.getSupplierName());
         holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%.2f", po.getTotalAmount()));
 
-        // FIXED: getOrderDate() is already a Date object, no need for "new Date()"
         if (po.getOrderDate() != null) {
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
             holder.tvOrderDate.setText(sdf.format(po.getOrderDate()));
@@ -69,19 +69,20 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
             String status = po.getStatus() != null ? po.getStatus() : "PENDING";
             holder.tvStatus.setText(status);
 
+            // Safe fallback colors for statuses
             int statusColor;
-            switch (status) {
+            switch (status.toUpperCase()) {
                 case "RECEIVED":
-                    statusColor = context.getResources().getColor(R.color.success_primary);
+                    statusColor = Color.parseColor("#388E3C"); // Green
                     break;
                 case "PARTIAL":
-                    statusColor = context.getResources().getColor(R.color.warning_primary);
+                    statusColor = Color.parseColor("#F57C00"); // Orange
                     break;
                 case "CANCELLED":
-                    statusColor = context.getResources().getColor(R.color.errorRed);
+                    statusColor = Color.parseColor("#D32F2F"); // Red
                     break;
                 default:
-                    statusColor = context.getResources().getColor(R.color.colorPrimary);
+                    statusColor = context.getResources().getColor(R.color.colorPrimary); // Blue/Default
             }
             holder.tvStatus.setTextColor(statusColor);
         }
@@ -109,11 +110,11 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
 
         public POViewHolder(@NonNull View itemView) {
             super(itemView);
+            // Matches perfectly with item_purchase_order.xml
             tvPONumber = itemView.findViewById(R.id.tvPONumber);
             tvSupplier = itemView.findViewById(R.id.tvSupplier);
             tvOrderDate = itemView.findViewById(R.id.tvOrderDate);
             tvTotalAmount = itemView.findViewById(R.id.tvTotalAmount);
-            // FIXED: Look strictly for tvStatus.
             tvStatus = itemView.findViewById(R.id.tvStatus);
         }
     }

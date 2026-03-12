@@ -20,7 +20,6 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +35,11 @@ public class StockMovementReportActivity extends BaseActivity {
     private StockMovementAdapter adapter;
     private List<StockMovementReport> reportList;
 
-    private DatabaseReference productRef, salesRef, adjustmentRef;
+    // ALIGNED: Using Repositories instead of direct Realtime DB references for Products and Sales
+    private ProductRepository productRepository;
+    private SalesRepository salesRepository;
+    private DatabaseReference adjustmentRef;
+
     private ReportExportUtil exportUtil;
     private PDFGenerator pdfGenerator;
     private CSVGenerator csvGenerator;
@@ -48,6 +51,8 @@ public class StockMovementReportActivity extends BaseActivity {
     private static final int PERMISSION_REQUEST_CODE = 200;
     private int pendingExportType = 0;
 
+    private String currentOwnerId;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,6 +62,8 @@ public class StockMovementReportActivity extends BaseActivity {
             getSupportActionBar().setTitle("Stock Movement Report");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
+
+        currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
 
         initializeViews();
         loadData();
@@ -83,8 +90,9 @@ public class StockMovementReportActivity extends BaseActivity {
             btnExportPDF.setEnabled(false);
         }
 
-        productRef = FirebaseDatabase.getInstance().getReference("Product");
-        salesRef = FirebaseDatabase.getInstance().getReference("Sales");
+        // ALIGNED: Initialize Repositories
+        productRepository = SalesInventoryApplication.getProductRepository();
+        salesRepository = SalesRepository.getInstance(getApplication());
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
 
         reportList = new ArrayList<>();
@@ -148,45 +156,37 @@ public class StockMovementReportActivity extends BaseActivity {
 
         Map<String, StockMovementReport> reportMap = new HashMap<>();
 
-        productRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Product p = ds.getValue(Product.class);
-                    if (p != null && p.isActive()) {
+        // ALIGNED: Using offline-first ProductRepository (Avoids DatabaseException crash completely)
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                for (Product p : products) {
+                    if (p != null && p.isActive() && p.getProductId() != null) {
                         StockMovementReport report = new StockMovementReport(
                                 p.getProductId(),
                                 p.getProductName(),
                                 p.getCategoryName(),
-                                p.getQuantity(),
+                                p.getQuantity(), // This is the Current/Closing Stock
                                 0,
                                 0,
                                 0,
                                 p.getQuantity(),
                                 System.currentTimeMillis()
                         );
-                        if (p.getProductId() != null) {
-                            reportMap.put(p.getProductId(), report);
-                        }
+                        reportMap.put(p.getProductId(), report);
                     }
                 }
                 loadSales(reportMap);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
+            } else {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(StockMovementReportActivity.this, "Error loading products: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     private void loadSales(Map<String, StockMovementReport> reportMap) {
-        salesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Sales s = ds.getValue(Sales.class);
+        // ALIGNED: Using offline-first SalesRepository
+        salesRepository.getAllSales().observe(this, sales -> {
+            if (sales != null) {
+                for (Sales s : sales) {
                     if (s != null && s.getProductId() != null && reportMap.containsKey(s.getProductId())) {
                         StockMovementReport report = reportMap.get(s.getProductId());
                         int qty = s.getQuantity();
@@ -195,28 +195,36 @@ public class StockMovementReportActivity extends BaseActivity {
                     }
                 }
                 loadAdjustments(reportMap);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
+            } else {
+                loadAdjustments(reportMap);
             }
         });
     }
 
     private void loadAdjustments(Map<String, StockMovementReport> reportMap) {
+        // ALIGNED: Safe fetch for adjustments using owner ID
         adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 for (DataSnapshot ds : snapshot.getChildren()) {
                     StockAdjustment adj = ds.getValue(StockAdjustment.class);
-                    if (adj != null && adj.getProductId() != null && reportMap.containsKey(adj.getProductId())) {
+                    if (adj == null || adj.getProductId() == null) continue;
+
+                    String owner = ds.child("ownerAdminId").getValue(String.class);
+                    if (owner != null && !owner.equals(currentOwnerId)) continue; // Keep data secure
+
+                    if (reportMap.containsKey(adj.getProductId())) {
                         StockMovementReport report = reportMap.get(adj.getProductId());
+
+                        // Capture "Received" (Purchases/Additions) vs "Adjusted" (Damages/Removals)
                         if ("Add Stock".equals(adj.getAdjustmentType())) {
                             report.addReceived(adj.getQuantityAdjusted());
                             grandTotalReceived += adj.getQuantityAdjusted();
                         } else {
-                            report.addAdjusted(adj.getQuantityAdjusted());
-                            grandTotalAdjusted += adj.getQuantityAdjusted();
+                            // Convert negative adjustment numbers to positive for the math logic
+                            int absQty = Math.abs(adj.getQuantityAdjusted());
+                            report.addAdjusted(absQty);
+                            grandTotalAdjusted += absQty;
                         }
                     }
                 }
@@ -225,6 +233,7 @@ public class StockMovementReportActivity extends BaseActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
+                finalizeReport(reportMap); // Finish rendering even if adjustments fail
             }
         });
     }
@@ -232,9 +241,16 @@ public class StockMovementReportActivity extends BaseActivity {
     private void finalizeReport(Map<String, StockMovementReport> reportMap) {
         reportList.clear();
         for (StockMovementReport report : reportMap.values()) {
-            report.calculateOpening();
+            report.calculateOpening(); // Reverse calculates opening stock: Closing + Sold + Adjusted - Received
             reportList.add(report);
         }
+
+        // Sort alphabetically
+        reportList.sort((r1, r2) -> {
+            String n1 = r1.getProductName() != null ? r1.getProductName() : "";
+            String n2 = r2.getProductName() != null ? r2.getProductName() : "";
+            return n1.compareToIgnoreCase(n2);
+        });
 
         progressBar.setVisibility(View.GONE);
         adapter.notifyDataSetChanged();

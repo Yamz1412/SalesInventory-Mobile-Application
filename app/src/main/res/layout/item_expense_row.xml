@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="12dp"
+    android:background="@drawable/edite_round"
+    android:layout_marginBottom="8dp"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/tvRowExpenseName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Rent"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="#333333" />
+
+    <TextView
+        android:id="@+id/tvRowExpenseAmount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="₱5,000.00"
+        android:textSize="16sp"
+        android:textColor="#D32F2F"
+        android:layout_marginEnd="16dp" />
+
+    <ImageButton
+        android:id="@+id/btnDeleteExpenseRow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_delete"
+        app:tint="#757575" />
+
+</LinearLayout>

@@ -20,9 +20,14 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -41,12 +46,27 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     private RecyclerView recyclerViewOrderItems;
     private POItemAdapter itemsAdapter;
 
-    private boolean isReceiveModeActive = false;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_purchase_order_detail);
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("PO Details");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
+        poId = getIntent().getStringExtra("PO_ID");
+        if (poId == null) poId = getIntent().getStringExtra("poId");
+
+        if (poId == null) {
+            Toast.makeText(this, "Error: No PO ID provided", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders").child(poId);
+        productRepository = SalesInventoryApplication.getProductRepository();
 
         tvPONumber = findViewById(R.id.tvPONumber);
         tvSupplier = findViewById(R.id.tvSupplier);
@@ -60,19 +80,10 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         recyclerViewOrderItems = findViewById(R.id.recyclerViewOrderItems);
 
         recyclerViewOrderItems.setLayoutManager(new LinearLayoutManager(this));
-        productRepository = SalesInventoryApplication.getProductRepository();
 
-        poId = getIntent().getStringExtra("poId");
-        if (poId == null) {
-            Toast.makeText(this, "Error: No PO ID", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders").child(poId);
         loadPurchaseOrder();
 
-        btnProcessDelivery.setOnClickListener(v -> handleProcessDeliveryClick());
+        btnProcessDelivery.setOnClickListener(v -> processDelivery());
         btnCancelOrder.setOnClickListener(v -> updateStatus(PurchaseOrder.STATUS_CANCELLED));
     }
 
@@ -81,185 +92,221 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 currentPo = snapshot.getValue(PurchaseOrder.class);
-                if (currentPo == null) return;
-
-                tvPONumber.setText("PO: " + currentPo.getPoNumber());
-                tvSupplier.setText("Supplier: " + currentPo.getSupplierName());
-                tvStatus.setText("Status: " + currentPo.getStatus());
-
-                if (currentPo.getOrderDate() != null) {
-                    SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-                    tvDate.setText("Date: " + sdf.format(currentPo.getOrderDate()));
-                }
-
-                if (currentPo.getDeliveryNote() != null && !currentPo.getDeliveryNote().isEmpty()) {
-                    tilDeliveryNote.setVisibility(View.VISIBLE);
-                    etDeliveryNote.setText(currentPo.getDeliveryNote());
-                }
-
-                if (itemsAdapter == null) {
-                    itemsAdapter = new POItemAdapter(PurchaseOrderDetailActivity.this, currentPo.getItems(), null, null);
-                    recyclerViewOrderItems.setAdapter(itemsAdapter);
+                if (currentPo != null) {
+                    updateUI();
                 } else {
-                    itemsAdapter.notifyDataSetChanged();
-                }
-
-                // Hide action buttons if the order is completely finished or cancelled
-                if (PurchaseOrder.STATUS_RECEIVED.equals(currentPo.getStatus()) || PurchaseOrder.STATUS_CANCELLED.equals(currentPo.getStatus())) {
-                    layoutActionButtons.setVisibility(View.GONE);
-                    tilDeliveryNote.setEnabled(false);
-                    etDeliveryNote.setEnabled(false);
+                    Toast.makeText(PurchaseOrderDetailActivity.this, "PO Not Found", Toast.LENGTH_SHORT).show();
+                    finish();
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(PurchaseOrderDetailActivity.this, "Failed to load details.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(PurchaseOrderDetailActivity.this, "Database Error", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void handleProcessDeliveryClick() {
-        if (!isReceiveModeActive) {
-            isReceiveModeActive = true;
-            itemsAdapter.setReceiveMode(true);
+    private void updateUI() {
+        tvPONumber.setText(currentPo.getPoNumber());
+        tvSupplier.setText(currentPo.getSupplierName());
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+        tvDate.setText("Expected: " + sdf.format(currentPo.getOrderDate()));
+
+        String status = currentPo.getStatus();
+        tvStatus.setText(status.toUpperCase());
+
+        if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) || status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
+            layoutActionButtons.setVisibility(View.VISIBLE);
             tilDeliveryNote.setVisibility(View.VISIBLE);
-            btnProcessDelivery.setText("Confirm Inventory Addition");
-            btnCancelOrder.setVisibility(View.GONE);
+            tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
+
+            // FIX: Pass the Delete Listener so it functions in Receive Mode
+            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position));
+            itemsAdapter.setReceiveMode(true);
         } else {
-            confirmDeliverySubmission();
+            layoutActionButtons.setVisibility(View.GONE);
+            tilDeliveryNote.setVisibility(View.GONE);
+
+            if (status.equalsIgnoreCase(PurchaseOrder.STATUS_RECEIVED)) {
+                tvStatus.setTextColor(getResources().getColor(R.color.successGreen));
+            } else {
+                tvStatus.setTextColor(getResources().getColor(R.color.errorRed));
+            }
+
+            // FIX: Set to ViewOnly mode so input boxes hide correctly on completed orders
+            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), null);
+            itemsAdapter.setViewOnlyMode(true);
         }
+
+        recyclerViewOrderItems.setAdapter(itemsAdapter);
     }
 
-    // =========================================================================
-    // NEW: Redirection Logic for Unregistered Items & Partial Deliveries
-    // =========================================================================
+    // =====================================================================
+    // NEW: Handles the deletion of a PO Item directly from Firebase
+    // =====================================================================
+    private void promptDeleteItem(int position) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Item")
+                .setMessage("Are you sure you want to completely remove this item from the Purchase Order?")
+                .setPositiveButton("Delete", (dialog, which) -> {
 
-    private void confirmDeliverySubmission() {
-        Map<Integer, Integer> newReceives = itemsAdapter.getNewlyReceivedMap();
-        boolean hasUpdates = false;
-        boolean isFullyReceived = true;
+                    currentPo.getItems().remove(position);
 
-        // Track items that do not exist in the main inventory yet
-        ArrayList<POItem> unlinkedItemsReceived = new ArrayList<>();
+                    // If they deleted the last item, cancel the order automatically
+                    if (currentPo.getItems().isEmpty()) {
+                        poRef.child("status").setValue(PurchaseOrder.STATUS_CANCELLED);
+                        Toast.makeText(this, "Order cancelled because all items were removed.", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
+
+                    // Recalculate total amount with the remaining items
+                    double newTotal = 0;
+                    for (POItem item : currentPo.getItems()) {
+                        newTotal += (item.getUnitPrice() * item.getQuantity());
+                    }
+                    currentPo.setTotalAmount(newTotal);
+
+                    // Push changes to Firebase immediately
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("items", currentPo.getItems());
+                    updates.put("totalAmount", newTotal);
+
+                    poRef.updateChildren(updates).addOnSuccessListener(aVoid -> {
+                        Toast.makeText(this, "Item removed and total updated", Toast.LENGTH_SHORT).show();
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+    // =====================================================================
+
+    private void processDelivery() {
+        boolean hasNewReceives = false;
+        boolean isPartial = false;
+        double totalCostDeduction = 0.0;
+
+        List<POItem> itemsReceivedNow = new ArrayList<>();
 
         for (int i = 0; i < currentPo.getItems().size(); i++) {
             POItem item = currentPo.getItems().get(i);
-            int newlyReceived = newReceives.containsKey(i) ? newReceives.get(i) : 0;
+            int newlyReceived = itemsAdapter.getNewlyReceivedMap().containsKey(i) ? itemsAdapter.getNewlyReceivedMap().get(i) : 0;
 
             if (newlyReceived > 0) {
-                hasUpdates = true;
+                hasNewReceives = true;
+                totalCostDeduction += (newlyReceived * item.getUnitPrice());
+
+                // Temporarily store the newly received amount in the object to pass it later
                 item.setReceivedQuantity(item.getReceivedQuantity() + newlyReceived);
-
-                final String productId = item.getProductId();
-                final int finalNewlyReceived = newlyReceived; // Prevent lambda error
-                final String receivedUnit = item.getUnit() != null ? item.getUnit().toLowerCase() : "pcs";
-
-                // If it's a completely new typed item from Create PO
-                if (productId != null && productId.startsWith("CUSTOM_")) {
-                    POItem customItem = new POItem(productId, item.getProductName(), item.getQuantity(), item.getUnitPrice(), item.getUnit());
-                    customItem.setReceivedQuantity(newlyReceived); // Pass exactly what was delivered
-                    unlinkedItemsReceived.add(customItem);
-                } else {
-                    // Standard Restock for Existing Items WITH SMART UNIT CONVERSION
-                    productRepository.getProductById(productId, new ProductRepository.OnProductFetchedListener() {
-                        @Override
-                        public void onProductFetched(Product product) {
-                            String baseUnit = product.getUnit() != null ? product.getUnit().toLowerCase() : "pcs";
-                            int qtyToAdd = finalNewlyReceived;
-
-                            // ========================================================
-                            // SMART UNIT CONVERSION ENGINE
-                            // ========================================================
-                            if (!baseUnit.equals(receivedUnit)) {
-                                // 1. Kilograms to Grams (e.g., receive 1kg -> add 1000g)
-                                if ((receivedUnit.equals("kg") || receivedUnit.equals("kilogram")) && baseUnit.equals("g")) {
-                                    qtyToAdd = finalNewlyReceived * 1000;
-                                }
-                                // 2. Grams to Kilograms (e.g., receive 1000g -> add 1kg)
-                                else if (receivedUnit.equals("g") && (baseUnit.equals("kg") || baseUnit.equals("kilogram"))) {
-                                    qtyToAdd = finalNewlyReceived / 1000;
-                                }
-                                // 3. Liters to Milliliters (e.g., receive 1L -> add 1000ml)
-                                else if ((receivedUnit.equals("l") || receivedUnit.equals("liter") || receivedUnit.equals("liters")) && baseUnit.equals("ml")) {
-                                    qtyToAdd = finalNewlyReceived * 1000;
-                                }
-                                // 4. Milliliters to Liters (e.g., receive 1000ml -> add 1L)
-                                else if (receivedUnit.equals("ml") && (baseUnit.equals("l") || baseUnit.equals("liter") || baseUnit.equals("liters"))) {
-                                    qtyToAdd = finalNewlyReceived / 1000;
-                                }
-                            }
-                            // ========================================================
-
-                            int updatedStock = product.getQuantity() + qtyToAdd;
-                            productRepository.updateProductQuantity(productId, updatedStock, null);
-                        }
-                        @Override public void onError(String error) {}
-                    });
-                }
+                POItem tempItem = new POItem(item.getProductId(), item.getProductName(), newlyReceived, item.getUnitPrice(), item.getUnit());
+                itemsReceivedNow.add(tempItem);
             }
 
-            // If the total received is still less than what we ordered, it's a Partial Delivery
             if (item.getReceivedQuantity() < item.getQuantity()) {
-                isFullyReceived = false;
+                isPartial = true;
             }
         }
 
-        if (!hasUpdates) {
-            Toast.makeText(this, "You must enter received quantities to process.", Toast.LENGTH_SHORT).show();
+        if (!hasNewReceives) {
+            Toast.makeText(this, "Please enter at least one received quantity.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Determine overall PO status
-        String newStatus = isFullyReceived ? PurchaseOrder.STATUS_RECEIVED : PurchaseOrder.STATUS_PARTIAL;
-        currentPo.setStatus(newStatus);
-
-        String note = etDeliveryNote.getText().toString().trim();
-        if (!note.isEmpty()) currentPo.setDeliveryNote(note);
-
-        // Prevent Lambda error by making this final
-        final boolean finalIsFullyReceived = isFullyReceived;
-
-        // Save back to Firebase
-        poRef.setValue(currentPo.toMap())
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Delivery Processed!", Toast.LENGTH_LONG).show();
-                    isReceiveModeActive = false;
-                    itemsAdapter.setReceiveMode(false);
-                    btnProcessDelivery.setText("Process Delivery");
-
-                    // Check for unlinked items FIRST, otherwise check for Partial Delivery
-                    if (!unlinkedItemsReceived.isEmpty()) {
-                        promptAddUnlinkedProduct(unlinkedItemsReceived.get(0));
-                    } else if (!finalIsFullyReceived) {
-                        showPartialDeliveryWarning();
-                    }
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Failed to save data.", Toast.LENGTH_SHORT).show());
+        // Run the async check for existing products
+        checkProductsAndFinalize(itemsReceivedNow, isPartial, totalCostDeduction);
     }
-    private void promptAddUnlinkedProduct(POItem customItem) {
+
+    private void checkProductsAndFinalize(List<POItem> itemsToCheck, boolean isPartial, double finalCostToDeduct) {
+        ArrayList<Bundle> registrationQueue = new ArrayList<>();
+        final int[] pendingQueries = {itemsToCheck.size()};
+
+        if (pendingQueries[0] == 0) {
+            finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
+            return;
+        }
+
+        for (POItem item : itemsToCheck) {
+            FirebaseDatabase.getInstance().getReference("Products")
+                    .orderByChild("productName")
+                    .equalTo(item.getProductName())
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            boolean productExists = false;
+
+                            for (DataSnapshot ds : snapshot.getChildren()) {
+                                Product p = ds.getValue(Product.class);
+                                if (p != null && p.getOwnerAdminId().equals(currentPo.getOwnerAdminId())) {
+                                    productExists = true;
+                                    // 1. PRODUCT EXISTS: Silently Add Stocks (Restock)
+                                    int newTotal = p.getQuantity() + item.getQuantity(); // item.getQuantity() holds the newlyReceived amount
+                                    productRepository.updateProductQuantity(p.getProductId(), newTotal, null);
+                                    break;
+                                }
+                            }
+
+                            // 2. PRODUCT DOES NOT EXIST: Add to Queue
+                            if (!productExists) {
+                                Bundle b = new Bundle();
+                                b.putString("PREFILL_NAME", item.getProductName());
+                                b.putDouble("PREFILL_COST", item.getUnitPrice());
+                                b.putInt("PREFILL_QTY", item.getQuantity());
+                                b.putString("PREFILL_UNIT", item.getUnit());
+                                b.putString("PREFILL_SUPPLIER", currentPo.getSupplierName());
+                                registrationQueue.add(b);
+                            }
+
+                            pendingQueries[0]--;
+                            if (pendingQueries[0] == 0) {
+                                finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            pendingQueries[0]--;
+                            if (pendingQueries[0] == 0) {
+                                finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
+                            }
+                        }
+                    });
+        }
+    }
+
+    private void finalizeDeliveryStatus(boolean isPartial, double finalCostToDeduct, ArrayList<Bundle> registrationQueue) {
+        String newStatus = isPartial ? PurchaseOrder.STATUS_PARTIAL : PurchaseOrder.STATUS_RECEIVED;
+
+        poRef.child("status").setValue(newStatus).addOnSuccessListener(aVoid -> {
+            poRef.child("items").setValue(currentPo.getItems());
+            if (finalCostToDeduct > 0) deductFromWallet(finalCostToDeduct);
+
+            Toast.makeText(this, "Delivery updated successfully", Toast.LENGTH_SHORT).show();
+
+            // If there are new products to register, launch the Queue
+            if (!registrationQueue.isEmpty()) {
+                Intent intent = new Intent(this, AddProductActivity.class);
+                intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
+                startActivity(intent);
+            }
+            finish();
+        });
+    }
+
+    private void promptToRegisterNewProduct(POItem customItem, int newlyReceivedQty) {
         new AlertDialog.Builder(this)
-                .setTitle("New Item Detected")
-                .setMessage("You received '" + customItem.getProductName() + "', but it is not registered in your main inventory yet.\n\nWould you like to register it now?")
-                .setPositiveButton("Register Product", (dialog, which) -> {
+                .setTitle("New Product Detected")
+                .setMessage("The item '" + customItem.getProductName() + "' is not currently in your inventory. You must register it to track its stock.")
+                .setPositiveButton("Register Now", (dialog, which) -> {
                     Intent intent = new Intent(PurchaseOrderDetailActivity.this, AddProductActivity.class);
-                    // Pass the data so AddProductActivity can pre-fill the form!
                     intent.putExtra("PREFILL_NAME", customItem.getProductName());
                     intent.putExtra("PREFILL_COST", customItem.getUnitPrice());
-                    intent.putExtra("PREFILL_QTY", customItem.getReceivedQuantity());
+                    intent.putExtra("PREFILL_QTY", newlyReceivedQty);
                     intent.putExtra("PREFILL_UNIT", customItem.getUnit());
                     startActivity(intent);
                 })
-                .setNegativeButton("Skip for now", null)
                 .setCancelable(false)
-                .show();
-    }
-
-    private void showPartialDeliveryWarning() {
-        new AlertDialog.Builder(this)
-                .setTitle("Partial Delivery Recorded")
-                .setMessage("You received fewer items than requested. The missing items have been placed on backorder.\n\nThe Purchase Order status has been changed to PARTIAL and will remain open until fully fulfilled.")
-                .setPositiveButton("Understood", null)
                 .show();
     }
 
@@ -273,5 +320,30 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 })
                 .setNegativeButton("No", null)
                 .show();
+    }
+
+    private void deductFromWallet(double totalAmount) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null) return;
+
+        DocumentReference walletRef = FirebaseFirestore.getInstance().collection("users")
+                .document(ownerId).collection("wallets").document("CASH");
+
+        FirebaseFirestore.getInstance().runTransaction(transaction -> {
+            DocumentSnapshot snap = transaction.get(walletRef);
+            if (snap.exists() && snap.getDouble("balance") != null) {
+                double currentBal = snap.getDouble("balance");
+                transaction.update(walletRef, "balance", currentBal - totalAmount);
+            }
+            return null;
+        }).addOnSuccessListener(aVoid -> {
+            Map<String, Object> transLog = new HashMap<>();
+            transLog.put("title", "PO Payment: " + tvPONumber.getText().toString());
+            transLog.put("date", new java.text.SimpleDateFormat("MMM dd, yyyy - hh:mm a", java.util.Locale.getDefault()).format(new java.util.Date()));
+            transLog.put("amount", totalAmount);
+            transLog.put("isIncome", false);
+            transLog.put("timestamp", System.currentTimeMillis());
+            FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("cash_transactions").add(transLog);
+        });
     }
 }

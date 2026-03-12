@@ -13,6 +13,9 @@ public class StockAdjustment {
     private long timestamp;
     private String adjustedBy;
 
+    // NEW: Added ownerAdminId to link the adjustment to your specific business
+    private String ownerAdminId;
+
     public StockAdjustment() {
         // Default constructor required for calls to DataSnapshot.getValue(StockAdjustment.class)
     }
@@ -66,4 +69,8 @@ public class StockAdjustment {
 
     public String getAdjustedBy() { return adjustedBy; }
     public void setAdjustedBy(String adjustedBy) { this.adjustedBy = adjustedBy; }
+
+    // NEW: Getter and Setter for ownerAdminId to fix the compilation error
+    public String getOwnerAdminId() { return ownerAdminId; }
+    public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
 }

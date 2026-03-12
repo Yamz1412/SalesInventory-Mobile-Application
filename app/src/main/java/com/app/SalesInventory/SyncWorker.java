@@ -44,49 +44,38 @@ public class SyncWorker extends Worker {
             if (pending == null || pending.isEmpty()) {
                 return Result.success();
             }
+
             for (ProductEntity pe : pending) {
                 if ("DELETE_PENDING".equals(pe.syncState)) {
-                    handleDelete(pe);
+                    deleteEntity(pe);
                 } else {
-                    handleUpsert(pe);
+                    syncEntity(pe);
                 }
             }
             return Result.success();
         } catch (Exception e) {
-            Log.e(TAG, "Sync failed", e);
+            Log.e(TAG, "SyncWorker failed", e);
             return Result.retry();
         }
     }
 
-    private void handleDelete(ProductEntity pe) {
+    private void deleteEntity(ProductEntity pe) {
         if (pe.productId != null && !pe.productId.isEmpty()) {
-            Task<Void> deleteTask = firestore
-                    .collection(firestoreManager.getUserProductsPath())
+            Task<Void> t = firestore.collection(firestoreManager.getUserProductsPath())
                     .document(pe.productId)
                     .delete();
             try {
-                Tasks.await(deleteTask);
+                Tasks.await(t);
                 productDao.deleteByLocalId(pe.localId);
             } catch (ExecutionException | InterruptedException e) {
-                productDao.setSyncInfo(pe.localId, pe.productId, "ERROR");
+                // Retry later
             }
         } else {
             productDao.deleteByLocalId(pe.localId);
         }
     }
 
-    private void handleUpsert(ProductEntity pe) {
-        try {
-            if (pe.imagePath != null && !pe.imagePath.isEmpty() && (pe.imageUrl == null || pe.imageUrl.isEmpty())) {
-                String url = uploadImage(pe);
-                if (url != null) {
-                    pe.imageUrl = url;
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Image upload failed for localId=" + pe.localId, e);
-        }
-
+    private void syncEntity(ProductEntity pe) {
         Map<String, Object> doc = new HashMap<>();
         doc.put("productName", pe.productName);
         doc.put("categoryId", pe.categoryId);
@@ -105,16 +94,32 @@ public class SyncWorker extends Worker {
         doc.put("dateAdded", pe.dateAdded);
         doc.put("addedBy", pe.addedBy);
         doc.put("isActive", pe.isActive);
-        doc.put("productType", pe.productType);
         doc.put("expiryDate", pe.expiryDate);
-        doc.put("lastUpdated", firestoreManager.getServerTimestamp());
-        if (pe.imageUrl != null && !pe.imageUrl.isEmpty()) {
-            doc.put("imageUrl", pe.imageUrl);
+        doc.put("productType", pe.productType);
+
+        // ==========================================
+        // NEW: MAP THE JSON CONFIGURATION LISTS!
+        // ==========================================
+        doc.put("sizesListJson", pe.sizesListJson);
+        doc.put("addonsListJson", pe.addonsListJson);
+        doc.put("notesListJson", pe.notesListJson);
+        doc.put("variantsListJson", pe.variantsListJson);
+        doc.put("bomListJson", pe.bomListJson);
+
+        try {
+            String newUrl = uploadImage(pe);
+            if (newUrl != null) {
+                pe.imageUrl = newUrl;
+                pe.imagePath = null;
+            }
+        } catch (Exception e) {
+            // Log image error, but continue syncing data
         }
 
+        doc.put("imageUrl", pe.imageUrl != null ? pe.imageUrl : "");
+
         if (pe.productId != null && !pe.productId.isEmpty()) {
-            Task<Void> t = firestore
-                    .collection(firestoreManager.getUserProductsPath())
+            Task<Void> t = firestore.collection(firestoreManager.getUserProductsPath())
                     .document(pe.productId)
                     .set(doc);
             try {
@@ -154,7 +159,6 @@ public class SyncWorker extends Worker {
         Tasks.await(uploadTask);
         Task<Uri> urlTask = ref.getDownloadUrl();
         Uri download = Tasks.await(urlTask);
-        if (download == null) return null;
         return download.toString();
     }
 }

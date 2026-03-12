@@ -3,11 +3,14 @@ package com.app.SalesInventory;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -36,6 +39,7 @@ public class Inventory extends BaseActivity {
     private ProductRepository productRepository;
     private AuthManager authManager;
     private Button btnAddProduct;
+    private Button btnAdjustStock; // NEW BUTTON
     private Spinner spinnerCategoryFilter;
     private String currentSearchQuery = "";
     private String currentCategoryFilter = "All";
@@ -63,6 +67,7 @@ public class Inventory extends BaseActivity {
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
         btnAddProduct = findViewById(R.id.btn_add_product);
+        btnAdjustStock = findViewById(R.id.btn_adjust_stock); // BIND NEW BUTTON
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
         tvTotalCount = findViewById(R.id.TotalCountTV);
         tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
@@ -87,8 +92,10 @@ public class Inventory extends BaseActivity {
             // Hide buttons if Staff or viewing as Impersonated Staff
             if (!isRealAdmin || isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
+                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
             } else {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
+                if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
             }
         }));
 
@@ -151,88 +158,62 @@ public class Inventory extends BaseActivity {
     }
 
     private void setupActionButtons() {
-        // Top static buttons
+        // Wire up buttons
         if (btnAddProduct != null) {
             btnAddProduct.setOnClickListener(v -> startActivity(new Intent(Inventory.this, AddProductActivity.class)));
         }
+
+        if (btnAdjustStock != null) {
+            btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
+        }
     }
 
+    // Inside Inventory.java, update this method
     private void listenToCategoriesForFilter() {
-        if (categoryListener != null) {
-            categoryRef.removeEventListener(categoryListener);
-        }
+        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Categories");
+
+        // Clear old listener if it exists to prevent memory leaks
+        if (categoryListener != null) ref.removeEventListener(categoryListener);
 
         categoryListener = new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                List<Category> inventoryCategories = new ArrayList<>();
-                if (snapshot != null) {
-                    for (DataSnapshot child : snapshot.getChildren()) {
-                        Category c = child.getValue(Category.class);
-                        if (c == null || !c.isActive()) continue;
-                        String type = c.getType();
-                        if (type == null || type.isEmpty()) type = "Inventory";
-                        if ("Menu".equalsIgnoreCase(type)) continue;
-                        inventoryCategories.add(c);
-                    }
-                }
-
-                Set<String> productCategoryNames = new HashSet<>();
-                for (Product p : allProducts) {
-                    if (p == null || !p.isActive()) continue;
-                    String type = p.getProductType() == null ? "" : p.getProductType();
-                    if ("Menu".equalsIgnoreCase(type)) continue;
-                    String cname = p.getCategoryName();
-                    if (cname != null && !cname.isEmpty()) {
-                        productCategoryNames.add(cname);
-                    }
-                }
-
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
                 List<String> options = new ArrayList<>();
                 options.add("All");
-                Set<String> added = new HashSet<>();
 
-                for (Category c : inventoryCategories) {
-                    String name = c.getCategoryName();
-                    if (name == null || name.isEmpty()) continue;
-                    if (!productCategoryNames.isEmpty() && !productCategoryNames.contains(name)) continue;
-                    if (added.add(name)) options.add(name);
-                }
-
-                if (options.size() == 1) {
-                    for (Category c : inventoryCategories) {
-                        String name = c.getCategoryName();
-                        if (name == null || name.isEmpty()) continue;
-                        if (added.add(name)) options.add(name);
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    Category c = child.getValue(Category.class);
+                    // Security Fix: Only show categories owned by THIS user
+                    // Context Fix: Only show Inventory types in this screen
+                    if (c != null && c.isActive() &&
+                            currentUserId.equals(c.getOwnerAdminId()) &&
+                            !"Menu".equalsIgnoreCase(c.getType())) {
+                        options.add(c.getCategoryName());
                     }
                 }
 
-                android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
-                        Inventory.this, android.R.layout.simple_spinner_item, options);
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(Inventory.this,
+                        android.R.layout.simple_spinner_item, options);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 spinnerCategoryFilter.setAdapter(adapter);
-
-                int index = options.indexOf(currentCategoryFilter);
-                if (index < 0) index = 0;
-                spinnerCategoryFilter.setSelection(index);
 
                 spinnerCategoryFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
                     @Override
                     public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                        String selected = (String) parent.getItemAtPosition(position);
-                        currentCategoryFilter = selected == null ? "All" : selected;
+                        currentCategoryFilter = (String) parent.getItemAtPosition(position);
                         applyFilters();
                     }
-                    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
+                    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
                 });
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
-                setupCategoryFilterSpinnerFallback();
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(Inventory.this, "Error loading categories", Toast.LENGTH_SHORT).show();
             }
         };
-        categoryRef.addValueEventListener(categoryListener);
+        ref.addValueEventListener(categoryListener);
     }
 
     private void setupCategoryFilterSpinnerFallback() {

@@ -6,6 +6,13 @@ import androidx.room.PrimaryKey;
 
 @Entity(tableName = "products")
 public class ProductEntity {
+
+    public String sizesListJson;
+    public String addonsListJson;
+    public String notesListJson;
+    public String variantsListJson;
+    public String bomListJson;
+
     @PrimaryKey(autoGenerate = true)
     public long localId;
     @ColumnInfo(name = "productId")
@@ -50,12 +57,14 @@ public class ProductEntity {
     public String syncState;
     @ColumnInfo(name = "imagePath")
     public String imagePath;
+
+    // --- NEW FIELDS MUST BE HERE ---
     @ColumnInfo(name = "imageUrl")
     public String imageUrl;
-    @ColumnInfo(name = "expiryDate")
-    public long expiryDate;
     @ColumnInfo(name = "productType")
     public String productType;
-
-    public ProductEntity() {}
+    @ColumnInfo(name = "ownerAdminId")
+    public String ownerAdminId;
+    @ColumnInfo(name = "expiryDate")
+    public long expiryDate;
 }

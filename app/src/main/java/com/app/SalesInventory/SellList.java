@@ -13,16 +13,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,19 +32,20 @@ import java.util.Set;
 public class SellList extends BaseActivity {
     private RecyclerView sellListView;
     private SellAdapter sellAdapter;
-    private List<Product> allMenuProducts;
-    private List<Product> filteredProducts;
+    private List<Product> allMenuProducts = new ArrayList<>();
+    private List<Product> filteredProducts = new ArrayList<>();
     private ProductRepository productRepository;
-
-    // Buttons & Search
-    private Button btnCheckout; // This is now your top-right button
-    private EditText etSearchProduct;
-
     private CartManager cartManager;
-    private LinearLayout layoutCategoryChips;
 
-    private String selectedCategory = "All";
-    private String currentSearchQuery = "";
+    private Button btnCheckout;
+    private EditText etSearchProduct;
+    private LinearLayout layoutCategoryChips;
+    private String currentCategoryFilter = "All";
+
+    // BULK ACTION VIEWS
+    private View layoutBulkActions;
+    private TextView tvSelectedCount;
+    private ImageButton btnBulkOptions, btnBulkDelete, btnBulkClose;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,360 +60,377 @@ public class SellList extends BaseActivity {
         etSearchProduct = findViewById(R.id.etSearchProduct);
         layoutCategoryChips = findViewById(R.id.layoutCategoryChips);
 
-        allMenuProducts = new ArrayList<>();
-        filteredProducts = new ArrayList<>();
+        // Bind Bulk Action views from XML
+        layoutBulkActions = findViewById(R.id.layoutBulkActions);
+        tvSelectedCount = findViewById(R.id.tvSelectedCount);
+        btnBulkOptions = findViewById(R.id.btnBulkOptions);
+        btnBulkDelete = findViewById(R.id.btnBulkDelete);
+        btnBulkClose = findViewById(R.id.btnBulkClose);
 
-        sellAdapter = new SellAdapter(this, filteredProducts);
-        sellAdapter.setOnProductClickListener(this::showProductOptionsDialog);
-        sellAdapter.setOnProductLongClickListener(this::handleProductLongClick);
+        setupBulkActionListeners();
 
-        sellListView.setLayoutManager(new GridLayoutManager(this, 3));
+        sellListView.setLayoutManager(new GridLayoutManager(this, 2));
+
+        // Initial Adapter attachment
+        sellAdapter = new SellAdapter(
+                this,
+                filteredProducts,
+                product -> showProductOptionsDialog(product),
+                selectedIds -> {
+                    if (selectedIds.isEmpty()) {
+                        if (layoutBulkActions != null) layoutBulkActions.setVisibility(View.GONE);
+                    } else {
+                        if (layoutBulkActions != null) {
+                            layoutBulkActions.setVisibility(View.VISIBLE);
+                            tvSelectedCount.setText(selectedIds.size() + " Selected");
+                        }
+                    }
+                }
+        );
         sellListView.setAdapter(sellAdapter);
 
-        loadProducts();
-        setupCheckoutButton();
-        setupSearchBar();
+        loadMenuProducts();
+
+        com.google.android.material.floatingactionbutton.FloatingActionButton fabAddSalesProduct = findViewById(R.id.fabAddSalesProduct);
+        if (!AuthManager.getInstance().isCurrentUserAdmin()) {
+            if (fabAddSalesProduct != null) fabAddSalesProduct.setVisibility(View.GONE);
+            if (btnBulkDelete != null) btnBulkDelete.setVisibility(View.GONE);
+            if (btnBulkOptions != null) btnBulkOptions.setVisibility(View.GONE);
+        }
+
+        if (fabAddSalesProduct != null) {
+            fabAddSalesProduct.setOnClickListener(v -> {
+                Intent intent = new Intent(SellList.this, AddProductActivity.class);
+                intent.putExtra("FORCE_SALE_ONLY", true);
+                startActivity(intent);
+            });
+        }
+
+        btnCheckout.setOnClickListener(v -> {
+            if (cartManager.getItems().isEmpty()) {
+                Toast.makeText(this, "Cart is empty", Toast.LENGTH_SHORT).show();
+            } else {
+                startActivity(new Intent(SellList.this, sellProduct.class));
+            }
+        });
+
+        etSearchProduct.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                applyFilters();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        loadProducts();
+    private void setupBulkActionListeners() {
+        if (btnBulkClose != null) {
+            btnBulkClose.setOnClickListener(v -> {
+                if (sellAdapter != null) sellAdapter.clearSelection();
+            });
+        }
+
+        if (btnBulkDelete != null) {
+            btnBulkDelete.setOnClickListener(v -> {
+                if (sellAdapter != null) performBulkDelete(sellAdapter.getSelectedIds());
+            });
+        }
+
+        if (btnBulkOptions != null) {
+            btnBulkOptions.setOnClickListener(v -> {
+                if (sellAdapter != null) performBulkCopyOptions(sellAdapter.getSelectedIds());
+            });
+        }
     }
 
-    private void loadProducts() {
+    private void performBulkDelete(Set<String> selectedIds) {
+        if (!AuthManager.getInstance().isCurrentUserAdmin()) return;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Products")
+                .setMessage("Are you sure you want to delete " + selectedIds.size() + " selected products?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    for (String id : selectedIds) {
+                        productRepository.deleteProduct(id, new ProductRepository.OnProductDeletedListener() {
+                            @Override public void onProductDeleted(String msg) {}
+                            @Override public void onError(String error) {}
+                        });
+                    }
+                    Toast.makeText(SellList.this, "Products deleted", Toast.LENGTH_SHORT).show();
+                    if (sellAdapter != null) sellAdapter.clearSelection();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void performBulkCopyOptions(Set<String> selectedIds) {
+        if (!AuthManager.getInstance().isCurrentUserAdmin()) return;
+
+        List<Product> templates = new ArrayList<>(allMenuProducts);
+        String[] templateNames = new String[templates.size()];
+        for (int i = 0; i < templates.size(); i++) {
+            templateNames[i] = templates.get(i).getProductName();
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Copy Configurations From...")
+                .setItems(templateNames, (dialog, which) -> {
+                    Product sourceProduct = templates.get(which);
+                    applyConfigurationsToSelected(sourceProduct, selectedIds);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void applyConfigurationsToSelected(Product sourceProduct, Set<String> selectedIds) {
+        int updatedCount = 0;
+        for (String id : selectedIds) {
+            String sourceId = sourceProduct.getProductId() != null ? sourceProduct.getProductId() : "local:" + sourceProduct.getLocalId();
+            if (id.equals(sourceId)) continue;
+
+            Product targetProduct = null;
+            for (Product p : allMenuProducts) {
+                String targetId = p.getProductId() != null ? p.getProductId() : "local:" + p.getLocalId();
+                if (targetId.equals(id)) {
+                    targetProduct = p;
+                    break;
+                }
+            }
+
+            if (targetProduct != null) {
+                targetProduct.setSizesList(sourceProduct.getSizesList());
+                targetProduct.setAddonsList(sourceProduct.getAddonsList());
+                targetProduct.setNotesList(sourceProduct.getNotesList());
+
+                productRepository.updateProduct(targetProduct, new ProductRepository.OnProductUpdatedListener() {
+                    @Override public void onProductUpdated() {}
+                    @Override public void onError(String error) {}
+                });
+                updatedCount++;
+            }
+        }
+        Toast.makeText(this, "Copied configurations to " + updatedCount + " products!", Toast.LENGTH_SHORT).show();
+        if (sellAdapter != null) sellAdapter.clearSelection();
+    }
+
+    private void loadMenuProducts() {
         productRepository.getAllProducts().observe(this, products -> {
             allMenuProducts.clear();
+            List<String> categories = new ArrayList<>();
+            categories.add("All");
+
             if (products != null) {
                 for (Product p : products) {
-                    if (p == null || !p.isActive()) continue;
-                    String type = p.getProductType() == null ? "" : p.getProductType();
-                    if ("Menu".equalsIgnoreCase(type)) {
+                    boolean isMenuActive = p != null && p.isActive();
+                    boolean isMenuType = p != null && ("Menu".equalsIgnoreCase(p.getProductType()) || "Both".equalsIgnoreCase(p.getProductType()));
+                    boolean isMenuCategory = p != null && "Menu".equalsIgnoreCase(p.getCategoryName());
+
+                    if (isMenuActive && (isMenuType || isMenuCategory)) {
                         allMenuProducts.add(p);
+                        String cat = p.getCategoryName();
+                        if (cat != null && !cat.trim().isEmpty() && !categories.contains(cat)) {
+                            categories.add(cat);
+                        }
                     }
                 }
             }
-            buildCategoryChips();
+            setupCategoryChips(categories);
             applyFilters();
         });
     }
 
-    private void buildCategoryChips() {
+    private void setupCategoryChips(List<String> categories) {
         layoutCategoryChips.removeAllViews();
-        Set<String> categories = new HashSet<>();
-        for (Product p : allMenuProducts) {
-            String c = p.getCategoryName();
-            if (c != null && !c.isEmpty()) {
-                categories.add(c);
-            }
-        }
-        List<String> list = new ArrayList<>();
-        list.add("All");
-        list.addAll(categories);
-
-        for (String cat : list) {
-            TextView chip = new TextView(this);
+        for (String cat : categories) {
+            MaterialButton chip = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
             chip.setText(cat);
-            chip.setPadding(32, 12, 32, 12);
-            chip.setTextSize(14f);
-            chip.setAllCaps(false);
-            chip.setBackgroundResource(R.drawable.chip_background);
-            chip.setTextColor(getResources().getColor(cat.equals(selectedCategory) ? android.R.color.white : android.R.color.black));
+            chip.setCheckable(true);
+            chip.setChecked(cat.equals(currentCategoryFilter));
+
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 16, 0);
+            chip.setLayoutParams(params);
 
             chip.setOnClickListener(v -> {
-                selectedCategory = cat;
-                buildCategoryChips(); // Refresh chip colors
-                applyFilters();       // Re-filter products
+                for (int i = 0; i < layoutCategoryChips.getChildCount(); i++) {
+                    ((MaterialButton) layoutCategoryChips.getChildAt(i)).setChecked(false);
+                }
+                chip.setChecked(true);
+                currentCategoryFilter = cat;
+                applyFilters();
             });
-
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(8, 0, 8, 0);
-            chip.setLayoutParams(lp);
             layoutCategoryChips.addView(chip);
         }
     }
 
-    // ====================================================================
-    // SEARCH & FILTER LOGIC
-    // ====================================================================
-    private void setupSearchBar() {
-        if (etSearchProduct != null) {
-            etSearchProduct.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    currentSearchQuery = s.toString().toLowerCase().trim();
-                    applyFilters();
-                }
-
-                @Override public void afterTextChanged(Editable s) {}
-            });
-        }
-    }
-
     private void applyFilters() {
+        String query = etSearchProduct.getText().toString().toLowerCase().trim();
         filteredProducts.clear();
+
         for (Product p : allMenuProducts) {
-
-            // Check Category Filter
-            boolean matchesCategory = "All".equalsIgnoreCase(selectedCategory) ||
-                    (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(selectedCategory));
-
-            // Check Search Text Filter
-            boolean matchesSearch = currentSearchQuery.isEmpty() ||
-                    (p.getProductName() != null && p.getProductName().toLowerCase().contains(currentSearchQuery));
+            String pCat = p.getCategoryName() != null ? p.getCategoryName() : "";
+            boolean matchesCategory = currentCategoryFilter.equals("All") || currentCategoryFilter.equals(pCat);
+            String pName = p.getProductName() != null ? p.getProductName().toLowerCase() : "";
+            boolean matchesSearch = pName.contains(query);
 
             if (matchesCategory && matchesSearch) {
                 filteredProducts.add(p);
             }
         }
-        sellAdapter.updateProducts(new ArrayList<>(filteredProducts));
-    }
 
-    private void setupCheckoutButton() {
-        if (btnCheckout != null) {
-            btnCheckout.setOnClickListener(v -> {
-                if (cartManager.getItems().isEmpty()) {
-                    Toast.makeText(this, "Cart is empty", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                Intent intent = new Intent(SellList.this, sellProduct.class);
-                startActivity(intent);
-            });
+        if (sellAdapter != null) {
+            sellAdapter.updateData(filteredProducts);
         }
     }
 
-    private void handleProductLongClick(Product product) {
-        AuthManager authManager = AuthManager.getInstance();
-        authManager.isCurrentUserAdminAsync(success -> runOnUiThread(() -> {
-            if (!success) {
-                Toast.makeText(this, "Only admins can manage products", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Intent i = new Intent(SellList.this, ProductDetailActivity.class);
-            i.putExtra("productId", product.getProductId());
-            startActivity(i);
-        }));
-    }
-
-    // ====================================================================
-    // FULLY DYNAMIC DIALOG GENERATOR FOR POS SELECTION
-    // ====================================================================
     private void showProductOptionsDialog(Product product) {
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null, false);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setView(dialogView)
-                .setCancelable(false)
-                .create();
-
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         TextView tvName = dialogView.findViewById(R.id.tvOptionProductName);
         TextView tvPrice = dialogView.findViewById(R.id.tvOptionProductPrice);
 
-        TextView tvSizeHeader = dialogView.findViewById(R.id.tvSizeHeader);
-        RadioGroup rgSize = dialogView.findViewById(R.id.rgSize);
-
-        TextView tvAddonsHeader = dialogView.findViewById(R.id.tvAddonsHeader);
-        LinearLayout containerAddons = dialogView.findViewById(R.id.containerAddons);
-
-        TextView tvNotesHeader = dialogView.findViewById(R.id.tvNotesHeader);
-        LinearLayout containerNotes = dialogView.findViewById(R.id.containerNotes);
+        LinearLayout layoutSizesContainer = dialogView.findViewById(R.id.layoutSizesContainer);
+        RadioGroup rgSizes = dialogView.findViewById(R.id.rgSizes);
+        LinearLayout layoutAddonsContainer = dialogView.findViewById(R.id.layoutAddonsContainer);
+        LinearLayout addonsList = dialogView.findViewById(R.id.addonsList);
+        LinearLayout layoutNotesContainer = dialogView.findViewById(R.id.layoutNotesContainer);
+        RadioGroup rgNotes = dialogView.findViewById(R.id.rgNotes);
 
         TextInputEditText etQty = dialogView.findViewById(R.id.etOptionQty);
         Button btnCancel = dialogView.findViewById(R.id.btnOptionCancel);
-        Button btnAdd = dialogView.findViewById(R.id.btnOptionAddToCart);
+        Button btnAddToCart = dialogView.findViewById(R.id.btnOptionAddToCart);
 
-        tvName.setText(product.getProductName());
+        tvName.setText(product.getProductName() != null ? product.getProductName() : "Product");
 
-        // Helper function to calculate and update the live Total Price text
-        Runnable updatePriceDisplay = () -> {
-            double currentPrice = product.getSellingPrice();
+        final double[] basePrice = {product.getSellingPrice()};
+        final double[] selectedSizePrice = {0.0};
+        final double[] selectedAddonsPrice = {0.0};
+        final String[] selectedSizeName = {""};
 
-            // Add selected size price
-            int selectedSizeId = rgSize.getCheckedRadioButtonId();
-            if (selectedSizeId != -1) {
-                RadioButton selectedRb = dialogView.findViewById(selectedSizeId);
-                if (selectedRb != null && selectedRb.getTag() != null) {
-                    Map<String, Object> sizeMap = (Map<String, Object>) selectedRb.getTag();
-                    currentPrice += Double.parseDouble(String.valueOf(sizeMap.get("price")));
-                }
-            }
-
-            // Add selected addons price
-            for (int i = 0; i < containerAddons.getChildCount(); i++) {
-                View child = containerAddons.getChildAt(i);
-                if (child instanceof CheckBox) {
-                    CheckBox cb = (CheckBox) child;
-                    if (cb.isChecked() && cb.getTag() != null) {
-                        Map<String, Object> addonMap = (Map<String, Object>) cb.getTag();
-                        currentPrice += Double.parseDouble(String.valueOf(addonMap.get("price")));
-                    }
-                }
-            }
-
-            // Multiply by quantity
-            int qty = 1;
-            String qtyStr = etQty.getText() != null ? etQty.getText().toString() : "1";
-            try { qty = Integer.parseInt(qtyStr.isEmpty() ? "1" : qtyStr); } catch (Exception e) { qty = 1; }
-            if (qty <= 0) qty = 1;
-
-            double totalPrice = currentPrice * qty;
-            tvPrice.setText("Total: ₱" + String.format(Locale.US, "%.2f", totalPrice));
+        Runnable updatePrice = () -> {
+            double total = basePrice[0] + selectedSizePrice[0] + selectedAddonsPrice[0];
+            tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", total));
         };
 
-        // 1. GENERATE SIZES DYNAMICALLY
+        // 1. SIZES
         if (product.getSizesList() != null && !product.getSizesList().isEmpty()) {
-            tvSizeHeader.setVisibility(View.VISIBLE);
-            rgSize.setVisibility(View.VISIBLE);
-
-            for (int i = 0; i < product.getSizesList().size(); i++) {
-                Map<String, Object> size = product.getSizesList().get(i);
+            layoutSizesContainer.setVisibility(View.VISIBLE);
+            rgSizes.removeAllViews();
+            boolean first = true;
+            for (Map<String, Object> size : product.getSizesList()) {
+                String name = (String) size.get("name");
+                double price = size.get("price") instanceof Number ? ((Number) size.get("price")).doubleValue() : 0.0;
                 RadioButton rb = new RadioButton(this);
+                rb.setText(name + " (+₱" + String.format(Locale.getDefault(), "%.2f", price) + ")");
+                rb.setTag(price);
                 rb.setId(View.generateViewId());
-
-                String sizeName = (String) size.get("name");
-                double priceDiff = Double.parseDouble(String.valueOf(size.get("price")));
-
-                rb.setText(sizeName + " (+₱" + priceDiff + ")");
-                rb.setTag(size);
-                rgSize.addView(rb);
-
+                if (first) {
+                    rb.setChecked(true);
+                    selectedSizePrice[0] = price;
+                    selectedSizeName[0] = name;
+                    first = false;
+                }
                 rb.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    if (isChecked) updatePriceDisplay.run();
+                    if (isChecked) {
+                        selectedSizePrice[0] = (double) buttonView.getTag();
+                        selectedSizeName[0] = name;
+                        updatePrice.run();
+                    }
                 });
-
-                if (i == 0) rb.setChecked(true); // Select first size automatically
+                rgSizes.addView(rb);
             }
         }
 
-        // 2. GENERATE ADD-ONS DYNAMICALLY
+        // 2. ADD-ONS
+        List<android.widget.CheckBox> addonBoxes = new ArrayList<>();
         if (product.getAddonsList() != null && !product.getAddonsList().isEmpty()) {
-            tvAddonsHeader.setVisibility(View.VISIBLE);
-            containerAddons.setVisibility(View.VISIBLE);
-
+            layoutAddonsContainer.setVisibility(View.VISIBLE);
+            addonsList.removeAllViews();
             for (Map<String, Object> addon : product.getAddonsList()) {
+                String name = (String) addon.get("name");
+                double price = addon.get("price") instanceof Number ? ((Number) addon.get("price")).doubleValue() : 0.0;
                 CheckBox cb = new CheckBox(this);
-                String addonName = (String) addon.get("name");
-                double addonPrice = Double.parseDouble(String.valueOf(addon.get("price")));
-
-                cb.setText(addonName + " (+₱" + addonPrice + ")");
-                cb.setTag(addon);
-                containerAddons.addView(cb);
-
-                cb.setOnCheckedChangeListener((buttonView, isChecked) -> updatePriceDisplay.run());
+                cb.setText(name + " (+₱" + String.format(Locale.getDefault(), "%.2f", price) + ")");
+                cb.setTag(price);
+                cb.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    double p = (double) buttonView.getTag();
+                    if (isChecked) selectedAddonsPrice[0] += p;
+                    else selectedAddonsPrice[0] -= p;
+                    updatePrice.run();
+                });
+                addonsList.addView(cb);
+                addonBoxes.add(cb);
             }
         }
 
-        // 3. GENERATE NOTES DYNAMICALLY
+        // 3. NOTES
+        final String[] selectedNoteText = {""};
         if (product.getNotesList() != null && !product.getNotesList().isEmpty()) {
-            tvNotesHeader.setVisibility(View.VISIBLE);
-            containerNotes.setVisibility(View.VISIBLE);
-
+            layoutNotesContainer.setVisibility(View.VISIBLE);
+            rgNotes.removeAllViews();
+            RadioButton rbNone = new RadioButton(this);
+            rbNone.setText("None");
+            rbNone.setId(View.generateViewId());
+            rbNone.setChecked(true);
+            rgNotes.addView(rbNone);
             for (Map<String, String> note : product.getNotesList()) {
-                com.google.android.material.textfield.TextInputLayout til = new com.google.android.material.textfield.TextInputLayout(this);
-                til.setHint(note.get("type") + " (e.g. " + note.get("value") + ")");
-
-                TextInputEditText et = new TextInputEditText(til.getContext());
-                et.setTag(note.get("type"));
-                til.addView(et);
-
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                params.setMargins(0, 0, 0, 16);
-                til.setLayoutParams(params);
-
-                containerNotes.addView(til);
+                String type = note.get("type");
+                String value = note.get("value");
+                RadioButton rb = new RadioButton(this);
+                rb.setText((type != null && !type.isEmpty()) ? type + " - " + value : value);
+                rb.setId(View.generateViewId());
+                rgNotes.addView(rb);
             }
+            rgNotes.setOnCheckedChangeListener((group, checkedId) -> {
+                RadioButton checkedRb = group.findViewById(checkedId);
+                if (checkedRb != null && !checkedRb.getText().toString().equals("None")) {
+                    selectedNoteText[0] = checkedRb.getText().toString();
+                } else {
+                    selectedNoteText[0] = "";
+                }
+            });
         }
 
-        // Trigger price display change when typing quantity
-        etQty.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updatePriceDisplay.run(); }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        // Initial setup for the price
-        updatePriceDisplay.run();
-
+        updatePrice.run();
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
-        btnAdd.setOnClickListener(v -> {
-            double calculatedUnitPrice = product.getSellingPrice();
-            String finalSizeStr = "";
-            StringBuilder finalExtrasStr = new StringBuilder();
+        btnAddToCart.setOnClickListener(v -> {
+            String qtyStr = etQty.getText().toString().trim();
+            int qty = qtyStr.isEmpty() ? 1 : Integer.parseInt(qtyStr);
+            if (qty <= 0) return;
 
-            // Extract selected size
-            int selectedSizeId = rgSize.getCheckedRadioButtonId();
-            if (selectedSizeId != -1) {
-                RadioButton selectedRb = dialogView.findViewById(selectedSizeId);
-                if (selectedRb != null && selectedRb.getTag() != null) {
-                    Map<String, Object> sizeMap = (Map<String, Object>) selectedRb.getTag();
-                    finalSizeStr = (String) sizeMap.get("name");
-                    calculatedUnitPrice += Double.parseDouble(String.valueOf(sizeMap.get("price")));
-                }
+            double finalPrice = basePrice[0] + selectedSizePrice[0] + selectedAddonsPrice[0];
+            StringBuilder extrasBuilder = new StringBuilder();
+            for (CheckBox cb : addonBoxes) {
+                if (cb.isChecked()) extrasBuilder.append(cb.getText()).append(", ");
             }
+            if (!selectedNoteText[0].isEmpty()) extrasBuilder.append(selectedNoteText[0]).append(", ");
 
-            // Extract checked add-ons
-            for (int i = 0; i < containerAddons.getChildCount(); i++) {
-                View child = containerAddons.getChildAt(i);
-                if (child instanceof CheckBox) {
-                    CheckBox cb = (CheckBox) child;
-                    if (cb.isChecked() && cb.getTag() != null) {
-                        Map<String, Object> addonMap = (Map<String, Object>) cb.getTag();
-                        finalExtrasStr.append(addonMap.get("name")).append(", ");
-                        calculatedUnitPrice += Double.parseDouble(String.valueOf(addonMap.get("price")));
-                    }
-                }
+            String extraDetails = extrasBuilder.toString();
+            if (extraDetails.endsWith(", ")) extraDetails = extraDetails.substring(0, extraDetails.length() - 2);
+
+            String safeId = product.getProductId() != null ? product.getProductId() : "local:" + product.getLocalId();
+            boolean added = cartManager.addItem(safeId, product.getProductName(), finalPrice, qty, 9999, selectedSizeName[0], extraDetails);
+
+            if (added) {
+                Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            } else {
+                Toast.makeText(this, "Not enough stock!", Toast.LENGTH_SHORT).show();
             }
-
-            // Extract typed notes
-            for (int i = 0; i < containerNotes.getChildCount(); i++) {
-                com.google.android.material.textfield.TextInputLayout til = (com.google.android.material.textfield.TextInputLayout) containerNotes.getChildAt(i);
-                TextInputEditText et = (TextInputEditText) til.getEditText();
-                if (et != null && et.getText() != null && !et.getText().toString().isEmpty()) {
-                    String noteType = (String) et.getTag();
-                    String noteValue = et.getText().toString();
-                    finalExtrasStr.append(noteType).append(": ").append(noteValue).append(", ");
-                }
-            }
-
-            String extraDetails = finalExtrasStr.toString();
-            if (extraDetails.endsWith(", ")) {
-                extraDetails = extraDetails.substring(0, extraDetails.length() - 2);
-            }
-
-            String qtyStr = etQty.getText() != null ? etQty.getText().toString() : "1";
-            int quantity = 1;
-            try { quantity = Integer.parseInt(qtyStr); } catch (Exception ignored) {}
-            if (quantity <= 0) {
-                Toast.makeText(this, "Quantity must be at least 1", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            String displayName = product.getProductName();
-            if (!finalSizeStr.isEmpty()) {
-                displayName += " (" + finalSizeStr + ")";
-            }
-
-            cartManager.addItem(
-                    product.getProductId(),
-                    displayName,
-                    calculatedUnitPrice,
-                    quantity,
-                    product.getQuantity(),
-                    finalSizeStr,
-                    extraDetails
-            );
-
-            Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
         });
 
         dialog.show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (sellAdapter != null) applyFilters();
     }
 }

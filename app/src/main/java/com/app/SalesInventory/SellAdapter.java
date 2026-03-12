@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -8,16 +9,17 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
+import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.load.Key;
-import com.bumptech.glide.signature.ObjectKey;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
@@ -25,78 +27,84 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
         void onProductClick(Product product);
     }
 
-    public interface OnProductLongClickListener {
-        void onProductLongClick(Product product);
+    public interface OnSelectionChangeListener {
+        void onSelectionChanged(Set<String> selectedIds);
     }
 
     private final Context ctx;
     private final List<Product> items = new ArrayList<>();
-    private final ProductRepository productRepository;
-    private final AuthManager authManager;
     private OnProductClickListener clickListener;
-    private OnProductLongClickListener longClickListener;
+    private OnSelectionChangeListener selectionChangeListener;
 
-    public SellAdapter(Context ctx, List<Product> initial) {
+    private Set<String> selectedIds = new HashSet<>();
+    private boolean isSelectionMode = false;
+
+    public SellAdapter(Context ctx, List<Product> initial, OnProductClickListener clickListener, OnSelectionChangeListener selectionChangeListener) {
         this.ctx = ctx;
         if (initial != null) {
-            items.addAll(initial);
+            this.items.addAll(initial);
         }
-        productRepository = SalesInventoryApplication.getProductRepository();
-        authManager = AuthManager.getInstance();
+        this.clickListener = clickListener;
+        this.selectionChangeListener = selectionChangeListener;
     }
 
-    public void updateProducts(List<Product> list) {
+    // FIXED: Added the missing updateData method
+    public void updateData(List<Product> newItems) {
         items.clear();
-        if (list != null) items.addAll(list);
+        if (newItems != null) {
+            items.addAll(newItems);
+        }
         notifyDataSetChanged();
     }
 
-    public void setOnProductClickListener(OnProductClickListener listener) {
-        this.clickListener = listener;
+    public void clearSelection() {
+        selectedIds.clear();
+        isSelectionMode = false;
+        notifyDataSetChanged();
+        if (selectionChangeListener != null) selectionChangeListener.onSelectionChanged(selectedIds);
     }
 
-    public void setOnProductLongClickListener(OnProductLongClickListener listener) {
-        this.longClickListener = listener;
+    public Set<String> getSelectedIds() {
+        return selectedIds;
     }
 
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(ctx).inflate(R.layout.productsell, parent, false);
-        return new VH(v);
+        View view = LayoutInflater.from(ctx).inflate(R.layout.productsell, parent, false);
+        return new VH(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         Product p = items.get(position);
         holder.name.setText(p.getProductName());
+        holder.price.setText(String.format(Locale.getDefault(), "₱%.2f", p.getSellingPrice()));
 
-        String category = p.getCategoryName() == null ? "" : p.getCategoryName();
-        holder.code.setText(category.isEmpty() ? "Uncategorized" : category);
-
-        double price = p.getSellingPrice();
-        holder.price.setText("₱" + String.format(java.util.Locale.US, "%.2f", price));
-
-        // --- OPTIMIZED IMAGE LOADING ---
-        String imageUrl = p.getImageUrl();
-        String imagePath = p.getImagePath();
-        String toLoad = null;
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            toLoad = imageUrl;
-        } else if (imagePath != null && !imagePath.isEmpty()) {
-            toLoad = imagePath;
+        if (p.getBarcode() != null && !p.getBarcode().isEmpty()) {
+            holder.code.setVisibility(View.VISIBLE);
+            holder.code.setText("Code: " + p.getBarcode());
+        } else {
+            holder.code.setVisibility(View.GONE);
         }
 
-        if (toLoad != null && !toLoad.isEmpty()) {
-            // Create a signature based on ID + Date to invalidate cache if product updates
-            Key sig = new ObjectKey((p.getProductId() != null ? p.getProductId() : "") + "_" + p.getDateAdded() + "_" + p.getExpiryDate());
+        String currentId = p.getProductId() != null ? p.getProductId() : "local:" + p.getLocalId();
+        boolean isSelected = selectedIds.contains(currentId);
 
-            Glide.with(ctx)
-                    .load(toLoad)
-                    .signature(sig)
-                    .thumbnail(0.1f) // Load thumbnail first
-                    .override(300, 300) // Resize for grid
+        if (isSelected) {
+            holder.cardView.setCardBackgroundColor(Color.parseColor("#D3E3FD"));
+            holder.itemView.setAlpha(0.8f);
+        } else {
+            holder.cardView.setCardBackgroundColor(Color.WHITE);
+            holder.itemView.setAlpha(1.0f);
+        }
+
+        String onlineUrl = p.getImageUrl();
+        if (onlineUrl != null && !onlineUrl.isEmpty()) {
+            Glide.with(ctx).load(onlineUrl)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(200, 200)
+                    .thumbnail(0.25f)
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .centerCrop()
@@ -104,36 +112,36 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
         } else {
             holder.productImage.setImageResource(R.drawable.ic_image_placeholder);
         }
-        // -------------------------------
 
         holder.itemView.setOnClickListener(v -> {
-            if (clickListener != null) clickListener.onProductClick(p);
+            if (isSelectionMode) {
+                toggleSelection(currentId);
+            } else {
+                if (clickListener != null) clickListener.onProductClick(p);
+            }
         });
 
         holder.itemView.setOnLongClickListener(v -> {
-            if (longClickListener != null) {
-                longClickListener.onProductLongClick(p);
+            if (!isSelectionMode) {
+                isSelectionMode = true;
+                toggleSelection(currentId);
                 return true;
             }
-            if (!authManager.isCurrentUserAdmin()) return true;
-            new AlertDialog.Builder(ctx)
-                    .setTitle("Delete Menu Item")
-                    .setMessage("Delete " + p.getProductName() + " from menu?")
-                    .setPositiveButton("Delete", (dialog, which) -> {
-                        productRepository.deleteProduct(p.getProductId(), new ProductRepository.OnProductDeletedListener() {
-                            @Override
-                            public void onProductDeleted(String archiveFilename) {
-                            }
-
-                            @Override
-                            public void onError(String error) {
-                            }
-                        });
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-            return true;
+            return false;
         });
+    }
+
+    private void toggleSelection(String id) {
+        if (selectedIds.contains(id)) {
+            selectedIds.remove(id);
+        } else {
+            selectedIds.add(id);
+        }
+        if (selectedIds.isEmpty()) {
+            isSelectionMode = false;
+        }
+        notifyDataSetChanged();
+        if (selectionChangeListener != null) selectionChangeListener.onSelectionChanged(selectedIds);
     }
 
     @Override
@@ -142,13 +150,13 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name;
-        TextView code;
-        TextView price;
+        TextView name, code, price;
         ImageView productImage;
+        CardView cardView;
 
         VH(@NonNull View itemView) {
             super(itemView);
+            cardView = (CardView) itemView;
             productImage = itemView.findViewById(R.id.ivProductImageSell);
             name = itemView.findViewById(R.id.NameTVS11);
             code = itemView.findViewById(R.id.CodeTVS11);

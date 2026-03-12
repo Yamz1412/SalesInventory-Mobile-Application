@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     app:cardCornerRadius="12dp"
-    app:cardElevation="4dp">
+    app:cardElevation="4dp"
+    android:layout_margin="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -29,89 +30,124 @@
             android:text="₱0.00"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorSecondary"
-            android:layout_marginBottom="16dp" />
+            android:textColor="#757575"
+            android:layout_marginBottom="12dp" />
 
-        <TextView
-            android:id="@+id/tvSizeHeader"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Select Size"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/textColorPrimary"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone" />
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:scrollbars="vertical">
 
-        <RadioGroup
-            android:id="@+id/rgSize"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-        </RadioGroup>
-
-        <TextView
-            android:id="@+id/tvAddonsHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Add-ons"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/textColorPrimary"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone" />
-
-        <LinearLayout
-            android:id="@+id/containerAddons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvNotesHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Special Instructions"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/textColorPrimary"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone" />
-
-        <LinearLayout
-            android:id="@+id/containerNotes"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-        </LinearLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/layoutOptionQty"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:hint="Quantity">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etOptionQty"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
-                android:text="1" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/layoutVariantsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Select Variant:"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp"/>
+                    <RadioGroup
+                        android:id="@+id/rgVariants"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutSizesContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Select Size:"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp"/>
+                    <RadioGroup
+                        android:id="@+id/rgSizes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutAddonsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Add-ons:"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp"/>
+                    <LinearLayout
+                        android:id="@+id/addonsList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutNotesContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Notes / Preferences:"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="4dp"/>
+                    <RadioGroup
+                        android:id="@+id/rgNotes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+                </LinearLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Quantity">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etOptionQty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:text="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+        </ScrollView>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="end"
-            android:layout_marginTop="20dp">
+            android:layout_marginTop="16dp">
 
             <Button
                 android:id="@+id/btnOptionCancel"

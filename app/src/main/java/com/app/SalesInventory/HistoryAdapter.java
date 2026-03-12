@@ -4,65 +4,76 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
+import android.widget.Button;
 import android.widget.TextView;
-
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
-public class HistoryAdapter extends BaseAdapter {
-    private ArrayList<Product> products;
+public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder> {
+
     private Context context;
+    private List<Sales> salesList;
+    private OnVoidClickListener voidClickListener;
 
-    public HistoryAdapter(Context context, ArrayList<Product> products) {
+    public interface OnVoidClickListener {
+        void onVoidClick(Sales sale);
+    }
+
+    public HistoryAdapter(Context context, List<Sales> salesList, OnVoidClickListener voidClickListener) {
         this.context = context;
-        this.products = products;
+        this.salesList = salesList;
+        this.voidClickListener = voidClickListener;
+    }
+
+    @NonNull
+    @Override
+    public HistoryViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.item_sale_history, parent, false);
+        return new HistoryViewHolder(view);
     }
 
     @Override
-    public int getCount() {
-        return products.size();
-    }
+    public void onBindViewHolder(@NonNull HistoryViewHolder holder, int position) {
+        Sales sale = salesList.get(position);
 
-    @Override
-    public Product getItem(int position) {
-        return products.get(position);
-    }
+        holder.tvProductName.setText(sale.getProductName());
 
-    @Override
-    public long getItemId(int position) {
-        return position;
-    }
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
+        String dateStr = sale.getTimestamp() > 0 ? sdf.format(new Date(sale.getTimestamp())) : "Unknown Date";
+        holder.tvDateAndPay.setText(dateStr + " | " + sale.getPaymentMethod());
 
-    @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
+        holder.tvTotal.setText(String.format(Locale.getDefault(), "₱%.2f (Qty: %d)", sale.getTotalPrice(), sale.getQuantity()));
 
-        if (convertView == null) {
-            LayoutInflater inflater = LayoutInflater.from(context);
-            convertView = inflater.inflate(R.layout.producthistory, parent, false);
-        }
-
-        Product product = products.get(position);
-
-        TextView name = convertView.findViewById(R.id.NameTVH);
-        TextView code = convertView.findViewById(R.id.CodeTVH);
-        TextView amount = convertView.findViewById(R.id.AmountTVH);
-        TextView sellprice = convertView.findViewById(R.id.SellPriceTVH);
-        TextView pDate = convertView.findViewById(R.id.PruchaseDateTV);
-
-        name.setText(product.getProductName());
-        code.setText(product.getProductId());
-        amount.setText(String.valueOf(product.getQuantity()));
-        sellprice.setText(String.format(Locale.getDefault(), "₱ %.2f", product.getSellingPrice()));
-        if (product.getDateAdded() != 0) {
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-            pDate.setText(sdf.format(new Date(product.getDateAdded())));
+        if ("VOIDED".equals(sale.getStatus())) {
+            holder.btnVoid.setVisibility(View.GONE);
+            holder.tvVoidedLabel.setVisibility(View.VISIBLE);
         } else {
-            pDate.setText("No Date");
+            holder.btnVoid.setVisibility(View.VISIBLE);
+            holder.tvVoidedLabel.setVisibility(View.GONE);
+            holder.btnVoid.setOnClickListener(v -> voidClickListener.onVoidClick(sale));
         }
+    }
 
-        return convertView;
+    @Override
+    public int getItemCount() {
+        return salesList.size();
+    }
+
+    static class HistoryViewHolder extends RecyclerView.ViewHolder {
+        TextView tvProductName, tvDateAndPay, tvTotal, tvVoidedLabel;
+        Button btnVoid;
+
+        public HistoryViewHolder(@NonNull View itemView) {
+            super(itemView);
+            tvProductName = itemView.findViewById(R.id.tvProductName);
+            tvDateAndPay = itemView.findViewById(R.id.tvDateAndPay);
+            tvTotal = itemView.findViewById(R.id.tvTotal);
+            tvVoidedLabel = itemView.findViewById(R.id.tvVoidedLabel);
+            btnVoid = itemView.findViewById(R.id.btnVoid);
+        }
     }
 }

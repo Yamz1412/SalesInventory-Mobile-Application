@@ -1,43 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#00695C</color>
-    <color name="colorPrimaryDark">#004D40</color>
-    <color name="colorAccent">#FFAB00</color>
-    <color name="backgroundColor">#F5F5F5</color>
-    <color name="cardBackground">#FFFFFF</color>
+    <color name="colorPrimary">#4E342E</color>        <color name="colorPrimaryDark">#3E2723</color>    <color name="colorAccent">#8D6E63</color>         <color name="backgroundColor">#D7CCC8</color>     <color name="cardBackground">#FFFFFF</color>      <color name="dashboard_background">#FDFBF7</color>
+
     <color name="textColorPrimary">#212121</color>
     <color name="textColorSecondary">#757575</color>
-    <color name="successGreen">#43A047</color>
-    <color name="errorRed">#D32F2F</color>
-    <color name="warningYellow">#FFA000</color>
-    <color name="statusBarColor">#00695C</color>
+    <color name="text_primary">#3E2723</color>        <color name="text_secondary">#8D6E63</color>      <color name="successGreen">#2E7D32</color>        <color name="errorRed">#C62828</color>            <color name="warningYellow">#F57F17</color>       <color name="status_failed">#C62828</color>
+    <color name="warning_light">#FFA500</color>
+    <color name="primary">#4E342E</color>
+    <color name="primary_dark">#3E2723</color>
+    <color name="accent_primary">#8D6E63</color>
+    <color name="success_primary">#2E7D32</color>
+    <color name="warning_primary">#F57F17</color>
+    <color name="info_primary">#D7CCC8</color>        <color name="statusBarColor">#3E2723</color>
+
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
     <color name="darkGray">#424242</color>
     <color name="mediumGray">#757575</color>
-    <color name="lightGray">#BDBDBD</color>
-    <color name="blue">#2196F3</color>
-    <color name="orange">#FF5722</color>
-    <color name="gray">#0A6B5F</color>
-    <color name="red">#D32F2F</color>
-    <color name="LightBlue">#00A5FF</color>
-    <color name="purple_700">#3700B3</color>
-    <color name="primary">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
-    <color name="accent_primary">#FF6B6B</color>
-    <color name="success_primary">#4ECDC4</color>
-    <color name="warning_primary">#FFD93D</color>
-    <color name="info_primary">#95E1D3</color>
-    <color name="dashboard_background">#F5F5F5</color>
-    <color name="dashboard_card_background">#FFFFFF</color>
-    <color name="text_primary">#1F1F1F</color>
-    <color name="text_secondary">#757575</color>
-    <color name="status_completed">#4CAF50</color>
-    <color name="status_pending">#FF9800</color>
-    <color name="status_failed">#F44336</color>
-    <color name="warning_light">#FFF3E0</color>
-    <color name="primaryBlue">#2196F3</color>
-    <color name="secondaryGreen">#4CAF50</color>
-    <color name="dirtyWhite">#A0EFCE</color>
-    <color name="defaultColor">#FFC107</color>
+    <color name="lightGray">#EFEBE9</color>           <color name="blue">#4E342E</color>                <color name="orange">#F57F17</color>
+    <color name="gray">#8D6E63</color>
+    <color name="red">#C62828</color>
+    <color name="LightBlue">#D7CCC8</color>           <color name="purple_700">#3E2723</color>
+    <color name="dirtyWhite">#FCD2E1DD</color>
 </resources>

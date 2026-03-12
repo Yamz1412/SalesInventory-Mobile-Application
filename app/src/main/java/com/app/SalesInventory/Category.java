@@ -8,6 +8,7 @@ public class Category {
     private String categoryId;
     private String categoryName;
     private String description;
+    private String ownerAdminId;
 
     @ServerTimestamp
     public Date timestamp;
@@ -36,6 +37,8 @@ public class Category {
         this.active = active;
         this.color = color;
     }
+    public String getOwnerAdminId() { return ownerAdminId; }
+    public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
 
     public String getCategoryId() { return categoryId; }
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }

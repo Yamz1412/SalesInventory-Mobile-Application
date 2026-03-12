@@ -2,14 +2,12 @@ package com.app.SalesInventory;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -17,8 +15,6 @@ import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -35,7 +31,7 @@ import java.util.Map;
 public class EditProfil extends BaseActivity {
 
     public static final String TAG = "EditProfil";
-    EditText ProfilName, ProfilEmail, ProfilPhone;
+    EditText ProfilName, ProfilUsername, ProfilEmail, ProfilPhone;
     Button savebtn, btnChangePhoto;
     ImageView imgAvatarEdit;
 
@@ -45,6 +41,7 @@ public class EditProfil extends BaseActivity {
     StorageReference storageRef;
     Uri selectedImageUri;
     String currentPhotoUrl;
+    String currentUsernameFetched = "";
 
     ActivityResultLauncher<String> imagePickerLauncher;
 
@@ -64,6 +61,7 @@ public class EditProfil extends BaseActivity {
         storageRef = FirebaseStorage.getInstance().getReference();
 
         ProfilName = findViewById(R.id.ProfilNameE);
+        ProfilUsername = findViewById(R.id.ProfilUsernameTE); // Bind Username Field
         ProfilEmail = findViewById(R.id.ProfilEmailTE);
         ProfilPhone = findViewById(R.id.ProfilPhoneTE);
         savebtn = findViewById(R.id.SaveProfile);
@@ -74,17 +72,14 @@ public class EditProfil extends BaseActivity {
         if (email != null) ProfilEmail.setText(email);
         if (phone != null) ProfilPhone.setText(phone);
 
-        loadCurrentImage();
+        loadCurrentUserDetails();
 
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.GetContent(),
                 uri -> {
                     if (uri != null) {
                         selectedImageUri = uri;
-                        Glide.with(this)
-                                .load(uri)
-                                .circleCrop()
-                                .into(imgAvatarEdit);
+                        Glide.with(this).load(uri).circleCrop().into(imgAvatarEdit);
                     }
                 }
         );
@@ -94,61 +89,75 @@ public class EditProfil extends BaseActivity {
             btnChangePhoto.setOnClickListener(v -> imagePickerLauncher.launch("image/*"));
         }
 
-        savebtn.setOnClickListener(v -> {
-            String name = ProfilName.getText().toString();
-            String mail = ProfilEmail.getText().toString();
-            String pNum = ProfilPhone.getText().toString();
+        savebtn.setOnClickListener(v -> handleSave());
 
-            if (name.isEmpty() || mail.isEmpty() || pNum.isEmpty()) {
-                Toast.makeText(EditProfil.this, "All fields are required.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // Check if email changed - Requires Re-Auth
-            if (!mail.equals(user.getEmail())) {
-                promptReAuthentication(password -> {
-                    savebtn.setEnabled(false);
-                    savebtn.setText("Saving...");
-                    updateEmailAndProfile(password, name, mail, pNum);
-                });
-            } else {
-                savebtn.setEnabled(false);
-                savebtn.setText("Saving...");
-                if (selectedImageUri != null) {
-                    uploadImageAndSaveProfile(name, mail, pNum);
-                } else {
-                    saveProfileData(name, mail, pNum, null);
-                }
-            }
-        });
-
-        // Setup Change Password Feature (Optional UI button handling)
-        Button btnChangePass = findViewById(R.id.btnChangePassword); // Assuming you might add this ID
+        Button btnChangePass = findViewById(R.id.btnChangePassword);
         if (btnChangePass != null) {
             btnChangePass.setOnClickListener(v -> showChangePasswordDialog());
         }
     }
 
-    private void loadCurrentImage() {
+    private void loadCurrentUserDetails() {
         if (user == null) return;
-        fStore.collection("users").document(user.getUid()).get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists()) {
-                currentPhotoUrl = documentSnapshot.getString("photoUrl");
+        fStore.collection("users").document(user.getUid()).get().addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                currentUsernameFetched = doc.getString("username");
+                if (currentUsernameFetched != null) ProfilUsername.setText(currentUsernameFetched);
+
+                currentPhotoUrl = doc.getString("photoUrl");
                 if (currentPhotoUrl != null && !currentPhotoUrl.isEmpty()) {
-                    Glide.with(this)
-                            .load(currentPhotoUrl)
-                            .placeholder(R.drawable.avatarprofil)
-                            .error(R.drawable.avatarprofil)
-                            .circleCrop()
-                            .into(imgAvatarEdit);
+                    Glide.with(this).load(currentPhotoUrl).placeholder(R.drawable.avatarprofil).circleCrop().into(imgAvatarEdit);
                 } else if (user.getPhotoUrl() != null) {
-                    Glide.with(this)
-                            .load(user.getPhotoUrl())
-                            .circleCrop()
-                            .into(imgAvatarEdit);
+                    Glide.with(this).load(user.getPhotoUrl()).circleCrop().into(imgAvatarEdit);
                 }
             }
         });
+    }
+
+    private void handleSave() {
+        String name = ProfilName.getText().toString().trim();
+        String newUsername = ProfilUsername.getText().toString().trim().toLowerCase(); // Force lowercase for safety
+        String mail = ProfilEmail.getText().toString().trim();
+        String pNum = ProfilPhone.getText().toString().trim();
+
+        if (name.isEmpty() || newUsername.isEmpty() || mail.isEmpty() || pNum.isEmpty()) {
+            Toast.makeText(EditProfil.this, "All fields are required.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        savebtn.setEnabled(false);
+        savebtn.setText("Saving...");
+
+        // 1. Check Username Uniqueness (if changed)
+        if (!newUsername.equals(currentUsernameFetched)) {
+            fStore.collection("users").whereEqualTo("username", newUsername).get().addOnSuccessListener(snap -> {
+                if (!snap.isEmpty()) {
+                    Toast.makeText(this, "Username is already taken", Toast.LENGTH_SHORT).show();
+                    savebtn.setEnabled(true);
+                    savebtn.setText("Save Changes");
+                } else {
+                    processEmailAndDatabase(name, newUsername, mail, pNum);
+                }
+            });
+        } else {
+            processEmailAndDatabase(name, newUsername, mail, pNum);
+        }
+    }
+
+    private void processEmailAndDatabase(String name, String username, String mail, String phone) {
+        // 2. If email changed, prompt Auth and Send Verification Link
+        if (!mail.equals(user.getEmail())) {
+            promptReAuthentication(password -> {
+                updateEmailAndProfile(password, name, username, mail, phone);
+            });
+        } else {
+            // 3. Normal save (no email change)
+            if (selectedImageUri != null) {
+                uploadImageAndSaveProfile(name, username, mail, phone);
+            } else {
+                saveProfileData(name, username, mail, phone, null);
+            }
+        }
     }
 
     // --- RE-AUTHENTICATION DIALOG ---
@@ -158,14 +167,14 @@ public class EditProfil extends BaseActivity {
 
     private void promptReAuthentication(OnReAuthSuccess callback) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Confirm Changes");
-        builder.setMessage("Please enter your current password to update sensitive information (Email/Password).");
+        builder.setTitle("Security Check");
+        builder.setMessage("You are changing your email address. Please enter your current password to verify.");
 
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         builder.setView(input);
 
-        builder.setPositiveButton("Confirm", (dialog, which) -> {
+        builder.setPositiveButton("Verify", (dialog, which) -> {
             String password = input.getText().toString();
             if (!password.isEmpty()) {
                 callback.onSuccess(password);
@@ -180,20 +189,26 @@ public class EditProfil extends BaseActivity {
             savebtn.setEnabled(true);
             savebtn.setText("Save Changes");
         });
-
         builder.show();
     }
 
-    private void updateEmailAndProfile(String password, String name, String newEmail, String phone) {
+    // ADDED "final" TO ALL PARAMETERS HERE:
+    private void updateEmailAndProfile(final String password, final String name, final String username, final String newEmail, final String phone) {
         AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), password);
         user.reauthenticate(credential).addOnSuccessListener(aVoid -> {
-            // Re-auth successful, now update email
+
+            // Re-auth successful, update email
             user.updateEmail(newEmail).addOnSuccessListener(unused -> {
-                // Email updated, now save rest of data
+
+                // Send verification link to the new email
+                user.sendEmailVerification().addOnSuccessListener(sendTask -> {
+                    Toast.makeText(EditProfil.this, "Email updated! Verification link sent to " + newEmail, Toast.LENGTH_LONG).show();
+                });
+
                 if (selectedImageUri != null) {
-                    uploadImageAndSaveProfile(name, newEmail, phone);
+                    uploadImageAndSaveProfile(name, username, newEmail, phone);
                 } else {
-                    saveProfileData(name, newEmail, phone, null);
+                    saveProfileData(name, username, newEmail, phone, null);
                 }
             }).addOnFailureListener(e -> {
                 savebtn.setEnabled(true);
@@ -207,14 +222,14 @@ public class EditProfil extends BaseActivity {
         });
     }
 
-    private void uploadImageAndSaveProfile(String name, String email, String phone) {
+    private void uploadImageAndSaveProfile(String name, String username, String email, String phone) {
         if (user == null) return;
         StorageReference fileRef = storageRef.child("profile_images/" + user.getUid() + ".jpg");
 
         fileRef.putFile(selectedImageUri)
                 .addOnSuccessListener(taskSnapshot -> fileRef.getDownloadUrl().addOnSuccessListener(uri -> {
                     String downloadUrl = uri.toString();
-                    saveProfileData(name, email, phone, downloadUrl);
+                    saveProfileData(name, username, email, phone, downloadUrl);
                 }))
                 .addOnFailureListener(e -> {
                     savebtn.setEnabled(true);
@@ -223,16 +238,19 @@ public class EditProfil extends BaseActivity {
                 });
     }
 
-    private void saveProfileData(String name, String email, String phone, String photoUrl) {
+    private void saveProfileData(String name, String username, String email, String phone, String photoUrl) {
         if (user == null) return;
         String uid = user.getUid();
         DocumentReference docRef = fStore.collection("users").document(uid);
 
         Map<String, Object> edited = new HashMap<>();
         edited.put("fName", name);
+        edited.put("name", name);
+        edited.put("Name", name);
+        edited.put("username", username); // Log new username
         edited.put("email", email);
         edited.put("phone", phone);
-        edited.put("Phone", phone); // Legacy support
+        edited.put("Phone", phone);
 
         if (photoUrl != null) {
             edited.put("photoUrl", photoUrl);
@@ -248,7 +266,6 @@ public class EditProfil extends BaseActivity {
         });
     }
 
-    // --- CHANGE PASSWORD DIALOG ---
     private void showChangePasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Change Password");

@@ -51,26 +51,35 @@ public class CartManager {
         return new ArrayList<>(items);
     }
 
-    public synchronized void addItem(String productId, String productName, double unitPrice, int quantity, int stock, String size, String addon) {
-        // Logic: Check if item already exists with same ID, Size, and Addon
+    // FIX: Enforce Stock Limits when adding items
+    public synchronized boolean addItem(String productId, String productName, double unitPrice, int quantity, int stock, String size, String addon) {
         for (CartItem item : items) {
             boolean sameId = item.productId.equals(productId);
             boolean sameSize = (item.size == null && size == null) || (item.size != null && item.size.equals(size));
             boolean sameAddon = (item.addon == null && addon == null) || (item.addon != null && item.addon.equals(addon));
 
             if (sameId && sameSize && sameAddon) {
-                // Merge quantities instead of adding new row
+                // Check if adding this quantity exceeds available stock
+                if (item.quantity + quantity > stock) {
+                    return false; // Rejects the addition, process violated
+                }
                 item.quantity += quantity;
-                // Optional: Update stock if it changed in the background, though usually stock is static during cart session
                 item.stock = stock;
-                return;
+                return true;
             }
         }
-        // If not found, add new
+
+        // Check if the initial addition exceeds stock
+        if (quantity > stock) {
+            return false; // Rejects the addition
+        }
+
         items.add(new CartItem(productId, productName, unitPrice, quantity, stock, size, addon));
+        return true;
     }
 
-    public synchronized void updateQuantity(String productId, String size, String addon, int quantity) {
+    // FIX: Enforce Stock Limits when updating quantities
+    public synchronized boolean updateQuantity(String productId, String size, String addon, int quantity) {
         Iterator<CartItem> iterator = items.iterator();
         while (iterator.hasNext()) {
             CartItem item = iterator.next();
@@ -80,12 +89,16 @@ public class CartManager {
             if (item.productId.equals(productId) && sameSize && sameAddon) {
                 if (quantity <= 0) {
                     iterator.remove();
+                    return true;
+                } else if (quantity > item.stock) {
+                    return false; // Rejects the update, process violated
                 } else {
                     item.quantity = quantity;
+                    return true;
                 }
-                return;
             }
         }
+        return false;
     }
 
     public synchronized void removeItemById(String productId) {

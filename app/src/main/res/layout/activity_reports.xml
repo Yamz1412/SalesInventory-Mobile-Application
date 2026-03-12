@@ -4,88 +4,63 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F5F5">
+    android:background="?android:colorBackground">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:elevation="0dp"
-        android:background="@android:color/white">
-
+        android:background="@android:color/white"
+        android:elevation="0dp">
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="Financial Reports"
-            app:titleTextColor="@color/black"
-            app:navigationIcon="@drawable/ic_arrow_back_black_24dp">
-        </androidx.appcompat.widget.Toolbar>
+            app:navigationIcon="@drawable/ic_arrow_back_black_24dp"
+            app:title="Financial &amp; Operations Reports"
+            app:titleTextColor="@color/black" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@android:color/white"
+        android:orientation="vertical"
         android:paddingHorizontal="16dp"
-        android:paddingBottom="16dp"
-        android:orientation="vertical">
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Date Range Filter"
+            android:textColor="@color/black"
+            android:textSize="14sp" />
 
         <LinearLayout
-            android:id="@+id/layoutCustomDates"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp"
-            android:visibility="visible"
             android:weightSum="2">
-
-            <EditText
-                android:id="@+id/etFromDate"
+            <Button
+                android:id="@+id/btnStartDate"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="45dp"
-                android:hint="From Date"
-                android:background="#F0F0F0"
-                android:paddingHorizontal="12dp"
+                android:layout_height="50dp"
                 android:layout_marginEnd="4dp"
-                android:focusable="false"
-                android:clickable="true"
-                android:textSize="14sp"/>
-
-            <EditText
-                android:id="@+id/etToDate"
-                android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="45dp"
-                android:hint="To Date"
-                android:background="#F0F0F0"
-                android:paddingHorizontal="12dp"
+                android:text="Start Date"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary" />
+            <Button
+                android:id="@+id/btnEndDate"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:focusable="false"
-                android:clickable="true"
-                android:textSize="14sp"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="45dp"
-            android:background="#F0F0F0"
-            android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_today"
-                app:tint="#757575" />
-
-            <Spinner
-                android:id="@+id/spinnerDateFilter"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_marginStart="8dp"
-                android:background="@null" />
+                android:layout_weight="1"
+                android:text="End Date"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary" />
         </LinearLayout>
     </LinearLayout>
 
@@ -93,7 +68,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:scrollbars="none">
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -101,240 +76,209 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="0dp"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="@android:color/white"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Summary"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/black"
-                        android:layout_marginBottom="16dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Gross Revenue"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvGrossRevenue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="@color/black"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Cost of Goods Sold"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvCogs"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="#D32F2F"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Gross Profit"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvGrossProfit"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="#388E3C"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Discounts"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvDiscounts"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="#F57C00"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Cash In Hand"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvCashSales"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="#1976D2"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="E-Payments"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvEPaymentSales"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="#7B1FA2"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Total Stock Asset"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvInventoryValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="₱0.00"
-                            android:textStyle="bold"
-                            android:textColor="@color/black"/>
-                    </LinearLayout>
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="12dp"/>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:text="Transactions"
-                            android:textColor="#757575"/>
-                        <TextView
-                            android:id="@+id/tvTransactions"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0"
-                            android:textStyle="bold"
-                            android:textColor="@color/black"/>
-                    </LinearLayout>
-
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnExportAccounting"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:text="Export Accounting Report"
+                android:text="Business Overview"
+                android:textColor="@color/black"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp"
-                android:layout_marginBottom="8dp"
-                app:backgroundTint="?attr/colorPrimary"/>
+                android:layout_marginBottom="8dp"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
+                android:weightSum="3"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    app:cardBackgroundColor="#E3F2FD"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="2dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Top Product" android:textSize="11sp" android:textColor="#1565C0"/>
+                        <TextView android:id="@+id/tvOverviewBestSeller" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="13sp" android:textColor="#0D47A1" android:textAlignment="center" android:maxLines="2" android:ellipsize="end"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="2dp"
+                    app:cardBackgroundColor="#E8F5E9"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="2dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Top Payment" android:textSize="11sp" android:textColor="#2E7D32"/>
+                        <TextView android:id="@+id/tvOverviewPayment" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="14sp" android:textColor="#1B5E20"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    app:cardBackgroundColor="#FFF3E0"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="2dp">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Transactions" android:textSize="11sp" android:textColor="#E65100"/>
+                        <TextView android:id="@+id/tvOverviewTransaction" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="13sp" android:textColor="#BF360C"/>
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardIncomeStatement"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
-                android:weightSum="2">
+                app:cardCornerRadius="4dp"
+                app:cardElevation="2dp"
+                app:strokeColor="#CCCCCC"
+                app:strokeWidth="1dp"
+                app:cardBackgroundColor="#FFFFFF">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView android:id="@+id/tvISBusinessName" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="BUSINESS NAME" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="Income Statement" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/tvISDateRange" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp" android:gravity="center" android:text="For the Period Ended..." android:textColor="#555555" android:textSize="12sp" />
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Revenue" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Gross Sales" android:textColor="#000000" />
+                        <TextView android:id="@+id/tvISGrossSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Sales Discounts" android:textColor="#000000" />
+                        <TextView android:id="@+id/tvISDiscounts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+                    <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Net Sales" android:textColor="#000000" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvISNetSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Cost of Goods Sold" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Cost of Products Sold" android:textColor="#000000" />
+                        <TextView android:id="@+id/tvISCogs" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+                    <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gross Profit" android:textColor="#000000" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvISGrossProfit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Operating Expenses" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Operating Expenses" android:textColor="#000000" />
+                        <TextView android:id="@+id/tvISOpex" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                    </RelativeLayout>
+                    <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+
+                    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NET INCOME" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvISNetIncome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
+                    </RelativeLayout>
+                    <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:background="#000000" />
+                    <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="1dp" android:background="#000000" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp"
+                android:weightSum="3">
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnInventoryReport"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:id="@+id/btnDetailedReport"
                     android:layout_width="0dp"
-                    android:layout_height="50dp"
+                    android:layout_height="55dp"
                     android:layout_weight="1"
-                    android:text="Inventory"
-                    android:textColor="?attr/colorPrimary"
+                    android:text="Operations Report"
+                    android:textSize="12sp"
+                    android:backgroundTint="?attr/colorPrimary"
+                    android:textColor="@color/white"
                     android:layout_marginEnd="4dp"
-                    app:strokeColor="?attr/colorPrimary"
                     app:cornerRadius="8dp" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOverallSummary"
+                    android:id="@+id/btnExportPDF"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="50dp"
+                    android:layout_height="55dp"
                     android:layout_weight="1"
-                    android:text="Overall Summary"
+                    android:text="Export PDF"
+                    android:textSize="12sp"
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginStart="4dp"
                     app:strokeColor="?attr/colorPrimary"
                     app:cornerRadius="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOperatingExpenses"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="55dp"
+                    android:layout_weight="1"
+                    android:text="Manage Expenses"
+                    android:textSize="12sp"
+                    android:textColor="#E53935"
+                    android:layout_marginStart="4dp"
+                    app:strokeColor="#E53935"
+                    app:cornerRadius="8dp" />
             </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp"
+            android:weightSum="2">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnInventoryReport"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="55dp"
+                android:layout_weight="1"
+                android:text="View Inventory Master Reports"
+                android:textSize="14sp"
+                android:layout_marginStart="5dp"
+                android:textColor="?attr/colorPrimary"
+                app:strokeColor="?attr/colorPrimary"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPOReport"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="55dp"
+                android:layout_weight="1"
+                android:layout_marginStart="9dp"
+                android:text="Purchase Order &amp; Supplier Report"
+                android:textSize="14sp"
+                android:textColor="#F57C00"
+                app:strokeColor="#F57C00"
+                app:cornerRadius="8dp"
+                android:layout_marginBottom="16dp" />
+        </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
@@ -343,7 +287,7 @@
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:textColor="@color/black"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
 
             <ListView
                 android:id="@+id/ReportsListView"
@@ -351,8 +295,7 @@
                 android:layout_height="wrap_content"
                 android:divider="@null"
                 android:dividerHeight="0dp"
-                android:nestedScrollingEnabled="true"/>
-
+                android:nestedScrollingEnabled="true" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

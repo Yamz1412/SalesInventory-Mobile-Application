@@ -12,11 +12,13 @@ public class FirestoreSyncListener {
     private static final String TAG = "FirestoreSyncListener";
     private static FirestoreSyncListener instance;
     private FirestoreManager firestoreManager;
+
     public MutableLiveData<SyncStatus> productsSyncStatus = new MutableLiveData<>();
     public MutableLiveData<SyncStatus> salesSyncStatus = new MutableLiveData<>();
     public MutableLiveData<SyncStatus> adjustmentsSyncStatus = new MutableLiveData<>();
     public MutableLiveData<SyncStatus> alertsSyncStatus = new MutableLiveData<>();
     public MutableLiveData<SyncStatus> categoriesSyncStatus = new MutableLiveData<>();
+
     private List<ListenerRegistration> activeListeners = new ArrayList<>();
 
     private FirestoreSyncListener() {
@@ -32,11 +34,12 @@ public class FirestoreSyncListener {
     }
 
     private void initializeSyncStatus() {
-        productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
-        salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
-        adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
-        alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
-        categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
+        // FIX: Replaced setValue with postValue for thread-safety
+        productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
+        salesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
+        adjustmentsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
+        alertsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
+        categoriesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
     }
 
     public void listenToProducts(OnProductsChangedListener listener) {
@@ -44,16 +47,21 @@ public class FirestoreSyncListener {
             Log.w(TAG, "User not authenticated for products listener");
             return;
         }
-        productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to products"));
+        productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to products"));
+
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserProductsPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
-                productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
-                return;
+                productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
+                return; // Safely exit without crashing
             }
             if (value != null) {
-                productsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCED, "Products synced: " + value.size()));
+                productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Products synced: " + value.size()));
                 if (listener != null) {
-                    listener.onProductsChanged(value);
+                    try {
+                        listener.onProductsChanged(value);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error in products listener callback", e);
+                    }
                 }
                 try {
                     ProductRepository repo = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
@@ -65,6 +73,7 @@ public class FirestoreSyncListener {
                         }
                     }
                 } catch (Exception e) {
+                    Log.e(TAG, "Error processing products", e);
                 }
             }
         });
@@ -72,19 +81,18 @@ public class FirestoreSyncListener {
     }
 
     public void listenToSales(OnSalesChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            return;
-        }
-        salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to sales"));
+        if (!firestoreManager.isUserAuthenticated()) return;
+
+        salesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to sales"));
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
-                salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
+                salesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
             }
             if (value != null) {
-                salesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCED, "Sales synced: " + value.size()));
+                salesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Sales synced: " + value.size()));
                 if (listener != null) {
-                    listener.onSalesChanged(value);
+                    try { listener.onSalesChanged(value); } catch (Exception e) { Log.e(TAG, "Error", e); }
                 }
             }
         });
@@ -92,19 +100,18 @@ public class FirestoreSyncListener {
     }
 
     public void listenToAdjustments(OnAdjustmentsChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            return;
-        }
-        adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to adjustments"));
+        if (!firestoreManager.isUserAuthenticated()) return;
+
+        adjustmentsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to adjustments"));
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserAdjustmentsPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
-                adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
+                adjustmentsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
             }
             if (value != null) {
-                adjustmentsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCED, "Adjustments synced: " + value.size()));
+                adjustmentsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Adjustments synced: " + value.size()));
                 if (listener != null) {
-                    listener.onAdjustmentsChanged(value);
+                    try { listener.onAdjustmentsChanged(value); } catch (Exception e) { Log.e(TAG, "Error", e); }
                 }
             }
         });
@@ -112,19 +119,18 @@ public class FirestoreSyncListener {
     }
 
     public void listenToAlerts(OnAlertsChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            return;
-        }
-        alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to alerts"));
+        if (!firestoreManager.isUserAuthenticated()) return;
+
+        alertsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to alerts"));
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
-                alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
+                alertsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
             }
             if (value != null) {
-                alertsSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCED, "Alerts synced: " + value.size()));
+                alertsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Alerts synced: " + value.size()));
                 if (listener != null) {
-                    listener.onAlertsChanged(value);
+                    try { listener.onAlertsChanged(value); } catch (Exception e) { Log.e(TAG, "Error", e); }
                 }
             }
         });
@@ -132,19 +138,18 @@ public class FirestoreSyncListener {
     }
 
     public void listenToCategories(OnCategoriesChangedListener listener) {
-        if (!firestoreManager.isUserAuthenticated()) {
-            return;
-        }
-        categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to categories"));
+        if (!firestoreManager.isUserAuthenticated()) return;
+
+        categoriesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to categories"));
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserCategoriesPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
-                categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
+                categoriesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
                 return;
             }
             if (value != null) {
-                categoriesSyncStatus.setValue(new SyncStatus(SyncStatus.Status.SYNCED, "Categories synced: " + value.size()));
+                categoriesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Categories synced: " + value.size()));
                 if (listener != null) {
-                    listener.onCategoriesChanged(value);
+                    try { listener.onCategoriesChanged(value); } catch (Exception e) { Log.e(TAG, "Error", e); }
                 }
             }
         });
@@ -153,7 +158,7 @@ public class FirestoreSyncListener {
 
     public void stopAllListeners() {
         for (ListenerRegistration registration : activeListeners) {
-            registration.remove();
+            if (registration != null) registration.remove();
         }
         activeListeners.clear();
         Log.d(TAG, "All listeners stopped");
@@ -171,23 +176,9 @@ public class FirestoreSyncListener {
         instance = null;
     }
 
-    public interface OnProductsChangedListener {
-        void onProductsChanged(QuerySnapshot snapshot);
-    }
-
-    public interface OnSalesChangedListener {
-        void onSalesChanged(QuerySnapshot snapshot);
-    }
-
-    public interface OnAdjustmentsChangedListener {
-        void onAdjustmentsChanged(QuerySnapshot snapshot);
-    }
-
-    public interface OnAlertsChangedListener {
-        void onAlertsChanged(QuerySnapshot snapshot);
-    }
-
-    public interface OnCategoriesChangedListener {
-        void onCategoriesChanged(QuerySnapshot snapshot);
-    }
+    public interface OnProductsChangedListener { void onProductsChanged(QuerySnapshot snapshot); }
+    public interface OnSalesChangedListener { void onSalesChanged(QuerySnapshot snapshot); }
+    public interface OnAdjustmentsChangedListener { void onAdjustmentsChanged(QuerySnapshot snapshot); }
+    public interface OnAlertsChangedListener { void onAlertsChanged(QuerySnapshot snapshot); }
+    public interface OnCategoriesChangedListener { void onCategoriesChanged(QuerySnapshot snapshot); }
 }

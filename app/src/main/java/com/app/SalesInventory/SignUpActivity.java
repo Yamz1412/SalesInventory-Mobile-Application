@@ -4,9 +4,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.InputFilter;
-import android.text.InputType;
 import android.text.TextWatcher;
+import android.view.View;
 import android.view.Window;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -23,13 +22,14 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.util.regex.Pattern;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SignUpActivity extends BaseActivity {
     private static final int TERMS_REQUEST_CODE = 101;
 
     private TextInputLayout tilPhone, tilCPassword;
-    private TextInputEditText mName, mEmail, mPhone, mPassword, mCPassword;
+    private TextInputEditText mName, mUserName, mEmail, mPhone, mPassword, mCPassword;
     private TextView reqLength, reqUpper, reqLower, reqNumber, reqSpecial;
     private CheckBox mCheck;
     private Button btnSignUp, btnSignInPage;
@@ -50,6 +50,7 @@ public class SignUpActivity extends BaseActivity {
         tilCPassword = findViewById(R.id.tilCPassword);
 
         mName = findViewById(R.id.mName);
+        mUserName = findViewById(R.id.mUserName); // Bound Username
         mEmail = findViewById(R.id.mEmail);
         mPhone = findViewById(R.id.mPhone);
         mPassword = findViewById(R.id.mPassword);
@@ -59,7 +60,6 @@ public class SignUpActivity extends BaseActivity {
         btnSignInPage = findViewById(R.id.SignInPage);
         progressBar = findViewById(R.id.progressBar);
 
-        // Password requirement TextViews
         reqLength = findViewById(R.id.reqLength);
         reqUpper = findViewById(R.id.reqUpper);
         reqLower = findViewById(R.id.reqLower);
@@ -87,7 +87,6 @@ public class SignUpActivity extends BaseActivity {
     }
 
     private void setupRealtimeValidation() {
-        // 1. Phone Validation (Must be exactly 10 digits since +63 is prefixed)
         mPhone.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -104,14 +103,12 @@ public class SignUpActivity extends BaseActivity {
             }
         });
 
-        // 2. Password Strength Validation
         mPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override
             public void afterTextChanged(Editable s) {
                 String pwd = s.toString();
-
                 boolean hasLength = pwd.length() >= 8;
                 boolean hasUpper = pwd.matches(".*[A-Z].*");
                 boolean hasLower = pwd.matches(".*[a-z].*");
@@ -128,7 +125,6 @@ public class SignUpActivity extends BaseActivity {
             }
         });
 
-        // 3. Confirm Password Validation
         mCPassword.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -136,11 +132,8 @@ public class SignUpActivity extends BaseActivity {
             public void afterTextChanged(Editable s) {
                 String pwd = mPassword.getText().toString();
                 String cpwd = s.toString();
-                if (!cpwd.isEmpty() && !pwd.equals(cpwd)) {
-                    tilCPassword.setError("Passwords do not match");
-                } else {
-                    tilCPassword.setError(null);
-                }
+                if (!cpwd.isEmpty() && !pwd.equals(cpwd)) tilCPassword.setError("Passwords do not match");
+                else tilCPassword.setError(null);
             }
         });
     }
@@ -148,10 +141,10 @@ public class SignUpActivity extends BaseActivity {
     private void updateRequirementUI(TextView tv, boolean isValid, String text) {
         if (isValid) {
             tv.setText("✓ " + text);
-            tv.setTextColor(Color.parseColor("#4CAF50")); // Green
+            tv.setTextColor(Color.parseColor("#4CAF50"));
         } else {
             tv.setText("✗ " + text);
-            tv.setTextColor(Color.parseColor("#757575")); // Gray
+            tv.setTextColor(Color.parseColor("#757575"));
         }
     }
 
@@ -164,7 +157,6 @@ public class SignUpActivity extends BaseActivity {
                 Intent intent = new Intent(SignUpActivity.this, Conditions.class);
                 startActivityForResult(intent, TERMS_REQUEST_CODE);
             }
-
             @Override
             public void updateDrawState(@NonNull android.text.TextPaint ds) {
                 super.updateDrawState(ds);
@@ -179,22 +171,20 @@ public class SignUpActivity extends BaseActivity {
 
     private void attemptSignUp() {
         String name = mName.getText() != null ? mName.getText().toString().trim() : "";
+        String username = mUserName.getText() != null ? mUserName.getText().toString().trim(): "";
         String email = mEmail.getText() != null ? mEmail.getText().toString().trim() : "";
-        // Pre-append +63 to the validated 10 digit input for backend
         String rawPhone = mPhone.getText() != null ? mPhone.getText().toString().trim() : "";
         String fullPhone = "+63" + rawPhone;
-
         String password = mPassword.getText() != null ? mPassword.getText().toString() : "";
         String cpassword = mCPassword.getText() != null ? mCPassword.getText().toString() : "";
 
-        if (name.isEmpty() || email.isEmpty() || password.isEmpty() || cpassword.isEmpty() || !mCheck.isChecked()) {
+        if (name.isEmpty() || username.isEmpty() || email.isEmpty() || password.isEmpty() || cpassword.isEmpty() || !mCheck.isChecked()) {
             Toast.makeText(this, "Please complete the form and accept terms", Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (!isPhoneValid) {
             Toast.makeText(this, "Please enter a valid 10-digit phone number", Toast.LENGTH_SHORT).show();
-            tilPhone.setError("Invalid phone number");
             return;
         }
 
@@ -205,31 +195,45 @@ public class SignUpActivity extends BaseActivity {
 
         if (!password.equals(cpassword)) {
             Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
-            tilCPassword.setError("Passwords do not match");
             return;
         }
 
         progressBar.setVisibility(android.view.View.VISIBLE);
+
+        // 1. Check if Username is already taken
+        firestore.collection("users").whereEqualTo("username", username).get().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && !task.getResult().isEmpty()) {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(this, "Username is already taken, please choose another.", Toast.LENGTH_LONG).show();
+                mUserName.setError("Taken");
+            } else {
+                // 2. If unique, proceed to Firebase Auth
+                createAccountAndSave(name, username, email, fullPhone, password);
+            }
+        });
+    }
+
+    private void createAccountAndSave(String name, String username, String email, String fullPhone, String password) {
         firebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(createTask -> {
             if (createTask.isSuccessful()) {
                 FirebaseUser createdUser = firebaseAuth.getCurrentUser();
-                if (createdUser == null) {
-                    runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
-                    return;
-                }
+                if (createdUser == null) return;
 
-                createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
-                    runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
+                // 3. Save ALL data (including Username) to Firestore so Login-by-Username works later
+                Map<String, Object> userMap = new HashMap<>();
+                userMap.put("name", name);
+                userMap.put("Name", name);
+                userMap.put("username", username);
+                userMap.put("email", email);
+                userMap.put("Email", email);
+                userMap.put("phone", fullPhone);
+                userMap.put("Phone", fullPhone);
+                userMap.put("role", "Admin");
+                userMap.put("approved", false);
 
-                    Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
-                    i.putExtra("user_name", name);
-                    i.putExtra("user_phone", fullPhone); // Pass the full +63 appended string
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                    startActivity(i);
-                    finish();
-                }).addOnFailureListener(e -> {
-                    runOnUiThread(() -> {
-                        progressBar.setVisibility(android.view.View.GONE);
+                firestore.collection("users").document(createdUser.getUid()).set(userMap).addOnCompleteListener(dbTask -> {
+                    createdUser.sendEmailVerification().addOnCompleteListener(sendTask -> {
+                        runOnUiThread(() -> progressBar.setVisibility(android.view.View.GONE));
                         Intent i = new Intent(SignUpActivity.this, WaitingVerificationActivity.class);
                         i.putExtra("user_name", name);
                         i.putExtra("user_phone", fullPhone);
@@ -251,8 +255,6 @@ public class SignUpActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == TERMS_REQUEST_CODE && resultCode == RESULT_OK) {
-            mCheck.setChecked(true);
-        }
+        if (requestCode == TERMS_REQUEST_CODE && resultCode == RESULT_OK) mCheck.setChecked(true);
     }
 }

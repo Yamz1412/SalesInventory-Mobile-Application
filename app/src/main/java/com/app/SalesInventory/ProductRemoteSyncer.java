@@ -12,6 +12,11 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class ProductRemoteSyncer {
     private static final String TAG = "ProductRemoteSyncer";
 
@@ -102,7 +107,70 @@ public class ProductRemoteSyncer {
         p.setProductType(getString(doc, "productType"));
         p.setImageUrl(getString(doc, "imageUrl"));
         p.setImagePath(null);
+
+        // MAP LISTS
+        p.setSizesList(getListObj(doc, "sizesList", "sizesListJson"));
+        p.setAddonsList(getListObj(doc, "addonsList", "addonsListJson"));
+        p.setVariantsList(getListObj(doc, "variantsList", "variantsListJson"));
+        p.setBomList(getListObj(doc, "bomList", "bomListJson"));
+        p.setNotesList(getListStr(doc, "notesList", "notesListJson"));
+
         return p;
+    }
+
+    // =======================================================
+    // JSON & ARRAY FETCH HELPERS
+    // =======================================================
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> getListObj(DocumentSnapshot doc, String arrayField, String jsonField) {
+        try {
+            if (doc.contains(arrayField) && doc.get(arrayField) instanceof List) {
+                return (List<Map<String, Object>>) doc.get(arrayField);
+            } else if (doc.contains(jsonField)) {
+                String json = doc.getString(jsonField);
+                if (json == null || json.isEmpty()) return null;
+                List<Map<String, Object>> list = new ArrayList<>();
+                org.json.JSONArray array = new org.json.JSONArray(json);
+                for (int i = 0; i < array.length(); i++) {
+                    org.json.JSONObject obj = array.getJSONObject(i);
+                    Map<String, Object> map = new HashMap<>();
+                    java.util.Iterator<String> keys = obj.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        map.put(key, obj.get(key));
+                    }
+                    list.add(map);
+                }
+                return list;
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, String>> getListStr(DocumentSnapshot doc, String arrayField, String jsonField) {
+        try {
+            if (doc.contains(arrayField) && doc.get(arrayField) instanceof List) {
+                return (List<Map<String, String>>) doc.get(arrayField);
+            } else if (doc.contains(jsonField)) {
+                String json = doc.getString(jsonField);
+                if (json == null || json.isEmpty()) return null;
+                List<Map<String, String>> list = new ArrayList<>();
+                org.json.JSONArray array = new org.json.JSONArray(json);
+                for (int i = 0; i < array.length(); i++) {
+                    org.json.JSONObject obj = array.getJSONObject(i);
+                    Map<String, String> map = new HashMap<>();
+                    java.util.Iterator<String> keys = obj.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        map.put(key, obj.getString(key));
+                    }
+                    list.add(map);
+                }
+                return list;
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return null;
     }
 
     private String getString(DocumentSnapshot doc, String field) {

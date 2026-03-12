@@ -11,14 +11,18 @@ import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -32,6 +36,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -52,10 +57,23 @@ public class AddProductActivity extends BaseActivity {
     private ImageButton btnAddPhoto;
     private TextInputEditText productNameET, productGroupET, sellingPriceET, quantityET, costPriceET, lowStockLevelET, expiryDateET;
     private Button addBtn, cancelBtn;
-    private Spinner unitSpinner, existingGroupSpinner;
+    private Spinner unitSpinner, existingGroupSpinner, salesUnitSpinner;
 
-    // Configurations
-    private SwitchMaterial switchSizes, switchAddons, switchNotes, switchBOM, switchForSaleOnly;
+    private SwitchMaterial switchSizes, switchAddons, switchNotes, switchBOM;
+
+    // Type Selector (Tabs)
+    private RadioGroup rgProductType;
+    private RadioButton rbTypeInventory, rbTypeSales, rbTypeBoth;
+
+    // Variants and Layout Configurations
+    private SwitchMaterial switchVariants;
+    private LinearLayout layoutConfigurations;
+    private List<Map<String, Object>> savedVariants = new ArrayList<>();
+
+    // Dual Measurement Setup UI
+    private View layoutDeduction;
+    private TextInputEditText deductionAmountET;
+    private View layoutSellingPrice;
     private LinearLayout layoutBuyingUnitQtyCritical;
 
     private ProductRepository productRepository;
@@ -66,14 +84,19 @@ public class AddProductActivity extends BaseActivity {
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<String> permissionLauncher;
 
-    // Full objects for Search and Filter logic
     private List<Product> inventoryProducts = new ArrayList<>();
 
-    // Data Storage for the Dynamic Dialogs
     private List<Map<String, Object>> savedSizes = new ArrayList<>();
     private List<Map<String, Object>> savedAddons = new ArrayList<>();
     private List<Map<String, String>> savedNotes = new ArrayList<>();
     private List<Map<String, Object>> savedBOM = new ArrayList<>();
+
+    private String currentUserId;
+    private TextInputLayout layoutPiecesPerUnit;
+    private TextInputEditText piecesPerUnitET;
+
+    // AUTOMATED QUEUE VARIABLES
+    private ArrayList<Bundle> registrationQueue;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,17 +104,25 @@ public class AddProductActivity extends BaseActivity {
         setContentView(R.layout.activity_add_product);
         productRepository = SalesInventoryApplication.getProductRepository();
 
+        layoutPiecesPerUnit = findViewById(R.id.layoutPiecesPerUnit);
+        piecesPerUnitET = findViewById(R.id.piecesPerUnitET);
+
         btnAddPhoto = findViewById(R.id.btnAddPhoto);
         productNameET = findViewById(R.id.productNameET);
         productGroupET = findViewById(R.id.productGroupET);
         sellingPriceET = findViewById(R.id.sellingPriceET);
         expiryDateET = findViewById(R.id.expiryDateET);
 
+        authManager = AuthManager.getInstance();
+        currentUserId = authManager.getCurrentUserId();
+
         costPriceET = findViewById(R.id.costPriceET);
         quantityET = findViewById(R.id.quantityET);
         lowStockLevelET = findViewById(R.id.lowStockLevelET);
         unitSpinner = findViewById(R.id.unitSpinner);
+
         layoutBuyingUnitQtyCritical = findViewById(R.id.layout_buying_unit_qty_critical);
+        layoutSellingPrice = findViewById(R.id.layoutSellingPrice);
 
         addBtn = findViewById(R.id.addBtn);
         cancelBtn = findViewById(R.id.cancelBtn);
@@ -99,9 +130,21 @@ public class AddProductActivity extends BaseActivity {
         switchAddons = findViewById(R.id.switchAddons);
         switchNotes = findViewById(R.id.switchNotes);
         switchBOM = findViewById(R.id.switchBOM);
-        switchForSaleOnly = findViewById(R.id.switchForSaleOnly);
 
-        setupCategorySpinner();
+        // MAP NEW TABS & DUAL MEASUREMENT UI
+        rgProductType = findViewById(R.id.rgProductType);
+        rbTypeInventory = findViewById(R.id.rbTypeInventory);
+        rbTypeSales = findViewById(R.id.rbTypeSales);
+        rbTypeBoth = findViewById(R.id.rbTypeBoth);
+
+        layoutDeduction = findViewById(R.id.layoutDeduction);
+        deductionAmountET = findViewById(R.id.deductionAmountET);
+        salesUnitSpinner = findViewById(R.id.salesUnitSpinner);
+
+        // MAP Configurations Layout and Variants
+        layoutConfigurations = findViewById(R.id.layoutConfigurations);
+        switchVariants = findViewById(R.id.switchVariants);
+
         setupImagePickers();
         loadInventoryForBOM();
 
@@ -109,8 +152,18 @@ public class AddProductActivity extends BaseActivity {
         ArrayAdapter<String> unitAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
         unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         unitSpinner.setAdapter(unitAdapter);
+        if(salesUnitSpinner != null) salesUnitSpinner.setAdapter(unitAdapter);
 
-        authManager = AuthManager.getInstance();
+        // Enforce logic based on intent
+        if (getIntent().getBooleanExtra("FORCE_SALE_ONLY", false)) {
+            rgProductType.check(R.id.rbTypeSales);
+            rbTypeInventory.setEnabled(false);
+            rbTypeBoth.setEnabled(false);
+        }
+
+        rgProductType.setOnCheckedChangeListener((group, checkedId) -> updateLayoutForSelectedType());
+        updateLayoutForSelectedType(); // Initial UI Setup
+
         authManager.refreshCurrentUserStatus(success -> {
             if (!authManager.isCurrentUserAdmin()) {
                 Toast.makeText(AddProductActivity.this, "Error: User not approved", Toast.LENGTH_SHORT).show();
@@ -118,8 +171,7 @@ public class AddProductActivity extends BaseActivity {
             }
         });
 
-        switchForSaleOnly.setOnCheckedChangeListener((btn, isChecked) -> updateLayoutForSelectedType());
-
+        switchVariants.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showVariantsDialog(); else savedVariants.clear(); });
         switchSizes.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showSizesDialog(); else savedSizes.clear(); });
         switchAddons.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showAddonsDialog(); else savedAddons.clear(); });
         switchNotes.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showNotesDialog(); else savedNotes.clear(); });
@@ -130,34 +182,95 @@ public class AddProductActivity extends BaseActivity {
         btnAddPhoto.setOnClickListener(v -> tryPickImage());
         expiryDateET.setOnClickListener(v -> showExpiryDatePicker());
 
-        Intent intent = getIntent();
-        if (intent != null && intent.hasExtra("PREFILL_NAME")) {
-            // Automatically switch it to an Inventory Item
-            switchForSaleOnly.setChecked(false);
+        checkAndApplyPrefillData();
 
-            // Pre-fill the details from the supplier delivery
-            productNameET.setText(intent.getStringExtra("PREFILL_NAME"));
+        unitSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String selected = parent.getItemAtPosition(position).toString().toLowerCase(Locale.ROOT);
+                if (selected.equals("box") || selected.equals("pack")) {
+                    layoutPiecesPerUnit.setVisibility(View.VISIBLE);
+                } else {
+                    layoutPiecesPerUnit.setVisibility(View.GONE);
+                }
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+    }
 
-            double prefillCost = intent.getDoubleExtra("PREFILL_COST", 0.0);
-            costPriceET.setText(String.valueOf(prefillCost));
+    private void updateLayoutForSelectedType() {
+        int checkedId = rgProductType.getCheckedRadioButtonId();
 
-            int prefillQty = intent.getIntExtra("PREFILL_QTY", 0);
-            quantityET.setText(String.valueOf(prefillQty));
+        if (checkedId == R.id.rbTypeSales) {
+            // SALES ONLY
+            layoutBuyingUnitQtyCritical.setVisibility(View.GONE);
+            if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
+            layoutConfigurations.setVisibility(View.VISIBLE);
+            layoutDeduction.setVisibility(View.GONE);
+            setupCategorySpinner(true);
+        } else if (checkedId == R.id.rbTypeBoth) {
+            // BOTH (Bulk Inventory to Sales)
+            layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
+            if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
+            layoutConfigurations.setVisibility(View.GONE); // Hide configs for dual measurement
+            layoutDeduction.setVisibility(View.VISIBLE);
+            setupCategorySpinner(true);
+        } else {
+            // INVENTORY ONLY
+            layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
+            if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.GONE);
+            layoutConfigurations.setVisibility(View.GONE);
+            layoutDeduction.setVisibility(View.GONE);
+            setupCategorySpinner(false);
+        }
+    }
 
-            String prefillUnit = intent.getStringExtra("PREFILL_UNIT");
-            if (prefillUnit != null && !prefillUnit.isEmpty()) {
-                String[] standardUnits = {"pcs", "ml", "L","oz", "g", "kg", "box", "pack"};
-                for (int i = 0; i < standardUnits.length; i++) {
-                    if (standardUnits[i].equalsIgnoreCase(prefillUnit)) {
+    private void checkAndApplyPrefillData() {
+        registrationQueue = getIntent().getParcelableArrayListExtra("REGISTRATION_QUEUE");
+        Bundle currentItemBundle = null;
+
+        if (registrationQueue != null && !registrationQueue.isEmpty()) {
+            currentItemBundle = registrationQueue.remove(0);
+
+            if (!registrationQueue.isEmpty()) {
+                Toast.makeText(this, "Please save this item. " + registrationQueue.size() + " more new items waiting.", Toast.LENGTH_LONG).show();
+                if (getSupportActionBar() != null) getSupportActionBar().setTitle("Add Product (Queue: " + (registrationQueue.size() + 1) + ")");
+            } else {
+                if (getSupportActionBar() != null) getSupportActionBar().setTitle("Add Product (Last Item)");
+            }
+        } else if (getIntent().getExtras() != null && getIntent().hasExtra("PREFILL_NAME")) {
+            currentItemBundle = getIntent().getExtras();
+        }
+
+        if (currentItemBundle != null) {
+            // STRICTLY ENFORCE INVENTORY ONLY FOR PO RECEIPTS
+            rgProductType.check(R.id.rbTypeInventory);
+            rbTypeSales.setEnabled(false);
+            rbTypeBoth.setEnabled(false);
+
+            if (currentItemBundle.containsKey("PREFILL_NAME")) productNameET.setText(currentItemBundle.getString("PREFILL_NAME"));
+            if (currentItemBundle.containsKey("PREFILL_COST")) costPriceET.setText(String.valueOf(currentItemBundle.getDouble("PREFILL_COST")));
+            if (currentItemBundle.containsKey("PREFILL_QTY")) quantityET.setText(String.valueOf(currentItemBundle.getInt("PREFILL_QTY")));
+
+            if (currentItemBundle.containsKey("PREFILL_UNIT")) {
+                String unit = currentItemBundle.getString("PREFILL_UNIT");
+                for (int i = 0; i < unitSpinner.getAdapter().getCount(); i++) {
+                    if (unitSpinner.getAdapter().getItem(i).toString().equalsIgnoreCase(unit)) {
                         unitSpinner.setSelection(i);
                         break;
                     }
                 }
             }
-
-            Toast.makeText(this, "Form pre-filled from Purchase Order!", Toast.LENGTH_LONG).show();
         }
-        updateLayoutForSelectedType();
+    }
+
+    private void proceedToNextInQueue() {
+        if (registrationQueue != null && !registrationQueue.isEmpty()) {
+            Intent intent = new Intent(this, AddProductActivity.class);
+            intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
+            startActivity(intent);
+        }
+        finish();
     }
 
     private void loadInventoryForBOM() {
@@ -173,9 +286,138 @@ public class AddProductActivity extends BaseActivity {
         });
     }
 
-    // ==========================================
-    // INVENTORY SELECTION DIALOG (WITH SEARCH & FILTER)
-    // ==========================================
+    private void clearForm() {
+        productNameET.setText("");
+        productGroupET.setText("");
+        sellingPriceET.setText("");
+        costPriceET.setText("");
+        quantityET.setText("");
+        lowStockLevelET.setText("");
+        expiryDateET.setText("");
+        selectedImagePath = null;
+        btnAddPhoto.setImageResource(android.R.drawable.ic_menu_report_image);
+
+        if (switchVariants != null) switchVariants.setChecked(false);
+        switchSizes.setChecked(false);
+        switchAddons.setChecked(false);
+        switchNotes.setChecked(false);
+        switchBOM.setChecked(false);
+        deductionAmountET.setText("");
+
+        savedVariants.clear();
+        savedSizes.clear();
+        savedAddons.clear();
+        savedNotes.clear();
+        savedBOM.clear();
+        productNameET.requestFocus();
+    }
+
+    private void showVariantsDialog() {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_variants, null);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        LinearLayout containerRows = view.findViewById(R.id.containerRows);
+        ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
+        Button btnCancel = view.findViewById(R.id.btnCancel);
+        Button btnSave = view.findViewById(R.id.btnSave);
+
+        List<String> inventoryNames = new ArrayList<>();
+        for (Product p : inventoryProducts) {
+            inventoryNames.add(p.getProductName());
+        }
+        ArrayAdapter<String> autoCompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, inventoryNames);
+
+        String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
+        ArrayAdapter<String> rowUnitAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
+        rowUnitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        Runnable addRow = () -> {
+            View row = LayoutInflater.from(this).inflate(R.layout.item_config_variant, null);
+
+            AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
+            actvItem.setAdapter(autoCompleteAdapter);
+
+            Spinner spinnerUnit = row.findViewById(R.id.spinnerVariantUnit);
+            spinnerUnit.setAdapter(rowUnitAdapter);
+
+            View btnDelete = row.findViewById(R.id.btnDelete);
+            btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+
+            containerRows.addView(row);
+        };
+
+        if (savedVariants.isEmpty()) {
+            addRow.run();
+        } else {
+            for (Map<String, Object> variant : savedVariants) {
+                View row = LayoutInflater.from(this).inflate(R.layout.item_config_variant, null);
+
+                AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
+                actvItem.setAdapter(autoCompleteAdapter);
+                actvItem.setText((String) variant.get("variantName"));
+
+                EditText etQty = row.findViewById(R.id.etVariantQty);
+                etQty.setText(String.valueOf(variant.get("deductQty")));
+
+                Spinner spinnerUnit = row.findViewById(R.id.spinnerVariantUnit);
+                spinnerUnit.setAdapter(rowUnitAdapter);
+
+                String savedUnit = (String) variant.get("unit");
+                if (savedUnit != null) {
+                    for (int i = 0; i < units.length; i++) {
+                        if (units[i].equalsIgnoreCase(savedUnit)) {
+                            spinnerUnit.setSelection(i);
+                            break;
+                        }
+                    }
+                }
+
+                View btnDelete = row.findViewById(R.id.btnDelete);
+                btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+
+                containerRows.addView(row);
+            }
+        }
+
+        btnAddRow.setOnClickListener(v -> addRow.run());
+
+        btnCancel.setOnClickListener(v -> {
+            if (savedVariants.isEmpty()) switchVariants.setChecked(false);
+            dialog.dismiss();
+        });
+
+        btnSave.setOnClickListener(v -> {
+            savedVariants.clear();
+            for (int i = 0; i < containerRows.getChildCount(); i++) {
+                View row = containerRows.getChildAt(i);
+
+                AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
+                EditText etQty = row.findViewById(R.id.etVariantQty);
+                Spinner spinnerUnit = row.findViewById(R.id.spinnerVariantUnit);
+
+                String itemName = actvItem.getText().toString().trim();
+                String qtyStr = etQty.getText().toString().trim();
+                String unitStr = spinnerUnit.getSelectedItem() != null ? spinnerUnit.getSelectedItem().toString() : "pcs";
+
+                if (!itemName.isEmpty()) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("variantName", itemName);
+                    map.put("linkedMaterial", itemName);
+                    map.put("deductQty", qtyStr.isEmpty() ? 0.0 : Double.parseDouble(qtyStr));
+                    map.put("unit", unitStr);
+                    map.put("extraPrice", 0.0);
+                    savedVariants.add(map);
+                }
+            }
+            if (savedVariants.isEmpty()) switchVariants.setChecked(false);
+            else Toast.makeText(this, "Variants Saved!", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
     private void showInventorySelectionDialog(TextView targetTextView) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_inventory_selection, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
@@ -186,7 +428,6 @@ public class AddProductActivity extends BaseActivity {
         ListView lvItems = view.findViewById(R.id.lvInventoryItems);
         Button btnClose = view.findViewById(R.id.btnCloseSelection);
 
-        // 1. Build Unique Category Filter
         List<String> categories = new ArrayList<>();
         categories.add("All Categories");
         for (Product p : inventoryProducts) {
@@ -197,7 +438,6 @@ public class AddProductActivity extends BaseActivity {
         catAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerFilter.setAdapter(catAdapter);
 
-        // 2. Setup ListView Adapter
         List<Product> filteredList = new ArrayList<>(inventoryProducts);
         ArrayAdapter<Product> listAdapter = new ArrayAdapter<Product>(this, android.R.layout.simple_list_item_1, filteredList) {
             @NonNull
@@ -214,11 +454,9 @@ public class AddProductActivity extends BaseActivity {
         };
         lvItems.setAdapter(listAdapter);
 
-        // 3. Create the filtering logic
         Runnable applyFilter = () -> {
             String query = etSearch.getText().toString().toLowerCase().trim();
             String cat = spinnerFilter.getSelectedItem() != null ? spinnerFilter.getSelectedItem().toString() : "All Categories";
-
             filteredList.clear();
             for (Product p : inventoryProducts) {
                 boolean matchesSearch = p.getProductName().toLowerCase().contains(query);
@@ -230,7 +468,6 @@ public class AddProductActivity extends BaseActivity {
             listAdapter.notifyDataSetChanged();
         };
 
-        // 4. Attach Listeners
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { applyFilter.run(); }
@@ -244,7 +481,7 @@ public class AddProductActivity extends BaseActivity {
 
         lvItems.setOnItemClickListener((parent, view1, position, id) -> {
             Product selected = filteredList.get(position);
-            targetTextView.setText(selected.getProductName()); // Return name to original box
+            targetTextView.setText(selected.getProductName());
             dialog.dismiss();
         });
 
@@ -252,10 +489,6 @@ public class AddProductActivity extends BaseActivity {
         dialog.show();
     }
 
-
-    // ==========================================
-    // BILL OF MATERIALS (BOM) LOGIC
-    // ==========================================
     private void showBOMDialog() {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_bom, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
@@ -271,46 +504,56 @@ public class AddProductActivity extends BaseActivity {
         rowUnitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         Runnable addRow = () -> {
-            View row = LayoutInflater.from(this).inflate(R.layout.item_config_bom, null);
+            try {
+                View row = LayoutInflater.from(this).inflate(R.layout.item_config_bom, null);
+                TextView tvMaterial = row.findViewById(R.id.tvRawMaterial);
+                if (tvMaterial != null) tvMaterial.setOnClickListener(v -> showInventorySelectionDialog(tvMaterial));
 
-            // Connect the Text View to open the Inventory Search Dialog
-            TextView tvMaterial = row.findViewById(R.id.tvRawMaterial);
-            tvMaterial.setOnClickListener(v -> showInventorySelectionDialog(tvMaterial));
+                Spinner spinnerUnit = row.findViewById(R.id.spinnerUnit);
+                if (spinnerUnit != null) spinnerUnit.setAdapter(rowUnitAdapter);
 
-            Spinner spinnerUnit = row.findViewById(R.id.spinnerUnit);
-            spinnerUnit.setAdapter(rowUnitAdapter);
+                View btnDelete = row.findViewById(R.id.btnDelete);
+                if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
 
-            ImageButton btnDelete = row.findViewById(R.id.btnDelete);
-            btnDelete.setOnClickListener(v -> containerRows.removeView(row));
-            containerRows.addView(row);
+                containerRows.addView(row);
+            } catch (Exception e) {
+                Toast.makeText(this, "Layout error. Check item_config_bom.xml IDs.", Toast.LENGTH_SHORT).show();
+            }
         };
 
         if (savedBOM.isEmpty()) {
             addRow.run();
         } else {
             for (Map<String, Object> bom : savedBOM) {
-                View row = LayoutInflater.from(this).inflate(R.layout.item_config_bom, null);
+                try {
+                    View row = LayoutInflater.from(this).inflate(R.layout.item_config_bom, null);
+                    TextView tvMaterial = row.findViewById(R.id.tvRawMaterial);
+                    if (tvMaterial != null) {
+                        tvMaterial.setText((String) bom.get("materialName"));
+                        tvMaterial.setOnClickListener(v -> showInventorySelectionDialog(tvMaterial));
+                    }
 
-                TextView tvMaterial = row.findViewById(R.id.tvRawMaterial);
-                tvMaterial.setText((String) bom.get("materialName"));
-                tvMaterial.setOnClickListener(v -> showInventorySelectionDialog(tvMaterial));
+                    EditText etQty = row.findViewById(R.id.etDeductQty);
+                    if (etQty != null) etQty.setText(String.valueOf(bom.get("quantity")));
 
-                ((EditText) row.findViewById(R.id.etDeductQty)).setText(String.valueOf(bom.get("quantity")));
-
-                Spinner spinnerUnit = row.findViewById(R.id.spinnerUnit);
-                spinnerUnit.setAdapter(rowUnitAdapter);
-                String savedUnit = (String) bom.get("unit");
-                if (savedUnit != null) {
-                    for (int i = 0; i < units.length; i++) {
-                        if (units[i].equalsIgnoreCase(savedUnit)) {
-                            spinnerUnit.setSelection(i);
-                            break;
+                    Spinner spinnerUnit = row.findViewById(R.id.spinnerUnit);
+                    if (spinnerUnit != null) {
+                        spinnerUnit.setAdapter(rowUnitAdapter);
+                        String savedUnit = (String) bom.get("unit");
+                        if (savedUnit != null) {
+                            for (int i = 0; i < units.length; i++) {
+                                if (units[i].equalsIgnoreCase(savedUnit)) {
+                                    spinnerUnit.setSelection(i);
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
 
-                row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-                containerRows.addView(row);
+                    View btnDelete = row.findViewById(R.id.btnDelete);
+                    if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                    containerRows.addView(row);
+                } catch (Exception e) { }
             }
         }
 
@@ -325,19 +568,22 @@ public class AddProductActivity extends BaseActivity {
             savedBOM.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
                 View row = containerRows.getChildAt(i);
-                String materialName = ((TextView) row.findViewById(R.id.tvRawMaterial)).getText().toString().trim();
-                String qtyStr = ((EditText) row.findViewById(R.id.etDeductQty)).getText().toString().trim();
-
+                TextView tvMat = row.findViewById(R.id.tvRawMaterial);
+                EditText etQty = row.findViewById(R.id.etDeductQty);
                 Spinner spinUnit = row.findViewById(R.id.spinnerUnit);
-                String unitStr = spinUnit.getSelectedItem() != null ? spinUnit.getSelectedItem().toString() : "pcs";
 
-                // Don't save if it says "Select Item" or is blank
-                if (!materialName.isEmpty() && !materialName.contains("Select Item")) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("materialName", materialName);
-                    map.put("quantity", qtyStr.isEmpty() ? 0.0 : Double.parseDouble(qtyStr));
-                    map.put("unit", unitStr);
-                    savedBOM.add(map);
+                if (tvMat != null && etQty != null && spinUnit != null) {
+                    String materialName = tvMat.getText().toString().trim();
+                    String qtyStr = etQty.getText().toString().trim();
+                    String unitStr = spinUnit.getSelectedItem() != null ? spinUnit.getSelectedItem().toString() : "pcs";
+
+                    if (!materialName.isEmpty() && !materialName.contains("Select Item")) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("materialName", materialName);
+                        map.put("quantity", qtyStr.isEmpty() ? 0.0 : Double.parseDouble(qtyStr));
+                        map.put("unit", unitStr);
+                        savedBOM.add(map);
+                    }
                 }
             }
             if (savedBOM.isEmpty()) switchBOM.setChecked(false);
@@ -347,9 +593,6 @@ public class AddProductActivity extends BaseActivity {
         dialog.show();
     }
 
-    // ==========================================
-    // SIZES, ADD-ONS, NOTES LOGIC (UNCHANGED)
-    // ==========================================
     private void showSizesDialog() {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_sizes, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
@@ -361,34 +604,52 @@ public class AddProductActivity extends BaseActivity {
         Button btnSave = view.findViewById(R.id.btnSave);
 
         Runnable addRow = () -> {
-            View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
-            row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-            containerRows.addView(row);
+            try {
+                View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
+                View btnDelete = row.findViewById(R.id.btnDelete);
+                if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                containerRows.addView(row);
+            } catch (Exception e) {
+                Toast.makeText(this, "Layout error. Check item_config_size.xml IDs.", Toast.LENGTH_SHORT).show();
+            }
         };
 
         if (savedSizes.isEmpty()) addRow.run();
         else {
             for (Map<String, Object> size : savedSizes) {
-                View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
-                ((EditText) row.findViewById(R.id.etSizeName)).setText((String) size.get("name"));
-                ((EditText) row.findViewById(R.id.etSizePrice)).setText(String.valueOf(size.get("price")));
-                row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-                containerRows.addView(row);
+                try {
+                    View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
+                    EditText etName = row.findViewById(R.id.etSizeName);
+                    EditText etPrice = row.findViewById(R.id.etSizePrice);
+                    if (etName != null) etName.setText((String) size.get("name"));
+                    if (etPrice != null) etPrice.setText(String.valueOf(size.get("price")));
+
+                    View btnDelete = row.findViewById(R.id.btnDelete);
+                    if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                    containerRows.addView(row);
+                } catch (Exception e) { }
             }
         }
+
         btnAddRow.setOnClickListener(v -> addRow.run());
         btnCancel.setOnClickListener(v -> { if (savedSizes.isEmpty()) switchSizes.setChecked(false); dialog.dismiss(); });
+
         btnSave.setOnClickListener(v -> {
             savedSizes.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
                 View row = containerRows.getChildAt(i);
-                String name = ((EditText) row.findViewById(R.id.etSizeName)).getText().toString().trim();
-                String priceStr = ((EditText) row.findViewById(R.id.etSizePrice)).getText().toString().trim();
-                if (!name.isEmpty()) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("name", name);
-                    map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
-                    savedSizes.add(map);
+                EditText etName = row.findViewById(R.id.etSizeName);
+                EditText etPrice = row.findViewById(R.id.etSizePrice);
+
+                if (etName != null && etPrice != null) {
+                    String name = etName.getText().toString().trim();
+                    String priceStr = etPrice.getText().toString().trim();
+                    if (!name.isEmpty()) {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("name", name);
+                        map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
+                        savedSizes.add(map);
+                    }
                 }
             }
             if (savedSizes.isEmpty()) switchSizes.setChecked(false);
@@ -399,54 +660,87 @@ public class AddProductActivity extends BaseActivity {
     }
 
     private void showAddonsDialog() {
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_addons, null);
-        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        try {
+            View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_addons, null);
+            AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
+            if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
-        LinearLayout containerRows = view.findViewById(R.id.containerRows);
-        ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
-        Button btnCancel = view.findViewById(R.id.btnCancel);
-        Button btnSave = view.findViewById(R.id.btnSave);
+            LinearLayout containerRows = view.findViewById(R.id.containerRows);
+            ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
+            Button btnCancel = view.findViewById(R.id.btnCancel);
+            Button btnSave = view.findViewById(R.id.btnSave);
 
-        Runnable addRow = () -> {
-            View row = LayoutInflater.from(this).inflate(R.layout.item_config_addon, null);
-            row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-            containerRows.addView(row);
-        };
+            Runnable addRow = () -> {
+                try {
+                    View row = LayoutInflater.from(this).inflate(R.layout.item_add_ons, null);
+                    View btnDelete = row.findViewById(R.id.btnDelete);
+                    if (btnDelete != null) {
+                        btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                    }
+                    containerRows.addView(row);
+                } catch (Exception e) {
+                    Toast.makeText(this, "Error inflating Add-on row: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            };
 
-        if (savedAddons.isEmpty()) addRow.run();
-        else {
-            for (Map<String, Object> addon : savedAddons) {
-                View row = LayoutInflater.from(this).inflate(R.layout.item_config_addon, null);
-                ((EditText) row.findViewById(R.id.etAddonName)).setText((String) addon.get("name"));
-                ((EditText) row.findViewById(R.id.etAddonPrice)).setText(String.valueOf(addon.get("price")));
-                ((EditText) row.findViewById(R.id.etAddonCost)).setText(String.valueOf(addon.get("cost")));
-                row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-                containerRows.addView(row);
-            }
-        }
-        btnAddRow.setOnClickListener(v -> addRow.run());
-        btnCancel.setOnClickListener(v -> { if (savedAddons.isEmpty()) switchAddons.setChecked(false); dialog.dismiss(); });
-        btnSave.setOnClickListener(v -> {
-            savedAddons.clear();
-            for (int i = 0; i < containerRows.getChildCount(); i++) {
-                View row = containerRows.getChildAt(i);
-                String name = ((EditText) row.findViewById(R.id.etAddonName)).getText().toString().trim();
-                String priceStr = ((EditText) row.findViewById(R.id.etAddonPrice)).getText().toString().trim();
-                String costStr = ((EditText) row.findViewById(R.id.etAddonCost)).getText().toString().trim();
-                if (!name.isEmpty()) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("name", name);
-                    map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
-                    map.put("cost", costStr.isEmpty() ? 0.0 : Double.parseDouble(costStr));
-                    savedAddons.add(map);
+            if (savedAddons.isEmpty()) {
+                addRow.run();
+            } else {
+                for (Map<String, Object> addon : savedAddons) {
+                    try {
+                        View row = LayoutInflater.from(this).inflate(R.layout.item_add_ons, null);
+                        EditText etName = row.findViewById(R.id.etAddonName);
+                        EditText etPrice = row.findViewById(R.id.etAddonPrice);
+
+                        if (etName != null) etName.setText((String) addon.get("name"));
+                        if (etPrice != null) etPrice.setText(String.valueOf(addon.get("price")));
+
+                        View btnDelete = row.findViewById(R.id.btnDelete);
+                        if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+
+                        containerRows.addView(row);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Error restoring saved add-on row", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
-            if (savedAddons.isEmpty()) switchAddons.setChecked(false);
-            else Toast.makeText(this, "Add-ons saved!", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
-        });
-        dialog.show();
+
+            btnAddRow.setOnClickListener(v -> addRow.run());
+            btnCancel.setOnClickListener(v -> {
+                if (savedAddons.isEmpty()) switchAddons.setChecked(false);
+                dialog.dismiss();
+            });
+
+            btnSave.setOnClickListener(v -> {
+                savedAddons.clear();
+                for (int i = 0; i < containerRows.getChildCount(); i++) {
+                    View row = containerRows.getChildAt(i);
+                    EditText etName = row.findViewById(R.id.etAddonName);
+                    EditText etPrice = row.findViewById(R.id.etAddonPrice);
+
+                    if (etName != null && etPrice != null) {
+                        String name = etName.getText().toString().trim();
+                        String priceStr = etPrice.getText().toString().trim();
+
+                        if (!name.isEmpty()) {
+                            Map<String, Object> map = new HashMap<>();
+                            map.put("name", name);
+                            map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
+                            savedAddons.add(map);
+                        }
+                    }
+                }
+                if (savedAddons.isEmpty()) switchAddons.setChecked(false);
+                else Toast.makeText(this, "Add-ons saved!", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            });
+
+            dialog.show();
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Fatal dialog error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            switchAddons.setChecked(false);
+        }
     }
 
     private void showNotesDialog() {
@@ -460,34 +754,53 @@ public class AddProductActivity extends BaseActivity {
         Button btnSave = view.findViewById(R.id.btnSave);
 
         Runnable addRow = () -> {
-            View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
-            row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-            containerRows.addView(row);
+            try {
+                View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
+                View btnDelete = row.findViewById(R.id.btnDelete);
+                if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                containerRows.addView(row);
+            } catch (Exception e) {
+                Toast.makeText(this, "Layout error. Check item_config_note.xml IDs.", Toast.LENGTH_SHORT).show();
+            }
         };
 
         if (savedNotes.isEmpty()) addRow.run();
         else {
             for (Map<String, String> note : savedNotes) {
-                View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
-                ((EditText) row.findViewById(R.id.etNoteType)).setText(note.get("type"));
-                ((EditText) row.findViewById(R.id.etNoteValue)).setText(note.get("value"));
-                row.findViewById(R.id.btnDelete).setOnClickListener(v -> containerRows.removeView(row));
-                containerRows.addView(row);
+                try {
+                    View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
+                    EditText etType = row.findViewById(R.id.etNoteType);
+                    EditText etVal = row.findViewById(R.id.etNoteValue);
+
+                    if (etType != null) etType.setText(note.get("type"));
+                    if (etVal != null) etVal.setText(note.get("value"));
+
+                    View btnDelete = row.findViewById(R.id.btnDelete);
+                    if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
+                    containerRows.addView(row);
+                } catch (Exception e) { }
             }
         }
+
         btnAddRow.setOnClickListener(v -> addRow.run());
         btnCancel.setOnClickListener(v -> { if (savedNotes.isEmpty()) switchNotes.setChecked(false); dialog.dismiss(); });
+
         btnSave.setOnClickListener(v -> {
             savedNotes.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
                 View row = containerRows.getChildAt(i);
-                String type = ((EditText) row.findViewById(R.id.etNoteType)).getText().toString().trim();
-                String value = ((EditText) row.findViewById(R.id.etNoteValue)).getText().toString().trim();
-                if (!type.isEmpty() || !value.isEmpty()) {
-                    Map<String, String> map = new HashMap<>();
-                    map.put("type", type);
-                    map.put("value", value);
-                    savedNotes.add(map);
+                EditText etType = row.findViewById(R.id.etNoteType);
+                EditText etVal = row.findViewById(R.id.etNoteValue);
+
+                if (etType != null && etVal != null) {
+                    String type = etType.getText().toString().trim();
+                    String value = etVal.getText().toString().trim();
+                    if (!type.isEmpty() || !value.isEmpty()) {
+                        Map<String, String> map = new HashMap<>();
+                        map.put("type", type);
+                        map.put("value", value);
+                        savedNotes.add(map);
+                    }
                 }
             }
             if (savedNotes.isEmpty()) switchNotes.setChecked(false);
@@ -497,27 +810,41 @@ public class AddProductActivity extends BaseActivity {
         dialog.show();
     }
 
-    private void setupCategorySpinner() {
+    private void setupCategorySpinner(boolean wantMenu) {
         existingGroupSpinner = findViewById(R.id.existingGroupSpinner);
+        productGroupET = findViewById(R.id.productGroupET);
+
         DatabaseReference categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
-        categoryRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                List<String> groups = new ArrayList<>();
-                groups.add("Select Group");
-                for (DataSnapshot child : snapshot.getChildren()) {
-                    Category c = child.getValue(Category.class);
-                    if (c != null) groups.add(c.getCategoryName());
-                }
-                ArrayAdapter<String> groupAdapter = new ArrayAdapter<>(AddProductActivity.this, android.R.layout.simple_spinner_item, groups);
-                existingGroupSpinner.setAdapter(groupAdapter);
-            }
-            @Override public void onCancelled(DatabaseError error) {}
-        });
+
+        categoryRef.orderByChild("ownerAdminId").equalTo(currentUserId)
+                .addListenerForSingleValueEvent(new ValueEventListener(){
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        List<String> groups = new ArrayList<>();
+                        groups.add("Select Group");
+
+                        for (DataSnapshot child : snapshot.getChildren()) {
+                            Category c = child.getValue(Category.class);
+                            if (c != null && c.isActive()) {
+                                if (wantMenu && "Menu".equalsIgnoreCase(c.getType())) {
+                                    groups.add(c.getCategoryName());
+                                } else if (!wantMenu && !"Menu".equalsIgnoreCase(c.getType())) {
+                                    groups.add(c.getCategoryName());
+                                }
+                            }
+                        }
+                        ArrayAdapter<String> groupAdapter = new ArrayAdapter<>(AddProductActivity.this, android.R.layout.simple_spinner_item, groups);
+                        existingGroupSpinner.setAdapter(groupAdapter);
+                    }
+                    @Override public void onCancelled(DatabaseError error) {}
+                });
 
         existingGroupSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                if (position > 0) productGroupET.setText(parent.getItemAtPosition(position).toString());
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                if (position > 0) {
+                    productGroupET.setText(parent.getItemAtPosition(position).toString());
+                }
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
@@ -553,15 +880,6 @@ public class AddProductActivity extends BaseActivity {
         imagePickerLauncher.launch(intent);
     }
 
-    private void updateLayoutForSelectedType() {
-        if (switchForSaleOnly.isChecked()) {
-            layoutBuyingUnitQtyCritical.setVisibility(View.GONE);
-            quantityET.setText(""); costPriceET.setText(""); lowStockLevelET.setText("");
-        } else {
-            layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
-        }
-    }
-
     private void showExpiryDatePicker() {
         Calendar now = Calendar.getInstance();
         DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
@@ -578,14 +896,20 @@ public class AddProductActivity extends BaseActivity {
         String name = productNameET.getText() != null ? productNameET.getText().toString().trim() : "";
         if (name.isEmpty()) { Toast.makeText(this, "Product name is required", Toast.LENGTH_SHORT).show(); return; }
 
-        String categoryName = productGroupET.getText() != null ? productGroupET.getText().toString().trim() : "";
-        if (categoryName.isEmpty()) { Toast.makeText(this, "Product Group is required", Toast.LENGTH_SHORT).show(); return; }
+        String categoryName = productGroupET.getText().toString().trim();
+        if (categoryName.isEmpty()) { Toast.makeText(this, "Product group is required", Toast.LENGTH_SHORT).show(); return; }
+
+        int checkedTabId = rgProductType.getCheckedRadioButtonId();
+        boolean isMenu = (checkedTabId == R.id.rbTypeSales || checkedTabId == R.id.rbTypeBoth);
+        checkAndCreateCategory(categoryName, isMenu);
 
         String categoryId = categoryName.toLowerCase(Locale.ROOT).replace(" ", "_");
-        boolean wantMenu = switchForSaleOnly.isChecked();
-        String productType = wantMenu ? "Menu" : "Inventory";
 
-        double sellingPrice = 0, costPrice = 0;
+        String productType = "Inventory";
+        if (checkedTabId == R.id.rbTypeSales) productType = "Menu";
+        else if (checkedTabId == R.id.rbTypeBoth) productType = "Both";
+
+        double sellingPrice = 0, costPrice = 0, deductionAmount = 1.0;
         int qty = 0, criticalLevel = 1, reorderLevel = 0, ceilingLevel = 0;
         long expiryDate = 0L;
 
@@ -608,6 +932,12 @@ public class AddProductActivity extends BaseActivity {
             criticalLevel = 1;
             if (qty < 0) qty = 0;
             if (reorderLevel < 0) reorderLevel = 0;
+
+            if ("Both".equalsIgnoreCase(productType)) {
+                try {
+                    deductionAmount = Double.parseDouble(deductionAmountET.getText().toString().trim());
+                } catch (Exception ignored) {}
+            }
         }
 
         Product p = new Product();
@@ -623,23 +953,42 @@ public class AddProductActivity extends BaseActivity {
         p.setCeilingLevel(ceilingLevel);
         p.setUnit(unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "");
         p.setExpiryDate(expiryDate);
+        p.setDeductionAmount(deductionAmount); // Sends deduction to sellProduct.java
+
+        p.setSalesUnit(salesUnitSpinner != null && salesUnitSpinner.getSelectedItem() != null ? salesUnitSpinner.getSelectedItem().toString() : "");
+        int ppu = 1;
+        if (layoutPiecesPerUnit.getVisibility() == View.VISIBLE) {
+            try { ppu = Integer.parseInt(piecesPerUnitET.getText().toString().trim()); } catch (Exception ignored) {}
+        }
+        p.setPiecesPerUnit(ppu);
+
         long now = System.currentTimeMillis();
         p.setDateAdded(now);
         p.setActive(true);
         p.setImagePath(selectedImagePath);
+        p.setOwnerAdminId(currentUserId);
 
-        // ATTACH CONFIGURATIONS
-        if (!savedSizes.isEmpty()) p.setSizesList(savedSizes);
-        if (!savedAddons.isEmpty()) p.setAddonsList(savedAddons);
-        if (!savedNotes.isEmpty()) p.setNotesList(savedNotes);
-        if (!savedBOM.isEmpty()) p.setBomList(savedBOM);
+        // Save Configurations if applicable
+        if (checkedTabId == R.id.rbTypeSales) {
+            if (!savedVariants.isEmpty()) p.setVariantsList(savedVariants);
+            if (!savedSizes.isEmpty()) p.setSizesList(savedSizes);
+            if (!savedAddons.isEmpty()) p.setAddonsList(savedAddons);
+            if (!savedNotes.isEmpty()) p.setNotesList(savedNotes);
+            if (!savedBOM.isEmpty()) p.setBomList(savedBOM);
+        }
 
         productRepository.addProduct(p, selectedImagePath, new ProductRepository.OnProductAddedListener() {
             @Override
             public void onProductAdded(String productId) {
                 runOnUiThread(() -> {
                     Toast.makeText(AddProductActivity.this, "Product added successfully", Toast.LENGTH_SHORT).show();
-                    finish();
+                    if (registrationQueue != null && !registrationQueue.isEmpty()) {
+                        proceedToNextInQueue();
+                    } else if (getIntent().hasExtra("PREFILL_NAME")) {
+                        finish();
+                    } else {
+                        clearForm();
+                    }
                 });
             }
             @Override
@@ -647,5 +996,49 @@ public class AddProductActivity extends BaseActivity {
                 runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show());
             }
         });
+    }
+
+    private void checkAndCreateCategory(String name, boolean isMenu) {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Categories");
+        ref.orderByChild("ownerAdminId").equalTo(currentUserId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean exists = false;
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    Category c = ds.getValue(Category.class);
+                    if (c != null && name.equalsIgnoreCase(c.getCategoryName())) {
+                        exists = true; break;
+                    }
+                }
+
+                if (!exists) {
+                    String id = ref.push().getKey();
+                    Category newCat = new Category();
+                    newCat.setCategoryId(id);
+                    newCat.setCategoryName(name);
+                    newCat.setOwnerAdminId(currentUserId);
+                    newCat.setType(isMenu ? "Menu" : "Inventory");
+                    newCat.setActive(true);
+                    if (id != null) ref.child(id).setValue(newCat);
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (registrationQueue != null && !registrationQueue.isEmpty()) proceedToNextInQueue();
+        else super.onBackPressed();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            if (registrationQueue != null && !registrationQueue.isEmpty()) proceedToNextInQueue();
+            else finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

@@ -12,13 +12,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class StockAdjustmentActivity extends BaseActivity {
 
@@ -31,7 +26,8 @@ public class StockAdjustmentActivity extends BaseActivity {
     private Product selectedProduct;
     private ProductRepository productRepository;
 
-    private static final int FLOOR_LEVEL = 1;
+    // FIX: Floor level MUST be 0. A product can completely run out or be entirely damaged.
+    private static final int FLOOR_LEVEL = 0;
     private static final int MAX_STOCK = 99999;
 
     @Override
@@ -88,13 +84,11 @@ public class StockAdjustmentActivity extends BaseActivity {
     }
 
     private void setupSpinners() {
-        // Adjustment Type Spinner - Simple Add or Remove
         String[] adjustmentTypes = {"Add Stock", "Remove Stock"};
         ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, adjustmentTypes);
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAdjustmentType.setAdapter(typeAdapter);
 
-        // Reason Spinner
         String[] reasons = {
                 "Purchase/Receiving",
                 "Sales Return",
@@ -117,22 +111,19 @@ public class StockAdjustmentActivity extends BaseActivity {
             productNames.add("Select Product");
 
             if (products != null) {
-                // 1. Filter out inactive products
                 List<Product> activeProducts = new ArrayList<>();
                 for (Product p : products) {
-                    if (p != null && p.isActive()) {
+                    if (p != null && p.isActive() && !"Menu".equalsIgnoreCase(p.getProductType())) {
                         activeProducts.add(p);
                     }
                 }
 
-                // 2. Sort Alphabetically (A to Z)
                 java.util.Collections.sort(activeProducts, (p1, p2) -> {
                     String name1 = p1.getProductName() != null ? p1.getProductName() : "";
                     String name2 = p2.getProductName() != null ? p2.getProductName() : "";
-                    return name1.compareToIgnoreCase(name2); // Ascending order
+                    return name1.compareToIgnoreCase(name2);
                 });
 
-                // 3. Populate the lists for the Spinner
                 for (Product p : activeProducts) {
                     productList.add(p);
                     productNames.add(p.getProductName());
@@ -150,14 +141,14 @@ public class StockAdjustmentActivity extends BaseActivity {
     private void calculateNewStock() {
         if (selectedProduct == null) {
             tvNewStock.setText("0");
-            tvNewStock.setTextColor(getResources().getColor(R.color.defaultColor));
+            tvNewStock.setTextColor(getResources().getColor(R.color.primary));
             return;
         }
 
         String quantityStr = etQuantity.getText().toString().trim();
         if (quantityStr.isEmpty()) {
             tvNewStock.setText(String.valueOf(selectedProduct.getQuantity()));
-            tvNewStock.setTextColor(getResources().getColor(R.color.defaultColor));
+            tvNewStock.setTextColor(getResources().getColor(R.color.text_secondary));
             return;
         }
 
@@ -166,20 +157,16 @@ public class StockAdjustmentActivity extends BaseActivity {
             int adjustmentQty = Integer.parseInt(quantityStr);
             String adjustmentType = spinnerAdjustmentType.getSelectedItem().toString();
 
-            // Calculate new stock based on adjustment type
             int newStock;
             if ("Add Stock".equals(adjustmentType)) {
                 newStock = currentStock + adjustmentQty;
             } else {
-                // Remove Stock
                 newStock = currentStock - adjustmentQty;
             }
 
-            // Ensure stock doesn't go below floor level
-            int finalStock = Math.max(FLOOR_LEVEL, newStock);
-            tvNewStock.setText(String.valueOf(finalStock));
+            // Allow the visual calculation to show a negative number so the user knows they made a mistake
+            tvNewStock.setText(String.valueOf(newStock));
 
-            // Color coding for visual feedback
             if (newStock < FLOOR_LEVEL) {
                 tvNewStock.setTextColor(getResources().getColor(R.color.errorRed));
             } else {
@@ -187,18 +174,16 @@ public class StockAdjustmentActivity extends BaseActivity {
             }
         } catch (NumberFormatException e) {
             tvNewStock.setText(String.valueOf(selectedProduct.getQuantity()));
-            tvNewStock.setTextColor(getResources().getColor(R.color.defaultColor));
+            tvNewStock.setTextColor(getResources().getColor(R.color.accent_primary));
         }
     }
 
     private void performAdjustment() {
-        // Validate product selected
         if (selectedProduct == null) {
             Toast.makeText(this, "Please select a product", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Validate quantity input
         String quantityStr = etQuantity.getText().toString().trim();
         if (quantityStr.isEmpty()) {
             etQuantity.setError("Quantity required");
@@ -218,32 +203,21 @@ public class StockAdjustmentActivity extends BaseActivity {
 
             int currentStock = selectedProduct.getQuantity();
 
-            // Calculate new stock
             int newStock;
             if ("Add Stock".equals(adjustmentType)) {
                 newStock = currentStock + adjustmentQty;
             } else {
-                // Remove Stock
                 newStock = currentStock - adjustmentQty;
             }
 
-            // Cap at max stock value
             newStock = Math.min(newStock, MAX_STOCK);
 
+            // FIX: If they try to deduct more than what exists, block the transaction entirely.
             if (newStock < FLOOR_LEVEL) {
-                int finalCurrentStock = currentStock;
-                int finalNewStock = newStock;
-                int finalAdjustmentQty = adjustmentQty;
-                String finalAdjustmentType = adjustmentType;
-                String finalReason = reason;
-                String finalRemarks = remarks;
-
                 new AlertDialog.Builder(this)
-                        .setTitle("Warning - Stock Below Floor Level")
-                        .setMessage("This adjustment will result in stock (" + finalNewStock + ") below the minimum floor level (" + FLOOR_LEVEL + ").\n\nDo you want to continue?")
-                        .setPositiveButton("Continue", (dialog, which) ->
-                                saveAdjustment(finalAdjustmentType, finalAdjustmentQty, finalCurrentStock, finalNewStock, finalReason, finalRemarks))
-                        .setNegativeButton("Cancel", null)
+                        .setTitle("Invalid Adjustment")
+                        .setMessage("You cannot remove " + adjustmentQty + " items. You only have " + currentStock + " in stock.")
+                        .setPositiveButton("OK", null)
                         .show();
             } else {
                 saveAdjustment(adjustmentType, adjustmentQty, currentStock, newStock, reason, remarks);
@@ -254,13 +228,12 @@ public class StockAdjustmentActivity extends BaseActivity {
     }
 
     private void saveAdjustment(String adjustmentType, int adjustmentQty, int currentStock, int newStock, String reason, String remarks) {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
+        String userId = AuthManager.getInstance().getCurrentUserId();
+        if (userId == null || userId.isEmpty()) {
             Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String userId = currentUser.getUid();
         com.google.firebase.database.DatabaseReference ref = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("StockAdjustments");
         String adjustmentId = ref.push().getKey();
 
@@ -269,10 +242,6 @@ public class StockAdjustmentActivity extends BaseActivity {
             return;
         }
 
-        // Ensure final stock is within bounds
-        int finalNewStock = Math.max(FLOOR_LEVEL, Math.min(newStock, MAX_STOCK));
-
-        // Create StockAdjustment record
         StockAdjustment adjustment = new StockAdjustment(
                 adjustmentId,
                 selectedProduct.getProductId(),
@@ -280,18 +249,16 @@ public class StockAdjustmentActivity extends BaseActivity {
                 adjustmentType,
                 currentStock,
                 adjustmentQty,
-                finalNewStock,
+                newStock,
                 reason,
                 remarks,
                 System.currentTimeMillis(),
                 userId
         );
 
-        // IMPORTANT: Update the Inventory quantity FIRST to guarantee it reflects on the dashboard
-        productRepository.updateProductQuantity(selectedProduct.getProductId(), finalNewStock, new ProductRepository.OnProductUpdatedListener() {
+        productRepository.updateProductQuantity(selectedProduct.getProductId(), newStock, new ProductRepository.OnProductUpdatedListener() {
             @Override
             public void onProductUpdated() {
-                // Stock successfully updated in Inventory! Now save the history log.
                 ref.child(adjustmentId).setValue(adjustment)
                         .addOnSuccessListener(aVoid -> {
                             runOnUiThread(() -> {

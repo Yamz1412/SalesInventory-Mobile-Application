@@ -50,7 +50,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:weightSum="2"
-            android:layout_marginBottom="15dp">
+            android:layout_marginBottom="20dp">
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/CustomTextInputLayout"
@@ -64,7 +64,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="?attr/colorOnBackground"
-                    android:hint="Product Group" />
+                    android:hint="Product Category" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <LinearLayout
@@ -83,6 +83,60 @@
             </LinearLayout>
         </LinearLayout>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Select Product Type:"
+            android:textStyle="bold"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/rgProductType"
+            android:layout_width="match_parent"
+            android:layout_height="45dp"
+            android:orientation="horizontal"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#E0E0E0"
+            android:padding="2dp"
+            android:layout_marginBottom="20dp"
+            android:weightSum="3">
+
+            <RadioButton
+                android:id="@+id/rbTypeInventory"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:button="@null"
+                android:gravity="center"
+                android:text="Inventory"
+                android:textColor="@color/black"
+                android:background="@drawable/selector_tab_background"
+                android:checked="true"/>
+
+            <RadioButton
+                android:id="@+id/rbTypeSales"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:button="@null"
+                android:gravity="center"
+                android:text="Sales"
+                android:textColor="@color/black"
+                android:background="@drawable/selector_tab_background"/>
+
+            <RadioButton
+                android:id="@+id/rbTypeBoth"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:button="@null"
+                android:gravity="center"
+                android:text="Both (Bulk)"
+                android:textColor="@color/black"
+                android:background="@drawable/selector_tab_background"/>
+        </RadioGroup>
+
         <LinearLayout
             android:id="@+id/layout_buying_unit_qty_critical"
             android:layout_width="match_parent"
@@ -93,7 +147,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:weightSum="2">
+                android:weightSum="1">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/CustomTextInputLayout"
@@ -109,24 +163,7 @@
                         android:layout_height="wrap_content"
                         android:inputType="numberDecimal"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Cost" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/CustomTextInputLayout"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginBottom="15dp">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/minPrice"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Price" />
+                        android:hint="Total Inventory Cost (₱)" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
@@ -148,9 +185,9 @@
                         android:id="@+id/quantityET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="number"
+                        android:inputType="numberDecimal"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Stocks" />
+                        android:hint="Inventory Stock" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -165,17 +202,18 @@
                         android:id="@+id/lowStockLevelET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="number"
+                        android:inputType="numberDecimal"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Low Stock Level" />
+                        android:hint="Low Stock Alert Level" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Unit of Measurement"
+                android:text="Inventory Unit of Measurement (e.g. kg, L)"
                 android:textColor="?attr/colorOnBackground"
+                android:textStyle="bold"
                 android:layout_marginBottom="5dp" />
 
             <LinearLayout
@@ -195,6 +233,24 @@
         </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layoutPiecesPerUnit"
+            style="@style/CustomTextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="15dp"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/piecesPerUnitET"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:textColor="?attr/colorOnBackground"
+                android:hint="How many pieces are inside this Box/Pack?" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/layoutSellingPrice"
             style="@style/CustomTextInputLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -206,8 +262,117 @@
                 android:layout_height="wrap_content"
                 android:inputType="numberDecimal"
                 android:textColor="?attr/colorOnBackground"
-                android:hint="Selling Price" />
+                android:hint="Selling Price per Sale (₱)" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutConfigurations"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp"
+            android:padding="12dp"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#F8F9FA">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Menu Configurations (Optional)"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="12dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="5">
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Variants" android:textSize="12sp" android:textStyle="bold" android:textColor="?attr/colorPrimary"/>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchVariants" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp"/>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp"/>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes" android:textSize="12sp"/>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
+                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutDeduction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#F0F8FF"
+            android:padding="12dp"
+            android:layout_marginBottom="15dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sales Measurement (What gets deducted per sale)"
+                android:textColor="?attr/colorPrimary"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_weight="1.2"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/deductionAmountET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Amount (e.g. 100)" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="55dp"
+                    android:layout_weight="0.8"
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="@color/dirtyWhite"
+                    android:layout_marginTop="4dp"
+                    android:padding="5dp">
+
+                    <Spinner
+                        android:id="@+id/salesUnitSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:spinnerMode="dropdown"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/CustomTextInputLayout"
@@ -226,119 +391,16 @@
                 android:hint="Expiry Date (optional, DD/MM/YYYY)" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchForSaleOnly"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="10dp"
-            android:gravity="center"
-            android:weightSum="3">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp"/>
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchAddons"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="16dp"
-                android:padding="12dp"
-                android:background="@drawable/edite_round"
-                android:backgroundTint="#F8F9FA">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Product Configurations"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
-                    android:layout_marginBottom="12dp"/>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:weightSum="4">
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp"/>
-                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp"/>
-                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes" android:textSize="12sp"/>
-                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
-                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                    </LinearLayout>
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes" android:textSize="12sp"/>
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchNotes"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textSize="12sp"/>
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchBOM"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
+            android:visibility="gone"/>
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchFractional"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="25dp"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Non-Inventory / For Sale Only"
-                android:textSize="16sp"
-                android:textColor="?attr/colorOnBackground" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchForSaleOnly"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+            android:visibility="gone"/>
 
         <LinearLayout
             android:layout_width="match_parent"

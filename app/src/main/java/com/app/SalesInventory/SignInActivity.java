@@ -89,11 +89,13 @@ public class SignInActivity extends BaseActivity {
                                     }
                                 }
                             });
+                        } else {
+                            clearRememberedUser();
                         }
                     }
                 });
             } else {
-                proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
+                clearRememberedUser();
             }
         }
     }
@@ -161,21 +163,19 @@ public class SignInActivity extends BaseActivity {
                             FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                         }
 
-                        if (!approved) {
-                            cb.onProceed(false);
-                            Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
-                            Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
-                            startActivity(intent);
-                            finish();
-                            return;
-                        }
-
-                        // CLEAR SINGLETON & LOCAL CACHES BEFORE LOADING TO PREVENT DATA LEAKS ACROSS ACCOUNTS
                         ProductRepository.getInstance(getApplication()).clearLocalData();
                         SalesRepository.getInstance(getApplication()).clearData();
 
                         if ("Admin".equalsIgnoreCase(role)) {
+                            // =========================================================
+                            // ADMIN LOGIN LOGIC
+                            // =========================================================
                             if (reloaded.isEmailVerified()) {
+                                // If Admin has verified email, auto-approve them in the database!
+                                if (!approved) {
+                                    fStore.collection("users").document(uid).update("approved", true);
+                                }
+
                                 applyRemoteTheme(userSnap);
                                 updateUserProfileFromAuth(reloaded, userSnap);
                                 FirestoreManager.getInstance().updateCurrentUserId(uid);
@@ -191,18 +191,8 @@ public class SignInActivity extends BaseActivity {
                                     clearRememberedUser();
                                 }
 
-                                // -------------------------------------------------------------
-                                // CHECK IF BUSINESS SETUP IS COMPLETE (Routes to Business Setup)
-                                // -------------------------------------------------------------
-                                String businessName = finalAdminSnap != null ? finalAdminSnap.getString("businessName") : null;
-                                if (businessName == null || businessName.isEmpty()) {
-                                    Intent intent = new Intent(getApplicationContext(), BusinessSetupActivity.class);
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                    startActivity(intent);
-                                    finish();
-                                    return;
-                                }
-
+                                // FIX: Removed the BusinessSetupActivity redirection completely.
+                                // Users will now go straight to the MainActivity Dashboard.
                                 proceedToMainActivityOffline(uid, uid);
                                 cb.onProceed(true);
                             } else {
@@ -211,6 +201,19 @@ public class SignInActivity extends BaseActivity {
                                 cb.onProceed(false);
                             }
                         } else {
+                            // =========================================================
+                            // STAFF LOGIN LOGIC
+                            // =========================================================
+                            if (!approved) {
+                                // Staff must wait for explicit Admin approval
+                                cb.onProceed(false);
+                                Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
+                                Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
+                                startActivity(intent);
+                                finish();
+                                return;
+                            }
+
                             applyRemoteTheme(userSnap);
                             updateUserProfileFromAuth(reloaded, userSnap);
                             FirestoreManager.getInstance().updateCurrentUserId(uid);
@@ -289,16 +292,44 @@ public class SignInActivity extends BaseActivity {
         editor.apply();
     }
 
+    // =========================================================================================
+    // SMART LOGIN (Recognizes Email vs Username)
+    // =========================================================================================
     public void SingInB(View view) {
-        String email = Email.getText().toString().trim();
+        String input = Email.getText().toString().trim();
         String password = Password.getText().toString().trim();
 
-        if (TextUtils.isEmpty(email)) { Email.setError("Email is Required"); return; }
+        if (TextUtils.isEmpty(input)) { Email.setError("Email or Username is Required"); return; }
         if (TextUtils.isEmpty(password)) { Password.setError("Password is Required"); return; }
         if (password.length() < 6) { Password.setError("Password Must be 6 Characters or More"); return; }
 
         progressBar.setVisibility(View.VISIBLE);
 
+        if (!input.contains("@")) {
+            // USER TYPED A USERNAME - Let's find the matching email in Firestore
+            String usernameLower = input.toLowerCase();
+            fStore.collection("users").whereEqualTo("username", usernameLower).get().addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                    // Found the username! Extract the attached email
+                    String fetchedEmail = task.getResult().getDocuments().get(0).getString("email");
+                    if (fetchedEmail != null) {
+                        performFirebaseAuthLogin(fetchedEmail, password);
+                    } else {
+                        progressBar.setVisibility(View.INVISIBLE);
+                        Toast.makeText(SignInActivity.this, "Error: Account has no email linked", Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    progressBar.setVisibility(View.INVISIBLE);
+                    Toast.makeText(SignInActivity.this, "Username not found", Toast.LENGTH_LONG).show();
+                }
+            });
+        } else {
+            // USER TYPED AN EMAIL
+            performFirebaseAuthLogin(input, password);
+        }
+    }
+
+    private void performFirebaseAuthLogin(String email, String password) {
         fAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {

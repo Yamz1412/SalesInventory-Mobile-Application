@@ -4,7 +4,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground">
+    android:background="@color/info_primary"
+    >
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -105,7 +106,8 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:paddingHorizontal="12dp"
-            android:paddingTop="12dp">
+            android:paddingTop="12dp"
+            android:weightSum="2">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_add_product"
@@ -113,8 +115,19 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="+ Add Product"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="4dp"
                 style="@style/CustomButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_adjust_stock"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Adjust Stock"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="?attr/colorPrimary"
+                android:textColor="?attr/colorPrimary" />
 
         </LinearLayout>
 

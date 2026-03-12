@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="8dp"
+    android:weightSum="7"> <androidx.cardview.widget.CardView
+    android:layout_width="0dp"
+    android:layout_height="48dp"
+    android:layout_weight="1"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="0dp"
+    android:layout_marginEnd="6dp"
+    app:cardBackgroundColor="#EEEEEE">
+    <ImageView
+        android:id="@+id/ivProductEntryImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/ic_image_placeholder"
+        android:scaleType="centerCrop"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Product Image" />
+</androidx.cardview.widget.CardView>
+
+    <EditText
+        android:id="@+id/etProductNameEntry"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="2.5"
+        android:hint="Product Name"
+        android:textSize="13sp"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:layout_marginEnd="4dp"
+        android:inputType="textCapWords" />
+
+    <EditText
+        android:id="@+id/etProductQty"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:hint="Qty"
+        android:textSize="13sp"
+        android:inputType="number"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:layout_marginEnd="4dp"/>
+
+    <EditText
+        android:id="@+id/etProductCost"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:hint="Cost ₱"
+        android:textSize="13sp"
+        android:inputType="numberDecimal"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:layout_marginEnd="4dp"/>
+
+    <Spinner
+        android:id="@+id/spinnerProductUnit"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_weight="1"
+        android:background="@drawable/edite_round"
+        android:layout_marginEnd="4dp"/>
+
+    <ImageButton
+        android:id="@+id/btnDeleteProductRow"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:src="@android:drawable/ic_menu_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        app:tint="@color/errorRed"/>
+</LinearLayout>

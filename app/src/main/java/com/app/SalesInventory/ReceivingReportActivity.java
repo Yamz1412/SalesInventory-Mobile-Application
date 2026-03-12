@@ -1,14 +1,15 @@
 package com.app.SalesInventory;
 
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
-import android.os.Bundle;
-import android.view.View;
-import android.widget.ProgressBar;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -16,22 +17,23 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 public class ReceivingReportActivity extends BaseActivity {
 
-    private RecyclerView recyclerView;
+    private TextView tvSummary, tvNoData;
     private ProgressBar progressBar;
-    private TextView tvNoData, tvSummary;
-    private ReceivingReportAdapter adapter;
-    private List<PurchaseOrder> purchaseOrderList;
+    private RecyclerView recyclerViewReceiving;
+
     private DatabaseReference poRef;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-    private NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("en", "PH"));
+    private String currentOwnerId;
+    private List<PurchaseOrder> receivedPOList = new ArrayList<>();
+    private ReceivingAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,71 +45,66 @@ public class ReceivingReportActivity extends BaseActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        initializeViews();
-        loadData();
-    }
-
-    private void initializeViews() {
-        recyclerView = findViewById(R.id.recyclerViewReceiving);
-        progressBar = findViewById(R.id.progressBar);
-        tvNoData = findViewById(R.id.tvNoData);
-        tvSummary = findViewById(R.id.tvSummary);
-
-        purchaseOrderList = new ArrayList<>();
-        adapter = new ReceivingReportAdapter(purchaseOrderList, dateFormat, currencyFormat);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
-
+        currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
+
+        tvSummary = findViewById(R.id.tvSummary);
+        tvNoData = findViewById(R.id.tvNoData);
+        progressBar = findViewById(R.id.progressBar);
+        recyclerViewReceiving = findViewById(R.id.recyclerViewReceiving);
+
+        recyclerViewReceiving.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new ReceivingAdapter();
+        recyclerViewReceiving.setAdapter(adapter);
+
+        loadReceivingData();
     }
 
-    private void loadData() {
+    private void loadReceivingData() {
         progressBar.setVisibility(View.VISIBLE);
-        tvNoData.setVisibility(View.GONE);
-
         poRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                purchaseOrderList.clear();
-                double totalReceivedAmount = 0;
-                int receivedCount = 0;
-                int pendingCount = 0;
+                receivedPOList.clear();
+                double totalSpent = 0.0;
+                int totalOrders = 0;
 
                 for (DataSnapshot ds : snapshot.getChildren()) {
                     PurchaseOrder po = ds.getValue(PurchaseOrder.class);
-                    if (po != null) {
-                        if (po.getPoId() == null || po.getPoId().isEmpty()) {
-                            po.setPoId(ds.getKey());
-                        }
-                        purchaseOrderList.add(po);
-                        if ("Received".equalsIgnoreCase(po.getStatus())) {
-                            totalReceivedAmount += po.getTotalAmount();
-                            receivedCount++;
-                        } else if ("Pending".equalsIgnoreCase(po.getStatus())) {
-                            pendingCount++;
+                    if (po != null && currentOwnerId.equals(po.getOwnerAdminId())) {
+
+                        // FIXED: Use STATUS_RECEIVED instead of STATUS_DELIVERED
+                        if (PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(po.getStatus()) ||
+                                PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
+                            receivedPOList.add(po);
+                            totalSpent += po.getTotalAmount();
+                            totalOrders++;
                         }
                     }
                 }
 
-                progressBar.setVisibility(View.GONE);
-                adapter.notifyDataSetChanged();
+                // FIXED: Safely compare Date objects by converting them to milliseconds
+                Collections.sort(receivedPOList, (a, b) -> Long.compare(
+                        b.getOrderDate() != null ? b.getOrderDate().getTime() : 0L,
+                        a.getOrderDate() != null ? a.getOrderDate().getTime() : 0L
+                ));
 
-                if (purchaseOrderList.isEmpty()) {
+                tvSummary.setText(String.format(Locale.US, "Summary: %d Orders Received | Total Value: ₱%,.2f", totalOrders, totalSpent));
+                progressBar.setVisibility(View.GONE);
+
+                if (receivedPOList.isEmpty()) {
                     tvNoData.setVisibility(View.VISIBLE);
-                    tvSummary.setText("No purchase orders found.");
+                    recyclerViewReceiving.setVisibility(View.GONE);
                 } else {
                     tvNoData.setVisibility(View.GONE);
-                    String summary = "Received: " + receivedCount +
-                            "   Pending: " + pendingCount +
-                            "   Total Amount: " + currencyFormat.format(totalReceivedAmount);
-                    tvSummary.setText(summary);
+                    recyclerViewReceiving.setVisibility(View.VISIBLE);
+                    adapter.notifyDataSetChanged();
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 progressBar.setVisibility(View.GONE);
-                Toast.makeText(ReceivingReportActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -118,67 +115,58 @@ public class ReceivingReportActivity extends BaseActivity {
         return true;
     }
 
-    public static class ReceivingReportAdapter extends RecyclerView.Adapter<ReceivingReportAdapter.ViewHolder> {
-
-        private List<PurchaseOrder> data;
-        private SimpleDateFormat dateFormat;
-        private NumberFormat currencyFormat;
-
-        public ReceivingReportAdapter(List<PurchaseOrder> data, SimpleDateFormat dateFormat, NumberFormat currencyFormat) {
-            this.data = data;
-            this.dateFormat = dateFormat;
-            this.currencyFormat = currencyFormat;
-        }
+    private class ReceivingAdapter extends RecyclerView.Adapter<ReceivingAdapter.ViewHolder> {
+        private SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
 
         @NonNull
         @Override
-        public ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
-            android.view.View view = android.view.LayoutInflater.from(parent.getContext()).inflate(R.layout.item_receiving_report_row, parent, false);
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_receiving_report_row, parent, false);
             return new ViewHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            PurchaseOrder po = data.get(position);
-
-            // FIXED: getOrderDate() is already a Date object
-            String dateStr = po.getOrderDate() != null ? dateFormat.format(po.getOrderDate()) : "Unknown";
+            PurchaseOrder po = receivedPOList.get(position);
 
             holder.tvPoNumber.setText(po.getPoNumber());
             holder.tvSupplier.setText(po.getSupplierName());
-            holder.tvDate.setText(dateStr);
-            holder.tvStatus.setText(po.getStatus());
-            holder.tvTotalAmount.setText(currencyFormat.format(po.getTotalAmount()));
 
-            int color;
-            String status = po.getStatus() != null ? po.getStatus() : "";
-            if ("Received".equalsIgnoreCase(status)) {
-                color = holder.itemView.getContext().getResources().getColor(R.color.successGreen);
-            } else if ("Pending".equalsIgnoreCase(status)) {
-                color = holder.itemView.getContext().getResources().getColor(R.color.warningYellow);
-            } else if ("Cancelled".equalsIgnoreCase(status)) {
-                color = holder.itemView.getContext().getResources().getColor(R.color.errorRed);
+            // FIXED: Safely format the Date directly
+            if (po.getOrderDate() != null) {
+                holder.tvDate.setText(sdf.format(po.getOrderDate()));
             } else {
-                color = holder.itemView.getContext().getResources().getColor(R.color.textColorSecondary);
+                holder.tvDate.setText("Unknown Date");
             }
-            holder.tvStatus.setTextColor(color);
+
+            holder.tvTotalAmount.setText(String.format(Locale.US, "₱%,.2f", po.getTotalAmount()));
+            holder.tvStatus.setText(po.getStatus() != null ? po.getStatus().toUpperCase() : "UNKNOWN");
+
+            // FIXED: Properly apply colors based on RECEIVED vs PARTIAL
+            if (PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
+                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
+            } else if (PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(po.getStatus())) {
+                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
+            } else {
+                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+            }
         }
 
         @Override
         public int getItemCount() {
-            return data.size();
+            return receivedPOList.size();
         }
 
-        public static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvPoNumber, tvSupplier, tvDate, tvStatus, tvTotalAmount;
+        class ViewHolder extends RecyclerView.ViewHolder {
+            TextView tvPoNumber, tvSupplier, tvDate, tvTotalAmount, tvStatus;
 
-            public ViewHolder(@NonNull android.view.View itemView) {
+            ViewHolder(View itemView) {
                 super(itemView);
                 tvPoNumber = itemView.findViewById(R.id.tvPoNumber);
                 tvSupplier = itemView.findViewById(R.id.tvSupplier);
                 tvDate = itemView.findViewById(R.id.tvDate);
-                tvStatus = itemView.findViewById(R.id.tvStatus);
                 tvTotalAmount = itemView.findViewById(R.id.tvTotalAmount);
+                tvStatus = itemView.findViewById(R.id.tvStatus);
             }
         }
     }

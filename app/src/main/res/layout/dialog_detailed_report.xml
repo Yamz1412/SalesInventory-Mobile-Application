@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@android:color/white">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Detailed Operations Report"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:layout_marginBottom="16dp"
+        android:gravity="center" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Products Sold &amp; Current Stock"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:layout_marginBottom="8dp"/>
+            <TextView
+                android:id="@+id/tvDetailedProducts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#444444"
+                android:textSize="14sp"
+                android:layout_marginBottom="20dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Damages &amp; Stock Deductions"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:layout_marginBottom="8dp"/>
+            <TextView
+                android:id="@+id/tvDetailedDamages"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No damages recorded."
+                android:textColor="#D32F2F"
+                android:textSize="14sp"
+                android:layout_marginBottom="20dp"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Missing / Partial Deliveries (PO)"
+                android:textStyle="bold"
+                android:textColor="@color/black"
+                android:textSize="16sp"
+                android:layout_marginBottom="8dp"/>
+            <TextView
+                android:id="@+id/tvDetailedPOs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No partial deliveries."
+                android:textColor="#F57C00"
+                android:textSize="14sp"
+                android:layout_marginBottom="16dp"/>
+        </LinearLayout>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnCloseDetailed"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="Close Report"
+        android:layout_marginTop="10dp"
+        style="@style/Widget.MaterialComponents.Button.TextButton" />
+</LinearLayout>

@@ -1,73 +1,80 @@
 package com.app.SalesInventory;
 
-import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-
+import androidx.appcompat.widget.Toolbar;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.os.Bundle;
-import android.widget.ListView;
+import android.view.MenuItem;
 import android.widget.Toast;
-
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
-import com.google.firebase.database.ValueEventListener;
-
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-public class History extends AppCompatActivity {
+public class History extends BaseActivity {
 
-    DatabaseReference databaseReference;
-    ListView listView;
-    ArrayList<Product> arrayList = new ArrayList<>();
-    private HistoryAdapter historyAdapter;
-
-    FirebaseAuth fAuth;
-    String UserId;
+    private RecyclerView recyclerView;
+    private HistoryAdapter adapter;
+    private List<Sales> salesList = new ArrayList<>();
+    private SalesRepository salesRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_history);
 
-        databaseReference = FirebaseDatabase.getInstance().getReference("History");
-        listView = findViewById(R.id.ProductList2);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-        fAuth = FirebaseAuth.getInstance();
+        recyclerView = findViewById(R.id.recyclerViewHistory);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        if (fAuth.getCurrentUser() == null) {
-            return;
-        }
+        salesRepository = SalesInventoryApplication.getSalesRepository();
 
-        UserId = fAuth.getCurrentUser().getUid();
+        adapter = new HistoryAdapter(this, salesList, sale -> confirmVoidSale(sale));
+        recyclerView.setAdapter(adapter);
 
-        historyAdapter = new HistoryAdapter(this, arrayList);
-        listView.setAdapter(historyAdapter);
+        loadSalesHistory();
+    }
 
-        Query query = databaseReference.orderByChild("userId").equalTo(UserId);
-        query.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                arrayList.clear();
-                for (DataSnapshot ds : dataSnapshot.getChildren()) {
-                    try {
-                        Product product = ds.getValue(Product.class);
-                        if (product != null) {
-                            arrayList.add(product);
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-                historyAdapter.notifyDataSetChanged();
-            }
+    private void loadSalesHistory() {
+        salesRepository.getAllSales().observe(this, sales -> {
+            if (sales != null) {
+                salesList.clear();
+                salesList.addAll(sales);
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                Toast.makeText(History.this, "Error: " + databaseError.getMessage(), Toast.LENGTH_SHORT).show();
+                // Sort by newest first
+                Collections.sort(salesList, (s1, s2) -> Long.compare(s2.getTimestamp(), s1.getTimestamp()));
+                adapter.notifyDataSetChanged();
             }
         });
+    }
+
+    private void confirmVoidSale(Sales sale) {
+        new AlertDialog.Builder(this)
+                .setTitle("Void Transaction")
+                .setMessage("Are you sure you want to VOID this sale?\n\nThis will return the stock to inventory and deduct the total from your cash/wallet.")
+                .setPositiveButton("VOID", (dialog, which) -> {
+                    salesRepository.voidSale(sale, new SalesRepository.OnSaleVoidedListener() {
+                        @Override
+                        public void onSuccess() {
+                            Toast.makeText(History.this, "Sale Voided. Stock Returned.", Toast.LENGTH_LONG).show();
+                        }
+                        @Override
+                        public void onError(String error) {
+                            Toast.makeText(History.this, "Failed to void: " + error, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) { finish(); return true; }
+        return super.onOptionsItemSelected(item);
     }
 }

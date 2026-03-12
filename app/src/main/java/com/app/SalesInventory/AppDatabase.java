@@ -8,7 +8,8 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 7, exportSchema = true)
+// CHANGED: version is bumped to 10 to force the destructive migration!
+@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 10, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
 
@@ -32,8 +33,8 @@ public abstract class AppDatabase extends RoomDatabase {
                                     "sales_inventory_db"
                             )
                             .addMigrations(MIGRATION_6_7)
-                            // Allowing main thread queries is generally bad practice,
-                            // but often used in simple apps. Keeping default behavior.
+                            // NEW: This prevents the app from crashing when you add new fields!
+                            .fallbackToDestructiveMigration()
                             .build();
                 }
             }
@@ -41,7 +42,6 @@ public abstract class AppDatabase extends RoomDatabase {
         return INSTANCE;
     }
 
-    // --- ADDED: Method to cleanly close and reset the database ---
     public static void closeDatabase() {
         if (INSTANCE != null) {
             if (INSTANCE.isOpen()) {
@@ -50,7 +50,6 @@ public abstract class AppDatabase extends RoomDatabase {
             INSTANCE = null;
         }
     }
-    // -------------------------------------------------------------
 
     public static void resetInstance() {
         INSTANCE = null;

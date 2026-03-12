@@ -67,6 +67,7 @@
                     android:text="Cost: ₱0.00"
                     android:textSize="12sp"
                     android:textColor="?attr/colorOnBackground"
+                    android:visibility="gone"
                     android:alpha="0.7" />
             </LinearLayout>
 
