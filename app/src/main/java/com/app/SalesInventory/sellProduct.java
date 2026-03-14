@@ -105,7 +105,6 @@ public class sellProduct extends BaseActivity {
     private String cachedBusinessName = "Store Name";
     private String cachedBusinessLogoUrl = null;
 
-    // NEW: Background cache of your inventory to deduct materials silently
     private List<Product> cachedInventoryList = new ArrayList<>();
 
     @Override
@@ -134,7 +133,6 @@ public class sellProduct extends BaseActivity {
         );
         productRepository.registerCriticalStockListener(criticalListener);
 
-        // Cache inventory silently for quick offline BOM deductions
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 cachedInventoryList.clear();
@@ -678,6 +676,32 @@ public class sellProduct extends BaseActivity {
         fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
     }
 
+    // --- NEW: BLUETOOTH PRINTER CHECK ---
+    @android.annotation.SuppressLint("MissingPermission")
+    private boolean isBluetoothPrinterConnected() {
+        try {
+            android.bluetooth.BluetoothAdapter adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null || !adapter.isEnabled()) return false;
+
+            java.util.Set<android.bluetooth.BluetoothDevice> pairedDevices = adapter.getBondedDevices();
+            if (pairedDevices != null) {
+                for (android.bluetooth.BluetoothDevice device : pairedDevices) {
+                    if (device.getBluetoothClass() != null) {
+                        int majorClass = device.getBluetoothClass().getMajorDeviceClass();
+                        // 1536 is the standard Class for IMAGING (Printers & Scanners)
+                        if (majorClass == android.bluetooth.BluetoothClass.Device.Major.IMAGING) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Silently fail if permissions aren't properly granted by user yet
+            return false;
+        }
+        return false;
+    }
+
     private void showReceiptDialogWithFetch(String orderId, String paymentMethod, boolean isDelivery,
                                             String dName, String dPhone, String dAddr, String dPay,
                                             Map<String, String> enrichedNames) {
@@ -766,7 +790,18 @@ public class sellProduct extends BaseActivity {
             if (layoutChange != null) layoutChange.setVisibility(View.GONE);
         }
 
-        if (btnPrint != null) btnPrint.setVisibility(View.GONE);
+        // --- NEW: Toggle Print Button based on Bluetooth status ---
+        if (btnPrint != null) {
+            if (isBluetoothPrinterConnected()) {
+                btnPrint.setVisibility(View.VISIBLE);
+                btnPrint.setOnClickListener(v -> {
+                    Toast.makeText(this, "Connecting to Bluetooth Printer...", Toast.LENGTH_SHORT).show();
+                    // Future Implementation: Trigger your ESC/POS printing library here
+                });
+            } else {
+                btnPrint.setVisibility(View.GONE);
+            }
+        }
 
         if (btnFinalize != null) {
             btnFinalize.setOnClickListener(v -> {
@@ -802,7 +837,6 @@ public class sellProduct extends BaseActivity {
         });
     }
 
-    // --- HELPER: Handles internal material logic silently in the background ---
     private void deductFromMaterial(String materialName, double deductAmt, String bUnit) {
         if (materialName == null || materialName.isEmpty() || deductAmt <= 0) return;
 
@@ -816,35 +850,23 @@ public class sellProduct extends BaseActivity {
 
         if (material == null) return;
 
-        String mUnit = material.getUnit() != null ? material.getUnit().toLowerCase(Locale.ROOT) : "";
-        bUnit = bUnit != null ? bUnit.toLowerCase(Locale.ROOT) : "";
-        double mQty = material.getQuantity();
-        boolean mUnitChanged = false;
+        int ppu = material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
 
-        // 1. Convert base if needed
-        if (mUnit.equals("l") && (bUnit.equals("ml") || bUnit.equals("oz"))) {
-            mQty *= 1000.0; mUnit = "ml"; mUnitChanged = true;
-        } else if (mUnit.equals("kg") && bUnit.equals("g")) {
-            mQty *= 1000.0; mUnit = "g"; mUnitChanged = true;
-        } else if ((mUnit.equals("box") || mUnit.equals("pack")) && bUnit.equals("pcs")) {
-            mQty *= material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
-            mUnit = "pcs"; mUnitChanged = true;
-        }
+        Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(
+                material.getQuantity(), material.getUnit(), bUnit, ppu);
 
-        // 2. Adjust deduction amount mathematically
-        if (mUnit.equals("ml") && bUnit.equals("oz")) deductAmt *= 29.5735;
-        else if (mUnit.equals("ml") && bUnit.equals("l")) deductAmt *= 1000.0;
-        else if (mUnit.equals("g") && bUnit.equals("kg")) deductAmt *= 1000.0;
-        else if (mUnit.equals("pcs") && (bUnit.equals("box") || bUnit.equals("pack"))) {
-            deductAmt *= material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
-        } else if (mUnit.equals("oz") && bUnit.equals("ml")) deductAmt /= 29.5735;
+        double convertedQty = (double) conversion[0];
+        String newUnit = (String) conversion[1];
+        boolean mUnitChanged = (boolean) conversion[2];
 
-        int finalMQty = (int) Math.max(0, Math.ceil(mQty - deductAmt));
+        double finalDeductAmt = UnitConverterUtil.calculateDeductionAmount(
+                deductAmt, newUnit, bUnit, ppu);
 
-        // 3. Save Unit & Quantity Updates silently
+        int finalMQty = UnitConverterUtil.calculateNewStock(convertedQty, finalDeductAmt);
+
         if (mUnitChanged) {
             FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
-                    .document(material.getProductId()).update("unit", mUnit);
+                    .document(material.getProductId()).update("unit", newUnit);
         }
         productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
     }
@@ -902,31 +924,20 @@ public class sellProduct extends BaseActivity {
                     @Override
                     public void onSaleAdded(String saleId) {
                         if (p != null) {
+                            int ppu = p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
+                            double baseDeduct = (p.getDeductionAmount() > 0 ? p.getDeductionAmount() : 1.0) * item.quantity;
 
-                            // 1. MAIN INVENTORY DEDUCTION
-                            String invUnit = p.getUnit() != null ? p.getUnit().toLowerCase(Locale.ROOT) : "";
-                            String sUnit = p.getSalesUnit() != null ? p.getSalesUnit().toLowerCase(Locale.ROOT) : "";
-                            double invQty = p.getQuantity();
-                            double deductAmt = (p.getDeductionAmount() > 0 ? p.getDeductionAmount() : 1.0) * item.quantity;
-                            boolean unitChanged = false;
+                            Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(
+                                    p.getQuantity(), p.getUnit(), p.getSalesUnit(), ppu);
 
-                            if (invUnit.equals("l") && (sUnit.equals("ml") || sUnit.equals("oz"))) {
-                                invQty *= 1000.0; invUnit = "ml"; unitChanged = true;
-                            } else if (invUnit.equals("kg") && sUnit.equals("g")) {
-                                invQty *= 1000.0; invUnit = "g"; unitChanged = true;
-                            } else if ((invUnit.equals("box") || invUnit.equals("pack")) && sUnit.equals("pcs")) {
-                                invQty *= p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
-                                invUnit = "pcs"; unitChanged = true;
-                            }
+                            double convertedInvQty = (double) conversion[0];
+                            String invUnit = (String) conversion[1];
+                            boolean unitChanged = (boolean) conversion[2];
 
-                            if (invUnit.equals("ml") && sUnit.equals("oz")) deductAmt *= 29.5735;
-                            else if (invUnit.equals("ml") && sUnit.equals("l")) deductAmt *= 1000.0;
-                            else if (invUnit.equals("g") && sUnit.equals("kg")) deductAmt *= 1000.0;
-                            else if (invUnit.equals("pcs") && (sUnit.equals("box") || sUnit.equals("pack"))) {
-                                deductAmt *= p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
-                            } else if (invUnit.equals("oz") && sUnit.equals("ml")) deductAmt /= 29.5735;
+                            double finalDeductAmt = UnitConverterUtil.calculateDeductionAmount(
+                                    baseDeduct, invUnit, p.getSalesUnit(), ppu);
 
-                            int newQty = (int) Math.max(0, Math.ceil(invQty - deductAmt));
+                            int newQty = UnitConverterUtil.calculateNewStock(convertedInvQty, finalDeductAmt);
 
                             if (unitChanged) {
                                 FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
@@ -936,8 +947,6 @@ public class sellProduct extends BaseActivity {
                             productRepository.updateProductQuantity(item.productId, newQty, new ProductRepository.OnProductUpdatedListener() {
                                 @Override
                                 public void onProductUpdated() {
-
-                                    // 2. DEDUCT BOM (Raw Materials) SILENTLY
                                     if (p.getBomList() != null && !p.getBomList().isEmpty()) {
                                         for (Map<String, Object> bomItem : p.getBomList()) {
                                             String materialName = (String) bomItem.get("materialName");
@@ -954,20 +963,68 @@ public class sellProduct extends BaseActivity {
                                         }
                                     }
 
-                                    saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+                                    if (p.getVariantsList() != null && !p.getVariantsList().isEmpty()) {
+                                        for (Map<String, Object> variantItem : p.getVariantsList()) {
+                                            String variantName = (String) variantItem.get("variantName");
+
+                                            boolean isSelectedSize = (item.size != null && item.size.equalsIgnoreCase(variantName));
+                                            boolean isSelectedAddon = (item.addon != null && item.addon.equalsIgnoreCase(variantName));
+
+                                            if (isSelectedSize || isSelectedAddon) {
+                                                String linkedMaterial = (String) variantItem.get("linkedMaterial");
+                                                double vQty = 0;
+                                                if (variantItem.get("deductQty") instanceof Number) vQty = ((Number) variantItem.get("deductQty")).doubleValue();
+                                                else if (variantItem.get("deductQty") instanceof String) {
+                                                    try { vQty = Double.parseDouble((String) variantItem.get("deductQty")); } catch (Exception ignored) {}
+                                                }
+                                                String vUnit = (String) variantItem.get("unit");
+
+                                                if (vQty > 0 && linkedMaterial != null) {
+                                                    deductFromMaterial(linkedMaterial, vQty * item.quantity, vUnit);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (p.getSizesList() != null && !p.getSizesList().isEmpty()) {
+                                        for (Map<String, Object> sizeItem : p.getSizesList()) {
+                                            String sizeName = (String) sizeItem.get("name");
+
+                                            if (item.size != null && item.size.equalsIgnoreCase(sizeName)) {
+                                                String linkedMaterial = (String) sizeItem.get("linkedMaterial");
+                                                if (linkedMaterial != null && !linkedMaterial.isEmpty()) {
+                                                    deductFromMaterial(linkedMaterial, 1.0 * item.quantity, "pcs");
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod,
+                                            deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
                                 }
-                                @Override public void onError(String error) {
-                                    saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+
+                                @Override
+                                public void onError(String error) {
+                                    handleSaveError(error);
                                 }
                             });
                         } else {
-                            saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod, deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
+                            saveCartItemRecursively(index + 1, items, orderId, subtotal, now, paymentMethod,
+                                    deliveryType, deliveryStatus, deliveryDate, dName, dPhone, dAddr, dPay, enrichedNames);
                         }
                     }
-                    @Override public void onError(String error) { handleSaveError(error); }
+
+                    @Override
+                    public void onError(String error) {
+                        handleSaveError(error);
+                    }
                 });
             }
-            @Override public void onError(String error) { handleSaveError(error); }
+
+            @Override
+            public void onError(String error) {
+                handleSaveError(error);
+            }
         });
     }
 

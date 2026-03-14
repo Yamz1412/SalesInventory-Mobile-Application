@@ -4,17 +4,17 @@ public class StockMovementReport {
     private String productId;
     private String productName;
     private String category;
-    private int openingStock;
+    private double openingStock;
     private int received;
     private int sold;
     private int adjusted;
-    private int closingStock;
+    private double closingStock;
     private double movementPercentage;
     private long reportDate;
 
     public StockMovementReport(String productId, String productName, String category,
-                               int openingStock, int received, int sold, int adjusted,
-                               int closingStock, long reportDate) {
+                               double openingStock, int received, int sold, int adjusted,
+                               double closingStock, long reportDate) {
         this.productId = productId;
         this.productName = productName;
         this.category = category;
@@ -27,7 +27,7 @@ public class StockMovementReport {
 
         calculateMovementPercentage();
     }
-    public void addReceived(int qty) {
+    public void addReceived(double qty) {
         this.received += qty;
     }
 
@@ -35,7 +35,7 @@ public class StockMovementReport {
         this.sold += qty;
     }
 
-    public void addAdjusted(int qty) {
+    public void addAdjusted(double qty) {
         this.adjusted += qty;
     }
 
@@ -53,7 +53,7 @@ public class StockMovementReport {
     }
 
     private void calculateMovementPercentage() {
-        int totalThroughput = openingStock + received;
+        double totalThroughput = openingStock + received;
         if (totalThroughput > 0) {
             this.movementPercentage = ((double) sold / totalThroughput) * 100;
         } else {
@@ -65,11 +65,11 @@ public class StockMovementReport {
     public String getProductId() { return productId; }
     public String getProductName() { return productName; }
     public String getCategory() { return category; }
-    public int getOpeningStock() { return openingStock; }
+    public double getOpeningStock() { return openingStock; }
     public int getReceived() { return received; }
     public int getSold() { return sold; }
     public int getAdjusted() { return adjusted; }
-    public int getClosingStock() { return closingStock; }
+    public double getClosingStock() { return closingStock; }
     public double getMovementPercentage() { return movementPercentage; }
     public long getReportDate() { return reportDate; }
     public int getTotalMovement() {

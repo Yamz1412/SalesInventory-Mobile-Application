@@ -8,8 +8,8 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-// CHANGED: version is bumped to 10 to force the destructive migration!
-@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 10, exportSchema = false)
+// CHANGED: version bumped to 11 for the decimal mapping update
+@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 11, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
 
@@ -33,7 +33,6 @@ public abstract class AppDatabase extends RoomDatabase {
                                     "sales_inventory_db"
                             )
                             .addMigrations(MIGRATION_6_7)
-                            // NEW: This prevents the app from crashing when you add new fields!
                             .fallbackToDestructiveMigration()
                             .build();
                 }

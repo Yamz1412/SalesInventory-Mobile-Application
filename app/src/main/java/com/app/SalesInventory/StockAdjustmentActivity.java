@@ -12,6 +12,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -153,11 +156,11 @@ public class StockAdjustmentActivity extends BaseActivity {
         }
 
         try {
-            int currentStock = selectedProduct.getQuantity();
+            double currentStock = selectedProduct.getQuantity();
             int adjustmentQty = Integer.parseInt(quantityStr);
             String adjustmentType = spinnerAdjustmentType.getSelectedItem().toString();
 
-            int newStock;
+            double newStock;
             if ("Add Stock".equals(adjustmentType)) {
                 newStock = currentStock + adjustmentQty;
             } else {
@@ -201,9 +204,9 @@ public class StockAdjustmentActivity extends BaseActivity {
             String reason = spinnerReason.getSelectedItem().toString();
             String remarks = etRemarks.getText().toString().trim();
 
-            int currentStock = selectedProduct.getQuantity();
+            double currentStock = selectedProduct.getQuantity();
 
-            int newStock;
+            double newStock;
             if ("Add Stock".equals(adjustmentType)) {
                 newStock = currentStock + adjustmentQty;
             } else {
@@ -227,14 +230,14 @@ public class StockAdjustmentActivity extends BaseActivity {
         }
     }
 
-    private void saveAdjustment(String adjustmentType, int adjustmentQty, int currentStock, int newStock, String reason, String remarks) {
+    private void saveAdjustment(String adjustmentType, double adjustmentQty, double currentStock, double newStock, String reason, String remarks) {
         String userId = AuthManager.getInstance().getCurrentUserId();
         if (userId == null || userId.isEmpty()) {
             Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        com.google.firebase.database.DatabaseReference ref = com.google.firebase.database.FirebaseDatabase.getInstance().getReference("StockAdjustments");
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("StockAdjustments");
         String adjustmentId = ref.push().getKey();
 
         if (adjustmentId == null) {

@@ -28,11 +28,14 @@ public class CriticalStockNotifier {
         if (dismissedForProduct.contains(productId)) return;
 
         String name = product.getProductName() == null ? "" : product.getProductName();
-        int qty = product.getQuantity();
+
+        // FIX: Accept the new double format and format it nicely for the user
+        double qty = product.getQuantity();
+        String qtyDisplay = (qty % 1 == 0) ? String.valueOf((long) qty) : String.valueOf(qty);
 
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
         builder.setTitle("Critical Stock Alert");
-        builder.setMessage("Product \"" + name + "\" is at critical level.\nCurrent quantity: " + qty + "\n\nPlease restock soon.");
+        builder.setMessage("Product \"" + name + "\" is at critical level.\nCurrent quantity: " + qtyDisplay + "\n\nPlease restock soon.");
 
         builder.setPositiveButton("Confirm", (dialog, which) -> {
             dismissedForProduct.add(productId);

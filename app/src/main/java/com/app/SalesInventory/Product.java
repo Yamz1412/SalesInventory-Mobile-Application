@@ -18,7 +18,10 @@ public class Product {
     private String description;
     private double costPrice;
     private double sellingPrice;
-    private int quantity;
+
+    // CHANGED: Quantity is now a double to support decimals (e.g. 4.9 Liters)
+    private double quantity;
+
     private int reorderLevel;
     private int criticalLevel;
     private int ceilingLevel;
@@ -48,9 +51,7 @@ public class Product {
     private int piecesPerUnit = 1;
     private Map<String, Integer> linkedMaterials;
 
-    // NEW: Added Variants List
     private List<Map<String, Object>> variantsList = new ArrayList<>();
-
     private List<Map<String, Object>> addonsList = new ArrayList<>();
     private List<Map<String, String>> notesList = new ArrayList<>();
     private List<Map<String, Object>> bomList = new ArrayList<>();
@@ -63,7 +64,7 @@ public class Product {
         this.isActive = true;
     }
 
-    public Product(long localId, String productId, String productName, String categoryId, String categoryName, String description, double costPrice, double sellingPrice, int quantity, int reorderLevel, int criticalLevel, int ceilingLevel, String unit, String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
+    public Product(long localId, String productId, String productName, String categoryId, String categoryName, String description, double costPrice, double sellingPrice, double quantity, int reorderLevel, int criticalLevel, int ceilingLevel, String unit, String barcode, String supplier, long dateAdded, String addedBy, boolean isActive) {
         this.localId = localId;
         this.productId = productId;
         this.productName = productName;
@@ -72,7 +73,7 @@ public class Product {
         this.description = description;
         this.costPrice = costPrice;
         this.sellingPrice = sellingPrice;
-        this.quantity = Math.max(0, quantity);
+        this.quantity = Math.max(0.0, quantity);
         this.reorderLevel = reorderLevel;
         this.criticalLevel = criticalLevel;
         this.ceilingLevel = ceilingLevel;
@@ -90,12 +91,9 @@ public class Product {
     public String getOwnerAdminId() { return ownerAdminId; }
     public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
 
-    public Map<String, Integer> getLinkedMaterials() {
-        return linkedMaterials == null ? new HashMap<>() : linkedMaterials;
-    }
-    public void setLinkedMaterials(Map<String, Integer> linkedMaterials) {
-        this.linkedMaterials = linkedMaterials;
-    }
+    public Map<String, Integer> getLinkedMaterials() { return linkedMaterials == null ? new HashMap<>() : linkedMaterials; }
+    public void setLinkedMaterials(Map<String, Integer> linkedMaterials) { this.linkedMaterials = linkedMaterials; }
+
     public String getSalesUnit() { return salesUnit; }
     public void setSalesUnit(String salesUnit) { this.salesUnit = salesUnit; }
 
@@ -126,10 +124,9 @@ public class Product {
     public double getSellingPrice() { return sellingPrice; }
     public void setSellingPrice(double sellingPrice) { this.sellingPrice = sellingPrice; }
 
-    public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) {
-        this.quantity = Math.max(0, quantity);
-    }
+    // CHANGED TO DOUBLE
+    public double getQuantity() { return quantity; }
+    public void setQuantity(double quantity) { this.quantity = Math.max(0.0, quantity); }
 
     public int getReorderLevel() { return reorderLevel; }
     public void setReorderLevel(int reorderLevel) { this.reorderLevel = reorderLevel; }
@@ -141,9 +138,7 @@ public class Product {
     public void setCeilingLevel(int ceilingLevel) { this.ceilingLevel = ceilingLevel; }
 
     public int getFloorLevel() { return floorLevel; }
-    public void setFloorLevel(int floorLevel) {
-        this.floorLevel = Math.max(0, floorLevel);
-    }
+    public void setFloorLevel(int floorLevel) { this.floorLevel = Math.max(0, floorLevel); }
 
     public String getUnit() { return unit == null ? "" : unit; }
     public void setUnit(String unit) { this.unit = unit; }
@@ -155,23 +150,14 @@ public class Product {
     public void setSupplier(String supplier) { this.supplier = supplier; }
 
     public long getDateAdded() { return dateAdded != null ? dateAdded.getTime() : 0L; }
-    public void setDateAdded(long dateAdded) {
-        this.dateAdded = (dateAdded > 0) ? new Date(dateAdded) : null;
-    }
+    public void setDateAdded(long dateAdded) { this.dateAdded = (dateAdded > 0) ? new Date(dateAdded) : null; }
+
     public long getExpiryDate() { return expiryDate != null ? expiryDate.getTime() : 0L; }
-    public void setExpiryDate(long expiryDate) {
-        this.expiryDate = (expiryDate > 0) ? new Date(expiryDate) : null;
-    }
+    public void setExpiryDate(long expiryDate) { this.expiryDate = (expiryDate > 0) ? new Date(expiryDate) : null; }
 
-    public double getDeductionAmount() {
-        return deductionAmount <= 0 ? 1.0 : deductionAmount;
-    }
+    public double getDeductionAmount() { return deductionAmount <= 0 ? 1.0 : deductionAmount; }
+    public void setDeductionAmount(double deductionAmount) { this.deductionAmount = deductionAmount; }
 
-    public void setDeductionAmount(double deductionAmount) {
-        this.deductionAmount = deductionAmount;
-    }
-
-    // NEW: Variants Getter/Setter
     public List<Map<String, Object>> getVariantsList() { return variantsList; }
     public void setVariantsList(List<Map<String, Object>> variantsList) { this.variantsList = variantsList; }
 
@@ -204,22 +190,10 @@ public class Product {
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
-    public boolean isCriticalStock() {
-        return quantity <= reorderLevel;
-    }
-
-    public boolean isLowStock() {
-        return quantity > reorderLevel && quantity <= Math.max(reorderLevel * 2, reorderLevel + 1);
-    }
-
-    public boolean isOverstock() {
-        if (ceilingLevel <= 0) return false;
-        return quantity > ceilingLevel;
-    }
-
-    public boolean isBelowFloor() {
-        return floorLevel > 0 && quantity <= floorLevel;
-    }
+    public boolean isCriticalStock() { return quantity <= reorderLevel; }
+    public boolean isLowStock() { return quantity > reorderLevel && quantity <= Math.max(reorderLevel * 2, reorderLevel + 1); }
+    public boolean isOverstock() { return ceilingLevel > 0 && quantity > ceilingLevel; }
+    public boolean isBelowFloor() { return floorLevel > 0 && quantity <= floorLevel; }
 
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();
@@ -231,7 +205,7 @@ public class Product {
         m.put("description", description);
         m.put("costPrice", costPrice);
         m.put("sellingPrice", sellingPrice);
-        m.put("quantity", quantity);
+        m.put("quantity", quantity); // Now saves as decimal
         m.put("reorderLevel", reorderLevel);
         m.put("criticalLevel", criticalLevel);
         m.put("ceilingLevel", ceilingLevel);
@@ -249,13 +223,11 @@ public class Product {
         m.put("imageUrl", imageUrl);
         m.put("linkedMaterials", linkedMaterials);
 
-        // NEW: Added Variants List to mapping
         m.put("variantsList", variantsList);
         m.put("sizesList", sizesList);
         m.put("addonsList", addonsList);
         m.put("notesList", notesList);
         m.put("bomList", bomList);
-
         return m;
     }
 
@@ -265,24 +237,18 @@ public class Product {
         if (m == null) return p;
 
         Object o;
-
-        o = m.get("localId");
-        if (o instanceof Number) p.localId = ((Number) o).longValue();
-
+        o = m.get("localId"); if (o instanceof Number) p.localId = ((Number) o).longValue();
         o = m.get("productId"); if (o != null) p.productId = String.valueOf(o);
         o = m.get("productName"); if (o != null) p.productName = String.valueOf(o);
         o = m.get("categoryId"); if (o != null) p.categoryId = String.valueOf(o);
         o = m.get("categoryName"); if (o != null) p.categoryName = String.valueOf(o);
         o = m.get("description"); if (o != null) p.description = String.valueOf(o);
 
-        o = m.get("costPrice");
-        if (o instanceof Number) p.costPrice = ((Number) o).doubleValue();
+        o = m.get("costPrice"); if (o instanceof Number) p.costPrice = ((Number) o).doubleValue();
+        o = m.get("sellingPrice"); if (o instanceof Number) p.sellingPrice = ((Number) o).doubleValue();
 
-        o = m.get("sellingPrice");
-        if (o instanceof Number) p.sellingPrice = ((Number) o).doubleValue();
-
-        o = m.get("quantity");
-        if (o instanceof Number) p.quantity = ((Number) o).intValue();
+        // CHANGED: Force to Double safely
+        o = m.get("quantity"); if (o instanceof Number) p.quantity = ((Number) o).doubleValue();
 
         o = m.get("reorderLevel"); if (o instanceof Number) p.reorderLevel = ((Number) o).intValue();
         o = m.get("criticalLevel"); if (o instanceof Number) p.criticalLevel = ((Number) o).intValue();
@@ -294,57 +260,37 @@ public class Product {
         o = m.get("supplier"); if (o != null) p.supplier = String.valueOf(o);
 
         o = m.get("dateAdded");
-        if (o instanceof com.google.firebase.Timestamp) {
-            p.dateAdded = ((com.google.firebase.Timestamp) o).toDate();
-        } else if (o instanceof Date) {
-            p.dateAdded = (Date) o;
-        } else if (o instanceof Number) {
+        if (o instanceof com.google.firebase.Timestamp) p.dateAdded = ((com.google.firebase.Timestamp) o).toDate();
+        else if (o instanceof Date) p.dateAdded = (Date) o;
+        else if (o instanceof Number) {
             long val = ((Number) o).longValue();
             p.dateAdded = val > 0 ? new Date(val) : null;
         }
 
         o = m.get("addedBy"); if (o != null) p.addedBy = String.valueOf(o);
-
-        o = m.get("isActive");
-        if (o instanceof Boolean) p.isActive = (Boolean) o;
-
+        o = m.get("isActive"); if (o instanceof Boolean) p.isActive = (Boolean) o;
         o = m.get("productType"); if (o != null) p.productType = String.valueOf(o);
         o = m.get("ownerAdminId"); if (o != null) p.ownerAdminId = String.valueOf(o);
 
         o = m.get("expiryDate");
-        if (o instanceof com.google.firebase.Timestamp) {
-            p.expiryDate = ((com.google.firebase.Timestamp) o).toDate();
-        } else if (o instanceof Date) {
-            p.expiryDate = (Date) o;
-        } else if (o instanceof Number) {
+        if (o instanceof com.google.firebase.Timestamp) p.expiryDate = ((com.google.firebase.Timestamp) o).toDate();
+        else if (o instanceof Date) p.expiryDate = (Date) o;
+        else if (o instanceof Number) {
             long val = ((Number) o).longValue();
             p.expiryDate = val > 0 ? new Date(val) : null;
         }
 
         Object lm = m.get("linkedMaterials");
-        if (lm instanceof Map) {
-            p.linkedMaterials = (Map<String, Integer>) lm;
-        }
+        if (lm instanceof Map) p.linkedMaterials = (Map<String, Integer>) lm;
 
         o = m.get("imagePath"); if (o != null) p.imagePath = String.valueOf(o);
         o = m.get("imageUrl"); if (o != null) p.imageUrl = String.valueOf(o);
 
-        // Extract lists
-        if (m.get("variantsList") instanceof List) {
-            p.variantsList = (List<Map<String, Object>>) m.get("variantsList");
-        }
-        if (m.get("sizesList") instanceof List) {
-            p.sizesList = (List<Map<String, Object>>) m.get("sizesList");
-        }
-        if (m.get("addonsList") instanceof List) {
-            p.addonsList = (List<Map<String, Object>>) m.get("addonsList");
-        }
-        if (m.get("notesList") instanceof List) {
-            p.notesList = (List<Map<String, String>>) m.get("notesList");
-        }
-        if (m.get("bomList") instanceof List) {
-            p.bomList = (List<Map<String, Object>>) m.get("bomList");
-        }
+        if (m.get("variantsList") instanceof List) p.variantsList = (List<Map<String, Object>>) m.get("variantsList");
+        if (m.get("sizesList") instanceof List) p.sizesList = (List<Map<String, Object>>) m.get("sizesList");
+        if (m.get("addonsList") instanceof List) p.addonsList = (List<Map<String, Object>>) m.get("addonsList");
+        if (m.get("notesList") instanceof List) p.notesList = (List<Map<String, String>>) m.get("notesList");
+        if (m.get("bomList") instanceof List) p.bomList = (List<Map<String, Object>>) m.get("bomList");
 
         return p;
     }

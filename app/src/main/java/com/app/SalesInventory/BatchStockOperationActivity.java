@@ -208,7 +208,15 @@ public class BatchStockOperationActivity extends BaseActivity {
             return;
         }
 
-        int quantity = Integer.parseInt(quantityStr);
+        // FIX: Now parses Double to support decimals
+        double quantity;
+        try {
+            quantity = Double.parseDouble(quantityStr);
+        } catch (NumberFormatException e) {
+            etQuantity.setError("Invalid quantity");
+            return;
+        }
+
         if (quantity <= 0) {
             etQuantity.setError("Quantity must be greater than 0");
             return;
@@ -234,7 +242,7 @@ public class BatchStockOperationActivity extends BaseActivity {
     }
 
     private void executeBatchOperation(String operationName, String operationType,
-                                       int quantity, String reason, String remarks) {
+                                       double quantity, String reason, String remarks) {
         progressBar.setVisibility(View.VISIBLE);
 
         String batchOpId = batchOpRef.push().getKey();
@@ -242,22 +250,22 @@ public class BatchStockOperationActivity extends BaseActivity {
         long timestamp = System.currentTimeMillis();
 
         BatchStockOperation batchOp = new BatchStockOperation(
-                batchOpId, operationName, operationType, quantity, reason, remarks, timestamp, userId, selectedProducts.size()
+                batchOpId, operationName, operationType, (int) quantity, reason, remarks, timestamp, userId, selectedProducts.size()
         );
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("/BatchOperations/" + batchOpId, batchOp);
 
         for (Product product : selectedProducts) {
-            int newQuantity;
-            int oldQuantity = product.getQuantity();
+            double newQuantity;
+            double oldQuantity = product.getQuantity();
 
             switch (operationType) {
                 case "ADD":
                     newQuantity = oldQuantity + quantity;
                     break;
                 case "SUBTRACT":
-                    newQuantity = Math.max(0, oldQuantity - quantity);
+                    newQuantity = Math.max(0.0, oldQuantity - quantity);
                     break;
                 case "SET":
                     newQuantity = quantity;
@@ -266,7 +274,7 @@ public class BatchStockOperationActivity extends BaseActivity {
                     newQuantity = oldQuantity;
             }
 
-            batchOp.addProductChange(product.getProductId(), newQuantity);
+            batchOp.addProductChange(product.getProductId(), (int) newQuantity);
 
             String adjustmentId = FirebaseDatabase.getInstance().getReference("StockAdjustments").push().getKey();
             if (adjustmentId != null) {
@@ -276,9 +284,9 @@ public class BatchStockOperationActivity extends BaseActivity {
                         product.getProductName(),
                         operationType.equals("ADD") ? "Add Stock" :
                                 operationType.equals("SUBTRACT") ? "Remove Stock" : "Set Stock",
-                        oldQuantity,
-                        Math.abs(newQuantity - oldQuantity),
-                        newQuantity,
+                        (int) oldQuantity,
+                        (int) Math.abs(newQuantity - oldQuantity),
+                        (int) newQuantity,
                         reason,
                         "Batch Operation: " + operationName,
                         timestamp,
@@ -291,14 +299,14 @@ public class BatchStockOperationActivity extends BaseActivity {
         FirebaseDatabase.getInstance().getReference().updateChildren(updates)
                 .addOnSuccessListener(aVoid -> {
                     for (Product product : selectedProducts) {
-                        int oldQuantity = product.getQuantity();
-                        int newQuantity;
+                        double oldQuantity = product.getQuantity();
+                        double newQuantity;
                         switch (operationType) {
                             case "ADD":
                                 newQuantity = oldQuantity + quantity;
                                 break;
                             case "SUBTRACT":
-                                newQuantity = Math.max(0, oldQuantity - quantity);
+                                newQuantity = Math.max(0.0, oldQuantity - quantity);
                                 break;
                             case "SET":
                                 newQuantity = quantity;
@@ -306,8 +314,9 @@ public class BatchStockOperationActivity extends BaseActivity {
                             default:
                                 newQuantity = oldQuantity;
                         }
-                        int finalNewQuantity = newQuantity;
-                        productRepository.updateProductQuantity(product.getProductId(), finalNewQuantity, new ProductRepository.OnProductUpdatedListener() {
+
+                        // Final Update passed as Double to the repository
+                        productRepository.updateProductQuantity(product.getProductId(), newQuantity, new ProductRepository.OnProductUpdatedListener() {
                             @Override
                             public void onProductUpdated() {
                             }

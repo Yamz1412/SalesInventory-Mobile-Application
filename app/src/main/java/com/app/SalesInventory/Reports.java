@@ -243,10 +243,6 @@ public class Reports extends BaseActivity {
                 double netPrice = s.getTotalPrice();
                 double cost = s.getTotalCost();
 
-                // ====================================================================
-                // SMART FALLBACK: Look up the product cost locally if the sale missed it
-                // (Matches the exact logic from MainActivity so Dashboard & Report match)
-                // ====================================================================
                 if (cost <= 0) {
                     String rawName = s.getProductName() != null ? s.getProductName() : "";
                     String baseName = rawName;
@@ -269,7 +265,6 @@ public class Reports extends BaseActivity {
                         }
                     }
                 }
-                // ====================================================================
 
                 double discount = 0;
                 try { discount = (double) s.getClass().getMethod("getDiscountAmount").invoke(s); } catch (Exception ignored) {}
@@ -279,7 +274,7 @@ public class Reports extends BaseActivity {
                 else if (paymentType.toLowerCase().contains("gcash")) { gcashCount++; currentGcashSales += netPrice; }
 
                 currentNetSales += netPrice;
-                currentTotalCOGS += cost; // Now accurately adds the fixed cost!
+                currentTotalCOGS += cost;
                 currentTotalDiscounts += discount;
 
                 String rawName = s.getProductName() != null ? s.getProductName() : "Unknown Product";
@@ -321,28 +316,38 @@ public class Reports extends BaseActivity {
         detailedProductsStr.setLength(0);
         Map<String, List<DetailedProductReport>> catGrouped = new HashMap<>();
         List<String> sortedCategories = new ArrayList<>();
+        Map<String, DetailedProductReport> allProductsMap = new HashMap<>();
 
-        for (BestSellerItem b : bestSellersList) {
-            String catName = "Uncategorized";
-            int sLeft = 0;
-            // No need to recalculate fallback cost here anymore because b.totalCost is perfectly accurate now!
-
-            for (Product p : currentInventory) {
-                if (p != null && p.getProductName() != null && p.getProductName().equals(b.productName)) {
-                    catName = p.getCategoryName();
-                    sLeft = p.getQuantity();
-                    break;
-                }
+        // 1. Register ALL newly added products and existing inventory first (even with 0 sales)
+        for (Product p : currentInventory) {
+            if (p != null && p.getProductName() != null && !"Menu".equals(p.getProductType())) {
+                String catName = p.getCategoryName() != null && !p.getCategoryName().isEmpty() ? p.getCategoryName() : "Uncategorized";
+                allProductsMap.put(p.getProductName(), new DetailedProductReport(p.getProductName(), catName, p.getQuantity()));
             }
+        }
 
-            DetailedProductReport dp = new DetailedProductReport(b.productName, catName, sLeft);
-            dp.quantitySold = b.quantitySold;
-            dp.totalRevenue = b.totalRevenue;
-            dp.totalCost = b.totalCost; // Use the accurately summed cost from the loop above
+        // 2. Overlay actual sales data onto the registered inventory items
+        for (BestSellerItem b : bestSellersList) {
+            if (allProductsMap.containsKey(b.productName)) {
+                DetailedProductReport dp = allProductsMap.get(b.productName);
+                dp.quantitySold = b.quantitySold;
+                dp.totalRevenue = b.totalRevenue;
+                dp.totalCost = b.totalCost;
+            } else {
+                // If a product was sold but later deleted from inventory
+                DetailedProductReport dp = new DetailedProductReport(b.productName, "Deleted Products", 0);
+                dp.quantitySold = b.quantitySold;
+                dp.totalRevenue = b.totalRevenue;
+                dp.totalCost = b.totalCost;
+                allProductsMap.put(b.productName, dp);
+            }
+        }
 
-            if (!sortedCategories.contains(catName)) sortedCategories.add(catName);
-            if (!catGrouped.containsKey(catName)) catGrouped.put(catName, new ArrayList<>());
-            catGrouped.get(catName).add(dp);
+        // 3. Group them by category for the Detailed Report
+        for (DetailedProductReport dp : allProductsMap.values()) {
+            if (!sortedCategories.contains(dp.category)) sortedCategories.add(dp.category);
+            if (!catGrouped.containsKey(dp.category)) catGrouped.put(dp.category, new ArrayList<>());
+            catGrouped.get(dp.category).add(dp);
         }
 
         Collections.sort(sortedCategories);
@@ -369,7 +374,7 @@ public class Reports extends BaseActivity {
         if (tvOverviewTransaction != null) tvOverviewTransaction.setText(String.valueOf(currentTransactionCount));
 
         currentGrossSales = currentNetSales + currentTotalDiscounts;
-        currentGrossProfit = currentNetSales - currentTotalCOGS; // Will now calculate correctly!
+        currentGrossProfit = currentNetSales - currentTotalCOGS;
 
         // Safety initialization before OPEX loads
         if (currentTotalOpex == 0.0) {
@@ -386,7 +391,7 @@ public class Reports extends BaseActivity {
         tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
         tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
 
-        adapter.notifyDataSetChanged(); 
+        adapter.notifyDataSetChanged();
 
         fetchOperationsData(startMillis, endMillis);
         fetchPODetailsData(startMillis, endMillis);
@@ -394,9 +399,6 @@ public class Reports extends BaseActivity {
         fetchOperatingExpenses(startMillis, endMillis);
     }
 
-    // =========================================================================
-    // NEW: OPERATING EXPENSES LOGIC
-    // =========================================================================
     private void fetchOperatingExpenses(long startMillis, long endMillis) {
         if (currentOwnerId == null || currentOwnerId.isEmpty()) return;
 
@@ -412,7 +414,6 @@ public class Reports extends BaseActivity {
                     if (dateLogged != null && dateLogged >= startMillis && dateLogged <= endMillis) {
                         DataSnapshot itemsSnapshot = ds.child("items");
                         for (DataSnapshot itemDs : itemsSnapshot.getChildren()) {
-                            // Safely extract the number to prevent crashes
                             Number amount = itemDs.getValue(Number.class);
                             if (amount != null) {
                                 currentTotalOpex += amount.doubleValue();
@@ -511,18 +512,15 @@ public class Reports extends BaseActivity {
         if (expenseId != null) {
             Map<String, Object> data = new HashMap<>();
             data.put("id", expenseId);
-            data.put("dateLogged", System.currentTimeMillis()); // Logged at current exact time
+            data.put("dateLogged", System.currentTimeMillis());
             data.put("items", expensesMap);
 
             expensesRef.child(expenseId).setValue(data).addOnSuccessListener(aVoid -> {
                 Toast.makeText(this, "Operating Expenses Saved!", Toast.LENGTH_SHORT).show();
-
-                // IMPORTANT: Instantly reload calculations so the new expense reflects on the UI Net Income!
                 calculateMetricsAndList();
             });
         }
     }
-    // =========================================================================
 
     private void fetchOperationsData(long startMillis, long endMillis) {
         DatabaseReference adjRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
@@ -786,8 +784,8 @@ public class Reports extends BaseActivity {
         public String category;
         public int quantitySold = 0;
         public double totalRevenue = 0.0, totalCost = 0.0;
-        public int stockLeft = 0;
-        public DetailedProductReport(String pn, String cat, int sLeft) {
+        public double stockLeft = 0;
+        public DetailedProductReport(String pn, String cat, double sLeft) {
             productName = pn;
             category = cat;
             stockLeft = sLeft;

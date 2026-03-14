@@ -6,7 +6,7 @@ public class StockValueReport {
     private String productId;
     private String productName;
     private String category;
-    private int quantity;
+    private double quantity;
     private double costPrice;
     private double sellingPrice;
     private int reorderLevel;
@@ -14,7 +14,7 @@ public class StockValueReport {
     private int ceilingLevel;
     private int floorLevel;
 
-    public StockValueReport(String productId, String productName, String category, int quantity, double costPrice, double sellingPrice, int reorderLevel, int criticalLevel, int ceilingLevel, int floorLevel) {
+    public StockValueReport(String productId, String productName, String category, double quantity, double costPrice, double sellingPrice, int reorderLevel, int criticalLevel, int ceilingLevel, int floorLevel) {
         this.productId = productId;
         this.productName = productName;
         this.category = category;
@@ -39,7 +39,7 @@ public class StockValueReport {
         return category == null ? "" : category;
     }
 
-    public int getQuantity() {
+    public double getQuantity() {
         return quantity;
     }
 

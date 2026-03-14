@@ -212,7 +212,7 @@ public class ProductRepository {
             if (e.criticalLevel < 1) e.criticalLevel = 1;
             if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
             if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-            if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
+            if (e.quantity > e.ceilingLevel) e.ceilingLevel = (int) Math.ceil(e.quantity);
 
             e.dateAdded = now;
             e.lastUpdated = now;
@@ -269,7 +269,7 @@ public class ProductRepository {
                 if (existing.criticalLevel < 1) existing.criticalLevel = 1;
                 if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                 if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
-                if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
+                if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = (int) Math.ceil(existing.quantity);
 
                 existing.lastUpdated = now;
                 existing.syncState = "PENDING";
@@ -290,7 +290,7 @@ public class ProductRepository {
                 if (e.criticalLevel < 1) e.criticalLevel = 1;
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
                 if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
-                if (e.quantity > e.ceilingLevel) e.ceilingLevel = e.quantity;
+                if (e.quantity > e.ceilingLevel) e.ceilingLevel = (int) Math.ceil(e.quantity);
 
                 e.lastUpdated = now;
                 e.syncState = "PENDING";
@@ -442,21 +442,22 @@ public class ProductRepository {
         return s.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
 
-    public void updateProductQuantity(String productId, int newQuantity, OnProductUpdatedListener listener) {
+    // CHANGED: newQuantity is now double
+    public void updateProductQuantity(String productId, double newQuantity, OnProductUpdatedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 ProductEntity existing = findEntityByIdSafe(productId);
                 if (existing != null) {
-                    int oldQuantity = existing.quantity;
+                    double oldQuantity = existing.quantity;
                     if (existing.floorLevel < 1) existing.floorLevel = 1;
                     if (existing.criticalLevel < 1) existing.criticalLevel = 1;
                     if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
                     if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
-                    int clamped = Math.max(0, newQuantity);
-                    if (clamped > 99999) clamped = 99999;
+                    double clamped = Math.max(0.0, newQuantity);
+                    if (clamped > 99999) clamped = 99999.0;
                     if (clamped > existing.ceilingLevel) {
-                        existing.ceilingLevel = clamped;
+                        existing.ceilingLevel = (int) Math.ceil(clamped);
                     }
 
                     existing.quantity = clamped;
@@ -605,9 +606,6 @@ public class ProductRepository {
         });
     }
 
-    // ===========================================================================
-    // JSON SERIALIZATION HELPERS
-    // ===========================================================================
     private String serializeListObj(List<Map<String, Object>> list) {
         if (list == null || list.isEmpty()) return null;
         JSONArray array = new JSONArray();
@@ -665,7 +663,6 @@ public class ProductRepository {
         } catch (Exception e) { }
         return list;
     }
-    // ===========================================================================
 
     private Product mapEntityToProduct(ProductEntity e) {
         Product p = new Product();
@@ -696,7 +693,6 @@ public class ProductRepository {
         p.setOwnerAdminId(e.ownerAdminId);
         p.setExpiryDate(e.expiryDate);
 
-        // MAP LISTS BACK TO PRODUCT
         p.setSizesList(deserializeListObj(e.sizesListJson));
         p.setAddonsList(deserializeListObj(e.addonsListJson));
         p.setVariantsList(deserializeListObj(e.variantsListJson));
@@ -736,7 +732,6 @@ public class ProductRepository {
         e.ownerAdminId = p.getOwnerAdminId();
         e.expiryDate = p.getExpiryDate();
 
-        // MAP LISTS INTO ENTITY
         e.sizesListJson = serializeListObj(p.getSizesList());
         e.addonsListJson = serializeListObj(p.getAddonsList());
         e.variantsListJson = serializeListObj(p.getVariantsList());
@@ -832,7 +827,7 @@ public class ProductRepository {
                 e.description = o.optString("description", null);
                 e.costPrice = o.optDouble("costPrice", 0.0);
                 e.sellingPrice = o.optDouble("sellingPrice", 0.0);
-                e.quantity = o.optInt("quantity", 0);
+                e.quantity = o.optDouble("quantity", 0.0); // Now supports decimal pulls
                 e.reorderLevel = o.optInt("reorderLevel", 0);
                 e.criticalLevel = o.optInt("criticalLevel", 0);
                 e.ceilingLevel = o.optInt("ceilingLevel", 0);
@@ -872,7 +867,7 @@ public class ProductRepository {
                     existing.costPrice = e.costPrice;
                     existing.sellingPrice = e.sellingPrice;
                     existing.quantity = e.quantity;
-                    if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = existing.quantity;
+                    if (existing.quantity > existing.ceilingLevel) existing.ceilingLevel = (int) Math.ceil(existing.quantity);
                     existing.reorderLevel = e.reorderLevel;
                     existing.criticalLevel = e.criticalLevel;
                     existing.floorLevel = e.floorLevel;
@@ -953,12 +948,12 @@ public class ProductRepository {
         });
     }
 
-    private int computeDefaultCeiling(int quantity, int reorderLevel) {
+    private int computeDefaultCeiling(double quantity, int reorderLevel) {
         int result;
         if (reorderLevel > 0) {
-            result = Math.max(quantity, reorderLevel * 2);
+            result = Math.max((int) quantity, reorderLevel * 2);
         } else {
-            result = Math.max(quantity, 100);
+            result = Math.max((int) quantity, 100);
         }
         if (result > 9999) result = 9999;
         return result;

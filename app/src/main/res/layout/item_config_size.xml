@@ -3,39 +3,59 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:layout_marginBottom="8dp"
-    android:weightSum="2">
+    android:orientation="vertical"
+    android:layout_marginBottom="12dp">
 
-    <EditText
-        android:id="@+id/etSizeName"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1.2"
-        android:hint="Size (e.g. Large / 16oz)"
-        android:textSize="14sp"
-        android:background="@drawable/edite_round"
-        android:padding="12dp"
-        android:layout_marginEnd="4dp"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp"
+        android:weightSum="3">
 
-    <EditText
-        android:id="@+id/etSizePrice"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="0.8"
-        android:hint="+ Price Diff"
-        android:textSize="14sp"
-        android:inputType="numberDecimal"
-        android:background="@drawable/edite_round"
-        android:padding="12dp"
-        android:layout_marginEnd="4dp"/>
 
-    <ImageButton
-        android:id="@+id/btnDelete"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:src="@android:drawable/ic_menu_delete"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        app:tint="@color/errorRed"/>
+        <AutoCompleteTextView
+            android:id="@+id/actvLinkedInventory"
+            android:layout_width="0dp"
+            android:layout_height="45dp"
+            android:layout_weight=".7"
+            android:hint="Link"
+            android:textSize="14sp"
+            android:background="@drawable/edite_round"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
+
+        <EditText
+            android:id="@+id/etSizeName"
+            android:layout_width="0dp"
+            android:layout_height="45dp"
+            android:layout_weight="1.4"
+            android:hint="Size (e.g. Large / 16oz)"
+            android:textSize="14sp"
+            android:background="@drawable/edite_round"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
+
+        <EditText
+            android:id="@+id/etSizePrice"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.8"
+            android:hint="+ Price Diff"
+            android:textSize="14sp"
+            android:inputType="numberDecimal"
+            android:background="@drawable/edite_round"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
+
+        <ImageButton
+            android:id="@+id/btnDelete"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/errorRed"/>
+    </LinearLayout>
+
 </LinearLayout>

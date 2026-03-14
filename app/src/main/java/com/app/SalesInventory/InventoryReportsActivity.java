@@ -109,9 +109,9 @@ public class InventoryReportsActivity extends BaseActivity  {
 
         for (Sales s : cachedSales) {
             String pid = s.getProductId();
-            int q = s.getQuantity();
+            double q = s.getQuantity();
             if (pid != null) {
-                soldMap.put(pid, soldMap.getOrDefault(pid, 0) + q);
+                soldMap.put(pid, soldMap.getOrDefault(pid, 0) + (int) q);
                 totalSoldHolder[0] += q;
             }
         }
@@ -134,13 +134,13 @@ public class InventoryReportsActivity extends BaseActivity  {
                     if (owner != null && !owner.equals(currentOwnerId)) continue;
 
                     String pid = a.getProductId();
-                    int qty = a.getQuantityAdjusted();
+                    double qty = a.getQuantityAdjusted();
 
                     if ("Add Stock".equals(a.getAdjustmentType())) {
-                        receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + qty);
+                        receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + (int)qty);
                         totalReceivedHolder[0] += qty;
                     } else {
-                        adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + qty);
+                        adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + (int)qty);
                         totalAdjustedHolder[0] += qty;
                     }
                 }

@@ -12,12 +12,12 @@ public class CartManager {
         public String productId;
         public String productName;
         public double unitPrice;
-        public int quantity;
-        public int stock;
+        public int quantity; // The number of "drinks/items" ordered
+        public double stock; // The amount of raw inventory left (now supports decimals)
         public String size;
         public String addon;
 
-        public CartItem(String productId, String productName, double unitPrice, int quantity, int stock, String size, String addon) {
+        public CartItem(String productId, String productName, double unitPrice, int quantity, double stock, String size, String addon) {
             this.productId = productId;
             this.productName = productName;
             this.unitPrice = unitPrice;
@@ -51,34 +51,26 @@ public class CartManager {
         return new ArrayList<>(items);
     }
 
-    // FIX: Enforce Stock Limits when adding items
-    public synchronized boolean addItem(String productId, String productName, double unitPrice, int quantity, int stock, String size, String addon) {
+    public synchronized boolean addItem(String productId, String productName, double unitPrice, int quantity, double stock, String size, String addon) {
         for (CartItem item : items) {
             boolean sameId = item.productId.equals(productId);
             boolean sameSize = (item.size == null && size == null) || (item.size != null && item.size.equals(size));
             boolean sameAddon = (item.addon == null && addon == null) || (item.addon != null && item.addon.equals(addon));
 
             if (sameId && sameSize && sameAddon) {
-                // Check if adding this quantity exceeds available stock
                 if (item.quantity + quantity > stock) {
-                    return false; // Rejects the addition, process violated
+                    return false;
                 }
                 item.quantity += quantity;
                 item.stock = stock;
                 return true;
             }
         }
-
-        // Check if the initial addition exceeds stock
-        if (quantity > stock) {
-            return false; // Rejects the addition
-        }
-
+        if (quantity > stock) return false;
         items.add(new CartItem(productId, productName, unitPrice, quantity, stock, size, addon));
         return true;
     }
 
-    // FIX: Enforce Stock Limits when updating quantities
     public synchronized boolean updateQuantity(String productId, String size, String addon, int quantity) {
         Iterator<CartItem> iterator = items.iterator();
         while (iterator.hasNext()) {
@@ -91,7 +83,7 @@ public class CartManager {
                     iterator.remove();
                     return true;
                 } else if (quantity > item.stock) {
-                    return false; // Rejects the update, process violated
+                    return false;
                 } else {
                     item.quantity = quantity;
                     return true;

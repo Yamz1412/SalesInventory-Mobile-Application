@@ -338,6 +338,12 @@ public class AddProductActivity extends BaseActivity {
             AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
             actvItem.setAdapter(autoCompleteAdapter);
 
+            // FIX: Instantly drop down the list when clicked or focused
+            actvItem.setOnClickListener(v -> actvItem.showDropDown());
+            actvItem.setOnFocusChangeListener((v, hasFocus) -> {
+                if (hasFocus) actvItem.showDropDown();
+            });
+
             Spinner spinnerUnit = row.findViewById(R.id.spinnerVariantUnit);
             spinnerUnit.setAdapter(rowUnitAdapter);
 
@@ -355,7 +361,14 @@ public class AddProductActivity extends BaseActivity {
 
                 AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
                 actvItem.setAdapter(autoCompleteAdapter);
-                actvItem.setText((String) variant.get("variantName"));
+
+                // FIX: Instantly drop down the list when clicked or focused
+                actvItem.setOnClickListener(v -> actvItem.showDropDown());
+                actvItem.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) actvItem.showDropDown();
+                });
+
+                actvItem.setText((String) variant.get("variantName"), false); // false prevents popup while setting text
 
                 EditText etQty = row.findViewById(R.id.etVariantQty);
                 etQty.setText(String.valueOf(variant.get("deductQty")));
@@ -603,9 +616,28 @@ public class AddProductActivity extends BaseActivity {
         Button btnCancel = view.findViewById(R.id.btnCancel);
         Button btnSave = view.findViewById(R.id.btnSave);
 
+        // Fetch Inventory items to show in the searchable Dropdown
+        List<String> inventoryNames = new ArrayList<>();
+        for (Product p : inventoryProducts) {
+            inventoryNames.add(p.getProductName());
+        }
+        ArrayAdapter<String> autoCompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, inventoryNames);
+
         Runnable addRow = () -> {
             try {
                 View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
+
+                AutoCompleteTextView actvLinked = row.findViewById(R.id.actvLinkedInventory);
+                if (actvLinked != null) {
+                    actvLinked.setAdapter(autoCompleteAdapter);
+
+                    // FIX: Instantly drop down the list when clicked or focused
+                    actvLinked.setOnClickListener(v -> actvLinked.showDropDown());
+                    actvLinked.setOnFocusChangeListener((v, hasFocus) -> {
+                        if (hasFocus) actvLinked.showDropDown();
+                    });
+                }
+
                 View btnDelete = row.findViewById(R.id.btnDelete);
                 if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
                 containerRows.addView(row);
@@ -621,6 +653,21 @@ public class AddProductActivity extends BaseActivity {
                     View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
                     EditText etName = row.findViewById(R.id.etSizeName);
                     EditText etPrice = row.findViewById(R.id.etSizePrice);
+                    AutoCompleteTextView actvLinked = row.findViewById(R.id.actvLinkedInventory);
+
+                    if (actvLinked != null) {
+                        actvLinked.setAdapter(autoCompleteAdapter);
+
+                        // FIX: Instantly drop down the list when clicked or focused
+                        actvLinked.setOnClickListener(v -> actvLinked.showDropDown());
+                        actvLinked.setOnFocusChangeListener((v, hasFocus) -> {
+                            if (hasFocus) actvLinked.showDropDown();
+                        });
+
+                        String linked = (String) size.get("linkedMaterial");
+                        if (linked != null) actvLinked.setText(linked, false);
+                    }
+
                     if (etName != null) etName.setText((String) size.get("name"));
                     if (etPrice != null) etPrice.setText(String.valueOf(size.get("price")));
 
@@ -640,14 +687,25 @@ public class AddProductActivity extends BaseActivity {
                 View row = containerRows.getChildAt(i);
                 EditText etName = row.findViewById(R.id.etSizeName);
                 EditText etPrice = row.findViewById(R.id.etSizePrice);
+                AutoCompleteTextView actvLinked = row.findViewById(R.id.actvLinkedInventory);
 
                 if (etName != null && etPrice != null) {
                     String name = etName.getText().toString().trim();
                     String priceStr = etPrice.getText().toString().trim();
+                    String linkedMaterial = actvLinked != null ? actvLinked.getText().toString().trim() : "";
+
                     if (!name.isEmpty()) {
                         Map<String, Object> map = new HashMap<>();
                         map.put("name", name);
                         map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
+
+                        // Automatically link to deduct 1 Unit
+                        if (!linkedMaterial.isEmpty()) {
+                            map.put("linkedMaterial", linkedMaterial);
+                            map.put("deductQty", 1.0);
+                            map.put("unit", "pcs");
+                        }
+
                         savedSizes.add(map);
                     }
                 }
@@ -953,7 +1011,7 @@ public class AddProductActivity extends BaseActivity {
         p.setCeilingLevel(ceilingLevel);
         p.setUnit(unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "");
         p.setExpiryDate(expiryDate);
-        p.setDeductionAmount(deductionAmount); // Sends deduction to sellProduct.java
+        p.setDeductionAmount(deductionAmount);
 
         p.setSalesUnit(salesUnitSpinner != null && salesUnitSpinner.getSelectedItem() != null ? salesUnitSpinner.getSelectedItem().toString() : "");
         int ppu = 1;

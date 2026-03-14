@@ -222,7 +222,7 @@ public class StockMovementReportActivity extends BaseActivity {
                             grandTotalReceived += adj.getQuantityAdjusted();
                         } else {
                             // Convert negative adjustment numbers to positive for the math logic
-                            int absQty = Math.abs(adj.getQuantityAdjusted());
+                            double absQty = Math.abs(adj.getQuantityAdjusted());
                             report.addAdjusted(absQty);
                             grandTotalAdjusted += absQty;
                         }

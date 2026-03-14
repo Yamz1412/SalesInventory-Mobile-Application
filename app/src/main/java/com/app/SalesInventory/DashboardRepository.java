@@ -49,15 +49,11 @@ public class DashboardRepository {
         return instance;
     }
 
-    // =========================================================================
-    // NEW: CLEAR DATA FOR MULTI-TENANCY LOGOUT
-    // =========================================================================
     public void clearData() {
         pendingPOCount = 0;
         metricsLiveData.postValue(new DashboardMetrics(0.0, 0.0, 0, 0, 0, 0.0));
         metricsSourcesAdded = false;
     }
-    // =========================================================================
 
     public void getDashboardMetrics(OnMetricsLoadedListener listener) {
         metricsListener = listener;
@@ -278,7 +274,8 @@ public class DashboardRepository {
         int inStock = 0, low = 0, critical = 0, out = 0;
         if (products != null) {
             for (Product p : products) {
-                int qty = p.getQuantity();
+                // FIX: Changed int to double
+                double qty = p.getQuantity();
                 if (qty <= 0) out++;
                 else if (p.isCriticalStock()) critical++;
                 else if (p.isLowStock()) low++;

@@ -122,7 +122,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             tilDeliveryNote.setVisibility(View.VISIBLE);
             tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
 
-            // FIX: Pass the Delete Listener so it functions in Receive Mode
             itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position));
             itemsAdapter.setReceiveMode(true);
         } else {
@@ -135,7 +134,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 tvStatus.setTextColor(getResources().getColor(R.color.errorRed));
             }
 
-            // FIX: Set to ViewOnly mode so input boxes hide correctly on completed orders
             itemsAdapter = new POItemAdapter(this, currentPo.getItems(), null);
             itemsAdapter.setViewOnlyMode(true);
         }
@@ -143,9 +141,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         recyclerViewOrderItems.setAdapter(itemsAdapter);
     }
 
-    // =====================================================================
-    // NEW: Handles the deletion of a PO Item directly from Firebase
-    // =====================================================================
     private void promptDeleteItem(int position) {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Item")
@@ -154,7 +149,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
 
                     currentPo.getItems().remove(position);
 
-                    // If they deleted the last item, cancel the order automatically
                     if (currentPo.getItems().isEmpty()) {
                         poRef.child("status").setValue(PurchaseOrder.STATUS_CANCELLED);
                         Toast.makeText(this, "Order cancelled because all items were removed.", Toast.LENGTH_SHORT).show();
@@ -162,14 +156,12 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                         return;
                     }
 
-                    // Recalculate total amount with the remaining items
                     double newTotal = 0;
                     for (POItem item : currentPo.getItems()) {
                         newTotal += (item.getUnitPrice() * item.getQuantity());
                     }
                     currentPo.setTotalAmount(newTotal);
 
-                    // Push changes to Firebase immediately
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("items", currentPo.getItems());
                     updates.put("totalAmount", newTotal);
@@ -181,7 +173,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 .setNegativeButton("Cancel", null)
                 .show();
     }
-    // =====================================================================
 
     private void processDelivery() {
         boolean hasNewReceives = false;
@@ -198,7 +189,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 hasNewReceives = true;
                 totalCostDeduction += (newlyReceived * item.getUnitPrice());
 
-                // Temporarily store the newly received amount in the object to pass it later
                 item.setReceivedQuantity(item.getReceivedQuantity() + newlyReceived);
                 POItem tempItem = new POItem(item.getProductId(), item.getProductName(), newlyReceived, item.getUnitPrice(), item.getUnit());
                 itemsReceivedNow.add(tempItem);
@@ -214,7 +204,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             return;
         }
 
-        // Run the async check for existing products
         checkProductsAndFinalize(itemsReceivedNow, isPartial, totalCostDeduction);
     }
 
@@ -240,14 +229,32 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                                 Product p = ds.getValue(Product.class);
                                 if (p != null && p.getOwnerAdminId().equals(currentPo.getOwnerAdminId())) {
                                     productExists = true;
-                                    // 1. PRODUCT EXISTS: Silently Add Stocks (Restock)
-                                    int newTotal = p.getQuantity() + item.getQuantity(); // item.getQuantity() holds the newlyReceived amount
+
+                                    // --- NEW: UNIT CONVERSION LOGIC FOR INCOMING DELIVERIES ---
+                                    int incomingQty = item.getQuantity(); // Note: Holds the newlyReceived amount
+                                    String inUnit = item.getUnit() != null ? item.getUnit().toLowerCase(Locale.ROOT) : "";
+                                    String invUnit = p.getUnit() != null ? p.getUnit().toLowerCase(Locale.ROOT) : "";
+
+                                    int addedAmount = incomingQty;
+
+                                    if ((inUnit.equals("box") || inUnit.equals("pack")) && invUnit.equals("pcs")) {
+                                        int ppu = p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
+                                        addedAmount = incomingQty * ppu;
+                                    } else if (inUnit.equals("l") && invUnit.equals("ml")) {
+                                        addedAmount = incomingQty * 1000;
+                                    } else if (inUnit.equals("kg") && invUnit.equals("g")) {
+                                        addedAmount = incomingQty * 1000;
+                                    } else if (inUnit.equals("l") && invUnit.equals("oz")) {
+                                        addedAmount = (int) Math.round(incomingQty * 33.814);
+                                    }
+
+                                    double newTotal = p.getQuantity() + addedAmount;
                                     productRepository.updateProductQuantity(p.getProductId(), newTotal, null);
+                                    // -----------------------------------------------------------
                                     break;
                                 }
                             }
 
-                            // 2. PRODUCT DOES NOT EXIST: Add to Queue
                             if (!productExists) {
                                 Bundle b = new Bundle();
                                 b.putString("PREFILL_NAME", item.getProductName());
@@ -284,7 +291,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
 
             Toast.makeText(this, "Delivery updated successfully", Toast.LENGTH_SHORT).show();
 
-            // If there are new products to register, launch the Queue
             if (!registrationQueue.isEmpty()) {
                 Intent intent = new Intent(this, AddProductActivity.class);
                 intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
@@ -292,22 +298,6 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             }
             finish();
         });
-    }
-
-    private void promptToRegisterNewProduct(POItem customItem, int newlyReceivedQty) {
-        new AlertDialog.Builder(this)
-                .setTitle("New Product Detected")
-                .setMessage("The item '" + customItem.getProductName() + "' is not currently in your inventory. You must register it to track its stock.")
-                .setPositiveButton("Register Now", (dialog, which) -> {
-                    Intent intent = new Intent(PurchaseOrderDetailActivity.this, AddProductActivity.class);
-                    intent.putExtra("PREFILL_NAME", customItem.getProductName());
-                    intent.putExtra("PREFILL_COST", customItem.getUnitPrice());
-                    intent.putExtra("PREFILL_QTY", newlyReceivedQty);
-                    intent.putExtra("PREFILL_UNIT", customItem.getUnit());
-                    startActivity(intent);
-                })
-                .setCancelable(false)
-                .show();
     }
 
     private void updateStatus(String newStatus) {

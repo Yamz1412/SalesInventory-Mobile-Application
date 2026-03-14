@@ -75,10 +75,19 @@
             android:id="@+id/btnBulkOptions"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:src="@android:drawable/ic_menu_edit"
+            android:src="@drawable/ic_paste"
             android:background="?attr/selectableItemBackgroundBorderless"
             app:tint="@android:color/white"
             android:tooltipText="Copy Configurations" />
+
+        <ImageButton
+            android:id="@+id/btnBulkEdit"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_edit"
+            app:tint="@color/white" />
 
         <ImageButton
             android:id="@+id/btnBulkDelete"

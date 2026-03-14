@@ -42,6 +42,11 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
+            android:name=".EditSalesProductActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
             android:name=".CategoryManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />

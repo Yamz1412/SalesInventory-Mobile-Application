@@ -93,7 +93,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
         loadImage(p.getImagePath(), p.getImageUrl(), holder.productImage);
 
-        // 1. Tapping the whole card -> View Details/Delete
         holder.itemView.setOnClickListener(v -> {
             int currentPos = holder.getAdapterPosition();
             if (currentPos != RecyclerView.NO_POSITION) {
@@ -104,7 +103,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             }
         });
 
-        // 2. Tapping the EDIT button -> Open Edit screen directly
         holder.btnEdit.setOnClickListener(v -> {
             int currentPos = holder.getAdapterPosition();
             if (currentPos != RecyclerView.NO_POSITION) {
@@ -124,12 +122,12 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             holder.btnIncrease.setVisibility(View.VISIBLE);
             holder.btnDecrease.setVisibility(View.VISIBLE);
 
-            // FIXED: Increase logic with thread protection
             holder.btnIncrease.setOnClickListener(v -> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
-                    int newQty = currentProduct.getQuantity() + 1;
+                    // FIX: Replaced int with double
+                    double newQty = currentProduct.getQuantity() + 1;
                     repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                         @Override
                         public void onProductUpdated() {
@@ -152,13 +150,13 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 }
             });
 
-            // FIXED: Decrease logic with thread protection
             holder.btnDecrease.setOnClickListener(v -> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
                     if (currentProduct.getQuantity() > 0) {
-                        int newQty = currentProduct.getQuantity() - 1;
+                        // FIX: Replaced int with double
+                        double newQty = currentProduct.getQuantity() - 1;
                         repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                             @Override
                             public void onProductUpdated() {
@@ -215,24 +213,66 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         }
     }
 
-    // Helper to update both stock text views safely on UI thread
-    private void updateStockDisplay(VH holder, int qty, String unit, int ppu) {
-        String displayStr = qty + (unit != null ? " " + unit : "");
+    // FIX: Safely handles decimals without crashing or rounding off fractions incorrectly
+    private void updateStockDisplay(VH holder, double qty, String unit, int ppu) {
+        String qtyStr = (qty % 1 == 0) ? String.valueOf((long) qty) : String.valueOf(qty);
+        String displayStr = qtyStr + (unit != null ? " " + unit : "");
 
-        if (unit != null) {
-            String u = unit.toLowerCase(Locale.ROOT);
-            if (u.equals("g") && qty >= 1000) {
-                int kg = qty / 1000;
-                int g = qty % 1000;
-                displayStr = kg + " kg" + (g > 0 ? " " + g + " g" : "");
-            } else if (u.equals("ml") && qty >= 1000) {
-                int l = qty / 1000;
-                int ml = qty % 1000;
-                displayStr = l + " L" + (ml > 0 ? " " + ml + " ml" : "");
-            } else if (u.equals("pcs") && ppu > 1) {
-                int boxes = qty / ppu;
-                int pcs = qty % ppu;
-                displayStr = boxes + " box" + (pcs > 0 ? " " + pcs + " pcs" : "");
+        if (unit != null && !unit.isEmpty()) {
+            String u = unit.toLowerCase(Locale.ROOT).trim();
+
+            if (u.equals("g") || u.equals("kg")) {
+                if (u.equals("g") && qty >= 1000) {
+                    long kg = (long) (qty / 1000);
+                    double g = qty % 1000;
+                    String gStr = (g % 1 == 0) ? String.valueOf((long) g) : String.format(Locale.US, "%.2f", g);
+                    displayStr = kg + "kg" + (g > 0 ? " " + gStr + "g" : "");
+                } else {
+                    displayStr = qtyStr + u;
+                }
+            } else if (u.equals("ml") || u.equals("l")) {
+                if (u.equals("ml") && qty >= 1000) {
+                    long l = (long) (qty / 1000);
+                    double ml = qty % 1000;
+                    String mlStr = (ml % 1 == 0) ? String.valueOf((long) ml) : String.format(Locale.US, "%.2f", ml);
+                    displayStr = l + "L" + (ml > 0 ? " " + mlStr + "ml" : "");
+                } else {
+                    displayStr = qtyStr + u;
+                }
+            } else if (u.contains("box") || u.contains("pack")) {
+                if (ppu > 1) {
+                    long packages = (long) (qty / ppu);
+                    double pcs = qty % ppu;
+                    String pcsStr = (pcs % 1 == 0) ? String.valueOf((long) pcs) : String.format(Locale.US, "%.2f", pcs);
+                    String pkgLabel = u.contains("box") ? (packages > 1 ? " boxes" : " box") : (packages > 1 ? " packs" : " pack");
+                    String pcsLabel = (pcs > 1 || pcs != 1.0) ? " pcs" : " pc";
+
+                    if (packages > 0 && pcs > 0) {
+                        displayStr = packages + pkgLabel + " " + pcsStr + pcsLabel;
+                    } else if (packages > 0) {
+                        displayStr = packages + pkgLabel;
+                    } else {
+                        displayStr = pcsStr + pcsLabel;
+                    }
+                } else {
+                    displayStr = qtyStr + " " + u;
+                }
+            } else if (u.equals("pcs")) {
+                if (ppu > 1) {
+                    long packages = (long) (qty / ppu);
+                    double pcs = qty % ppu;
+                    String pcsStr = (pcs % 1 == 0) ? String.valueOf((long) pcs) : String.format(Locale.US, "%.2f", pcs);
+
+                    if (packages > 0 && pcs > 0) {
+                        displayStr = packages + " boxes " + pcsStr + " pcs";
+                    } else if (packages > 0) {
+                        displayStr = packages + (packages > 1 ? " boxes" : " box");
+                    } else {
+                        displayStr = pcsStr + " pcs";
+                    }
+                } else {
+                    displayStr = qtyStr + " pcs";
+                }
             }
         }
 
@@ -246,8 +286,8 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             if (file.exists()) {
                 Glide.with(ctx).load(file)
                         .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .override(200, 200) // Resizes image in memory for faster scrolling
-                        .thumbnail(0.25f)   // Loads a 25% low-res thumbnail instantly
+                        .override(200, 200)
+                        .thumbnail(0.25f)
                         .placeholder(R.drawable.ic_image_placeholder)
                         .error(R.drawable.ic_image_placeholder)
                         .centerCrop()
@@ -258,8 +298,8 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         if (onlineUrl != null && !onlineUrl.isEmpty()) {
             Glide.with(ctx).load(onlineUrl)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .override(200, 200) // Resizes image in memory for faster scrolling
-                    .thumbnail(0.25f)   // Loads a 25% low-res thumbnail instantly
+                    .override(200, 200)
+                    .thumbnail(0.25f)
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .centerCrop()

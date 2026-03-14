@@ -29,8 +29,11 @@ public class ProductEntity {
     public double costPrice;
     @ColumnInfo(name = "sellingPrice")
     public double sellingPrice;
+
+    // CHANGED: Now a double to support fractional inventory (e.g., 4.9 Liters)
     @ColumnInfo(name = "quantity")
-    public int quantity;
+    public double quantity;
+
     @ColumnInfo(name = "reorderLevel")
     public int reorderLevel;
     @ColumnInfo(name = "criticalLevel")

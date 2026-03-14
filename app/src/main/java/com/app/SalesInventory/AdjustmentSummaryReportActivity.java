@@ -133,7 +133,7 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
             holder.tvAdjustmentType.setText(adj.getAdjustmentType());
 
             // Format Quantity explicitly
-            int qty = adj.getQuantityAdjusted();
+            double qty = adj.getQuantityAdjusted();
             if (qty > 0) {
                 holder.tvQuantity.setText("+" + qty);
                 holder.tvQuantity.setTextColor(getResources().getColor(android.R.color.holo_green_dark));

@@ -5,9 +5,9 @@ public class StockAdjustment {
     private String productId;
     private String productName;
     private String adjustmentType;
-    private int quantityBefore;
-    private int quantityAdjusted;
-    private int quantityAfter;
+    private double quantityBefore;
+    private double quantityAdjusted;
+    private double quantityAfter;
     private String reason;
     private String remarks;
     private long timestamp;
@@ -21,8 +21,8 @@ public class StockAdjustment {
     }
 
     public StockAdjustment(String adjustmentId, String productId, String productName,
-                           String adjustmentType, int quantityBefore, int quantityAdjusted,
-                           int quantityAfter, String reason, String remarks,
+                           String adjustmentType, double quantityBefore, double quantityAdjusted,
+                           double quantityAfter, String reason, String remarks,
                            long timestamp, String adjustedBy) {
         this.adjustmentId = adjustmentId;
         this.productId = productId;
@@ -49,13 +49,13 @@ public class StockAdjustment {
     public String getAdjustmentType() { return adjustmentType; }
     public void setAdjustmentType(String adjustmentType) { this.adjustmentType = adjustmentType; }
 
-    public int getQuantityBefore() { return quantityBefore; }
+    public double getQuantityBefore() { return quantityBefore; }
     public void setQuantityBefore(int quantityBefore) { this.quantityBefore = quantityBefore; }
 
-    public int getQuantityAdjusted() { return quantityAdjusted; }
+    public double getQuantityAdjusted() { return quantityAdjusted; }
     public void setQuantityAdjusted(int quantityAdjusted) { this.quantityAdjusted = quantityAdjusted; }
 
-    public int getQuantityAfter() { return quantityAfter; }
+    public double getQuantityAfter() { return quantityAfter; }
     public void setQuantityAfter(int quantityAfter) { this.quantityAfter = quantityAfter; }
 
     public String getReason() { return reason; }

@@ -45,7 +45,7 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
         holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
         holder.category.setText(p.getCategoryName() != null ? p.getCategoryName() : "");
 
-        int qty = p.getQuantity();
+        double qty = p.getQuantity();
         int reorder = p.getReorderLevel();
         int critical = p.getCriticalLevel();
         holder.stockInfo.setText("Stock: " + qty + " | Reorder: " + reorder + " | Critical: " + critical);

@@ -25,7 +25,6 @@ public class SalesRepository {
     private MutableLiveData<Double> totalMonthlyRevenue;
     private MutableLiveData<List<Sales>> recentSales;
 
-    // NEW: Needed to prevent data leaks between logged-in users
     private ListenerRegistration allSalesListener;
     private ListenerRegistration todaySalesListener;
     private ListenerRegistration monthlyRevenueListener;
@@ -61,7 +60,6 @@ public class SalesRepository {
         return instance;
     }
 
-    // --- NEW: CLEARS ALL CACHED DATA AND SHUTS DOWN LISTENERS ---
     public void clearData() {
         if (allSalesListener != null) { allSalesListener.remove(); allSalesListener = null; }
         if (todaySalesListener != null) { todaySalesListener.remove(); todaySalesListener = null; }
@@ -74,7 +72,6 @@ public class SalesRepository {
         recentSales.postValue(new ArrayList<>());
     }
 
-    // --- DATA LOADING METHODS ---
     private void loadOverallRevenue() {
         if (monthlyRevenueListener != null) monthlyRevenueListener.remove();
         monthlyRevenueListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
@@ -196,7 +193,6 @@ public class SalesRepository {
             return;
         }
 
-        // 1. Mark as VOIDED in Firestore
         firestoreManager.getDb().collection("users")
                 .document(ownerId)
                 .collection("sales")
@@ -204,20 +200,19 @@ public class SalesRepository {
                 .update("status", "VOIDED")
                 .addOnSuccessListener(aVoid -> {
 
-                    // 2. Return Stock to Inventory
                     ProductRepository pr = SalesInventoryApplication.getProductRepository();
                     pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
                         @Override
                         public void onProductFetched(Product p) {
                             if (p != null) {
-                                int newQty = p.getQuantity() + sale.getQuantity();
+                                // FIX: Casted correctly to double
+                                double newQty = p.getQuantity() + sale.getQuantity();
                                 pr.updateProductQuantity(p.getProductId(), newQty, null);
                             }
                         }
                         @Override public void onError(String error) {}
                     });
 
-                    // 3. Deduct Money from Wallet
                     String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
                     DocumentReference walletRef = firestoreManager.getDb().collection("users")
                             .document(ownerId).collection("wallets").document(walletId);

@@ -15,7 +15,7 @@ public class SalesOrderItemEntity {
     public long orderLocalId;
     public String productId;
     public String productName;
-    public int quantity;
+    public double quantity;
     public double unitPrice;
     public double lineTotal;
     public String size;
