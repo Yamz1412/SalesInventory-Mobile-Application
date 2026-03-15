@@ -55,7 +55,8 @@ import java.util.Map;
 
 public class AddProductActivity extends BaseActivity {
     private ImageButton btnAddPhoto;
-    private TextInputEditText productNameET, productGroupET, sellingPriceET, quantityET, costPriceET, lowStockLevelET, expiryDateET;
+    private TextInputEditText productNameET, productGroupET, sellingPriceET, quantityET, costPriceET, expiryDateET;
+    private TextView tvStockLevel;
     private Button addBtn, cancelBtn;
     private Spinner unitSpinner, existingGroupSpinner, salesUnitSpinner;
 
@@ -118,7 +119,7 @@ public class AddProductActivity extends BaseActivity {
 
         costPriceET = findViewById(R.id.costPriceET);
         quantityET = findViewById(R.id.quantityET);
-        lowStockLevelET = findViewById(R.id.lowStockLevelET);
+        tvStockLevel = findViewById(R.id.tvStockLevel);
         unitSpinner = findViewById(R.id.unitSpinner);
 
         layoutBuyingUnitQtyCritical = findViewById(R.id.layout_buying_unit_qty_critical);
@@ -162,7 +163,7 @@ public class AddProductActivity extends BaseActivity {
         }
 
         rgProductType.setOnCheckedChangeListener((group, checkedId) -> updateLayoutForSelectedType());
-        updateLayoutForSelectedType(); // Initial UI Setup
+        updateLayoutForSelectedType();
 
         authManager.refreshCurrentUserStatus(success -> {
             if (!authManager.isCurrentUserAdmin()) {
@@ -184,6 +185,17 @@ public class AddProductActivity extends BaseActivity {
 
         checkAndApplyPrefillData();
 
+        // ----------------------------------------------------
+        // NEW: AUTOMATED REAL-TIME LOW STOCK CALCULATION LOGIC
+        // ----------------------------------------------------
+        quantityET.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateAutomatedLowStock();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
         unitSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
@@ -193,30 +205,51 @@ public class AddProductActivity extends BaseActivity {
                 } else {
                     layoutPiecesPerUnit.setVisibility(View.GONE);
                 }
+                updateAutomatedLowStock();
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
+    }
+
+    /**
+     * Calculates 20% of the input stock and dynamically updates the UI threshold
+     */
+    private void updateAutomatedLowStock() {
+        if (tvStockLevel == null) return;
+        try {
+            String qtyStr = quantityET.getText() != null ? quantityET.getText().toString() : "0";
+            double qty = qtyStr.isEmpty() ? 0 : Double.parseDouble(qtyStr);
+            String unit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
+
+            // Standard rule: Alert triggers when stock drops to 20% or below
+            int lowStockThreshold = (int) Math.ceil(qty * 0.20);
+
+            if (qty <= 0) {
+                tvStockLevel.setText("0 " + unit);
+            } else {
+                tvStockLevel.setText(lowStockThreshold + " " + unit);
+            }
+        } catch (Exception e) {
+            tvStockLevel.setText("0");
+        }
     }
 
     private void updateLayoutForSelectedType() {
         int checkedId = rgProductType.getCheckedRadioButtonId();
 
         if (checkedId == R.id.rbTypeSales) {
-            // SALES ONLY
             layoutBuyingUnitQtyCritical.setVisibility(View.GONE);
             if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
             layoutConfigurations.setVisibility(View.VISIBLE);
             layoutDeduction.setVisibility(View.GONE);
             setupCategorySpinner(true);
         } else if (checkedId == R.id.rbTypeBoth) {
-            // BOTH (Bulk Inventory to Sales)
             layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
             if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
-            layoutConfigurations.setVisibility(View.GONE); // Hide configs for dual measurement
+            layoutConfigurations.setVisibility(View.GONE);
             layoutDeduction.setVisibility(View.VISIBLE);
             setupCategorySpinner(true);
         } else {
-            // INVENTORY ONLY
             layoutBuyingUnitQtyCritical.setVisibility(View.VISIBLE);
             if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.GONE);
             layoutConfigurations.setVisibility(View.GONE);
@@ -243,7 +276,6 @@ public class AddProductActivity extends BaseActivity {
         }
 
         if (currentItemBundle != null) {
-            // STRICTLY ENFORCE INVENTORY ONLY FOR PO RECEIPTS
             rgProductType.check(R.id.rbTypeInventory);
             rbTypeSales.setEnabled(false);
             rbTypeBoth.setEnabled(false);
@@ -292,7 +324,7 @@ public class AddProductActivity extends BaseActivity {
         sellingPriceET.setText("");
         costPriceET.setText("");
         quantityET.setText("");
-        lowStockLevelET.setText("");
+        tvStockLevel.setText("0");
         expiryDateET.setText("");
         selectedImagePath = null;
         btnAddPhoto.setImageResource(android.R.drawable.ic_menu_report_image);
@@ -338,12 +370,6 @@ public class AddProductActivity extends BaseActivity {
             AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
             actvItem.setAdapter(autoCompleteAdapter);
 
-            // FIX: Instantly drop down the list when clicked or focused
-            actvItem.setOnClickListener(v -> actvItem.showDropDown());
-            actvItem.setOnFocusChangeListener((v, hasFocus) -> {
-                if (hasFocus) actvItem.showDropDown();
-            });
-
             Spinner spinnerUnit = row.findViewById(R.id.spinnerVariantUnit);
             spinnerUnit.setAdapter(rowUnitAdapter);
 
@@ -361,14 +387,7 @@ public class AddProductActivity extends BaseActivity {
 
                 AutoCompleteTextView actvItem = row.findViewById(R.id.actvVariantItem);
                 actvItem.setAdapter(autoCompleteAdapter);
-
-                // FIX: Instantly drop down the list when clicked or focused
-                actvItem.setOnClickListener(v -> actvItem.showDropDown());
-                actvItem.setOnFocusChangeListener((v, hasFocus) -> {
-                    if (hasFocus) actvItem.showDropDown();
-                });
-
-                actvItem.setText((String) variant.get("variantName"), false); // false prevents popup while setting text
+                actvItem.setText((String) variant.get("variantName"));
 
                 EditText etQty = row.findViewById(R.id.etVariantQty);
                 etQty.setText(String.valueOf(variant.get("deductQty")));
@@ -616,7 +635,6 @@ public class AddProductActivity extends BaseActivity {
         Button btnCancel = view.findViewById(R.id.btnCancel);
         Button btnSave = view.findViewById(R.id.btnSave);
 
-        // Fetch Inventory items to show in the searchable Dropdown
         List<String> inventoryNames = new ArrayList<>();
         for (Product p : inventoryProducts) {
             inventoryNames.add(p.getProductName());
@@ -628,15 +646,7 @@ public class AddProductActivity extends BaseActivity {
                 View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
 
                 AutoCompleteTextView actvLinked = row.findViewById(R.id.actvLinkedInventory);
-                if (actvLinked != null) {
-                    actvLinked.setAdapter(autoCompleteAdapter);
-
-                    // FIX: Instantly drop down the list when clicked or focused
-                    actvLinked.setOnClickListener(v -> actvLinked.showDropDown());
-                    actvLinked.setOnFocusChangeListener((v, hasFocus) -> {
-                        if (hasFocus) actvLinked.showDropDown();
-                    });
-                }
+                if (actvLinked != null) actvLinked.setAdapter(autoCompleteAdapter);
 
                 View btnDelete = row.findViewById(R.id.btnDelete);
                 if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
@@ -657,15 +667,8 @@ public class AddProductActivity extends BaseActivity {
 
                     if (actvLinked != null) {
                         actvLinked.setAdapter(autoCompleteAdapter);
-
-                        // FIX: Instantly drop down the list when clicked or focused
-                        actvLinked.setOnClickListener(v -> actvLinked.showDropDown());
-                        actvLinked.setOnFocusChangeListener((v, hasFocus) -> {
-                            if (hasFocus) actvLinked.showDropDown();
-                        });
-
                         String linked = (String) size.get("linkedMaterial");
-                        if (linked != null) actvLinked.setText(linked, false);
+                        if (linked != null) actvLinked.setText(linked);
                     }
 
                     if (etName != null) etName.setText((String) size.get("name"));
@@ -699,7 +702,6 @@ public class AddProductActivity extends BaseActivity {
                         map.put("name", name);
                         map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
 
-                        // Automatically link to deduct 1 Unit
                         if (!linkedMaterial.isEmpty()) {
                             map.put("linkedMaterial", linkedMaterial);
                             map.put("deductQty", 1.0);
@@ -986,7 +988,12 @@ public class AddProductActivity extends BaseActivity {
         } else {
             try { costPrice = Double.parseDouble(costPriceET.getText() != null ? costPriceET.getText().toString() : "0"); } catch (Exception ignored) {}
             try { qty = Integer.parseInt(quantityET.getText() != null ? quantityET.getText().toString() : "0"); } catch (Exception ignored) {}
-            try { reorderLevel = Integer.parseInt(lowStockLevelET.getText() != null ? lowStockLevelET.getText().toString() : "0"); } catch (Exception ignored) {}
+
+            // ----------------------------------------------------
+            // NEW: AUTOMATICALLY ASSIGN 20% AS LOW STOCK LEVEL
+            // ----------------------------------------------------
+            reorderLevel = (int) Math.ceil(qty * 0.20);
+
             criticalLevel = 1;
             if (qty < 0) qty = 0;
             if (reorderLevel < 0) reorderLevel = 0;
@@ -1007,7 +1014,7 @@ public class AddProductActivity extends BaseActivity {
         p.setCostPrice(costPrice);
         p.setQuantity(qty);
         p.setCriticalLevel(criticalLevel);
-        p.setReorderLevel(reorderLevel);
+        p.setReorderLevel(reorderLevel); // Automated threshold saved here
         p.setCeilingLevel(ceilingLevel);
         p.setUnit(unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "");
         p.setExpiryDate(expiryDate);
@@ -1026,7 +1033,6 @@ public class AddProductActivity extends BaseActivity {
         p.setImagePath(selectedImagePath);
         p.setOwnerAdminId(currentUserId);
 
-        // Save Configurations if applicable
         if (checkedTabId == R.id.rbTypeSales) {
             if (!savedVariants.isEmpty()) p.setVariantsList(savedVariants);
             if (!savedSizes.isEmpty()) p.setSizesList(savedSizes);

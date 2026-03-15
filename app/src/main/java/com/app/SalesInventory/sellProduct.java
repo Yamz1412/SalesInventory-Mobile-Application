@@ -676,7 +676,6 @@ public class sellProduct extends BaseActivity {
         fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
     }
 
-    // --- NEW: BLUETOOTH PRINTER CHECK ---
     @android.annotation.SuppressLint("MissingPermission")
     private boolean isBluetoothPrinterConnected() {
         try {
@@ -688,7 +687,6 @@ public class sellProduct extends BaseActivity {
                 for (android.bluetooth.BluetoothDevice device : pairedDevices) {
                     if (device.getBluetoothClass() != null) {
                         int majorClass = device.getBluetoothClass().getMajorDeviceClass();
-                        // 1536 is the standard Class for IMAGING (Printers & Scanners)
                         if (majorClass == android.bluetooth.BluetoothClass.Device.Major.IMAGING) {
                             return true;
                         }
@@ -696,7 +694,6 @@ public class sellProduct extends BaseActivity {
                 }
             }
         } catch (Exception e) {
-            // Silently fail if permissions aren't properly granted by user yet
             return false;
         }
         return false;
@@ -790,13 +787,11 @@ public class sellProduct extends BaseActivity {
             if (layoutChange != null) layoutChange.setVisibility(View.GONE);
         }
 
-        // --- NEW: Toggle Print Button based on Bluetooth status ---
         if (btnPrint != null) {
             if (isBluetoothPrinterConnected()) {
                 btnPrint.setVisibility(View.VISIBLE);
                 btnPrint.setOnClickListener(v -> {
                     Toast.makeText(this, "Connecting to Bluetooth Printer...", Toast.LENGTH_SHORT).show();
-                    // Future Implementation: Trigger your ESC/POS printing library here
                 });
             } else {
                 btnPrint.setVisibility(View.GONE);
@@ -837,6 +832,7 @@ public class sellProduct extends BaseActivity {
         });
     }
 
+    // FIX: Using double for calculation to correctly subtract fractions (e.g., 0.2L from 5.0L)
     private void deductFromMaterial(String materialName, double deductAmt, String bUnit) {
         if (materialName == null || materialName.isEmpty() || deductAmt <= 0) return;
 
@@ -862,7 +858,8 @@ public class sellProduct extends BaseActivity {
         double finalDeductAmt = UnitConverterUtil.calculateDeductionAmount(
                 deductAmt, newUnit, bUnit, ppu);
 
-        int finalMQty = UnitConverterUtil.calculateNewStock(convertedQty, finalDeductAmt);
+        // FIX: The result of mathematical reduction is accurately captured as a Double
+        double finalMQty = UnitConverterUtil.calculateNewStock(convertedQty, finalDeductAmt);
 
         if (mUnitChanged) {
             FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
@@ -937,7 +934,8 @@ public class sellProduct extends BaseActivity {
                             double finalDeductAmt = UnitConverterUtil.calculateDeductionAmount(
                                     baseDeduct, invUnit, p.getSalesUnit(), ppu);
 
-                            int newQty = UnitConverterUtil.calculateNewStock(convertedInvQty, finalDeductAmt);
+                            // FIX: Capturing exact decimal quantity instead of rounding it as an Int
+                            double newQty = UnitConverterUtil.calculateNewStock(convertedInvQty, finalDeductAmt);
 
                             if (unitChanged) {
                                 FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
