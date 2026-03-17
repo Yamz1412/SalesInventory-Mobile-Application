@@ -13,7 +13,7 @@ import com.bumptech.glide.Glide;
 
 public class ProductDetailActivity extends BaseActivity {
 
-    private TextView tvName, tvCategory, tvType, tvPrice, tvCost, tvQty, tvUnit, tvExpiry;
+    private TextView tvName, tvProductLine, tvCategory, tvType, tvPrice, tvCost, tvQty, tvUnit, tvExpiry;
     private ImageView imgProduct;
     private Button btnDelete; // btnEdit has been removed to match your XML
 
@@ -37,6 +37,7 @@ public class ProductDetailActivity extends BaseActivity {
         tvExpiry = findViewById(R.id.tvDetailExpiry);
         imgProduct = findViewById(R.id.imgDetailProduct);
         btnDelete = findViewById(R.id.btnDeleteProduct);
+        tvProductLine = findViewById(R.id.tvDetailProductLine); // NEW
 
         productRepository = SalesInventoryApplication.getProductRepository();
 
@@ -89,6 +90,8 @@ public class ProductDetailActivity extends BaseActivity {
         tvCost.setText("Buying Price: ₱" + String.format(java.util.Locale.US, "%.2f", p.getCostPrice()));
         tvQty.setText("Current Stock: " + p.getQuantity());
         tvUnit.setText("Unit: " + (p.getUnit() != null ? p.getUnit() : ""));
+        String pLine = p.getProductLine() != null && !p.getProductLine().isEmpty() ? p.getProductLine() : "None Assigned";
+        tvProductLine.setText("Product Line: " + pLine);
 
         if (p.getExpiryDate() > 0) {
             java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault());

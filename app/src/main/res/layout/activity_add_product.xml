@@ -53,34 +53,39 @@
             android:layout_marginBottom="20dp">
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="0dp"
-                android:layout_weight="1.2"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp">
+                android:layout_weight="1"
+                android:layout_marginRight="8dp"
+                android:layout_marginBottom="15dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/productGroupET"
+                <AutoCompleteTextView
+                    android:id="@+id/productCategoryET"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="?attr/colorOnBackground"
                     android:hint="Product Category" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <LinearLayout
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layoutProductLine"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="0dp"
-                android:layout_height="55dp"
-                android:layout_weight="0.8"
-                android:background="@drawable/edite_round"
-                android:backgroundTint="@color/dirtyWhite"
-                android:padding="5dp">
+                android:layout_marginLeft="3dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginBottom="15dp">
 
-                <Spinner
-                    android:id="@+id/existingGroupSpinner"
+                <AutoCompleteTextView
+                    android:id="@+id/productLineET"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:spinnerMode="dropdown"/>
-            </LinearLayout>
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Product Line (e.g. Core, Seasonal, Retail)"
+                    android:inputType="text" />
+            </com.google.android.material.textfield.TextInputLayout>
+
         </LinearLayout>
 
         <TextView
@@ -219,7 +224,44 @@
                         android:textColor="#E65100" />
                 </LinearLayout>
             </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                android:layout_marginBottom="15dp">
 
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/leadTimeDaysET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Lead Time (Days)" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/safetyStockET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Safety Stock Qty" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -322,7 +364,7 @@
                 </LinearLayout>
 
                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ingredients" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
                     <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                 </LinearLayout>
             </LinearLayout>

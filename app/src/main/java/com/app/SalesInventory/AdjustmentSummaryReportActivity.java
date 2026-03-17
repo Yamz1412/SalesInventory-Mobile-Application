@@ -1,9 +1,8 @@
 package com.app.SalesInventory;
 
+import android.app.DatePickerDialog;
 import android.os.Bundle;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -20,22 +19,33 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class AdjustmentSummaryReportActivity extends BaseActivity {
 
-    private TextView tvTotalAdjustments, tvNoData;
-    private Button btnExportCSV;
+    private TextView tvTotalItems, tvTotalAdditions, tvTotalRemovals, tvNoData;
+    private Button btnDateFilter;
     private ProgressBar progressBar;
     private RecyclerView recyclerViewReport;
 
     private DatabaseReference adjustmentRef;
     private String currentOwnerId;
-    private List<StockAdjustment> adjustmentList = new ArrayList<>();
-    private AdjustmentAdapter adapter;
+
+    // Master list of raw Firebase data
+    private List<StockAdjustment> masterAdjustmentList = new ArrayList<>();
+
+    // Processed Summary List for Adapter
+    private List<AdjustmentSummaryReport> summaryList = new ArrayList<>();
+    private AdjustmentSummaryAdapter adapter;
+
+    // Filter
+    private long filterStartDate = 0;
+    private long filterEndDate = System.currentTimeMillis();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,28 +53,57 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         setContentView(R.layout.activity_adjustment_summary_report);
 
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Stock Adjustments");
+            getSupportActionBar().setTitle("Adjustment Summary");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
 
-        tvTotalAdjustments = findViewById(R.id.tvTotalAdjustments);
+        initializeViews();
+        setupFilters();
+        loadAdjustments();
+    }
+
+    private void initializeViews() {
+        tvTotalItems = findViewById(R.id.tvTotalItems);
+        tvTotalAdditions = findViewById(R.id.tvTotalAdditions);
+        tvTotalRemovals = findViewById(R.id.tvTotalRemovals);
         tvNoData = findViewById(R.id.tvNoData);
-        btnExportCSV = findViewById(R.id.btnExportCSV);
+        btnDateFilter = findViewById(R.id.btnDateFilter);
         progressBar = findViewById(R.id.progressBar);
         recyclerViewReport = findViewById(R.id.recyclerViewReport);
 
         recyclerViewReport.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new AdjustmentAdapter();
+        adapter = new AdjustmentSummaryAdapter(summaryList);
         recyclerViewReport.setAdapter(adapter);
+    }
 
-        btnExportCSV.setOnClickListener(v -> {
-            // Add CSV Export Logic here if needed
+    private void setupFilters() {
+        btnDateFilter.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth, 0, 0, 0);
+                filterStartDate = calendar.getTimeInMillis();
+
+                calendar.set(year, month, dayOfMonth, 23, 59, 59);
+                filterEndDate = calendar.getTimeInMillis();
+
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                btnDateFilter.setText("Filter: " + sdf.format(calendar.getTime()));
+
+                applyFilterAndGroup();
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
         });
 
-        loadAdjustments();
+        // Long press to reset filter
+        btnDateFilter.setOnLongClickListener(v -> {
+            filterStartDate = 0;
+            filterEndDate = System.currentTimeMillis();
+            btnDateFilter.setText("Filter by Date: All Time");
+            applyFilterAndGroup();
+            return true;
+        });
     }
 
     private void loadAdjustments() {
@@ -72,34 +111,18 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                adjustmentList.clear();
-                int totalAdjustments = 0;
+                masterAdjustmentList.clear();
 
                 for (DataSnapshot ds : snapshot.getChildren()) {
                     StockAdjustment adj = ds.getValue(StockAdjustment.class);
                     if (adj != null) {
                         String owner = ds.child("ownerAdminId").getValue(String.class);
                         if (currentOwnerId.equals(owner) || currentOwnerId.equals(adj.getOwnerAdminId())) {
-                            adjustmentList.add(adj);
-                            totalAdjustments++;
+                            masterAdjustmentList.add(adj);
                         }
                     }
                 }
-
-                // Sort by most recent first
-                Collections.sort(adjustmentList, (a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
-
-                tvTotalAdjustments.setText(String.valueOf(totalAdjustments));
-                progressBar.setVisibility(View.GONE);
-
-                if (adjustmentList.isEmpty()) {
-                    tvNoData.setVisibility(View.VISIBLE);
-                    recyclerViewReport.setVisibility(View.GONE);
-                } else {
-                    tvNoData.setVisibility(View.GONE);
-                    recyclerViewReport.setVisibility(View.VISIBLE);
-                    adapter.notifyDataSetChanged();
-                }
+                applyFilterAndGroup();
             }
 
             @Override
@@ -109,63 +132,75 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         });
     }
 
+    private void applyFilterAndGroup() {
+        Map<String, AdjustmentSummaryReport> groupMap = new HashMap<>();
+
+        double overallAdditions = 0.0;
+        double overallRemovals = 0.0;
+
+        for (StockAdjustment adj : masterAdjustmentList) {
+            long adjDate = adj.getTimestamp();
+
+            // Check Date Filter
+            if (filterStartDate == 0 || (adjDate >= filterStartDate && adjDate <= filterEndDate)) {
+
+                String pId = adj.getProductId();
+                if (pId == null) continue;
+
+                // Get or Create Report Object for this Product
+                AdjustmentSummaryReport report = groupMap.get(pId);
+                if (report == null) {
+                    report = new AdjustmentSummaryReport(pId, adj.getProductName() != null ? adj.getProductName() : "Unknown Item");
+                    groupMap.put(pId, report);
+                }
+
+                // Process Additions vs Removals
+                double qty = adj.getQuantityAdjusted();
+                if ("Add Stock".equalsIgnoreCase(adj.getAdjustmentType())) {
+                    report.addAddition(qty);
+                    overallAdditions += qty;
+                } else {
+                    report.addRemoval(Math.abs(qty));
+                    overallRemovals += Math.abs(qty);
+                }
+
+                // Save Reason
+                report.addReason(adj.getReason());
+            }
+        }
+
+        // Convert Map to List for the Adapter
+        summaryList.clear();
+        summaryList.addAll(groupMap.values());
+
+        // Sort alphabetically by product name
+        Collections.sort(summaryList, (r1, r2) -> r1.getProductName().compareToIgnoreCase(r2.getProductName()));
+
+        // Update Dashboard Cards
+        tvTotalItems.setText(String.valueOf(summaryList.size()));
+        tvTotalAdditions.setText("+" + formatQuantity(overallAdditions));
+        tvTotalRemovals.setText("-" + formatQuantity(overallRemovals));
+
+        progressBar.setVisibility(View.GONE);
+
+        if (summaryList.isEmpty()) {
+            tvNoData.setVisibility(View.VISIBLE);
+            recyclerViewReport.setVisibility(View.GONE);
+        } else {
+            tvNoData.setVisibility(View.GONE);
+            recyclerViewReport.setVisibility(View.VISIBLE);
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+    private String formatQuantity(double value) {
+        if (value % 1 == 0) return String.valueOf((long) value);
+        return String.format(Locale.US, "%.2f", value);
+    }
+
     @Override
     public boolean onSupportNavigateUp() {
         onBackPressed();
         return true;
-    }
-
-    private class AdjustmentAdapter extends RecyclerView.Adapter<AdjustmentAdapter.ViewHolder> {
-        private SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_stock_adjustment, parent, false);
-            return new ViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            StockAdjustment adj = adjustmentList.get(position);
-
-            holder.tvProductName.setText(adj.getProductName());
-            holder.tvAdjustmentType.setText(adj.getAdjustmentType());
-
-            // Format Quantity explicitly
-            double qty = adj.getQuantityAdjusted();
-            if (qty > 0) {
-                holder.tvQuantity.setText("+" + qty);
-                holder.tvQuantity.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-                holder.tvAdjustmentType.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-            } else {
-                holder.tvQuantity.setText(String.valueOf(qty));
-                holder.tvQuantity.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
-                holder.tvAdjustmentType.setTextColor(getResources().getColor(android.R.color.holo_red_dark));
-            }
-
-            holder.tvRemarks.setText(adj.getReason() != null ? adj.getReason() : "No remarks");
-            holder.tvDate.setText(sdf.format(new Date(adj.getTimestamp())));
-            holder.tvAdjustedBy.setText("By: " + (adj.getAdjustedBy() != null ? adj.getAdjustedBy() : "Admin"));
-        }
-
-        @Override
-        public int getItemCount() {
-            return adjustmentList.size();
-        }
-
-        class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvProductName, tvAdjustmentType, tvQuantity, tvRemarks, tvDate, tvAdjustedBy;
-
-            ViewHolder(View itemView) {
-                super(itemView);
-                tvProductName = itemView.findViewById(R.id.tvProductName);
-                tvAdjustmentType = itemView.findViewById(R.id.tvAdjustmentType);
-                tvQuantity = itemView.findViewById(R.id.tvQuantity);
-                tvRemarks = itemView.findViewById(R.id.tvRemarks);
-                tvDate = itemView.findViewById(R.id.tvDate);
-                tvAdjustedBy = itemView.findViewById(R.id.tvAdjustedBy);
-            }
-        }
     }
 }

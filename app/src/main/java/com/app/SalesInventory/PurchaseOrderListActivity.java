@@ -23,9 +23,10 @@ import com.google.firebase.database.ValueEventListener;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class PurchaseOrderListActivity extends BaseActivity  {
 
@@ -55,6 +56,10 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
 
+        // TRIGGER MOCK DATA INJECTIONS FOR PANELISTS
+        injectMockPOs();
+        injectMockReturns();
+
         loadPurchaseOrders();
 
         btnCreatePO.setOnClickListener(v -> {
@@ -73,8 +78,228 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         });
     }
 
+    /**
+     * MOCK DATA INJECTOR FOR SUPPLIER RETURNS
+     * Creates realistic returns for damaged/expired products
+     */
+    private void injectMockReturns() {
+        String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentAdminId == null || currentAdminId.isEmpty()) {
+            currentAdminId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (currentAdminId == null) return;
+
+        final String adminId = currentAdminId;
+        DatabaseReference returnsRef = FirebaseDatabase.getInstance().getReference("Returns");
+
+        returnsRef.orderByChild("ownerAdminId").equalTo(adminId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean hasMock = false;
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String reason = ds.child("reason").getValue(String.class);
+                    if (reason != null && reason.contains("[MOCK]")) {
+                        hasMock = true;
+                        break;
+                    }
+                }
+                if (!hasMock) {
+                    generateMockReturns(adminId, returnsRef);
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    private void generateMockReturns(String adminId, DatabaseReference returnsRef) {
+        long now = System.currentTimeMillis();
+        long oneDay = 24L * 60 * 60 * 1000L;
+
+        // RETURN 1: Damaged in Transit (Syrup Bottles)
+        Map<String, Object> ret1 = new HashMap<>();
+        ret1.put("ownerAdminId", adminId);
+        ret1.put("date", now - (14 * oneDay));
+        ret1.put("supplierName", "Sweet Syrups Inc.");
+        ret1.put("reason", "Damaged during transit (Shattered bottles) [MOCK]");
+        List<Map<String, Object>> items1 = new ArrayList<>();
+        Map<String, Object> item1a = new HashMap<>();
+        item1a.put("productName", "Vanilla Syrup");
+        item1a.put("returnQty", 2);
+        item1a.put("unit", "bottle");
+        items1.add(item1a);
+        ret1.put("items", items1);
+
+        // RETURN 2: Spoiled / Near Expiry Delivery
+        Map<String, Object> ret2 = new HashMap<>();
+        ret2.put("ownerAdminId", adminId);
+        ret2.put("date", now - (5 * oneDay));
+        ret2.put("supplierName", "Daily Dairy Suppliers");
+        ret2.put("reason", "Delivered milk was already sour/spoiled upon arrival [MOCK]");
+        List<Map<String, Object>> items2 = new ArrayList<>();
+        Map<String, Object> item2a = new HashMap<>();
+        item2a.put("productName", "Fresh Whole Milk");
+        item2a.put("returnQty", 10);
+        item2a.put("unit", "L");
+        items2.add(item2a);
+        ret2.put("items", items2);
+
+        // RETURN 3: Wrong Item Delivered
+        Map<String, Object> ret3 = new HashMap<>();
+        ret3.put("ownerAdminId", adminId);
+        ret3.put("date", now - (25 * oneDay));
+        ret3.put("supplierName", "Packaging Pros");
+        ret3.put("reason", "Wrong sizes delivered (Received 12oz cups instead of 16oz) [MOCK]");
+        List<Map<String, Object>> items3 = new ArrayList<>();
+        Map<String, Object> item3a = new HashMap<>();
+        item3a.put("productName", "16oz Plastic Cups");
+        item3a.put("returnQty", 5);
+        item3a.put("unit", "box");
+        items3.add(item3a);
+        ret3.put("items", items3);
+
+        // Save to Firebase
+        returnsRef.push().setValue(ret1);
+        returnsRef.push().setValue(ret2);
+        returnsRef.push().setValue(ret3);
+    }
+
+    /**
+     * MOCK DATA INJECTOR FOR PURCHASE ORDERS
+     */
+    private void injectMockPOs() {
+        String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentAdminId == null || currentAdminId.isEmpty()) {
+            currentAdminId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (currentAdminId == null) return;
+
+        final String adminId = currentAdminId;
+
+        poRef.orderByChild("ownerAdminId").equalTo(adminId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean hasMock = false;
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    PurchaseOrder po = ds.getValue(PurchaseOrder.class);
+                    if (po != null && po.getPoNumber() != null && po.getPoNumber().startsWith("PO-MOCK-")) {
+                        hasMock = true;
+                        break;
+                    }
+                }
+                if (!hasMock) {
+                    generateMockData(adminId);
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    private void generateMockData(String adminId) {
+        long now = System.currentTimeMillis();
+        long oneDay = 24L * 60 * 60 * 1000L;
+
+        List<PurchaseOrder> mockPOs = new ArrayList<>();
+
+        // 1. COMPLETED - Coffee Beans
+        List<POItem> items1 = new ArrayList<>();
+        items1.add(new POItem("MOCK-P1", "Arabica Beans", 10, 800.0, "kg"));
+        items1.get(0).setReceivedQuantity(10);
+        items1.add(new POItem("MOCK-P2", "Robusta Beans", 5, 600.0, "kg"));
+        items1.get(1).setReceivedQuantity(5);
+        PurchaseOrder po1 = new PurchaseOrder("MOCK-PO-1", "PO-MOCK-1001", "Bean Crafters Co.", "09171234567", PurchaseOrder.STATUS_COMPLETED, now - (30 * oneDay), 11000.0, items1);
+        po1.setOwnerAdminId(adminId); po1.setExpectedDeliveryDate(now - (28 * oneDay));
+        mockPOs.add(po1);
+
+        // 2. PARTIAL - Packaging
+        List<POItem> items2 = new ArrayList<>();
+        items2.add(new POItem("MOCK-P3", "16oz Plastic Cups", 20, 150.0, "box"));
+        items2.get(0).setReceivedQuantity(10); // Missing 10
+        items2.add(new POItem("MOCK-P4", "Dome Lids", 20, 100.0, "box"));
+        items2.get(1).setReceivedQuantity(20); // Fully received
+        PurchaseOrder po2 = new PurchaseOrder("MOCK-PO-2", "PO-MOCK-1002", "Packaging Pros", "09179876543", PurchaseOrder.STATUS_PARTIAL, now - (15 * oneDay), 5000.0, items2);
+        po2.setOwnerAdminId(adminId); po2.setExpectedDeliveryDate(now - (10 * oneDay));
+        po2.setDeliveryNote("Supplier ran out of 16oz cups. Will deliver remaining next week.");
+        mockPOs.add(po2);
+
+        // 3. PENDING - Syrups
+        List<POItem> items3 = new ArrayList<>();
+        items3.add(new POItem("MOCK-P5", "Vanilla Syrup", 12, 350.0, "bottle"));
+        items3.add(new POItem("MOCK-P6", "Caramel Sauce", 6, 450.0, "bottle"));
+        PurchaseOrder po3 = new PurchaseOrder("MOCK-PO-3", "PO-MOCK-1003", "Sweet Syrups Inc.", "09181112222", PurchaseOrder.STATUS_PENDING, now - (2 * oneDay), 6900.0, items3);
+        po3.setOwnerAdminId(adminId); po3.setExpectedDeliveryDate(now + (2 * oneDay));
+        mockPOs.add(po3);
+
+        // 4. COMPLETED - Dairy
+        List<POItem> items4 = new ArrayList<>();
+        items4.add(new POItem("MOCK-P7", "Fresh Whole Milk", 50, 95.0, "L"));
+        items4.get(0).setReceivedQuantity(50);
+        items4.add(new POItem("MOCK-P8", "Oat Milk", 20, 180.0, "L"));
+        items4.get(1).setReceivedQuantity(20);
+        PurchaseOrder po4 = new PurchaseOrder("MOCK-PO-4", "PO-MOCK-1004", "Daily Dairy Suppliers", "09193334444", PurchaseOrder.STATUS_COMPLETED, now - (20 * oneDay), 8350.0, items4);
+        po4.setOwnerAdminId(adminId); po4.setExpectedDeliveryDate(now - (19 * oneDay));
+        mockPOs.add(po4);
+
+        // 5. CANCELLED - Cleaning Supplies
+        List<POItem> items5 = new ArrayList<>();
+        items5.add(new POItem("MOCK-P9", "Bleach", 5, 120.0, "gal"));
+        PurchaseOrder po5 = new PurchaseOrder("MOCK-PO-5", "PO-MOCK-1005", "Clean & Clear Goods", "09205556666", PurchaseOrder.STATUS_CANCELLED, now - (40 * oneDay), 600.0, items5);
+        po5.setOwnerAdminId(adminId);
+        po5.setDeliveryNote("Cancelled due to extreme delay in shipping. Ordered from elsewhere.");
+        mockPOs.add(po5);
+
+        // 6. COMPLETED - Pastries
+        List<POItem> items6 = new ArrayList<>();
+        items6.add(new POItem("MOCK-P10", "Butter Croissants", 100, 45.0, "pcs"));
+        items6.get(0).setReceivedQuantity(100);
+        items6.add(new POItem("MOCK-P11", "Blueberry Muffins", 50, 55.0, "pcs"));
+        items6.get(1).setReceivedQuantity(50);
+        PurchaseOrder po6 = new PurchaseOrder("MOCK-PO-6", "PO-MOCK-1006", "City Bakery", "09217778888", PurchaseOrder.STATUS_COMPLETED, now - (5 * oneDay), 7250.0, items6);
+        po6.setOwnerAdminId(adminId); po6.setExpectedDeliveryDate(now - (4 * oneDay));
+        mockPOs.add(po6);
+
+        // 7. PENDING - Matcha & Cocoa
+        List<POItem> items7 = new ArrayList<>();
+        items7.add(new POItem("MOCK-P12", "Premium Matcha Powder", 5, 1200.0, "kg"));
+        items7.add(new POItem("MOCK-P13", "Dutch Cocoa Powder", 10, 600.0, "kg"));
+        PurchaseOrder po7 = new PurchaseOrder("MOCK-PO-7", "PO-MOCK-1007", "Asian Imports Ltd.", "09229990000", PurchaseOrder.STATUS_PENDING, now - (1 * oneDay), 12000.0, items7);
+        po7.setOwnerAdminId(adminId); po7.setExpectedDeliveryDate(now + (4 * oneDay));
+        mockPOs.add(po7);
+
+        // 8. PARTIAL - Paper Straws & Napkins
+        List<POItem> items8 = new ArrayList<>();
+        items8.add(new POItem("MOCK-P14", "Paper Straws", 30, 100.0, "box"));
+        items8.get(0).setReceivedQuantity(30);
+        items8.add(new POItem("MOCK-P15", "Branded Tissue Napkins", 50, 80.0, "pack"));
+        items8.get(1).setReceivedQuantity(10); // Missing 40 packs
+        PurchaseOrder po8 = new PurchaseOrder("MOCK-PO-8", "PO-MOCK-1008", "Packaging Pros", "09179876543", PurchaseOrder.STATUS_PARTIAL, now - (12 * oneDay), 7000.0, items8);
+        po8.setOwnerAdminId(adminId); po8.setExpectedDeliveryDate(now - (8 * oneDay));
+        po8.setDeliveryNote("Tissues are on backorder.");
+        mockPOs.add(po8);
+
+        // 9. COMPLETED - Premium Espresso
+        List<POItem> items9 = new ArrayList<>();
+        items9.add(new POItem("MOCK-P16", "House Blend Espresso", 20, 900.0, "kg"));
+        items9.get(0).setReceivedQuantity(20);
+        PurchaseOrder po9 = new PurchaseOrder("MOCK-PO-9", "PO-MOCK-1009", "Bean Crafters Co.", "09171234567", PurchaseOrder.STATUS_COMPLETED, now - (60 * oneDay), 18000.0, items9);
+        po9.setOwnerAdminId(adminId); po9.setExpectedDeliveryDate(now - (58 * oneDay));
+        mockPOs.add(po9);
+
+        // 10. PENDING - Sugar & Sweeteners
+        List<POItem> items10 = new ArrayList<>();
+        items10.add(new POItem("MOCK-P17", "White Sugar", 50, 65.0, "kg"));
+        items10.add(new POItem("MOCK-P18", "Brown Sugar", 50, 70.0, "kg"));
+        PurchaseOrder po10 = new PurchaseOrder("MOCK-PO-10", "PO-MOCK-1010", "Sweet Syrups Inc.", "09181112222", PurchaseOrder.STATUS_PENDING, now, 6750.0, items10);
+        po10.setOwnerAdminId(adminId); po10.setExpectedDeliveryDate(now + (3 * oneDay));
+        mockPOs.add(po10);
+
+        // Save all to database using toMap() safely
+        for (PurchaseOrder po : mockPOs) {
+            poRef.child(po.getPoId()).setValue(po.toMap());
+        }
+        Toast.makeText(this, "Mock Purchase Orders & Returns Injected!", Toast.LENGTH_LONG).show();
+    }
+
     private void loadPurchaseOrders() {
-        // FIX: Ensure we use the Business Owner's ID to fetch the unified list
         String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (currentAdminId == null || currentAdminId.isEmpty()) {
             currentAdminId = AuthManager.getInstance().getCurrentUserId();
@@ -200,11 +425,19 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
             int color;
             switch (po.getStatus().toUpperCase()) {
-                case "RECEIVED": color = getResources().getColor(R.color.successGreen); break;
-                case "PENDING": color = getResources().getColor(R.color.warningYellow); break;
-                case "PARTIAL": color = getResources().getColor(R.color.warningYellow); break;
-                case "CANCELLED": color = getResources().getColor(R.color.errorRed); break;
-                default: color = getResources().getColor(R.color.textColorSecondary);
+                case "RECEIVED":
+                case "COMPLETED": // ADDED: Completed shares success color
+                    color = getResources().getColor(R.color.successGreen);
+                    break;
+                case "PENDING":
+                case "PARTIAL":
+                    color = getResources().getColor(R.color.warningYellow);
+                    break;
+                case "CANCELLED":
+                    color = getResources().getColor(R.color.errorRed);
+                    break;
+                default:
+                    color = getResources().getColor(R.color.textColorSecondary);
             }
             holder.tvStatus.setTextColor(color);
         }

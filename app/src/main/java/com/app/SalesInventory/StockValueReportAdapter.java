@@ -34,20 +34,26 @@ public class StockValueReportAdapter extends RecyclerView.Adapter<StockValueRepo
         holder.tvProductName.setText(report.getProductName());
         holder.tvCategory.setText("Category: " + report.getCategory());
         holder.tvQuantity.setText("Qty: " + report.getQuantity() + " units");
-        holder.tvFloor.setText("Floor: " + report.getFloorLevel());
-        holder.tvCostValue.setText("Cost Value: ₱" + String.format(Locale.getDefault(), "%.2f", report.getTotalCostValue()));
-        holder.tvSellingValue.setText("Selling Value: ₱" + String.format(Locale.getDefault(), "%.2f", report.getTotalSellingValue()));
-        holder.tvProfit.setText("Profit: ₱" + String.format(Locale.getDefault(), "%.2f", report.getProfit()));
+
+        holder.tvCostValue.setText(String.format(Locale.getDefault(), "Cost: ₱%,.2f", report.getTotalCostValue()));
+        holder.tvSellingValue.setText(String.format(Locale.getDefault(), "Selling: ₱%,.2f", report.getTotalSellingValue()));
+        holder.tvProfit.setText(String.format(Locale.getDefault(), "Profit: ₱%,.2f", report.getProfit()));
         holder.tvMargin.setText("Margin: " + report.getProfitMargin());
 
-        switch (report.getStockStatus()) {
+        // Display the Automated Stock Numbers
+        if (holder.tvCeiling != null) holder.tvCeiling.setText("Max: " + report.getCeilingLevel());
+        if (holder.tvReorder != null) holder.tvReorder.setText("Reorder: " + report.getReorderLevel());
+        if (holder.tvCritical != null) holder.tvCritical.setText("Critical: " + report.getCriticalLevel());
+
+        String status = report.getStockStatus();
+        switch (status) {
             case "CRITICAL":
                 holder.tvStatus.setTextColor(context.getResources().getColor(R.color.errorRed));
-                holder.tvStatus.setText("🔴 CRITICAL");
+                holder.tvStatus.setText("⚠️ CRITICAL");
                 break;
-            case "LOW":
+            case "LOW STOCK":
                 holder.tvStatus.setTextColor(context.getResources().getColor(R.color.warningYellow));
-                holder.tvStatus.setText("🟡 LOW");
+                holder.tvStatus.setText("⚠️ LOW STOCK");
                 break;
             case "NORMAL":
                 holder.tvStatus.setTextColor(context.getResources().getColor(R.color.colorPrimary));
@@ -69,8 +75,10 @@ public class StockValueReportAdapter extends RecyclerView.Adapter<StockValueRepo
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvProductName, tvCategory, tvQuantity, tvFloor, tvCostValue, tvSellingValue,
+        TextView tvProductName, tvCategory, tvQuantity, tvCostValue, tvSellingValue,
                 tvProfit, tvMargin, tvStatus;
+
+        TextView tvCeiling, tvReorder, tvCritical;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -82,6 +90,11 @@ public class StockValueReportAdapter extends RecyclerView.Adapter<StockValueRepo
             tvProfit = itemView.findViewById(R.id.tvProfit);
             tvMargin = itemView.findViewById(R.id.tvMargin);
             tvStatus = itemView.findViewById(R.id.tvStatus);
+
+            // Map the new automated threshold fields
+            tvCeiling = itemView.findViewById(R.id.tvCeiling);
+            tvReorder = itemView.findViewById(R.id.tvReorder);
+            tvCritical = itemView.findViewById(R.id.tvCritical);
         }
     }
 }

@@ -3,11 +3,11 @@ package com.app.SalesInventory;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.bumptech.glide.Glide;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -18,66 +18,86 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
 
     public interface OnProductClickListener {
         void onProductClick(Product product);
-        void onProductLongClick(Product product); // NEW: Long press
+        void onProductLongClick(Product product);
     }
 
     public SupplierProductAdapter(List<Product> products, OnProductClickListener listener) {
-        this.products = new ArrayList<>(products);
+        this.products = new ArrayList<>(products != null ? products : new ArrayList<>());
         this.listener = listener;
     }
 
     public void filterList(List<Product> filteredList) {
-        this.products = filteredList;
-        notifyDataSetChanged();
+        this.products = filteredList != null ? filteredList : new ArrayList<>();
+        // Post to avoid notifyDataSetChanged during RecyclerView layout/measure pass
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(this::notifyDataSetChanged);
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_supplier_product_grid, parent, false);
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.item_supplier_product_grid, parent, false);
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        // Guard: invalid position or null product
+        if (position < 0 || position >= products.size()) return;
         Product p = products.get(position);
-        holder.tvName.setText(p.getProductName());
+        if (p == null) return;
 
+        // Product name — safe null fallback
+        holder.tvName.setText(p.getProductName() != null ? p.getProductName() : "Unknown Product");
+
+        // Price
         holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", p.getCostPrice()));
 
-        if (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) {
-            Glide.with(holder.itemView.getContext())
-                    .load(p.getImageUrl())
-                    .placeholder(R.drawable.ic_image_placeholder)
-                    .into(holder.ivImage);
-        } else {
-            holder.ivImage.setImageResource(R.drawable.ic_image_placeholder);
+        // Category badge — show if available
+        String category = p.getCategoryName();
+        if (holder.tvCategory != null) {
+            if (category != null && !category.trim().isEmpty()) {
+                holder.tvCategory.setText(category);
+                holder.tvCategory.setVisibility(View.VISIBLE);
+            } else {
+                holder.tvCategory.setVisibility(View.GONE);
+            }
         }
 
-        // Single Click -> Add to Cart
-        holder.itemView.setOnClickListener(v -> listener.onProductClick(p));
+        // Stock info — show unit + quantity
+        if (holder.tvStock != null) {
+            String unit = p.getUnit() != null ? p.getUnit() : "pcs";
+            double qty = p.getQuantity();
+            holder.tvStock.setText(String.format(Locale.getDefault(),
+                    "Stock: %.0f %s", qty, unit));
+        }
 
-        // NEW: Long Press -> Delete Product
+        // Single click → Add to Cart
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onProductClick(p);
+        });
+
+        // Long press → Delete
         holder.itemView.setOnLongClickListener(v -> {
-            listener.onProductLongClick(p);
+            if (listener != null) listener.onProductLongClick(p);
             return true;
         });
     }
 
     @Override
     public int getItemCount() {
-        return products.size();
+        return products != null ? products.size() : 0;
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        ImageView ivImage;
-        TextView tvName, tvPrice;
+        TextView tvName, tvPrice, tvCategory, tvStock;
 
         ViewHolder(View itemView) {
             super(itemView);
-            ivImage = itemView.findViewById(R.id.ivProductImageGrid);
-            tvName = itemView.findViewById(R.id.tvProductNameGrid);
-            tvPrice = itemView.findViewById(R.id.tvProductPriceGrid);
+            tvName     = itemView.findViewById(R.id.tvProductNameGrid);
+            tvPrice    = itemView.findViewById(R.id.tvProductPriceGrid);
+            tvCategory = itemView.findViewById(R.id.tvProductCategoryGrid);
+            tvStock    = itemView.findViewById(R.id.tvProductStockGrid);
         }
     }
 }

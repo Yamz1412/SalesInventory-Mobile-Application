@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
-    android:background="@color/backgroundColor">
+    android:background="?android:colorBackground">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -17,7 +17,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/colorPrimary"
+            android:background="?attr/colorPrimary"
             app:title="Stock Adjustment"
             app:titleTextColor="@color/white"
             android:elevation="4dp" />
@@ -41,9 +41,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/cardBackground"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="#F8F9FA"
                 android:elevation="2dp"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="12dp">
 
                 <TextView
                     android:layout_width="match_parent"
@@ -51,16 +52,16 @@
                     android:text="Select Product"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/colorPrimary"
+                    android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp" />
 
                 <Spinner
                     android:id="@+id/spinnerProduct"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:padding="12dp"
-                    android:textColor="@color/textColorPrimary" />
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="#FFFFFF"
+                    android:padding="12dp" />
 
             </LinearLayout>
 
@@ -69,9 +70,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:padding="16dp"
-                android:background="@color/cardBackground"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="#FFFFFF"
                 android:elevation="2dp"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="12dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -85,24 +87,23 @@
                         android:layout_height="wrap_content"
                         android:text="Current Stock"
                         android:textSize="12sp"
-                        android:textColor="@color/textColorSecondary"
+                        android:textColor="#757575"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
                         android:id="@+id/tvCurrentStock"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="24sp"
+                        android:text="0.0"
+                        android:textSize="22sp"
                         android:textStyle="bold"
-                        android:textColor="@color/colorPrimary" />
-
+                        android:textColor="?attr/colorOnBackground" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="1dp"
                     android:layout_height="match_parent"
-                    android:background="@color/lightGray"
+                    android:background="#E0E0E0"
                     android:layout_marginStart="8dp"
                     android:layout_marginEnd="8dp" />
 
@@ -118,20 +119,49 @@
                         android:layout_height="wrap_content"
                         android:text="New Stock"
                         android:textSize="12sp"
-                        android:textColor="@color/textColorSecondary"
+                        android:textColor="#757575"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
                         android:id="@+id/tvNewStock"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="24sp"
+                        android:text="0.0"
+                        android:textSize="22sp"
                         android:textStyle="bold"
-                        android:textColor="@color/successGreen" />
-
+                        android:textColor="#4CAF50" />
                 </LinearLayout>
+            </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/layoutFinancialImpact"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="#FFF3E0"
+                android:elevation="1dp"
+                android:layout_marginBottom="12dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Estimated Value Impact:"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#E65100" />
+
+                <TextView
+                    android:id="@+id/tvFinancialImpact"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="₱0.00"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="#D32F2F" />
             </LinearLayout>
 
             <LinearLayout
@@ -139,114 +169,72 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="16dp"
-                android:background="@color/cardBackground"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="#F8F9FA"
                 android:elevation="2dp"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="12dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Adjustment Type"
+                    android:text="Adjustment Details"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="@color/colorPrimary"
+                    android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp" />
 
                 <Spinner
                     android:id="@+id/spinnerAdjustmentType"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="#FFFFFF"
                     android:padding="12dp"
-                    android:textColor="@color/textColorPrimary" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:background="@color/cardBackground"
-                android:elevation="2dp"
-                android:layout_marginBottom="8dp">
+                    android:layout_marginBottom="12dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Quantity"
-                    style="@style/CustomTextInputLayout"
-                    app:boxStrokeColor="@color/colorPrimary"
-                    app:hintTextColor="@color/colorPrimary">
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_marginBottom="12dp"
+                    app:boxStrokeColor="?attr/colorPrimary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etQuantity"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:textColor="@color/textColorPrimary"
+                        android:inputType="numberDecimal"
+                        android:hint="Adjustment Quantity"
+                        android:textColor="?attr/colorOnBackground"
                         android:textSize="16sp" />
-
                 </com.google.android.material.textfield.TextInputLayout>
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:background="@color/cardBackground"
-                android:elevation="2dp"
-                android:layout_marginBottom="8dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Reason for Adjustment"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/colorPrimary"
-                    android:layout_marginBottom="8dp" />
 
                 <Spinner
                     android:id="@+id/spinnerReason"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="#FFFFFF"
                     android:padding="12dp"
-                    android:textColor="@color/textColorPrimary" />
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:background="@color/cardBackground"
-                android:elevation="2dp"
-                android:layout_marginBottom="8dp">
+                    android:layout_marginBottom="12dp" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Remarks (Optional)"
-                    style="@style/CustomTextInputLayout"
-                    app:boxStrokeColor="@color/colorPrimary"
-                    app:hintTextColor="@color/colorPrimary">
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    app:boxStrokeColor="?attr/colorPrimary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etRemarks"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:hint="Remarks (Optional but recommended)"
                         android:inputType="textMultiLine"
-                        android:minLines="3"
-                        android:maxLines="5"
+                        android:minLines="2"
+                        android:maxLines="4"
                         android:gravity="top|start"
-                        android:textColor="@color/textColorPrimary"
+                        android:textColor="?attr/colorOnBackground"
                         android:textSize="16sp" />
-
                 </com.google.android.material.textfield.TextInputLayout>
 
             </LinearLayout>
@@ -260,30 +248,29 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="16dp"
-        android:background="@color/white"
+        android:background="?android:colorBackground"
         android:elevation="4dp">
 
         <Button
             android:id="@+id/btnViewHistory"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="60dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="View History"
-            android:textColor="@color/white"
-            android:background="@drawable/btn_primary"
+            android:text="History"
+            android:textColor="#757575"
+            android:backgroundTint="#EEEEEE"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btnAdjust"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_height="60dp"
+            android:layout_weight="1.5"
             android:layout_marginStart="8dp"
-            android:text="ADJUST STOCK"
+            android:text="CONFIRM ADJUSTMENT"
             android:textColor="@color/white"
-            android:padding="12dp"
-            style="@style/CustomButton" />
+            android:backgroundTint="?attr/colorPrimary" />
 
     </LinearLayout>
 

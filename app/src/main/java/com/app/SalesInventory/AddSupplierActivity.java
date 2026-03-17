@@ -1,37 +1,32 @@
 package com.app.SalesInventory;
 
-import android.Manifest;
 import android.app.AlertDialog;
-import android.content.ContentValues;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class AddSupplierActivity extends BaseActivity {
@@ -45,16 +40,6 @@ public class AddSupplierActivity extends BaseActivity {
 
     private ProductRepository productRepository;
     private ArrayAdapter<String> unitAdapter;
-
-    // Image Handling Variables
-    private ImageView currentImageViewProcessing;
-    private Uri imageUriTemp;
-    private final Map<View, Uri> rowImageUriMap = new HashMap<>();
-
-    // Activity Result Launchers
-    private ActivityResultLauncher<Intent> cameraLauncher;
-    private ActivityResultLauncher<String> galleryLauncher;
-    private ActivityResultLauncher<String[]> permissionLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,7 +64,6 @@ public class AddSupplierActivity extends BaseActivity {
         containerSupplierProducts = findViewById(R.id.containerSupplierProducts);
         btnAddProductRow = findViewById(R.id.btnAddProductRow);
 
-        initLaunchers();
         setupAdapters();
 
         btnAddProductRow.setOnClickListener(v -> addProductRow());
@@ -96,22 +80,12 @@ public class AddSupplierActivity extends BaseActivity {
     private void addProductRow() {
         View row = LayoutInflater.from(this).inflate(R.layout.item_supplier_product_entry, null);
 
-        ImageView ivProductImage = row.findViewById(R.id.ivProductEntryImage);
         Spinner spinnerUnit = row.findViewById(R.id.spinnerProductUnit);
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteProductRow);
 
         spinnerUnit.setAdapter(unitAdapter);
 
-        // Handle Image Selection on Click
-        ivProductImage.setOnClickListener(v -> {
-            currentImageViewProcessing = ivProductImage;
-            showImagePickDialog();
-        });
-
-        btnDelete.setOnClickListener(v -> {
-            rowImageUriMap.remove(row);
-            containerSupplierProducts.removeView(row);
-        });
+        btnDelete.setOnClickListener(v -> containerSupplierProducts.removeView(row));
 
         containerSupplierProducts.addView(row);
     }
@@ -147,157 +121,184 @@ public class AddSupplierActivity extends BaseActivity {
 
         suppliersRef.child(id).setValue(supplierData)
                 .addOnSuccessListener(aVoid -> {
-                    processSuppliedProducts(name); // Link products
+                    // Process products — this will add stock to existing ones
+                    // and open AddProductActivity for any brand-new products.
+                    processSuppliedProducts(name);
                     Toast.makeText(AddSupplierActivity.this, "Supplier Saved Successfully", Toast.LENGTH_SHORT).show();
-                    finish();
+                    // Note: finish() is called inside processSuppliedProducts
+                    // after handling the product rows so we don't close too early.
                 })
                 .addOnFailureListener(e -> Toast.makeText(AddSupplierActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
+    // -------------------------------------------------------------------------
+    // UPDATED: processSuppliedProducts
+    //
+    // For each product row the user filled in:
+    //   • If a product with the same name (case-insensitive) already exists in
+    //     the inventory for this owner → just add the entered quantity to its
+    //     current stock (no duplicate created).
+    //   • If it does NOT exist yet → collect it into a "registration queue" and
+    //     open AddProductActivity with the data pre-filled so the user can
+    //     properly register it.  Only products that go through AddProductActivity
+    //     get a supplier tag, which means they will show up in the supplier
+    //     product panel later.
+    //
+    // Products added manually from the dashboard button (without a supplier
+    // name set) will NEVER appear in the supplier product panel because
+    // CreatePurchaseOrderActivity now filters by supplier != null/empty.
+    // -------------------------------------------------------------------------
     private void processSuppliedProducts(String supplierName) {
         String adminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (adminId == null || adminId.isEmpty()) adminId = AuthManager.getInstance().getCurrentUserId();
+        final String finalAdminId = adminId;
 
+        // Collect all filled-in product rows from the form
+        List<ProductRow> rows = collectProductRows();
+
+        if (rows.isEmpty()) {
+            // No product rows entered — just close the screen
+            finish();
+            return;
+        }
+
+        // We need the current inventory to check for existing products.
+        // Fetch once from Firestore so we always have the latest state.
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(finalAdminId).collection("products")
+                .whereEqualTo("isActive", true)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+
+                    // Build a name → productId map of existing inventory products
+                    Map<String, String> existingByName = new HashMap<>();   // lowerName → productId
+                    Map<String, Double> existingQtyById = new HashMap<>();  // productId → currentQty
+
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Product p = doc.toObject(Product.class);
+                        if (p == null) continue;
+                        p.setProductId(doc.getId());
+                        String lowerName = p.getProductName() != null
+                                ? p.getProductName().trim().toLowerCase()
+                                : "";
+                        if (!lowerName.isEmpty()) {
+                            existingByName.put(lowerName, doc.getId());
+                            existingQtyById.put(doc.getId(), p.getQuantity());
+                        }
+                    }
+
+                    // Separate rows into "existing" (add stock) vs "new" (register)
+                    ArrayList<Bundle> registrationQueue = new ArrayList<>();
+
+                    for (ProductRow row : rows) {
+                        String lowerName = row.name.toLowerCase();
+
+                        if (existingByName.containsKey(lowerName)) {
+                            // ---- Product already exists → increment stock ----
+                            String productId = existingByName.get(lowerName);
+                            double currentQty = existingQtyById.containsKey(productId)
+                                    ? existingQtyById.get(productId) : 0;
+                            double newQty = currentQty + row.qty;
+
+                            // Update quantity in both Firestore and the local Room cache
+                            // via the existing updateProductQuantityAndCost method.
+                            // Passing 0 for cost price means the cost won't be overwritten.
+                            productRepository.updateProductQuantityAndCost(
+                                    productId,
+                                    newQty,
+                                    0,  // 0 = keep existing cost price unchanged
+                                    new ProductRepository.OnProductUpdatedListener() {
+                                        @Override
+                                        public void onProductUpdated() {
+                                            // Also push the new quantity to Firestore
+                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                                    .collection("users").document(finalAdminId)
+                                                    .collection("products").document(productId)
+                                                    .update("quantity", newQty);
+                                        }
+                                        @Override
+                                        public void onError(String error) {
+                                            runOnUiThread(() -> Toast.makeText(
+                                                    AddSupplierActivity.this,
+                                                    "Failed to update stock for " + row.name,
+                                                    Toast.LENGTH_SHORT).show());
+                                        }
+                                    });
+
+                        } else {
+                            // ---- Product does not exist → queue for registration ----
+                            Bundle b = new Bundle();
+                            b.putString("PREFILL_NAME", row.name);
+                            b.putDouble("PREFILL_COST", row.cost);
+                            b.putInt("PREFILL_QTY", row.qty);
+                            b.putString("PREFILL_UNIT", row.unit);
+                            // Pass supplier name so AddProductActivity can tag it
+                            b.putString("PREFILL_SUPPLIER", supplierName);
+                            registrationQueue.add(b);
+                        }
+                    }
+
+                    runOnUiThread(() -> {
+                        if (!registrationQueue.isEmpty()) {
+                            // Open AddProductActivity with the queue so each new
+                            // product gets properly registered in the inventory.
+                            Intent intent = new Intent(AddSupplierActivity.this, AddProductActivity.class);
+                            intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
+                            startActivity(intent);
+                        }
+                        // Close AddSupplierActivity — supplier is already saved.
+                        finish();
+                    });
+                })
+                .addOnFailureListener(e -> runOnUiThread(() -> {
+                    Toast.makeText(this, "Could not verify existing products. Please try again.", Toast.LENGTH_SHORT).show();
+                    // Still close; the supplier was saved successfully.
+                    finish();
+                }));
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper: read every filled product row from the form into a plain list.
+    // -------------------------------------------------------------------------
+    private List<ProductRow> collectProductRows() {
+        List<ProductRow> rows = new ArrayList<>();
         for (int i = 0; i < containerSupplierProducts.getChildCount(); i++) {
             View row = containerSupplierProducts.getChildAt(i);
-            EditText etNameEntry = row.findViewById(R.id.etProductNameEntry);
-            EditText etQty = row.findViewById(R.id.etProductQty);
+
+            EditText etName = row.findViewById(R.id.etProductNameEntry);
+            EditText etQty  = row.findViewById(R.id.etProductQty);
             EditText etCost = row.findViewById(R.id.etProductCost);
-            Spinner spinUnit = row.findViewById(R.id.spinnerProductUnit);
+            Spinner  spinUnit = row.findViewById(R.id.spinnerProductUnit);
 
-            String pNameEntry = etNameEntry.getText().toString().trim();
-            String pQtyStr = etQty.getText().toString().trim();
-            String pCostStr = etCost.getText().toString().trim();
-            String pUnit = spinUnit.getSelectedItem() != null ? spinUnit.getSelectedItem().toString() : "pcs";
+            String name = etName.getText().toString().trim();
+            if (name.isEmpty()) continue; // Skip blank rows
 
-            if (pNameEntry.isEmpty()) continue; // Skip incomplete rows
+            String qtyStr  = etQty.getText().toString().trim();
+            String costStr = etCost.getText().toString().trim();
+            String unit    = spinUnit.getSelectedItem() != null
+                    ? spinUnit.getSelectedItem().toString() : "pcs";
 
-            int qty = pQtyStr.isEmpty() ? 0 : Integer.parseInt(pQtyStr);
-            double cost = pCostStr.isEmpty() ? 0.0 : Double.parseDouble(pCostStr);
+            int qty     = qtyStr.isEmpty()  ? 0   : Integer.parseInt(qtyStr);
+            double cost = costStr.isEmpty() ? 0.0 : Double.parseDouble(costStr);
 
-            // Fetch URI stored for this specific row view
-            Uri selectedUri = null;
-            ImageView ivInRow = row.findViewById(R.id.ivProductEntryImage);
-            if (rowImageUriMap.containsKey(ivInRow)) {
-                selectedUri = rowImageUriMap.get(ivInRow);
-            }
-
-            // Create new inventory definition specific to this supplier
-            // We append supplier name to make the definition unique in the global inventory
-            Product newProd = new Product();
-            newProd.setProductName(pNameEntry + " - " + supplierName);
-            newProd.setCostPrice(cost);
-            newProd.setUnit(pUnit);
-            newProd.setSupplier(supplierName);
-            newProd.setQuantity(qty); // Optional initial stock
-            newProd.setProductType("Inventory");
-            newProd.setCategoryName("Raw Materials");
-            newProd.setActive(true);
-            newProd.setOwnerAdminId(adminId);
-
-            // Add product, repository handles optional image upload automatically
-            productRepository.addProduct(newProd, selectedUri, null);
+            rows.add(new ProductRow(name, qty, cost, unit));
         }
+        return rows;
     }
 
-    // =============================================================================================
-    // MODIFIED: Professional Image Picker Logic (Optional, Camera or Gallery)
-    // =============================================================================================
+    // Simple data-holder for one product row
+    private static class ProductRow {
+        final String name;
+        final int    qty;
+        final double cost;
+        final String unit;
 
-    private void initLaunchers() {
-        // Handle Camera Result
-        cameraLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && currentImageViewProcessing != null && imageUriTemp != null) {
-                        currentImageViewProcessing.setImageURI(imageUriTemp);
-                        rowImageUriMap.put(currentImageViewProcessing, imageUriTemp); // Store URI for this row
-                    }
-                }
-        );
-
-        // Handle Gallery Result (Modern Android Picker)
-        galleryLauncher = registerForActivityResult(
-                new ActivityResultContracts.GetContent(),
-                uri -> {
-                    if (uri != null && currentImageViewProcessing != null) {
-                        currentImageViewProcessing.setImageURI(uri);
-                        rowImageUriMap.put(currentImageViewProcessing, uri); // Store URI for this row
-                    }
-                }
-        );
-
-        // Handle Permission Requests
-        permissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestMultiplePermissions(),
-                result -> {
-                    Boolean cameraGranted = result.getOrDefault(Manifest.permission.CAMERA, false);
-                    Boolean storageGranted = false;
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        storageGranted = result.getOrDefault(Manifest.permission.READ_MEDIA_IMAGES, false);
-                    } else {
-                        storageGranted = result.getOrDefault(Manifest.permission.WRITE_EXTERNAL_STORAGE, false);
-                    }
-
-                    if (cameraGranted && storageGranted) {
-                        launchCameraIntent();
-                    } else {
-                        Toast.makeText(this, "Permissions required for Camera", Toast.LENGTH_SHORT).show();
-                    }
-                }
-        );
-    }
-
-    private void showImagePickDialog() {
-        String[] options = {"Take Photo (Camera)", "Choose from Gallery"};
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Add Product Image (Optional)");
-        builder.setItems(options, (dialog, which) -> {
-            if (which == 0) {
-                checkCameraPermissions();
-            } else {
-                galleryLauncher.launch("image/*");
-            }
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
-    }
-
-    private void checkCameraPermissions() {
-        String[] permissions;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions = new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_MEDIA_IMAGES};
-        } else {
-            permissions = new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE};
+        ProductRow(String name, int qty, double cost, String unit) {
+            this.name = name;
+            this.qty  = qty;
+            this.cost = cost;
+            this.unit = unit;
         }
-
-        boolean allGranted = true;
-        for (String perm : permissions) {
-            if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
-                allGranted = false;
-                break;
-            }
-        }
-
-        if (allGranted) {
-            launchCameraIntent();
-        } else {
-            permissionLauncher.launch(permissions);
-        }
-    }
-
-    private void launchCameraIntent() {
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.Images.Media.TITLE, "New Product Image");
-        values.put(MediaStore.Images.Media.DESCRIPTION, "From Supplier Entry");
-
-        // Save to temporary system file URI
-        imageUriTemp = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUriTemp);
-        cameraLauncher.launch(intent);
     }
 
     @Override

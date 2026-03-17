@@ -34,4 +34,10 @@ public interface SalesDao {
 
     @Query("DELETE FROM sales_orders")
     void deleteAllOrders();
+
+    // NEW: Automated Reorder Point Query
+    @Query("SELECT SUM(items.quantity) FROM sales_order_items AS items " +
+            "INNER JOIN sales_orders AS orders ON items.orderLocalId = orders.localId " +
+            "WHERE items.productId = :productId AND orders.orderDate >= :sinceTimestamp")
+    Double getTotalQuantitySoldSince(String productId, long sinceTimestamp);
 }

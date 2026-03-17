@@ -25,12 +25,13 @@ public class ProductEntity {
     public String categoryName;
     @ColumnInfo(name = "description")
     public String description;
+    @ColumnInfo(name = "productLine")
+    public String productLine;
     @ColumnInfo(name = "costPrice")
     public double costPrice;
     @ColumnInfo(name = "sellingPrice")
     public double sellingPrice;
 
-    // CHANGED: Now a double to support fractional inventory (e.g., 4.9 Liters)
     @ColumnInfo(name = "quantity")
     public double quantity;
 
@@ -42,6 +43,20 @@ public class ProductEntity {
     public int ceilingLevel;
     @ColumnInfo(name = "floorLevel")
     public int floorLevel;
+
+    // --- NEW: Variables for Automated Reorder Calculation ---
+    @ColumnInfo(name = "leadTimeDays")
+    public int leadTimeDays;
+
+    // Using double to support fractional safety stock (e.g., 1.5 Liters of milk)
+    @ColumnInfo(name = "safetyStock")
+    public double safetyStock;
+
+    // We keep this here so Room doesn't throw a schema mismatch error,
+    // but we will no longer use it in the UI or logic.
+    @ColumnInfo(name = "preOrderLevel")
+    public int preOrderLevel;
+
     @ColumnInfo(name = "unit")
     public String unit;
     @ColumnInfo(name = "barcode")
@@ -61,7 +76,6 @@ public class ProductEntity {
     @ColumnInfo(name = "imagePath")
     public String imagePath;
 
-    // --- NEW FIELDS MUST BE HERE ---
     @ColumnInfo(name = "imageUrl")
     public String imageUrl;
     @ColumnInfo(name = "productType")
@@ -70,4 +84,8 @@ public class ProductEntity {
     public String ownerAdminId;
     @ColumnInfo(name = "expiryDate")
     public long expiryDate;
+    @ColumnInfo(name = "piecesPerUnit")
+    public int piecesPerUnit = 1;
+    @ColumnInfo(name = "salesUnit")
+    public String salesUnit;
 }

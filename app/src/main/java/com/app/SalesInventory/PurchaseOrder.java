@@ -11,6 +11,9 @@ public class PurchaseOrder {
     public static final String STATUS_PARTIAL = "PARTIAL";
     public static final String STATUS_RECEIVED = "RECEIVED";
     public static final String STATUS_CANCELLED = "CANCELLED";
+    public static final String STATUS_DRAFT = "DRAFT";
+    public static final String STATUS_SENT = "SENT";
+    public static final String STATUS_COMPLETED = "COMPLETED";
 
     private String poId;
     private String poNumber;

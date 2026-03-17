@@ -77,7 +77,6 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
         POItem item = items.get(position);
         holder.tvName.setText(item.getProductName());
 
-        // Attach Delete Listener for all modes where the button is visible
         if (holder.btnDelete != null) {
             holder.btnDelete.setOnClickListener(v -> {
                 if (removeListener != null) removeListener.onItemRemoved(holder.getAdapterPosition());
@@ -85,31 +84,27 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
         }
 
         if (viewOnlyMode) {
-            // ========================================================
-            // VIEW ONLY MODE (Completed / Cancelled POs)
-            // ========================================================
+            // VIEW ONLY MODE (Completed / Cancelled)
             holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f / %s", item.getUnitPrice(), item.getUnit()));
-            holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d (Rcvd: %d)", item.getQuantity(), item.getReceivedQuantity()));
+            holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d | Total Rcvd: %d", item.getQuantity(), item.getReceivedQuantity()));
             holder.tvStatus.setVisibility(View.VISIBLE);
             holder.tvStatus.setTextColor(context.getResources().getColor(R.color.successGreen, null));
             holder.etQty.setVisibility(View.GONE);
             if (holder.btnDelete != null) holder.btnDelete.setVisibility(View.VISIBLE);
 
         } else if (receiveMode) {
-            // ========================================================
-            // RECEIVE MODE (Pending / Partial POs)
-            // ========================================================
+            // RECEIVE MODE (Pending / Partial)
             holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f / %s", item.getUnitPrice(), item.getUnit()));
-            holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d (Rcvd: %d)", item.getQuantity(), item.getReceivedQuantity()));
+            holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d | Prev Rcvd: %d", item.getQuantity(), item.getReceivedQuantity()));
             holder.tvStatus.setVisibility(View.VISIBLE);
 
-            // FIX: Make Delete Button Visible in Receive Mode
             if (holder.btnDelete != null) holder.btnDelete.setVisibility(View.VISIBLE);
 
             int remaining = item.getQuantity() - item.getReceivedQuantity();
 
             if (remaining > 0) {
                 holder.etQty.setVisibility(View.VISIBLE);
+                holder.etQty.setHint("Rcv Today"); // Clear hint for staff
 
                 if (holder.textWatcher != null) holder.etQty.removeTextChangedListener(holder.textWatcher);
 
@@ -152,18 +147,17 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
                 holder.etQty.addTextChangedListener(holder.textWatcher);
             } else {
                 holder.etQty.setVisibility(View.GONE);
-                if (holder.btnDelete != null) holder.btnDelete.setVisibility(View.GONE); // Hide delete if item is fully received
-                holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d (Rcvd: %d) - COMPLETED", item.getQuantity(), item.getReceivedQuantity()));
+                if (holder.btnDelete != null) holder.btnDelete.setVisibility(View.GONE);
+                holder.tvStatus.setText(String.format(Locale.getDefault(), "Ordered: %d | Total Rcvd: %d - COMPLETED", item.getQuantity(), item.getReceivedQuantity()));
                 holder.tvStatus.setTextColor(context.getResources().getColor(R.color.successGreen, null));
             }
 
         } else {
-            // ========================================================
             // CART MODE (Create PO Screen)
-            // ========================================================
             holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", item.getSubtotal()));
             holder.tvStatus.setVisibility(View.GONE);
             holder.etQty.setVisibility(View.VISIBLE);
+            holder.etQty.setHint("Qty");
 
             if (holder.btnDelete != null) holder.btnDelete.setVisibility(View.VISIBLE);
 

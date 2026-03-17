@@ -29,7 +29,8 @@
             android:layout_width="12dp"
             android:layout_height="12dp"
             android:layout_marginStart="8dp"
-            android:visibility="gone" />
+            android:layout_marginTop="2dp"
+            android:background="@android:color/darker_gray" />
     </LinearLayout>
 
     <TextView

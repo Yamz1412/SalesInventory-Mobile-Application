@@ -40,22 +40,46 @@ public class SyncWorker extends Worker {
     @Override
     public Result doWork() {
         try {
+            // === EXISTING: Upload pending local items ===
             List<ProductEntity> pending = productDao.getPendingProductsSync();
-            if (pending == null || pending.isEmpty()) {
-                return Result.success();
-            }
-
-            for (ProductEntity pe : pending) {
-                if ("DELETE_PENDING".equals(pe.syncState)) {
-                    deleteEntity(pe);
-                } else {
-                    syncEntity(pe);
+            if (pending != null) {
+                for (ProductEntity pe : pending) {
+                    if ("DELETE_PENDING".equals(pe.syncState)) {
+                        deleteEntity(pe);
+                    } else {
+                        syncEntity(pe);
+                    }
                 }
             }
+            // === NEW: Download from Firestore into Room ===
+            pullFromFirestore();
             return Result.success();
         } catch (Exception e) {
             Log.e(TAG, "SyncWorker failed", e);
             return Result.retry();
+        }
+    }
+
+    private void pullFromFirestore() {
+        try {
+            com.google.firebase.firestore.QuerySnapshot snapshot =
+                    Tasks.await(firestore.collection(firestoreManager.getUserProductsPath()).get());
+
+            ProductRepository repo = ProductRepository.getInstance(
+                    (android.app.Application) getApplicationContext().getApplicationContext()
+            );
+
+            for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                Product p = doc.toObject(Product.class);
+                if (p != null) {
+                    p.setProductId(doc.getId());
+                    repo.upsertFromRemote(p);
+                }
+            }
+            Log.d(TAG, "Pulled " + snapshot.size() + " products from Firestore");
+        } catch (Exception e) {
+            Log.e(TAG, "pullFromFirestore failed", e);
+            // Non-fatal: don't fail the whole job
         }
     }
 

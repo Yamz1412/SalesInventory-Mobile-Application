@@ -65,6 +65,12 @@ public class FirestoreManager {
         return ensureCurrentUserId();
     }
 
+    // --- ADDED RESET SIGNAL PATH ---
+    public com.google.firebase.firestore.DocumentReference getResetSignalRef() {
+        return getDb().collection("users").document(getBusinessOwnerId()).collection("system").document("reset_signal");
+    }
+    // -------------------------------
+
     public String getUserProductsPath() {
         return "products/" + getBusinessOwnerId() + "/items";
     }

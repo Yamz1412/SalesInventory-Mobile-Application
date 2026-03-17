@@ -33,14 +33,15 @@ public class SettingsActivity extends BaseActivity {
 
     private Spinner themeSpinner;
     private Button resetThemeBtn, applyBtn, btnClearCache;
-    private Button btnBackup, btnRestore, btnUserManual;
+    private Button btnBackup, btnRestore, btnUserManual, btnInjectMockData;
 
     private ThemeManager themeManager;
     private ThemeManager.Theme[] allThemes;
     private ThemeManager.Theme selectedTheme;
 
     private ActivityResultLauncher<String> backupLauncher;
-    private ActivityResultLauncher<String> restoreLauncher;
+    private ActivityResultLauncher<String[]> restoreLauncher;
+    private Button btnResetMockData;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,11 +51,62 @@ public class SettingsActivity extends BaseActivity {
         themeManager = ThemeManager.getInstance(this);
 
         initializeUI();
-        initBackupLaunchers();
+        setupLaunchers();
         setupListeners();
     }
 
+    // =========================================================================
+    // BACKUP & RESTORE ENGINE (Storage Access Framework)
+    // =========================================================================
+    private void setupLaunchers() {
+        // 1. Setup Backup Launcher (Prompts user where to save the .db file)
+        backupLauncher = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("application/octet-stream"),
+                uri -> {
+                    if (uri != null) {
+                        boolean success = BackupManager.exportDatabase(this, uri);
+                        if (success) {
+                            Toast.makeText(this, "Backup successfully saved!", Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(this, "Failed to create backup.", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
+
+        // 2. Setup Restore Launcher (Prompts user to pick a .db file to load)
+        restoreLauncher = registerForActivityResult(
+                new ActivityResultContracts.OpenDocument(),
+                uri -> {
+                    if (uri != null) {
+                        // Crucial: Warn the user before wiping their current data
+                        new AlertDialog.Builder(this)
+                                .setTitle("⚠️ Confirm Restore")
+                                .setMessage("This will completely overwrite your current inventory, sales, and settings with the data from the backup file. Are you absolutely sure?")
+                                .setPositiveButton("Yes, Restore", (dialog, which) -> {
+                                    boolean success = BackupManager.importDatabase(this, uri);
+                                    if (success) {
+                                        Toast.makeText(this, "Restore Successful! Restarting app...", Toast.LENGTH_LONG).show();
+
+                                        // To prevent Room Database crashes from cached data,
+                                        // we sign the user out and restart the app cleanly.
+                                        AuthManager.getInstance().signOutAndCleanup(() -> {
+                                            Intent intent = new Intent(SettingsActivity.this, SignInActivity.class);
+                                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                            startActivity(intent);
+                                            finish();
+                                        });
+                                    } else {
+                                        Toast.makeText(this, "Restore Failed. The file might be corrupted or invalid.", Toast.LENGTH_LONG).show();
+                                    }
+                                })
+                                .setNegativeButton("Cancel", null)
+                                .show();
+                    }
+                });
+    }
+
     private void initializeUI() {
+        btnInjectMockData = findViewById(R.id.btnInjectMockData);
         themeSpinner = findViewById(R.id.themeSpinner);
         resetThemeBtn = findViewById(R.id.resetThemeBtn);
         applyBtn = findViewById(R.id.applyBtn);
@@ -62,36 +114,9 @@ public class SettingsActivity extends BaseActivity {
         btnRestore = findViewById(R.id.btnRestore);
         btnUserManual = findViewById(R.id.btnUserManual);
         btnClearCache = findViewById(R.id.btnClearCache);
+        btnResetMockData = findViewById(R.id.btnResetMockData);
 
         setupThemeSpinner();
-    }
-
-    private void initBackupLaunchers() {
-        backupLauncher = registerForActivityResult(
-                new ActivityResultContracts.CreateDocument("application/octet-stream"),
-                uri -> {
-                    if (uri != null) {
-                        boolean ok = BackupManager.exportDatabase(this, uri);
-                        if (ok) {
-                            Toast.makeText(this, "Backup completed", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(this, "Backup failed", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
-
-        restoreLauncher = registerForActivityResult(
-                new ActivityResultContracts.GetContent(),
-                uri -> {
-                    if (uri != null) {
-                        boolean ok = BackupManager.importDatabase(this, uri);
-                        if (ok) {
-                            Toast.makeText(this, "Restore completed. Restart app to apply.", Toast.LENGTH_LONG).show();
-                        } else {
-                            Toast.makeText(this, "Restore failed", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
     }
 
     private void setupThemeSpinner() {
@@ -161,6 +186,40 @@ public class SettingsActivity extends BaseActivity {
             public void onNothingSelected(AdapterView<?> parent) {}
         });
 
+        btnInjectMockData.setOnClickListener(v -> {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Inject Mock Data")
+                    .setMessage("This will add 60 inventory items and 54 sales products for a Philippine coffee shop. Continue?")
+                    .setPositiveButton("Yes, Inject", (dialog, which) -> {
+                        MockDataInjector.injectHanZaiDefenseData(this, () -> {
+                            // Data is already in Room — navigate to MainActivity so all screens reload
+                            Intent intent = new Intent(this, MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                        });
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        btnResetMockData.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("⚠️ WIPE ALL DATA")
+                    .setMessage("Are you absolutely sure? This will delete ALL Sales, Inventory, Purchase Orders, and Adjustments for your account. This cannot be undone.")
+                    .setPositiveButton("YES, WIPE DATA", (dialog, which) -> {
+                        Toast.makeText(this, "Wiping database...", Toast.LENGTH_LONG).show();
+                        MockDataInjector.resetHanZaiDefenseData(this, () -> {
+                            Toast.makeText(this, "System Reset Successful! Restarting...", Toast.LENGTH_LONG).show();
+                            Intent intent = new Intent(this, MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+                            finish();
+                        });
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
         resetThemeBtn.setOnClickListener(v -> {
             ThemeManager.Theme currentTheme = themeManager.getCurrentTheme();
             for (int i = 0; i < allThemes.length; i++) {
@@ -173,8 +232,16 @@ public class SettingsActivity extends BaseActivity {
         });
 
         applyBtn.setOnClickListener(v -> applyTheme());
-        btnBackup.setOnClickListener(v -> backupLauncher.launch("sales_inventory_backup.db"));
-        btnRestore.setOnClickListener(v -> restoreLauncher.launch("*/*"));
+
+        btnBackup.setOnClickListener(v -> {
+            String filename = "HanZai_Backup_" + System.currentTimeMillis() + ".db";
+            backupLauncher.launch(filename);
+        });
+
+        btnRestore.setOnClickListener(v -> {
+            restoreLauncher.launch(new String[]{"*/*"});
+        });
+
         btnUserManual.setOnClickListener(v -> openUserManual());
         btnClearCache.setOnClickListener(v -> showClearCacheConfirmation());
     }

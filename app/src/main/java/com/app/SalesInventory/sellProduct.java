@@ -863,7 +863,11 @@ public class sellProduct extends BaseActivity {
 
         if (mUnitChanged) {
             FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
-                    .document(material.getProductId()).update("unit", newUnit);
+                    .document(material.getProductId()).update(
+                            "unit", newUnit,
+                            "reorderLevel", material.getReorderLevel() * ppu,
+                            "criticalLevel", material.getCriticalLevel() * ppu
+                    );
         }
         productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
     }
@@ -889,6 +893,7 @@ public class sellProduct extends BaseActivity {
         double lineTotal = item.getLineTotal();
         double ratio     = subtotal == 0 ? 0 : lineTotal / subtotal;
         double lineFinal = finalTotal * ratio;
+        double lineDiscount = lineTotal - lineFinal;
 
         StringBuilder nameBuilder = new StringBuilder(item.productName);
         if (item.size != null && !item.size.isEmpty()) nameBuilder.append(" (").append(item.size).append(")");
@@ -906,6 +911,7 @@ public class sellProduct extends BaseActivity {
                 sale.setPrice(item.unitPrice);
                 sale.setTotalPrice(lineFinal);
                 sale.setTotalCost(p != null ? (p.getCostPrice() * item.quantity) : 0.0);
+                sale.setDiscountAmount(lineDiscount);
                 sale.setPaymentMethod(paymentMethod);
                 sale.setDate(now);
                 sale.setTimestamp(now);
@@ -921,25 +927,30 @@ public class sellProduct extends BaseActivity {
                     @Override
                     public void onSaleAdded(String saleId) {
                         if (p != null) {
-                            int ppu = p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
-                            double baseDeduct = (p.getDeductionAmount() > 0 ? p.getDeductionAmount() : 1.0) * item.quantity;
+                            double ppu = p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1.0;
+                            double amountUsed = p.getDeductionAmount() > 0 ? p.getDeductionAmount() : 1.0;
+                            double baseDeduct = (amountUsed * item.quantity) / ppu;
 
                             Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(
-                                    p.getQuantity(), p.getUnit(), p.getSalesUnit(), ppu);
+                                    p.getQuantity(), p.getUnit(), p.getSalesUnit(), (int) ppu);
 
                             double convertedInvQty = (double) conversion[0];
                             String invUnit = (String) conversion[1];
                             boolean unitChanged = (boolean) conversion[2];
 
                             double finalDeductAmt = UnitConverterUtil.calculateDeductionAmount(
-                                    baseDeduct, invUnit, p.getSalesUnit(), ppu);
+                                    baseDeduct, invUnit, p.getSalesUnit(), (int) ppu);
 
                             // FIX: Capturing exact decimal quantity instead of rounding it as an Int
                             double newQty = UnitConverterUtil.calculateNewStock(convertedInvQty, finalDeductAmt);
 
                             if (unitChanged) {
                                 FirebaseFirestore.getInstance().collection(FirestoreManager.getInstance().getUserProductsPath())
-                                        .document(p.getProductId()).update("unit", invUnit);
+                                        .document(p.getProductId()).update(
+                                                "unit", invUnit,
+                                                "reorderLevel", p.getReorderLevel() * ppu,
+                                                "criticalLevel", p.getCriticalLevel() * ppu
+                                        );
                             }
 
                             productRepository.updateProductQuantity(item.productId, newQty, new ProductRepository.OnProductUpdatedListener() {

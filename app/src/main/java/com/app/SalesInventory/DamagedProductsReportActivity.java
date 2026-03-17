@@ -1,0 +1,241 @@
+package com.app.SalesInventory;
+
+import android.app.DatePickerDialog;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.Spinner;
+import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Locale;
+
+public class DamagedProductsReportActivity extends BaseActivity {
+
+    private TextView tvTotalItems, tvTotalLoss, tvNoData;
+    private Button btnDateFilter;
+    private Spinner spinnerProductLine;
+    private ProgressBar progressBar;
+    private RecyclerView rvDamagedItems;
+    private DamagedItemAdapter adapter;
+
+    private String currentOwnerId;
+
+    // Filters
+    private long filterStartDate = 0;
+    private long filterEndDate = System.currentTimeMillis();
+    private String currentProductLineFilter = "All Lines";
+
+    private List<Product> currentInventory = new ArrayList<>();
+    private List<StockAdjustment> masterAdjustmentList = new ArrayList<>();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_damaged_products_report);
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Damaged / Spoiled Report");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
+        currentOwnerId = AuthManager.getInstance().getCurrentUserId();
+
+        initializeViews();
+        setupFilters();
+
+        SalesInventoryApplication.getProductRepository().getAllProducts().observe(this, products -> {
+            if (products != null) {
+                currentInventory.clear();
+                currentInventory.addAll(products);
+                loadDamagedData();
+            }
+        });
+
+        loadProductLinesFilter();
+    }
+
+    private void initializeViews() {
+        tvTotalItems = findViewById(R.id.tvTotalItems);
+        tvTotalLoss = findViewById(R.id.tvTotalLoss);
+        tvNoData = findViewById(R.id.tvNoData);
+        btnDateFilter = findViewById(R.id.btnDateFilter);
+        spinnerProductLine = findViewById(R.id.spinnerProductLine);
+        progressBar = findViewById(R.id.progressBar);
+        rvDamagedItems = findViewById(R.id.rvDamagedItems);
+
+        rvDamagedItems.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new DamagedItemAdapter();
+        rvDamagedItems.setAdapter(adapter);
+    }
+
+    private void setupFilters() {
+        btnDateFilter.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth, 0, 0, 0);
+                filterStartDate = calendar.getTimeInMillis();
+
+                calendar.set(year, month, dayOfMonth, 23, 59, 59);
+                filterEndDate = calendar.getTimeInMillis();
+
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                btnDateFilter.setText(sdf.format(calendar.getTime()));
+
+                processDamagedData();
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+        });
+
+        btnDateFilter.setOnLongClickListener(v -> {
+            filterStartDate = 0;
+            filterEndDate = System.currentTimeMillis();
+            btnDateFilter.setText("All Time");
+            processDamagedData();
+            return true;
+        });
+    }
+
+    private void loadProductLinesFilter() {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
+        ref.orderByChild("ownerAdminId").equalTo(currentOwnerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<String> lines = new ArrayList<>();
+                lines.add("All Lines");
+
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String lineName = ds.child("lineName").getValue(String.class);
+                    if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
+                }
+
+                ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(DamagedProductsReportActivity.this, android.R.layout.simple_spinner_item, lines);
+                spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                spinnerProductLine.setAdapter(spinAdapter);
+
+                spinnerProductLine.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        currentProductLineFilter = (String) parent.getItemAtPosition(position);
+                        processDamagedData();
+                    }
+                    @Override public void onNothingSelected(AdapterView<?> parent) {}
+                });
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    private void loadDamagedData() {
+        progressBar.setVisibility(View.VISIBLE);
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("StockAdjustments");
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                masterAdjustmentList.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    StockAdjustment adj = ds.getValue(StockAdjustment.class);
+                    if (adj != null && currentOwnerId.equals(adj.getOwnerAdminId())) {
+                        masterAdjustmentList.add(adj);
+                    }
+                }
+                processDamagedData();
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {
+                progressBar.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void processDamagedData() {
+        List<DamagedItemAdapter.DamagedItem> damagedLogs = new ArrayList<>();
+        double totalMonetaryLoss = 0.0;
+        int itemsDamagedCount = 0;
+
+        for (StockAdjustment adj : masterAdjustmentList) {
+            long ts = adj.getTimestamp();
+
+            // Apply Date Filter
+            if (filterStartDate == 0 || (ts >= filterStartDate && ts <= filterEndDate)) {
+
+                String reason = adj.getReason() != null ? adj.getReason().toLowerCase() : "";
+
+                // Condition: Look for damage/spoilage keywords and ONLY negative removals
+                if ("Remove Stock".equalsIgnoreCase(adj.getAdjustmentType()) &&
+                        (reason.contains("damage") || reason.contains("spoil") || reason.contains("expire") || reason.contains("waste"))) {
+
+                    double qtyLost = Math.abs(adj.getQuantityAdjusted());
+                    double costPrice = 0.0;
+                    String productLine = "";
+
+                    // Find corresponding inventory product to get exact cost price
+                    for (Product p : currentInventory) {
+                        if (p.getProductId().equals(adj.getProductId())) {
+                            costPrice = p.getCostPrice();
+                            productLine = p.getProductLine() != null ? p.getProductLine() : "";
+                            break;
+                        }
+                    }
+
+                    // Apply Product Line Filter
+                    if (!"All Lines".equals(currentProductLineFilter)) {
+                        if (!currentProductLineFilter.equalsIgnoreCase(productLine)) {
+                            continue;
+                        }
+                    }
+
+                    double lossAmount = qtyLost * costPrice;
+                    totalMonetaryLoss += lossAmount;
+                    itemsDamagedCount++;
+
+                    damagedLogs.add(new DamagedItemAdapter.DamagedItem(
+                            adj.getProductName(),
+                            adj.getReason(),
+                            ts,
+                            qtyLost,
+                            lossAmount
+                    ));
+                }
+            }
+        }
+
+        // Sort newest first
+        damagedLogs.sort((a, b) -> Long.compare(b.timestamp, a.timestamp));
+
+        // Update UI
+        tvTotalItems.setText(String.valueOf(itemsDamagedCount));
+        tvTotalLoss.setText(String.format(Locale.US, "₱%,.2f", totalMonetaryLoss));
+
+        progressBar.setVisibility(View.GONE);
+        adapter.setDamagedList(damagedLogs);
+
+        if (damagedLogs.isEmpty()) {
+            tvNoData.setVisibility(View.VISIBLE);
+            rvDamagedItems.setVisibility(View.GONE);
+        } else {
+            tvNoData.setVisibility(View.GONE);
+            rvDamagedItems.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        onBackPressed();
+        return true;
+    }
+}

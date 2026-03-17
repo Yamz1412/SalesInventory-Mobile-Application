@@ -3,6 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
     android:background="#F5F5F5"
     android:focusable="true"
@@ -71,6 +72,13 @@
                 android:drawableStart="@android:drawable/ic_menu_search"
                 android:drawablePadding="8dp"/>
 
+            <Spinner
+                android:id="@+id/spinnerSupplierFilter"
+                android:layout_width="match_parent"
+                android:layout_height="45dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/edite_round" />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvSuppliers"
                 android:layout_width="match_parent"
@@ -98,6 +106,18 @@
                 android:textStyle="bold"
                 android:textColor="?attr/colorPrimary" />
 
+            <Button
+                android:id="@+id/btnContactSupplier"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="📞 Contact Supplier to Check Stock"
+                android:textColor="@color/white"
+                android:backgroundTint="@color/colorPrimary"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
             <EditText
                 android:id="@+id/etSearchProduct"
                 android:layout_width="match_parent"
@@ -111,9 +131,17 @@
                 android:drawableStart="@android:drawable/ic_menu_search"
                 android:drawablePadding="8dp"/>
 
+            <Spinner
+                android:id="@+id/spinnerProductFilter"
+                android:layout_width="match_parent"
+                android:layout_height="45dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/edite_round" />
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvSupplierProducts"
                 android:layout_width="match_parent"
+                tools:listitem="@layout/item_supplier_product_grid"
                 android:layout_height="match_parent"
                 android:layout_marginTop="12dp"
                 android:clipToPadding="false"

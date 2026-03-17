@@ -2,13 +2,19 @@ package com.app.SalesInventory;
 
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-@Entity(tableName = "sales_order_items",
-        foreignKeys = @ForeignKey(entity = SalesOrderEntity.class,
+@Entity(
+        tableName = "sales_order_items",
+        foreignKeys = @ForeignKey(
+                entity = SalesOrderEntity.class,
                 parentColumns = "localId",
                 childColumns = "orderLocalId",
-                onDelete = ForeignKey.CASCADE))
+                onDelete = ForeignKey.CASCADE
+        ),
+        indices = {@Index(value = {"orderLocalId"})}
+)
 public class SalesOrderItemEntity {
     @PrimaryKey(autoGenerate = true)
     public long localId;

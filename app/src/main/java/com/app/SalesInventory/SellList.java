@@ -45,7 +45,7 @@ public class SellList extends BaseActivity {
     // BULK ACTION VIEWS
     private View layoutBulkActions;
     private TextView tvSelectedCount;
-    private ImageButton btnBulkOptions, btnBulkDelete, btnBulkClose;
+    private ImageButton btnBulkOptions, btnBulkDelete, btnBulkClose, btnBulkEdit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +66,7 @@ public class SellList extends BaseActivity {
         btnBulkOptions = findViewById(R.id.btnBulkOptions);
         btnBulkDelete = findViewById(R.id.btnBulkDelete);
         btnBulkClose = findViewById(R.id.btnBulkClose);
+        btnBulkEdit = findViewById(R.id.btnBulkEdit); // <-- NEW
 
         setupBulkActionListeners();
 
@@ -92,10 +93,13 @@ public class SellList extends BaseActivity {
         loadMenuProducts();
 
         com.google.android.material.floatingactionbutton.FloatingActionButton fabAddSalesProduct = findViewById(R.id.fabAddSalesProduct);
+
+        // Hide Admin functions from Cashiers
         if (!AuthManager.getInstance().isCurrentUserAdmin()) {
             if (fabAddSalesProduct != null) fabAddSalesProduct.setVisibility(View.GONE);
             if (btnBulkDelete != null) btnBulkDelete.setVisibility(View.GONE);
             if (btnBulkOptions != null) btnBulkOptions.setVisibility(View.GONE);
+            if (btnBulkEdit != null) btnBulkEdit.setVisibility(View.GONE); // <-- NEW
         }
 
         if (fabAddSalesProduct != null) {
@@ -139,6 +143,31 @@ public class SellList extends BaseActivity {
         if (btnBulkOptions != null) {
             btnBulkOptions.setOnClickListener(v -> {
                 if (sellAdapter != null) performBulkCopyOptions(sellAdapter.getSelectedIds());
+            });
+        }
+
+        // --- NEW EDIT LOGIC ---
+        if (btnBulkEdit != null) {
+            btnBulkEdit.setOnClickListener(v -> {
+                if (sellAdapter != null) {
+                    Set<String> selectedIds = sellAdapter.getSelectedIds();
+
+                    if (selectedIds.size() == 1) {
+                        // Extract the single selected ID
+                        String idToEdit = selectedIds.iterator().next();
+
+                        // Launch Edit Activity
+                        Intent intent = new Intent(SellList.this, EditSalesProductActivity.class);
+                        intent.putExtra("PRODUCT_ID", idToEdit);
+                        startActivity(intent);
+
+                        // Optional: Clear selection so it's clean when user comes back
+                        sellAdapter.clearSelection();
+
+                    } else if (selectedIds.size() > 1) {
+                        Toast.makeText(SellList.this, "Please select only 1 item to edit", Toast.LENGTH_SHORT).show();
+                    }
+                }
             });
         }
     }
@@ -215,28 +244,60 @@ public class SellList extends BaseActivity {
 
     private void loadMenuProducts() {
         productRepository.getAllProducts().observe(this, products -> {
-            allMenuProducts.clear();
-            List<String> categories = new ArrayList<>();
-            categories.add("All");
+            if (products != null && !products.isEmpty()) {
+                populateMenuList(products);
+            } else {
+                // Room is empty — pull directly from Firestore
+                fetchMenuProductsFromFirestore();
+            }
+        });
+    }
 
-            if (products != null) {
-                for (Product p : products) {
-                    boolean isMenuActive = p != null && p.isActive();
-                    boolean isMenuType = p != null && ("Menu".equalsIgnoreCase(p.getProductType()) || "Both".equalsIgnoreCase(p.getProductType()));
-                    boolean isMenuCategory = p != null && "Menu".equalsIgnoreCase(p.getCategoryName());
+    // ADD this new method:
+    private void fetchMenuProductsFromFirestore() {
+        String ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
 
-                    if (isMenuActive && (isMenuType || isMenuCategory)) {
-                        allMenuProducts.add(p);
-                        String cat = p.getCategoryName();
-                        if (cat != null && !cat.trim().isEmpty() && !categories.contains(cat)) {
-                            categories.add(cat);
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId).collection("products")
+                .whereEqualTo("isActive", true)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    List<Product> products = new ArrayList<>();
+                    ProductRepository repo = SalesInventoryApplication.getProductRepository();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Product p = doc.toObject(Product.class);
+                        if (p != null) {
+                            p.setProductId(doc.getId());
+                            p.setActive(true);
+                            products.add(p);
+                            repo.upsertFromRemote(p); // saves to Room for next time
                         }
                     }
+                    runOnUiThread(() -> populateMenuList(products));
+                });
+    }
+
+    // ADD this helper (extracted from loadMenuProducts):
+    private void populateMenuList(List<Product> products) {
+        allMenuProducts.clear();
+        List<String> categories = new ArrayList<>();
+        categories.add("All");
+
+        for (Product p : products) {
+            if (p == null || !p.isActive()) continue;
+            boolean isMenuType = "Menu".equalsIgnoreCase(p.getProductType())
+                    || "Both".equalsIgnoreCase(p.getProductType());
+            if (isMenuType) {
+                allMenuProducts.add(p);
+                String cat = p.getCategoryName();
+                if (cat != null && !cat.trim().isEmpty() && !categories.contains(cat)) {
+                    categories.add(cat);
                 }
             }
-            setupCategoryChips(categories);
-            applyFilters();
-        });
+        }
+        setupCategoryChips(categories);
+        applyFilters();
     }
 
     private void setupCategoryChips(List<String> categories) {

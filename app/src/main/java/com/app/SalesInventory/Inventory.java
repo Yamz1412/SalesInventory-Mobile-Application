@@ -32,6 +32,7 @@ public class Inventory extends BaseActivity {
 
     private RecyclerView productsRecyclerView;
     private SearchView searchView;
+    private Spinner spinnerProductLineFilter;
     private TextView emptyStateTV;
     private ProductAdapter productAdapter;
     private List<Product> allProducts = new ArrayList<>();
@@ -39,10 +40,11 @@ public class Inventory extends BaseActivity {
     private ProductRepository productRepository;
     private AuthManager authManager;
     private Button btnAddProduct;
-    private Button btnAdjustStock; // NEW BUTTON
+    private Button btnAdjustStock;
     private Spinner spinnerCategoryFilter;
     private String currentSearchQuery = "";
     private String currentCategoryFilter = "All";
+    private String currentProductLineFilter = "All Lines";
     private CriticalStockNotifier criticalNotifier;
     private ProductRepository.OnCriticalStockListener criticalListener;
     private boolean showLowStockOnly = false;
@@ -52,7 +54,6 @@ public class Inventory extends BaseActivity {
     private DatabaseReference categoryRef;
     private ValueEventListener categoryListener;
 
-    // Tracks if we are viewing as a restricted staff
     private boolean isReadOnly = false;
 
     @Override
@@ -63,11 +64,14 @@ public class Inventory extends BaseActivity {
         authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
 
+        spinnerProductLineFilter = findViewById(R.id.spinnerProductLineFilter);
+        listenToProductLinesForFilter();
+
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
         btnAddProduct = findViewById(R.id.btn_add_product);
-        btnAdjustStock = findViewById(R.id.btn_adjust_stock); // BIND NEW BUTTON
+        btnAdjustStock = findViewById(R.id.btn_adjust_stock);
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
         tvTotalCount = findViewById(R.id.TotalCountTV);
         tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
@@ -75,12 +79,9 @@ public class Inventory extends BaseActivity {
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
 
-        // Grab ReadOnly Signal from MainActivity Impersonation
         isReadOnly = getIntent().getBooleanExtra("readonly", false);
 
         productAdapter = new ProductAdapter(filteredProducts, this);
-
-        // Let adapter know about read-only so it hides the specific item edit/qty buttons
         productAdapter.setReadOnly(isReadOnly);
 
         productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
@@ -88,8 +89,6 @@ public class Inventory extends BaseActivity {
 
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isRealAdmin = authManager.isCurrentUserAdmin();
-
-            // Hide buttons if Staff or viewing as Impersonated Staff
             if (!isRealAdmin || isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
@@ -106,12 +105,15 @@ public class Inventory extends BaseActivity {
         setupSearchView();
         listenToCategoriesForFilter();
 
+        // REPLACE lines 108-115 in onCreate():
         productRepository.getAllProducts().observe(this, products -> {
-            if (products != null) {
+            if (products != null && !products.isEmpty()) {
                 allProducts.clear();
                 allProducts.addAll(products);
                 updateHeaderStats();
                 applyFilters();
+            } else {
+                fetchInventoryFromFirestore();
             }
         });
 
@@ -120,6 +122,75 @@ public class Inventory extends BaseActivity {
                 criticalNotifier.showCriticalDialog(this, product)
         );
         productRepository.registerCriticalStockListener(criticalListener);
+    }
+
+    // ADD this new method to Inventory.java:
+    private void fetchInventoryFromFirestore() {
+        String ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
+
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId).collection("products")
+                .whereEqualTo("isActive", true)
+                .get()
+                .addOnSuccessListener(snapshot -> {
+                    allProducts.clear();
+                    ProductRepository repo = SalesInventoryApplication.getProductRepository();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        Product p = doc.toObject(Product.class);
+                        if (p != null) {
+                            p.setProductId(doc.getId());
+                            p.setActive(true);
+                            allProducts.add(p);
+                            repo.upsertFromRemote(p); // saves to Room for next time
+                        }
+                    }
+                    runOnUiThread(() -> {
+                        updateHeaderStats();
+                        applyFilters();
+                    });
+                })
+                .addOnFailureListener(e ->
+                        runOnUiThread(() ->
+                                Toast.makeText(this, "Could not load products", Toast.LENGTH_SHORT).show()
+                        )
+                );
+    }
+
+    private void listenToProductLinesForFilter() {
+        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
+
+        ref.orderByChild("ownerAdminId").equalTo(currentUserId).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<String> lines = new ArrayList<>();
+                lines.add("All Lines");
+                lines.add("Core Products"); lines.add("Specialty / Unique Offerings");
+                lines.add("Complementary Goods"); lines.add("Retail / Merchandise");
+                lines.add("Seasonal Items"); lines.add("Grab-and-Go");
+
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String lineName = ds.child("lineName").getValue(String.class);
+                    if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
+                }
+
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(Inventory.this, android.R.layout.simple_spinner_item, lines);
+                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                if (spinnerProductLineFilter != null) {
+                    spinnerProductLineFilter.setAdapter(adapter);
+                    spinnerProductLineFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+                        @Override
+                        public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                            currentProductLineFilter = (String) parent.getItemAtPosition(position);
+                            applyFilters();
+                        }
+                        @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+                    });
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
 
     private void setupSearchView() {
@@ -158,7 +229,6 @@ public class Inventory extends BaseActivity {
     }
 
     private void setupActionButtons() {
-        // Wire up buttons
         if (btnAddProduct != null) {
             btnAddProduct.setOnClickListener(v -> startActivity(new Intent(Inventory.this, AddProductActivity.class)));
         }
@@ -168,12 +238,10 @@ public class Inventory extends BaseActivity {
         }
     }
 
-    // Inside Inventory.java, update this method
     private void listenToCategoriesForFilter() {
         String currentUserId = AuthManager.getInstance().getCurrentUserId();
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Categories");
 
-        // Clear old listener if it exists to prevent memory leaks
         if (categoryListener != null) ref.removeEventListener(categoryListener);
 
         categoryListener = new ValueEventListener() {
@@ -184,8 +252,6 @@ public class Inventory extends BaseActivity {
 
                 for (DataSnapshot child : snapshot.getChildren()) {
                     Category c = child.getValue(Category.class);
-                    // Security Fix: Only show categories owned by THIS user
-                    // Context Fix: Only show Inventory types in this screen
                     if (c != null && c.isActive() &&
                             currentUserId.equals(c.getOwnerAdminId()) &&
                             !"Menu".equalsIgnoreCase(c.getType())) {
@@ -250,8 +316,9 @@ public class Inventory extends BaseActivity {
     }
 
     private void applyFilters() {
-        String q = currentSearchQuery == null ? "" : currentSearchQuery.toLowerCase();
         String cat = currentCategoryFilter == null ? "All" : currentCategoryFilter;
+        String line = currentProductLineFilter == null ? "All Lines" : currentProductLineFilter;
+        String q = currentSearchQuery == null ? "" : currentSearchQuery.toLowerCase().trim();
 
         filteredProducts.clear();
         for (Product p : allProducts) {
@@ -267,7 +334,12 @@ public class Inventory extends BaseActivity {
             boolean matchesCategory = "All".equalsIgnoreCase(cat)
                     || (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(cat));
 
-            if (!matchesSearch || !matchesCategory) continue;
+            boolean matchesProductLine = "All Lines".equalsIgnoreCase(line)
+                    || p.getProductLine() == null        // ← null = show under all lines
+                    || p.getProductLine().isEmpty()      // ← empty = show under all lines
+                    || p.getProductLine().equalsIgnoreCase(line);
+
+            if (!matchesSearch || !matchesCategory || !matchesProductLine) continue;
 
             if (showLowStockOnly) {
                 if (!p.isCriticalStock() && !p.isLowStock()) continue;
@@ -306,7 +378,17 @@ public class Inventory extends BaseActivity {
                 lowOrCritical++;
             }
         }
-        if (tvTotalCount != null) tvTotalCount.setText(String.valueOf(total));
+
+        if (tvTotalCount != null) {
+            tvTotalCount.setText(String.valueOf(total));
+            tvTotalCount.setOnLongClickListener(v -> {
+                MockDataInjector.injectHanZaiDefenseData(Inventory.this, () -> {
+                    runOnUiThread(() -> fetchInventoryFromFirestore());
+                });
+                return true;
+            });
+        }
+
         if (tvLowStockWarning != null) {
             if (lowOrCritical > 0) {
                 tvLowStockWarning.setText(lowOrCritical + " alerts");

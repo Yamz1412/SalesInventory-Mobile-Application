@@ -88,6 +88,43 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
             return false;
         });
 
+        // --- START ONLINE/OFFLINE DOT LOGIC ---
+        View statusIndicator = holder.itemView.findViewById(R.id.statusIndicator);
+        statusIndicator.setVisibility(View.VISIBLE);
+
+        // Extract the user's ID (assuming the getter is getId or getUid)
+        String targetUid = extract(ai, "id", "getId");
+        if (targetUid == null) targetUid = extract(ai, "uid", "getUid");
+
+        if (targetUid != null) {
+            com.google.firebase.database.FirebaseDatabase.getInstance()
+                    .getReference("UsersStatus").child(targetUid)
+                    .addValueEventListener(new com.google.firebase.database.ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                            String status = snapshot.getValue(String.class);
+                            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+                            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+
+                            // Green if online, Red if offline or null
+                            if ("online".equals(status)) {
+                                gd.setColor(android.graphics.Color.parseColor("#4CAF50")); // Green
+                            } else {
+                                gd.setColor(android.graphics.Color.parseColor("#F44336")); // Red
+                            }
+                            statusIndicator.setBackground(gd);
+                        }
+                        @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+                    });
+        } else {
+            // Default to gray if no ID is found
+            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            gd.setColor(android.graphics.Color.GRAY);
+            statusIndicator.setBackground(gd);
+        }
+        // --- END ONLINE/OFFLINE DOT LOGIC ---
+
         // Hook up the View As button
         Button btnViewAs = holder.itemView.findViewById(R.id.btnViewAs);
         if (btnViewAs != null) {

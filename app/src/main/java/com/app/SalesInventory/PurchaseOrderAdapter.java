@@ -73,6 +73,7 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
             int statusColor;
             switch (status.toUpperCase()) {
                 case "RECEIVED":
+                case "COMPLETED": // ADDED: Completed orders share the success green color
                     statusColor = Color.parseColor("#388E3C"); // Green
                     break;
                 case "PARTIAL":
@@ -110,7 +111,6 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
 
         public POViewHolder(@NonNull View itemView) {
             super(itemView);
-            // Matches perfectly with item_purchase_order.xml
             tvPONumber = itemView.findViewById(R.id.tvPONumber);
             tvSupplier = itemView.findViewById(R.id.tvSupplier);
             tvOrderDate = itemView.findViewById(R.id.tvOrderDate);

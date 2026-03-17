@@ -4,8 +4,9 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -19,7 +20,6 @@ import androidx.appcompat.app.AlertDialog;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -33,7 +33,6 @@ import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
@@ -91,7 +90,6 @@ public class Profile extends BaseActivity {
 
         btnEditProfile.setOnClickListener(v -> {
             Intent intent = new Intent(Profile.this, EditProfil.class);
-            // Pass the current data to the Edit Profile screen so it pre-fills the boxes
             intent.putExtra("name", tvName.getText().toString());
             intent.putExtra("email", tvEmail.getText().toString().replace("Email: ", ""));
             intent.putExtra("phone", tvPhone.getText().toString().replace("Phone: ", ""));
@@ -105,7 +103,9 @@ public class Profile extends BaseActivity {
             startActivity(new Intent(Profile.this, BusinessSetupActivity.class));
         });
 
-        btnResetData.setOnClickListener(v -> showResetDataDialog());
+        if (btnResetData != null) {
+            btnResetData.setOnClickListener(v -> wipeAllBusinessData());
+        }
         btnDeleteAccount.setOnClickListener(v -> showDeleteAccountDialog());
     }
 
@@ -132,7 +132,7 @@ public class Profile extends BaseActivity {
                     tvPhone.setText("Phone: " + (phone != null ? phone : "Not Set"));
                     tvRole.setText("Role: " + (role != null ? role : "Unknown"));
 
-                    if ("Admin".equalsIgnoreCase(role)) {
+                    if ("Admin".equalsIgnoreCase(role) || "Owner".equalsIgnoreCase(role)) {
                         btnEditBusiness.setVisibility(View.VISIBLE);
                         btnResetData.setVisibility(View.VISIBLE);
                     } else {
@@ -146,59 +146,196 @@ public class Profile extends BaseActivity {
         });
     }
 
-    private void showResetDataDialog() {
+    // =====================================================================
+    // TRUE FACTORY RESET LOGIC (TARGETS FIRESTORE + NOTIFICATIONS)
+    // =====================================================================
+    private void wipeAllBusinessData() {
         new AlertDialog.Builder(this)
-                .setTitle("Reset Data")
-                .setMessage("Delete ALL inventory, sales, and transactions? This is permanent.")
-                .setPositiveButton("Reset", (dialog, which) -> performDataReset(false))
+                .setTitle("⚠️ FULL FACTORY RESET")
+                .setMessage("This will permanently scrub EVERYTHING (Products, Sales, POs, Notifications, etc.) from the cloud database and your device. \n\nAre you absolutely sure you want to start from zero?")
+                .setPositiveButton("SCRUB EVERYTHING", (dialog, which) -> {
+
+                    String wipeId = FirestoreManager.getInstance().getBusinessOwnerId();
+                    if (wipeId == null || wipeId.isEmpty()) wipeId = currentUserId;
+                    if (wipeId == null) return;
+                    final String finalWipeId = wipeId;
+
+                    ProgressDialog pd = new ProgressDialog(this);
+                    pd.setMessage("Deleting Firestore Collections & Device Memory... Please wait.");
+                    pd.setCancelable(false);
+                    pd.show();
+
+                    // 1. FORCE CLEAR ANDROID SYSTEM NOTIFICATIONS IMMEDIATELY
+                    NotificationHelper.clearAllNotifications(Profile.this);
+
+                    // 2. WIPE FIRESTORE SUBCOLLECTIONS (The Core Data!)
+                    String[] firestoreCollections = {
+                            "products", "sales", "adjustments", "categories",
+                            "suppliers", "purchaseOrders", "deliveries", "alerts"
+                    };
+
+                    for (String collection : firestoreCollections) {
+                        // Clear under Business Owner ID
+                        fStore.collection(collection).document(finalWipeId).collection("items").get()
+                                .addOnCompleteListener(task -> {
+                                    if (task.isSuccessful() && task.getResult() != null) {
+                                        for (DocumentSnapshot doc : task.getResult()) {
+                                            doc.getReference().delete();
+                                        }
+                                    }
+                                });
+
+                        // Clear under Specific Admin ID just in case data crossed over
+                        if (!finalWipeId.equals(currentUserId)) {
+                            fStore.collection(collection).document(currentUserId).collection("items").get()
+                                    .addOnCompleteListener(task -> {
+                                        if (task.isSuccessful() && task.getResult() != null) {
+                                            for (DocumentSnapshot doc : task.getResult()) {
+                                                doc.getReference().delete();
+                                            }
+                                        }
+                                    });
+                        }
+                    }
+
+                    // 3. Wipe Cash Transactions and Reset Wallet
+                    try {
+                        fStore.collection("users").document(finalWipeId)
+                                .collection("cash_transactions").get().addOnCompleteListener(task -> {
+                                    if (task.isSuccessful() && task.getResult() != null) {
+                                        for (DocumentSnapshot doc : task.getResult()) {
+                                            doc.getReference().delete();
+                                        }
+                                    }
+                                });
+
+                        Map<String, Object> resetWallet = new HashMap<>();
+                        resetWallet.put("balance", 0.0);
+                        fStore.collection("users").document(finalWipeId)
+                                .collection("wallets").document("CASH").set(resetWallet);
+
+                    } catch (Exception e) {
+                        Log.e("Profile", "Firestore user data wipe error safely ignored.");
+                    }
+
+                    // 4. WIPE REALTIME DATABASE (Just in case legacy data is there)
+                    DatabaseReference db = FirebaseDatabase.getInstance().getReference();
+                    db.child("OperatingExpenses").child(finalWipeId).removeValue();
+                    db.child("Cart").child(finalWipeId).removeValue();
+                    String[] legacyNodes = {"Products", "Sales", "PurchaseOrders", "Returns", "StockAdjustments", "Alerts"};
+                    for (String node : legacyNodes) {
+                        deleteRTDBNodes(db.child(node), "ownerAdminId", finalWipeId);
+                        deleteRTDBNodes(db.child(node), "adminId", finalWipeId);
+                        deleteRTDBNodes(db.child(node), "ownerAdminId", currentUserId);
+                    }
+
+                    // 5. SEND THE KILL SWITCH SIGNAL TO ALL STAFF
+                    Map<String, Object> signalData = new HashMap<>();
+                    signalData.put("lastResetTime", com.google.firebase.firestore.FieldValue.serverTimestamp());
+                    fStore.collection("users").document(finalWipeId).collection("system").document("reset_signal").set(signalData);
+
+                    // 6. Force Local Room Database clear on BACKGROUND THREAD
+                    new Thread(() -> {
+                        try {
+                            if (SalesInventoryApplication.getProductRepository() != null) {
+                                SalesInventoryApplication.getProductRepository().clearLocalData();
+                            }
+                            if (SalesInventoryApplication.getSalesRepository() != null) {
+                                SalesInventoryApplication.getSalesRepository().clearData();
+                            }
+                            try {
+                                AlertRepository.getInstance(getApplication()).clearAllAlerts();
+                            } catch (Exception ignored) {}
+                        } catch (Exception e) {
+                            Log.e("Profile", "Local wipe error: " + e.getMessage());
+                        }
+
+                        // Return to Main Thread and Restart UI
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            pd.dismiss();
+                            Toast.makeText(Profile.this, "✅ SYSTEM FACTORY RESET COMPLETE!", Toast.LENGTH_LONG).show();
+
+                            Intent intent = new Intent(Profile.this, MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            startActivity(intent);
+                            finish();
+                        }, 3000); // 3-second delay to let Firestore batches finish deleting
+                    }).start();
+                })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
+    private void deleteRTDBNodes(DatabaseReference ref, String orderBy, String ownerId) {
+        ref.orderByChild(orderBy).equalTo(ownerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                for (DataSnapshot ds : snapshot.getChildren()) ds.getRef().removeValue();
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    // =====================================================================
+    // ACCOUNT DELETION LOGIC (NOW TARGETS FIRESTORE & ALERTS)
+    // =====================================================================
     private void showDeleteAccountDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Account")
-                .setMessage("Permanently delete your account and data?")
-                .setPositiveButton("Delete", (dialog, which) -> performDataReset(true))
+                .setMessage("Permanently delete your account, business profile, and all associated data?")
+                .setPositiveButton("Delete", (dialog, which) -> performAccountDeletion())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void performDataReset(boolean deleteAccountAfter) {
+    private void performAccountDeletion() {
         FirebaseUser user = fAuth.getCurrentUser();
         if (user == null) return;
-        String targetUid = user.getUid();
+
+        String targetUid = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (targetUid == null || targetUid.isEmpty()) targetUid = user.getUid();
 
         ProgressDialog pd = new ProgressDialog(this);
-        pd.setMessage(deleteAccountAfter ? "Deleting Account..." : "Wiping Data...");
+        pd.setMessage("Deleting Account & Data...");
         pd.setCancelable(false);
         pd.show();
 
-        DatabaseReference rtdb = FirebaseDatabase.getInstance().getReference();
-        String[] nodes = {"Products", "Categories", "PurchaseOrders", "StockAdjustments", "History"};
+        NotificationHelper.clearAllNotifications(Profile.this);
 
-        for (String node : nodes) {
-            rtdb.child(node).orderByChild("ownerAdminId").equalTo(targetUid)
-                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-                            for (DataSnapshot ds : snapshot.getChildren()) ds.getRef().removeValue();
+        // Wipe Firestore Subcollections First
+        String[] firestoreCollections = {
+                "products", "sales", "adjustments", "categories",
+                "suppliers", "purchaseOrders", "deliveries", "alerts"
+        };
+        for (String collection : firestoreCollections) {
+            fStore.collection(collection).document(targetUid).collection("items").get()
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (DocumentSnapshot doc : task.getResult()) doc.getReference().delete();
                         }
-                        @Override public void onCancelled(@NonNull DatabaseError error) {}
                     });
         }
 
-        if (deleteAccountAfter) {
-            fStore.collection("users").document(targetUid).delete().addOnCompleteListener(task -> {
+        // Delete Profile Picture from Storage
+        StorageReference avatarRef = fStorage.getReference().child("avatars/" + user.getUid() + ".jpg");
+        avatarRef.delete().addOnCompleteListener(task -> {
+            // Delete Firestore user document
+            fStore.collection("users").document(user.getUid()).delete().addOnCompleteListener(task2 -> {
+                // Finally, delete Auth Account
                 user.delete().addOnCompleteListener(authTask -> {
                     pd.dismiss();
-                    navigateToLogin();
+                    if (authTask.isSuccessful()) {
+                        Toast.makeText(Profile.this, "Account Permanently Deleted.", Toast.LENGTH_LONG).show();
+                        navigateToLogin();
+                    } else {
+                        Toast.makeText(Profile.this, "Data wiped. Please log in again to finalize account deletion.", Toast.LENGTH_LONG).show();
+                        fAuth.signOut();
+                        navigateToLogin();
+                    }
                 });
             });
-        } else {
-            pd.dismiss();
-            Toast.makeText(this, "Data wiped.", Toast.LENGTH_SHORT).show();
-        }
+        });
     }
 
     private void performLogout() {

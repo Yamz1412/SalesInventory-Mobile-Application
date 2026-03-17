@@ -103,12 +103,15 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             }
         });
 
+        // =========================================================
+        // FIX: Routes the Edit Button back to AddProductActivity
+        // =========================================================
         holder.btnEdit.setOnClickListener(v -> {
             int currentPos = holder.getAdapterPosition();
             if (currentPos != RecyclerView.NO_POSITION) {
                 Product currentProduct = items.get(currentPos);
-                Intent intent = new Intent(ctx, EditProduct.class);
-                intent.putExtra("productId", currentProduct.getProductId());
+                Intent intent = new Intent(ctx, AddProductActivity.class);
+                intent.putExtra("EDIT_PRODUCT_ID", currentProduct.getProductId());
                 ctx.startActivity(intent);
             }
         });
@@ -126,7 +129,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
-                    // FIX: Replaced int with double
                     double newQty = currentProduct.getQuantity() + 1;
                     repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                         @Override
@@ -155,7 +157,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
                     if (currentProduct.getQuantity() > 0) {
-                        // FIX: Replaced int with double
                         double newQty = currentProduct.getQuantity() - 1;
                         repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                             @Override
@@ -180,6 +181,9 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 }
             });
 
+            // =========================================================
+            // EXISTING DELETE/ARCHIVE LOGIC (Long Press to Archive)
+            // =========================================================
             holder.itemView.setOnLongClickListener(v -> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
@@ -213,7 +217,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         }
     }
 
-    // FIX: Safely handles decimals without crashing or rounding off fractions incorrectly
     private void updateStockDisplay(VH holder, double qty, String unit, int ppu) {
         String qtyStr = (qty % 1 == 0) ? String.valueOf((long) qty) : String.valueOf(qty);
         String displayStr = qtyStr + (unit != null ? " " + unit : "");
@@ -222,37 +225,44 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             String u = unit.toLowerCase(Locale.ROOT).trim();
 
             if (u.equals("g") || u.equals("kg")) {
-                if (u.equals("g") && qty >= 1000) {
-                    long kg = (long) (qty / 1000);
-                    double g = qty % 1000;
-                    String gStr = (g % 1 == 0) ? String.valueOf((long) g) : String.format(Locale.US, "%.2f", g);
-                    displayStr = kg + "kg" + (g > 0 ? " " + gStr + "g" : "");
+                long kg = (long) Math.floor(qty);
+                double fractionalPart = qty - kg;
+                long g = (long) Math.round(fractionalPart * 1000);
+
+                if (kg > 0 && g > 0) {
+                    displayStr = kg + "kg " + g + "g";
+                } else if (kg > 0) {
+                    displayStr = kg + "kg";
                 } else {
-                    displayStr = qtyStr + u;
+                    displayStr = g + "g";
                 }
             } else if (u.equals("ml") || u.equals("l")) {
-                if (u.equals("ml") && qty >= 1000) {
-                    long l = (long) (qty / 1000);
-                    double ml = qty % 1000;
-                    String mlStr = (ml % 1 == 0) ? String.valueOf((long) ml) : String.format(Locale.US, "%.2f", ml);
-                    displayStr = l + "L" + (ml > 0 ? " " + mlStr + "ml" : "");
+                long l = (long) Math.floor(qty);
+                double fractionalPart = qty - l;
+                long ml = (long) Math.round(fractionalPart * 1000);
+
+                if (l > 0 && ml > 0) {
+                    displayStr = l + "L " + ml + "ml";
+                } else if (l > 0) {
+                    displayStr = l + "L";
                 } else {
-                    displayStr = qtyStr + u;
+                    displayStr = ml + "ml";
                 }
             } else if (u.contains("box") || u.contains("pack")) {
                 if (ppu > 1) {
-                    long packages = (long) (qty / ppu);
-                    double pcs = qty % ppu;
-                    String pcsStr = (pcs % 1 == 0) ? String.valueOf((long) pcs) : String.format(Locale.US, "%.2f", pcs);
+                    long packages = (long) Math.floor(qty);
+                    double fractionalPart = qty - packages;
+                    long pcs = (long) Math.round(fractionalPart * ppu);
+
                     String pkgLabel = u.contains("box") ? (packages > 1 ? " boxes" : " box") : (packages > 1 ? " packs" : " pack");
-                    String pcsLabel = (pcs > 1 || pcs != 1.0) ? " pcs" : " pc";
+                    String pcsLabel = (pcs > 1) ? " pcs" : " pc";
 
                     if (packages > 0 && pcs > 0) {
-                        displayStr = packages + pkgLabel + " " + pcsStr + pcsLabel;
+                        displayStr = packages + pkgLabel + " " + pcs + pcsLabel;
                     } else if (packages > 0) {
                         displayStr = packages + pkgLabel;
                     } else {
-                        displayStr = pcsStr + pcsLabel;
+                        displayStr = pcs + pcsLabel;
                     }
                 } else {
                     displayStr = qtyStr + " " + u;

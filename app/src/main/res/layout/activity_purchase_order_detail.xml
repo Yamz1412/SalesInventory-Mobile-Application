@@ -117,30 +117,50 @@
         </LinearLayout>
     </ScrollView>
 
+    <Button
+        android:id="@+id/btnDispatchPO"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="📤 Send to Supplier (Dispatch)"
+        android:textColor="@color/white"
+        android:backgroundTint="?attr/colorPrimary"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/layoutActionButtons"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@android:color/white"
-        android:elevation="8dp">
+        android:orientation="horizontal"
+        android:weightSum="3"
+        android:visibility="gone">
 
-        <com.google.android.material.button.MaterialButton
+        <Button
             android:id="@+id/btnProcessDelivery"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Process Delivery"
-            app:cornerRadius="8dp" />
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Receive"
+            android:backgroundTint="@color/successGreen" />
 
-        <com.google.android.material.button.MaterialButton
+        <Button
+            android:id="@+id/btnForceClose"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="Force Close"
+            android:visibility="gone"
+            android:backgroundTint="@color/warningYellow" />
+
+        <Button
             android:id="@+id/btnCancelOrder"
-            android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Cancel Order"
-            android:layout_marginTop="8dp"
-            app:backgroundTint="@color/errorRed"
-            android:textColor="@color/white"
-            app:cornerRadius="8dp" />
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_weight="1"
+            android:text="Cancel"
+            android:backgroundTint="@color/errorRed" />
     </LinearLayout>
 </LinearLayout>

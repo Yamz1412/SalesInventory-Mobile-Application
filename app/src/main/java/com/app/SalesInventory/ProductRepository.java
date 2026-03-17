@@ -442,25 +442,35 @@ public class ProductRepository {
         return s.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
 
-    // CHANGED: newQuantity is now double
     public void updateProductQuantity(String productId, double newQuantity, OnProductUpdatedListener listener) {
+        updateProductQuantityAndCost(productId, newQuantity, 0, listener);
+    }
+
+    public void updateProductQuantityAndCost(String productId, double newQuantity, double newCostPrice, OnProductUpdatedListener listener) {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 ProductEntity existing = findEntityByIdSafe(productId);
                 if (existing != null) {
                     double oldQuantity = existing.quantity;
-                    if (existing.floorLevel < 1) existing.floorLevel = 1;
-                    if (existing.criticalLevel < 1) existing.criticalLevel = 1;
-                    if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
-                    if (existing.ceilingLevel > 9999) existing.ceilingLevel = 9999;
 
                     double clamped = Math.max(0.0, newQuantity);
                     if (clamped > 99999) clamped = 99999.0;
-                    if (clamped > existing.ceilingLevel) {
-                        existing.ceilingLevel = (int) Math.ceil(clamped);
+
+                    if (!"Menu".equalsIgnoreCase(existing.productType)) {
+                        existing.ceilingLevel = (int) Math.max(10, Math.ceil(clamped * 2.0));
+                        existing.reorderLevel = (int) Math.max(1, Math.ceil(clamped * 0.20));
+                        existing.criticalLevel = (int) Math.max(1, Math.ceil(clamped * 0.05));
+                        existing.floorLevel = 1;
                     }
 
+                    // 1. Update Quantity
                     existing.quantity = clamped;
+
+                    // 2. Synchronize Cost Price from the Purchase Order!
+                    if (newCostPrice > 0) {
+                        existing.costPrice = newCostPrice;
+                    }
+
                     existing.lastUpdated = System.currentTimeMillis();
                     existing.syncState = "PENDING";
                     productDao.update(existing);

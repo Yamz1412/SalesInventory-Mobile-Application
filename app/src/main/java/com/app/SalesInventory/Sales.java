@@ -11,7 +11,8 @@ public class Sales {
     private int quantity;
     private double price;
     private double totalPrice;
-    private double totalCost; // NEW: For calculating Gross Profit
+    private double totalCost;
+    private double discountAmount;
     private String paymentMethod;
     private String status = "COMPLETED";
 
@@ -60,9 +61,12 @@ public class Sales {
     public double getTotalPrice() { return totalPrice; }
     public void setTotalPrice(double totalPrice) { this.totalPrice = totalPrice; }
 
-    // NEW: Getters and Setters for Cost
     public double getTotalCost() { return totalCost; }
     public void setTotalCost(double totalCost) { this.totalCost = totalCost; }
+
+    // NEW: Getters and Setters for Discount
+    public double getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(double discountAmount) { this.discountAmount = discountAmount; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

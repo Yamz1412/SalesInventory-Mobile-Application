@@ -20,9 +20,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -34,7 +31,7 @@ import java.util.Map;
 public class PurchaseOrderDetailActivity extends BaseActivity {
 
     private TextView tvPONumber, tvSupplier, tvStatus, tvDate;
-    private Button btnProcessDelivery, btnCancelOrder;
+    private Button btnProcessDelivery, btnCancelOrder, btnForceClose, btnDispatchPO;
     private TextInputLayout tilDeliveryNote;
     private TextInputEditText etDeliveryNote;
     private LinearLayout layoutActionButtons;
@@ -74,6 +71,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         tvDate = findViewById(R.id.tvDate);
         btnProcessDelivery = findViewById(R.id.btnProcessDelivery);
         btnCancelOrder = findViewById(R.id.btnCancelOrder);
+        btnForceClose = findViewById(R.id.btnForceClose);
+        btnDispatchPO = findViewById(R.id.btnDispatchPO); // Phase 2: Dispatch Button
         tilDeliveryNote = findViewById(R.id.tilDeliveryNote);
         etDeliveryNote = findViewById(R.id.etDeliveryNote);
         layoutActionButtons = findViewById(R.id.layoutActionButtons);
@@ -85,6 +84,14 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
 
         btnProcessDelivery.setOnClickListener(v -> processDelivery());
         btnCancelOrder.setOnClickListener(v -> updateStatus(PurchaseOrder.STATUS_CANCELLED));
+
+        if (btnForceClose != null) {
+            btnForceClose.setOnClickListener(v -> promptForceClose());
+        }
+
+        if (btnDispatchPO != null) {
+            btnDispatchPO.setOnClickListener(v -> dispatchOrder());
+        }
     }
 
     private void loadPurchaseOrder() {
@@ -117,18 +124,35 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         String status = currentPo.getStatus();
         tvStatus.setText(status.toUpperCase());
 
-        if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) || status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
+        if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) || status.equalsIgnoreCase("SENT") || status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
             layoutActionButtons.setVisibility(View.VISIBLE);
             tilDeliveryNote.setVisibility(View.VISIBLE);
             tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
+
+            if (btnDispatchPO != null) {
+                if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING)) {
+                    btnDispatchPO.setVisibility(View.VISIBLE);
+                } else {
+                    btnDispatchPO.setVisibility(View.GONE);
+                }
+            }
+
+            if (btnForceClose != null) {
+                if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
+                    btnForceClose.setVisibility(View.VISIBLE);
+                } else {
+                    btnForceClose.setVisibility(View.GONE);
+                }
+            }
 
             itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position));
             itemsAdapter.setReceiveMode(true);
         } else {
             layoutActionButtons.setVisibility(View.GONE);
             tilDeliveryNote.setVisibility(View.GONE);
+            if (btnDispatchPO != null) btnDispatchPO.setVisibility(View.GONE);
 
-            if (status.equalsIgnoreCase(PurchaseOrder.STATUS_RECEIVED)) {
+            if (status.equalsIgnoreCase(PurchaseOrder.STATUS_RECEIVED) || status.equalsIgnoreCase("COMPLETED")) {
                 tvStatus.setTextColor(getResources().getColor(R.color.successGreen));
             } else {
                 tvStatus.setTextColor(getResources().getColor(R.color.errorRed));
@@ -139,6 +163,30 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         }
 
         recyclerViewOrderItems.setAdapter(itemsAdapter);
+    }
+
+    private void dispatchOrder() {
+        new AlertDialog.Builder(this)
+                .setTitle("Dispatch Order")
+                .setMessage("Are you sure you want to officially send this order to the supplier? \n\n(This will lock the items so you can begin receiving them).")
+                .setPositiveButton("Dispatch", (dialog, which) -> {
+                    poRef.child("status").setValue("SENT")
+                            .addOnSuccessListener(aVoid -> Toast.makeText(this, "Order Dispatched to Supplier!", Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void promptForceClose() {
+        new AlertDialog.Builder(this)
+                .setTitle("Force Close Order")
+                .setMessage("Are you sure you want to mark this partial order as Completed? You will not be able to receive any more items for this PO.")
+                .setPositiveButton("Close Order", (dialog, which) -> {
+                    poRef.child("status").setValue("COMPLETED")
+                            .addOnSuccessListener(aVoid -> Toast.makeText(this, "Order marked as Completed", Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void promptDeleteItem(int position) {
@@ -177,23 +225,25 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     private void processDelivery() {
         boolean hasNewReceives = false;
         boolean isPartial = false;
-        double totalCostDeduction = 0.0;
 
         List<POItem> itemsReceivedNow = new ArrayList<>();
 
         for (int i = 0; i < currentPo.getItems().size(); i++) {
             POItem item = currentPo.getItems().get(i);
+
+            // Extract the quantity the user just inputted for this specific session
             int newlyReceived = itemsAdapter.getNewlyReceivedMap().containsKey(i) ? itemsAdapter.getNewlyReceivedMap().get(i) : 0;
 
             if (newlyReceived > 0) {
                 hasNewReceives = true;
-                totalCostDeduction += (newlyReceived * item.getUnitPrice());
-
                 item.setReceivedQuantity(item.getReceivedQuantity() + newlyReceived);
+
+                // Create a temporary POItem to represent exactly what arrived right now
                 POItem tempItem = new POItem(item.getProductId(), item.getProductName(), newlyReceived, item.getUnitPrice(), item.getUnit());
                 itemsReceivedNow.add(tempItem);
             }
 
+            // If the total received is still less than what was ordered, it remains a Partial PO
             if (item.getReceivedQuantity() < item.getQuantity()) {
                 isPartial = true;
             }
@@ -204,99 +254,103 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             return;
         }
 
-        checkProductsAndFinalize(itemsReceivedNow, isPartial, totalCostDeduction);
+        checkProductsAndFinalize(itemsReceivedNow, isPartial);
     }
 
-    private void checkProductsAndFinalize(List<POItem> itemsToCheck, boolean isPartial, double finalCostToDeduct) {
+    private void checkProductsAndFinalize(List<POItem> itemsToCheck, boolean isPartial) {
         ArrayList<Bundle> registrationQueue = new ArrayList<>();
-        final int[] pendingQueries = {itemsToCheck.size()};
 
-        if (pendingQueries[0] == 0) {
-            finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
-            return;
-        }
+        // Run on a background thread to prevent UI freezing while querying the local Room Database
+        new Thread(() -> {
+            AppDatabase db = AppDatabase.getInstance(PurchaseOrderDetailActivity.this);
+            ProductDao productDao = db.productDao();
 
-        for (POItem item : itemsToCheck) {
-            FirebaseDatabase.getInstance().getReference("Products")
-                    .orderByChild("productName")
-                    .equalTo(item.getProductName())
-                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-                            boolean productExists = false;
+            for (POItem item : itemsToCheck) {
+                // FIX: Query the local Room DB synchronously instead of the deprecated Realtime DB node
+                ProductEntity p = productDao.getByProductIdSync(item.getProductId());
 
-                            for (DataSnapshot ds : snapshot.getChildren()) {
-                                Product p = ds.getValue(Product.class);
-                                if (p != null && p.getOwnerAdminId().equals(currentPo.getOwnerAdminId())) {
-                                    productExists = true;
+                if (p != null) {
+                    // SCENARIO A: Product exists.
+                    double newlyReceived = item.getQuantity();
 
-                                    // --- NEW: UNIT CONVERSION LOGIC FOR INCOMING DELIVERIES ---
-                                    int incomingQty = item.getQuantity(); // Note: Holds the newlyReceived amount
-                                    String inUnit = item.getUnit() != null ? item.getUnit().toLowerCase(Locale.ROOT) : "";
-                                    String invUnit = p.getUnit() != null ? p.getUnit().toLowerCase(Locale.ROOT) : "";
+                    // 1. Convert units if supplier unit differs from inventory unit (e.g., Box to Pcs)
+                    double addedAmount = calculateConvertedQuantity(newlyReceived, item.getUnit(), p.unit, p.piecesPerUnit);
 
-                                    int addedAmount = incomingQty;
+                    double oldQty = p.quantity;
+                    double finalQty = oldQty + addedAmount;
 
-                                    if ((inUnit.equals("box") || inUnit.equals("pack")) && invUnit.equals("pcs")) {
-                                        int ppu = p.getPiecesPerUnit() > 0 ? p.getPiecesPerUnit() : 1;
-                                        addedAmount = incomingQty * ppu;
-                                    } else if (inUnit.equals("l") && invUnit.equals("ml")) {
-                                        addedAmount = incomingQty * 1000;
-                                    } else if (inUnit.equals("kg") && invUnit.equals("g")) {
-                                        addedAmount = incomingQty * 1000;
-                                    } else if (inUnit.equals("l") && invUnit.equals("oz")) {
-                                        addedAmount = (int) Math.round(incomingQty * 33.814);
-                                    }
+                    // 2. ACCOUNTING UPGRADE: Calculate Moving Average Cost (MAC)
+                    double oldTotalValue = oldQty * p.costPrice;
+                    double newReceivedValue = newlyReceived * item.getUnitPrice();
 
-                                    double newTotal = p.getQuantity() + addedAmount;
-                                    productRepository.updateProductQuantity(p.getProductId(), newTotal, null);
-                                    // -----------------------------------------------------------
-                                    break;
-                                }
-                            }
+                    double newAverageCost = p.costPrice; // Default fallback
+                    if (finalQty > 0) {
+                        newAverageCost = (oldTotalValue + newReceivedValue) / finalQty;
+                    }
 
-                            if (!productExists) {
-                                Bundle b = new Bundle();
-                                b.putString("PREFILL_NAME", item.getProductName());
-                                b.putDouble("PREFILL_COST", item.getUnitPrice());
-                                b.putInt("PREFILL_QTY", item.getQuantity());
-                                b.putString("PREFILL_UNIT", item.getUnit());
-                                b.putString("PREFILL_SUPPLIER", currentPo.getSupplierName());
-                                registrationQueue.add(b);
-                            }
+                    // 3. Update Inventory using the Repository to ensure it syncs to Firestore
+                    productRepository.updateProductQuantityAndCost(
+                            p.productId,
+                            finalQty,
+                            newAverageCost,
+                            null
+                    );
+                } else {
+                    // SCENARIO B: Product doesn't exist (deleted, or brand new). Send to Queue.
+                    Bundle b = new Bundle();
+                    b.putString("PREFILL_NAME", item.getProductName());
+                    b.putDouble("PREFILL_COST", item.getUnitPrice());
+                    b.putInt("PREFILL_QTY", (int) item.getQuantity());
+                    b.putString("PREFILL_UNIT", item.getUnit());
+                    b.putString("PREFILL_SUPPLIER", currentPo.getSupplierName());
+                    registrationQueue.add(b);
+                }
+            }
 
-                            pendingQueries[0]--;
-                            if (pendingQueries[0] == 0) {
-                                finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
-                            }
-                        }
+            // Return to Main Thread to update UI and Firebase PO Status
+            runOnUiThread(() -> finalizeDeliveryStatus(isPartial, registrationQueue));
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            pendingQueries[0]--;
-                            if (pendingQueries[0] == 0) {
-                                finalizeDeliveryStatus(isPartial, finalCostToDeduct, registrationQueue);
-                            }
-                        }
-                    });
-        }
+        }).start();
     }
 
-    private void finalizeDeliveryStatus(boolean isPartial, double finalCostToDeduct, ArrayList<Bundle> registrationQueue) {
+    // Helper method to keep conversion math clean and separated
+    private double calculateConvertedQuantity(double receivedQty, String inUnit, String invUnit, int piecesPerUnit) {
+        if (inUnit == null || invUnit == null) return receivedQty;
+
+        inUnit = inUnit.toLowerCase(Locale.ROOT).trim();
+        invUnit = invUnit.toLowerCase(Locale.ROOT).trim();
+
+        if ((inUnit.contains("box") || inUnit.contains("pack")) && invUnit.equals("pcs")) {
+            int ppu = piecesPerUnit > 0 ? piecesPerUnit : 1;
+            return receivedQty * ppu;
+        } else if (inUnit.equals("l") && invUnit.equals("ml")) {
+            return receivedQty * 1000.0;
+        } else if (inUnit.equals("kg") && invUnit.equals("g")) {
+            return receivedQty * 1000.0;
+        } else if (inUnit.equals("l") && invUnit.equals("oz")) {
+            return receivedQty * 33.814;
+        }
+
+        return receivedQty; // Default if units match perfectly
+    }
+
+    private void finalizeDeliveryStatus(boolean isPartial, ArrayList<Bundle> registrationQueue) {
         String newStatus = isPartial ? PurchaseOrder.STATUS_PARTIAL : PurchaseOrder.STATUS_RECEIVED;
 
         poRef.child("status").setValue(newStatus).addOnSuccessListener(aVoid -> {
             poRef.child("items").setValue(currentPo.getItems());
-            if (finalCostToDeduct > 0) deductFromWallet(finalCostToDeduct);
 
-            Toast.makeText(this, "Delivery updated successfully", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Delivery updated and inventory synchronized!", Toast.LENGTH_SHORT).show();
 
+            // Fire the Registration Queue if there are missing/new products
             if (!registrationQueue.isEmpty()) {
                 Intent intent = new Intent(this, AddProductActivity.class);
                 intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
                 startActivity(intent);
+            } else {
+                // Only close the activity if we aren't jumping to the AddProductActivity
+                finish();
             }
-            finish();
         });
     }
 
@@ -310,30 +364,5 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 })
                 .setNegativeButton("No", null)
                 .show();
-    }
-
-    private void deductFromWallet(double totalAmount) {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null) return;
-
-        DocumentReference walletRef = FirebaseFirestore.getInstance().collection("users")
-                .document(ownerId).collection("wallets").document("CASH");
-
-        FirebaseFirestore.getInstance().runTransaction(transaction -> {
-            DocumentSnapshot snap = transaction.get(walletRef);
-            if (snap.exists() && snap.getDouble("balance") != null) {
-                double currentBal = snap.getDouble("balance");
-                transaction.update(walletRef, "balance", currentBal - totalAmount);
-            }
-            return null;
-        }).addOnSuccessListener(aVoid -> {
-            Map<String, Object> transLog = new HashMap<>();
-            transLog.put("title", "PO Payment: " + tvPONumber.getText().toString());
-            transLog.put("date", new java.text.SimpleDateFormat("MMM dd, yyyy - hh:mm a", java.util.Locale.getDefault()).format(new java.util.Date()));
-            transLog.put("amount", totalAmount);
-            transLog.put("isIncome", false);
-            transLog.put("timestamp", System.currentTimeMillis());
-            FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("cash_transactions").add(transLog);
-        });
     }
 }

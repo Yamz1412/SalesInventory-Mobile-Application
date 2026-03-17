@@ -8,8 +8,8 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-// CHANGED: version bumped to 11 for the decimal mapping update
-@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 11, exportSchema = false)
+// CHANGED: version bumped to 14 for the automated reorder point variables
+@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class}, version = 15, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
 
@@ -23,6 +23,22 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    private static final Migration MIGRATION_12_13 = new Migration(12, 13) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE products ADD COLUMN preOrderLevel INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
+    // NEW: Migration 13 to 14 to add automation variables
+    private static final Migration MIGRATION_13_14 = new Migration(13, 14) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE products ADD COLUMN leadTimeDays INTEGER NOT NULL DEFAULT 0");
+            database.execSQL("ALTER TABLE products ADD COLUMN safetyStock REAL NOT NULL DEFAULT 0.0");
+        }
+    };
+
     public static AppDatabase getInstance(Context context) {
         if (INSTANCE == null) {
             synchronized (AppDatabase.class) {
@@ -32,7 +48,8 @@ public abstract class AppDatabase extends RoomDatabase {
                                     AppDatabase.class,
                                     "sales_inventory_db"
                             )
-                            .addMigrations(MIGRATION_6_7)
+                            // Add MIGRATION_13_14 to the list
+                            .addMigrations(MIGRATION_6_7, MIGRATION_12_13, MIGRATION_13_14)
                             .fallbackToDestructiveMigration()
                             .build();
                 }

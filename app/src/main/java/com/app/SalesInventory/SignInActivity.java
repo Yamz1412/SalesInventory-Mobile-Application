@@ -39,7 +39,7 @@ public class SignInActivity extends BaseActivity {
     private static final String KEY_REMEMBER = "remember";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_ID = "user_id";
-    private static final String KEY_USER_ROLE = "user_role";
+    private static final String KEY_USER_ROLE = "user_role"; // Used for offline routing
     private static final String KEY_BUSINESS_OWNER = "business_owner";
     private static final String KEY_LAST_LOGIN = "last_login";
 
@@ -64,12 +64,14 @@ public class SignInActivity extends BaseActivity {
         boolean remembered = prefs.getBoolean(KEY_REMEMBER, false);
         String cachedUserId = prefs.getString(KEY_USER_ID, null);
         String cachedBusinessOwner = prefs.getString(KEY_BUSINESS_OWNER, null);
+        String cachedRole = prefs.getString(KEY_USER_ROLE, "Staff"); // Default to staff for safety
 
         if (remembered && cachedUserId != null) {
             FirebaseUser currentUser = fAuth.getCurrentUser();
 
             if (currentUser != null && currentUser.getUid().equals(cachedUserId)) {
-                proceedToMainActivityOffline(cachedUserId, cachedBusinessOwner);
+                // FAST PATH: Auto-login based on cached role
+                proceedToNextScreen(cachedUserId, cachedBusinessOwner, cachedRole);
             } else if (currentUser != null) {
                 progressBar.setVisibility(View.VISIBLE);
                 currentUser.reload().addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -80,10 +82,9 @@ public class SignInActivity extends BaseActivity {
                         if (reloaded != null) {
                             checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
                                 @Override
-                                public void onProceed(boolean allowed) {
+                                public void onProceed(boolean allowed, String role) {
                                     if (allowed) {
-                                        cacheUserData(reloaded.getUid(),
-                                                FirestoreManager.getInstance().getBusinessOwnerId());
+                                        cacheUserData(reloaded.getUid(), FirestoreManager.getInstance().getBusinessOwnerId(), role);
                                     } else {
                                         clearRememberedUser();
                                     }
@@ -100,13 +101,24 @@ public class SignInActivity extends BaseActivity {
         }
     }
 
-    private void proceedToMainActivityOffline(String userId, String businessOwner) {
+    // =========================================================================
+    // THE ROUTING ENGINE (Admin goes to Dashboard, Staff goes to POS)
+    // =========================================================================
+    private void proceedToNextScreen(String userId, String businessOwner, String role) {
         FirestoreManager.getInstance().updateCurrentUserId(userId);
         if (businessOwner != null && !businessOwner.isEmpty()) {
             FirestoreManager.getInstance().setBusinessOwnerId(businessOwner);
         }
 
-        Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+        Intent intent;
+        if ("Admin".equalsIgnoreCase(role)) {
+            // Admin gets the full Dashboard
+            intent = new Intent(getApplicationContext(), MainActivity.class);
+        } else {
+            // Cashiers/Staff bypass the dashboard and go straight to the Point of Sale
+            intent = new Intent(getApplicationContext(), MainActivity.class);
+        }
+
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         intent.putExtra("offline_mode", true);
         startActivity(intent);
@@ -114,7 +126,7 @@ public class SignInActivity extends BaseActivity {
     }
 
     private interface RoleCheckCallback {
-        void onProceed(boolean allowed);
+        void onProceed(boolean allowed, String role);
     }
 
     private void checkUserRoleAndProceedAfterReload(@NonNull final FirebaseUser reloaded, @NonNull final RoleCheckCallback cb) {
@@ -167,14 +179,9 @@ public class SignInActivity extends BaseActivity {
                         SalesRepository.getInstance(getApplication()).clearData();
 
                         if ("Admin".equalsIgnoreCase(role)) {
-                            // =========================================================
-                            // ADMIN LOGIN LOGIC
-                            // =========================================================
+                            // --- ADMIN LOGIN LOGIC ---
                             if (reloaded.isEmailVerified()) {
-                                // If Admin has verified email, auto-approve them in the database!
-                                if (!approved) {
-                                    fStore.collection("users").document(uid).update("approved", true);
-                                }
+                                if (!approved) fStore.collection("users").document(uid).update("approved", true);
 
                                 applyRemoteTheme(userSnap);
                                 updateUserProfileFromAuth(reloaded, userSnap);
@@ -185,28 +192,23 @@ public class SignInActivity extends BaseActivity {
                                 syncer.startRealtimeSync(uid);
 
                                 if (rememberCheck != null && rememberCheck.isChecked()) {
-                                    cacheUserData(uid, uid);
+                                    cacheUserData(uid, uid, "Admin");
                                     prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
                                 } else {
                                     clearRememberedUser();
                                 }
 
-                                // FIX: Removed the BusinessSetupActivity redirection completely.
-                                // Users will now go straight to the MainActivity Dashboard.
-                                proceedToMainActivityOffline(uid, uid);
-                                cb.onProceed(true);
+                                proceedToNextScreen(uid, uid, "Admin");
+                                cb.onProceed(true, "Admin");
                             } else {
                                 Toast.makeText(SignInActivity.this, "Please verify your email before logging in.", Toast.LENGTH_LONG).show();
                                 FirebaseAuth.getInstance().signOut();
-                                cb.onProceed(false);
+                                cb.onProceed(false, "");
                             }
                         } else {
-                            // =========================================================
-                            // STAFF LOGIN LOGIC
-                            // =========================================================
+                            // --- STAFF LOGIN LOGIC ---
                             if (!approved) {
-                                // Staff must wait for explicit Admin approval
-                                cb.onProceed(false);
+                                cb.onProceed(false, "");
                                 Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
                                 Intent intent = new Intent(getApplicationContext(), WaitingVerificationActivity.class);
                                 startActivity(intent);
@@ -225,14 +227,14 @@ public class SignInActivity extends BaseActivity {
                             }
 
                             if (rememberCheck != null && rememberCheck.isChecked()) {
-                                cacheUserData(uid, owner);
+                                cacheUserData(uid, owner, "Staff");
                                 prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
                             } else {
                                 clearRememberedUser();
                             }
 
-                            proceedToMainActivityOffline(uid, owner);
-                            cb.onProceed(true);
+                            proceedToNextScreen(uid, owner, "Staff");
+                            cb.onProceed(true, "Staff");
                         }
                     }
                 });
@@ -273,11 +275,12 @@ public class SignInActivity extends BaseActivity {
         }
     }
 
-    private void cacheUserData(String userId, String businessOwner) {
+    private void cacheUserData(String userId, String businessOwner, String role) {
         SharedPreferences.Editor editor = prefs.edit();
         editor.putString(KEY_USER_ID, userId);
         editor.putString(KEY_USER_EMAIL, Email.getText().toString().trim());
         editor.putString(KEY_BUSINESS_OWNER, businessOwner != null ? businessOwner : userId);
+        editor.putString(KEY_USER_ROLE, role); // Caches the role for fast routing
         editor.putLong(KEY_LAST_LOGIN, System.currentTimeMillis());
         editor.apply();
     }
@@ -288,13 +291,11 @@ public class SignInActivity extends BaseActivity {
         editor.remove(KEY_USER_ID);
         editor.remove(KEY_USER_EMAIL);
         editor.remove(KEY_BUSINESS_OWNER);
+        editor.remove(KEY_USER_ROLE);
         editor.remove(KEY_LAST_LOGIN);
         editor.apply();
     }
 
-    // =========================================================================================
-    // SMART LOGIN (Recognizes Email vs Username)
-    // =========================================================================================
     public void SingInB(View view) {
         String input = Email.getText().toString().trim();
         String password = Password.getText().toString().trim();
@@ -306,11 +307,9 @@ public class SignInActivity extends BaseActivity {
         progressBar.setVisibility(View.VISIBLE);
 
         if (!input.contains("@")) {
-            // USER TYPED A USERNAME - Let's find the matching email in Firestore
             String usernameLower = input.toLowerCase();
             fStore.collection("users").whereEqualTo("username", usernameLower).get().addOnCompleteListener(task -> {
                 if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
-                    // Found the username! Extract the attached email
                     String fetchedEmail = task.getResult().getDocuments().get(0).getString("email");
                     if (fetchedEmail != null) {
                         performFirebaseAuthLogin(fetchedEmail, password);
@@ -324,7 +323,6 @@ public class SignInActivity extends BaseActivity {
                 }
             });
         } else {
-            // USER TYPED AN EMAIL
             performFirebaseAuthLogin(input, password);
         }
     }
@@ -347,10 +345,20 @@ public class SignInActivity extends BaseActivity {
                                 }
                                 checkUserRoleAndProceedAfterReload(reloaded, new RoleCheckCallback() {
                                     @Override
-                                    public void onProceed(boolean success) {
+                                    public void onProceed(boolean success, String role) {
                                         if (success) {
-                                            if (rememberCheck != null && rememberCheck.isChecked()) prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
-                                            else clearRememberedUser();
+                                            if (rememberCheck != null && rememberCheck.isChecked()) {
+                                                prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
+                                            } else {
+                                                clearRememberedUser();
+                                            }
+
+                                            if ("Admin".equalsIgnoreCase(role)) {
+                                                startActivity(new Intent(SignInActivity.this, MainActivity.class));
+                                            } else {
+                                                startActivity(new Intent(SignInActivity.this, SellList.class));
+                                            }
+                                            finish();
                                         }
                                     }
                                 });

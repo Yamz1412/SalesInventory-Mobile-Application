@@ -14,6 +14,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -53,6 +54,8 @@ public class EditProduct extends BaseActivity {
     private Spinner unitSpinner, existingGroupSpinner;
     private Button updateBtn, cancelBtn;
     private ImageButton btnEditPhoto;
+    private TextView tvAutoCeiling, tvAutoReorder, tvAutoCritical;
+    private View layoutAutomatedStock;
 
     private SwitchMaterial switchSizes, switchAddons, switchNotes, switchBOM, switchForSaleOnly;
     private LinearLayout layoutBuyingUnitQtyCritical;
@@ -67,6 +70,8 @@ public class EditProduct extends BaseActivity {
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private ActivityResultLauncher<String> permissionLauncher;
 
+    private AutoCompleteTextView productLineET;
+    private TextView tvMarkupPercentage;
     private String currentUserId;
     private List<Product> inventoryProducts = new ArrayList<>();
 
@@ -84,6 +89,9 @@ public class EditProduct extends BaseActivity {
         productRepository = SalesInventoryApplication.getProductRepository();
         currentUserId = AuthManager.getInstance().getCurrentUserId();
 
+        productLineET = findViewById(R.id.productLineET);
+        tvMarkupPercentage = findViewById(R.id.tvMarkupPercentage);
+
         // Binding Views
         btnEditPhoto = findViewById(R.id.btnEditPhoto);
         productNameET = findViewById(R.id.productNameET);
@@ -92,8 +100,6 @@ public class EditProduct extends BaseActivity {
         sellingPriceET = findViewById(R.id.sellingPriceET);
         costPriceET = findViewById(R.id.costPriceET);
         quantityET = findViewById(R.id.quantityET);
-        minStockET = findViewById(R.id.minStockET);
-        floorLevelET = findViewById(R.id.floorLevelET);
         expiryDateET = findViewById(R.id.expiryDateET);
         unitSpinner = findViewById(R.id.unitSpinner);
 
@@ -106,6 +112,24 @@ public class EditProduct extends BaseActivity {
         switchNotes = findViewById(R.id.switchNotes);
         switchBOM = findViewById(R.id.switchBOM);
         switchForSaleOnly = findViewById(R.id.switchForSaleOnly);
+
+        // AUTOMATED STOCK SAVING
+        if (!"Menu".equalsIgnoreCase(currentProduct.getProductType())) {
+            double qty = currentProduct.getQuantity();
+            int ceilVal = (int) Math.max(10, Math.ceil(qty * 2.0));
+            int reorderVal = (int) Math.max(1, Math.ceil(qty * 0.20));
+            int critVal = (int) Math.max(1, Math.ceil(qty * 0.05));
+
+            currentProduct.setCeilingLevel(ceilVal);
+            currentProduct.setReorderLevel(reorderVal);
+            currentProduct.setCriticalLevel(critVal);
+            currentProduct.setFloorLevel(1);
+        } else {
+            currentProduct.setCeilingLevel(0);
+            currentProduct.setReorderLevel(0);
+            currentProduct.setCriticalLevel(0);
+            currentProduct.setFloorLevel(0);
+        }
 
         String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
         ArrayAdapter<String> unitAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
@@ -139,6 +163,87 @@ public class EditProduct extends BaseActivity {
                 loadProductData();
             }
         }
+
+        productLineET.setOnClickListener(v -> productLineET.showDropDown());
+        productLineET.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) productLineET.showDropDown();
+        });
+
+        // Setup Markup Watcher
+        TextWatcher markupWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateMarkup(); }
+            @Override public void afterTextChanged(Editable s) {}
+        };
+        costPriceET.addTextChangedListener(markupWatcher);
+        sellingPriceET.addTextChangedListener(markupWatcher);
+
+        loadDynamicProductLines();
+    }
+
+    private void calculateMarkup() {
+        if (tvMarkupPercentage == null) return;
+        try {
+            double cost = costPriceET.getText().toString().isEmpty() ? 0 : Double.parseDouble(costPriceET.getText().toString());
+            double sell = sellingPriceET.getText().toString().isEmpty() ? 0 : Double.parseDouble(sellingPriceET.getText().toString());
+
+            if (cost > 0 && sell > 0) {
+                double markup = ((sell - cost) / cost) * 100;
+                tvMarkupPercentage.setText(String.format(Locale.US, "Markup: %.2f%%", markup));
+                if (markup >= 0) tvMarkupPercentage.setTextColor(android.graphics.Color.parseColor("#388E3C")); // Green
+                else tvMarkupPercentage.setTextColor(android.graphics.Color.parseColor("#D32F2F")); // Red
+            } else {
+                tvMarkupPercentage.setText("Markup: N/A");
+                tvMarkupPercentage.setTextColor(getResources().getColor(android.R.color.darker_gray));
+            }
+        } catch (Exception e) {
+            tvMarkupPercentage.setText("Markup: 0.00%");
+            tvMarkupPercentage.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        }
+    }
+
+    private void loadDynamicProductLines() {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
+        ref.orderByChild("ownerAdminId").equalTo(currentUserId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<String> lines = new ArrayList<>();
+                lines.add("Core Products"); lines.add("Specialty / Unique Offerings"); lines.add("Complementary Goods");
+                lines.add("Retail / Merchandise"); lines.add("Seasonal Items"); lines.add("Grab-and-Go");
+
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String lineName = ds.child("lineName").getValue(String.class);
+                    if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
+                }
+                ArrayAdapter<String> lineAdapter = new ArrayAdapter<>(EditProduct.this, android.R.layout.simple_dropdown_item_1line, lines);
+                productLineET.setAdapter(lineAdapter);
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
+    private void checkAndCreateProductLine(String lineName) {
+        if (lineName == null || lineName.trim().isEmpty()) return;
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
+        ref.orderByChild("ownerAdminId").equalTo(currentUserId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                boolean exists = false;
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String existingName = ds.child("lineName").getValue(String.class);
+                    if (existingName != null && existingName.equalsIgnoreCase(lineName.trim())) { exists = true; break; }
+                }
+                if (!exists) {
+                    String id = ref.push().getKey();
+                    if (id != null) {
+                        Map<String, Object> newProductLine = new HashMap<>();
+                        newProductLine.put("id", id); newProductLine.put("lineName", lineName.trim()); newProductLine.put("ownerAdminId", currentUserId);
+                        ref.child(id).setValue(newProductLine);
+                    }
+                }
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
     }
 
     private void loadInventoryForBOM() {
@@ -152,6 +257,34 @@ public class EditProduct extends BaseActivity {
                 }
             }
         });
+    }
+
+    private void setupAutomatedStockLogic() {
+        if (quantityET != null) {
+            quantityET.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    String qtyStr = s.toString().trim();
+                    if (!qtyStr.isEmpty()) {
+                        try {
+                            double qty = Double.parseDouble(qtyStr);
+                            if (qty > 0) {
+                                double ceiling = qty * 2.0;       // Maximum allowance
+                                double reorder = qty * 0.20;      // Safety threshold
+                                double critical = qty * 0.05;     // Minimum threshold
+
+                                if (tvAutoCeiling != null) tvAutoCeiling.setText(String.format(java.util.Locale.US, "%.1f", ceiling));
+                                if (tvAutoReorder != null) tvAutoReorder.setText(String.format(java.util.Locale.US, "%.1f", reorder));
+                                if (tvAutoCritical != null) tvAutoCritical.setText(String.format(java.util.Locale.US, "%.1f", critical));
+                            }
+                        } catch (NumberFormatException ignored) { }
+                    }
+                }
+            });
+        }
     }
 
     private void setupCategorySpinner() {
@@ -209,6 +342,7 @@ public class EditProduct extends BaseActivity {
         if (currentProduct != null) {
             productNameET.setText(currentProduct.getProductName());
             productGroupET.setText(currentProduct.getCategoryName());
+            productLineET.setText(currentProduct.getProductLine() != null ? currentProduct.getProductLine() : "", false);
             costPriceET.setText(String.valueOf(currentProduct.getCostPrice()));
             sellingPriceET.setText(String.valueOf(currentProduct.getSellingPrice()));
             quantityET.setText(String.valueOf(currentProduct.getQuantity()));
@@ -327,6 +461,10 @@ public class EditProduct extends BaseActivity {
             currentProduct.setAddonsList(savedAddons);
             currentProduct.setNotesList(savedNotes);
             currentProduct.setBomList(savedBOM);
+
+            String productLine = productLineET.getText() != null ? productLineET.getText().toString().trim() : "";
+            checkAndCreateProductLine(productLine);
+            currentProduct.setProductLine(productLine);
 
             productRepository.updateProduct(currentProduct, new ProductRepository.OnProductUpdatedListener() {
                 @Override

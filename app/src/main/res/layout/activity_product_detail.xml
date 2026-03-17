@@ -37,6 +37,13 @@
             android:layout_marginTop="4dp" />
 
         <TextView
+            android:id="@+id/tvDetailProductLine"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Product Line"
+            android:layout_marginTop="4dp" />
+
+        <TextView
             android:id="@+id/tvDetailType"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

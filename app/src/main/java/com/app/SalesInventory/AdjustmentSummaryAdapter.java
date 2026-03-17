@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
+import java.util.Locale;
 
 public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSummaryAdapter.ViewHolder> {
 
@@ -22,8 +23,7 @@ public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSum
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_adjustment_summary, parent, false);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_adjustment_summary, parent, false);
         return new ViewHolder(view);
     }
 
@@ -34,11 +34,12 @@ public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSum
 
         holder.tvProductName.setText(report.getProductName());
         holder.tvTotalAdjustments.setText(String.valueOf(report.getTotalAdjustments()));
-        holder.tvAdditions.setText("+" + report.getAdditions());
-        holder.tvRemovals.setText("-" + report.getRemovals());
 
-        int net = report.getNetChange();
-        holder.tvNetChange.setText((net >= 0 ? "+" : "") + net);
+        holder.tvAdditions.setText("+" + formatQuantity(report.getAdditions()));
+        holder.tvRemovals.setText("-" + formatQuantity(report.getRemovals()));
+
+        double net = report.getNetChange();
+        holder.tvNetChange.setText((net > 0 ? "+" : "") + formatQuantity(net));
 
         if (net > 0) {
             holder.tvNetChange.setTextColor(context.getResources().getColor(R.color.successGreen));
@@ -50,11 +51,16 @@ public class AdjustmentSummaryAdapter extends RecyclerView.Adapter<AdjustmentSum
 
         String reasonsText = report.getReasonsText();
         if (reasonsText != null && !reasonsText.isEmpty()) {
-            holder.tvReasons.setText(reasonsText);
+            holder.tvReasons.setText("Reasons: " + reasonsText);
             holder.tvReasons.setVisibility(View.VISIBLE);
         } else {
             holder.tvReasons.setVisibility(View.GONE);
         }
+    }
+
+    private String formatQuantity(double value) {
+        if (value % 1 == 0) return String.valueOf((long) value);
+        return String.format(Locale.US, "%.2f", value);
     }
 
     @Override

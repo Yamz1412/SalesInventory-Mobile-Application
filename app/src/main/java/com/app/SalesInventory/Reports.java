@@ -7,24 +7,31 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,12 +55,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 public class Reports extends BaseActivity {
 
     private static final int REQUEST_WRITE_STORAGE = 1001;
+    private static final String TAG = "ReportsActivity";
 
+    private SwipeRefreshLayout swipeRefreshLayout;
+
+    private Spinner spinnerDateFilter;
+    private LinearLayout layoutCustomDate;
     private Button btnStartDate, btnEndDate, btnExportPDF, btnDetailedReport, btnInventoryReport, btnPOReport, btnOperatingExpenses;
     private ListView reportsListView;
     private TextView tvOverviewBestSeller, tvOverviewPayment, tvOverviewTransaction;
@@ -62,6 +75,7 @@ public class Reports extends BaseActivity {
     private TextView tvISBusinessName, tvISDateRange;
     private TextView tvISGrossSales, tvISDiscounts, tvISNetSales;
     private TextView tvISCogs, tvISGrossProfit, tvISOpex, tvISNetIncome;
+    private LinearLayout containerISExpenses;
 
     private Calendar startCalendar = Calendar.getInstance();
     private Calendar endCalendar = Calendar.getInstance();
@@ -80,6 +94,10 @@ public class Reports extends BaseActivity {
     private double currentTotalCOGS = 0.0, currentGrossProfit = 0.0, currentTotalOpex = 0.0, currentNetIncome = 0.0;
     private double currentCashSales = 0, currentGcashSales = 0, currentInventoryValue = 0;
     private int currentTransactionCount = 0;
+
+    // Operating Expenses Tracking
+    private Map<String, Double> databaseExpenses = new HashMap<>(); // Saved in DB
+    private Map<String, Double> temporarySessionExpenses = new HashMap<>(); // Temporary in memory
 
     private StringBuilder detailedProductsStr = new StringBuilder();
     private StringBuilder detailedDamagesStr = new StringBuilder();
@@ -111,13 +129,16 @@ public class Reports extends BaseActivity {
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
 
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        spinnerDateFilter = findViewById(R.id.spinnerDateFilter);
+        layoutCustomDate = findViewById(R.id.layoutCustomDate);
         btnStartDate = findViewById(R.id.btnStartDate);
         btnEndDate = findViewById(R.id.btnEndDate);
         btnExportPDF = findViewById(R.id.btnExportPDF);
         btnDetailedReport = findViewById(R.id.btnDetailedReport);
         btnInventoryReport = findViewById(R.id.btnInventoryReport);
         btnPOReport = findViewById(R.id.btnPOReport);
-        btnOperatingExpenses = findViewById(R.id.btnOperatingExpenses); // NEW
+        btnOperatingExpenses = findViewById(R.id.btnOperatingExpenses);
         reportsListView = findViewById(R.id.ReportsListView);
 
         tvOverviewBestSeller = findViewById(R.id.tvOverviewBestSeller);
@@ -131,26 +152,38 @@ public class Reports extends BaseActivity {
         tvISNetSales     = findViewById(R.id.tvISNetSales);
         tvISCogs         = findViewById(R.id.tvISCogs);
         tvISGrossProfit  = findViewById(R.id.tvISGrossProfit);
+        containerISExpenses = findViewById(R.id.containerISExpenses);
         tvISOpex         = findViewById(R.id.tvISOpex);
         tvISNetIncome    = findViewById(R.id.tvISNetIncome);
 
         adapter = new ReportAdapter(this, allReportItems);
         reportsListView.setAdapter(adapter);
 
-        startCalendar.set(Calendar.DAY_OF_MONTH, 1);
-        updateDateButtons();
+        setupDateFilterSpinner();
 
         loadLocalData();
         fetchBusinessProfile();
+
+        // Refresh Feature
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            salesRepository.reloadAllSales();
+            fetchBusinessProfile();
+            calculateMetricsAndList();
+        });
 
         btnStartDate.setOnClickListener(v -> showDatePicker(true));
         btnEndDate.setOnClickListener(v -> showDatePicker(false));
         btnDetailedReport.setOnClickListener(v -> showDetailedOperationsDialog());
         btnPOReport.setOnClickListener(v -> showPOReportDialog());
         btnInventoryReport.setOnClickListener(v -> startActivity(new Intent(Reports.this, InventoryReportsActivity.class)));
-        btnOperatingExpenses.setOnClickListener(v -> showOperatingExpensesDialog()); // NEW
 
-        btnExportPDF.setOnClickListener(v -> { if (ensureWritePermission()) exportAccountingPdf(); });
+        btnOperatingExpenses.setOnClickListener(v -> showOperatingExpensesDialog());
+        btnOperatingExpenses.setOnLongClickListener(v -> {
+            resetOperatingExpensesDatabase();
+            return true;
+        });
+
+        btnExportPDF.setOnClickListener(v -> { if (ensureWritePermission()) showExportOptionsDialog(); });
 
         createDocumentLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
@@ -168,6 +201,80 @@ public class Reports extends BaseActivity {
         });
     }
 
+    private void setupDateFilterSpinner() {
+        String[] options = {
+                "Today", "Yesterday", "This Week", "Last Week",
+                "This Month", "Last Month", "This Year", "Last Year to Now", "Custom Range"
+        };
+        ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, options);
+        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerDateFilter.setAdapter(spinAdapter);
+
+        // Set default to "Last Year to Now"
+        spinnerDateFilter.setSelection(7);
+
+        spinnerDateFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selection = options[position];
+
+                if (selection.equals("Custom Range")) {
+                    layoutCustomDate.setVisibility(View.VISIBLE);
+                    return; // Wait for the user to pick dates using the buttons
+                } else {
+                    layoutCustomDate.setVisibility(View.GONE);
+                }
+
+                Calendar now = Calendar.getInstance();
+                startCalendar.setTime(now.getTime());
+                endCalendar.setTime(now.getTime());
+
+                // Reset End Time to end of day
+                endCalendar.set(Calendar.HOUR_OF_DAY, 23); endCalendar.set(Calendar.MINUTE, 59); endCalendar.set(Calendar.SECOND, 59);
+                // Reset Start Time to beginning of day
+                startCalendar.set(Calendar.HOUR_OF_DAY, 0); startCalendar.set(Calendar.MINUTE, 0); startCalendar.set(Calendar.SECOND, 0);
+
+                switch (selection) {
+                    case "Today":
+                        break;
+                    case "Yesterday":
+                        startCalendar.add(Calendar.DAY_OF_MONTH, -1);
+                        endCalendar.add(Calendar.DAY_OF_MONTH, -1);
+                        break;
+                    case "This Week":
+                        startCalendar.set(Calendar.DAY_OF_WEEK, startCalendar.getFirstDayOfWeek());
+                        break;
+                    case "Last Week":
+                        startCalendar.add(Calendar.WEEK_OF_YEAR, -1);
+                        startCalendar.set(Calendar.DAY_OF_WEEK, startCalendar.getFirstDayOfWeek());
+                        endCalendar.add(Calendar.WEEK_OF_YEAR, -1);
+                        endCalendar.set(Calendar.DAY_OF_WEEK, endCalendar.getFirstDayOfWeek());
+                        endCalendar.add(Calendar.DAY_OF_MONTH, 6);
+                        break;
+                    case "This Month":
+                        startCalendar.set(Calendar.DAY_OF_MONTH, 1);
+                        break;
+                    case "Last Month":
+                        startCalendar.add(Calendar.MONTH, -1);
+                        startCalendar.set(Calendar.DAY_OF_MONTH, 1);
+                        endCalendar.add(Calendar.MONTH, -1);
+                        endCalendar.set(Calendar.DAY_OF_MONTH, endCalendar.getActualMaximum(Calendar.DAY_OF_MONTH));
+                        break;
+                    case "This Year":
+                        startCalendar.set(Calendar.DAY_OF_YEAR, 1);
+                        break;
+                    case "Last Year to Now":
+                        startCalendar.add(Calendar.YEAR, -1);
+                        startCalendar.set(Calendar.DAY_OF_YEAR, 1);
+                        break;
+                }
+                updateDateButtons();
+                if (!allSalesList.isEmpty()) calculateMetricsAndList();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
     private void loadLocalData() {
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
@@ -178,15 +285,107 @@ public class Reports extends BaseActivity {
                         currentInventoryValue += (p.getQuantity() * p.getCostPrice());
                     }
                 }
+                calculateMetricsAndList();
             }
         });
 
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales != null) {
-                allSalesList = sales;
+                allSalesList = new ArrayList<>(sales);
+                injectAdviserMockData();
                 calculateMetricsAndList();
             }
         });
+    }
+
+    /**
+     * MOCK DATA INJECTOR FOR REALISTIC DEFENSE PRESENTATION
+     * Fills the reports with random data from the past year.
+     */
+    private void injectAdviserMockData() {
+        boolean exists = false;
+        for (Sales s : allSalesList) {
+            if (s.getOrderId() != null && s.getOrderId().startsWith("MOCK-")) {
+                exists = true;
+                break;
+            }
+        }
+        if (exists) return; // Prevent duplicate injection
+
+        long now = System.currentTimeMillis();
+        long oneDay = 24L * 60 * 60 * 1000L;
+        long oneMonth = 30L * oneDay;
+
+        // SCENARIO 1: The Cashier Mistake & Refund (from 2 months ago)
+        long twoMonthsAgo = now - (2 * oneMonth);
+        Sales mistake = new Sales();
+        mistake.setOrderId("MOCK-ERR-99991");
+        mistake.setProductName("Caramel Macchiato (MISTAKE)");
+        mistake.setQuantity(1);
+        mistake.setTotalPrice(5000.0);
+        mistake.setTotalCost(45.0);
+        mistake.setPaymentMethod("Cash (CASHIER TYPO - 5000 instead of 150)");
+        mistake.setTimestamp(twoMonthsAgo);
+
+        Sales refund = new Sales();
+        refund.setOrderId("MOCK-REF-99991");
+        refund.setProductName("Caramel Macchiato (REFUND)");
+        refund.setQuantity(-1);
+        refund.setTotalPrice(-4850.0); // Returning the excess money
+        refund.setTotalCost(-45.0);
+        refund.setPaymentMethod("Refund (Manager Override)");
+        refund.setTimestamp(twoMonthsAgo + 300000); // 5 mins later
+
+        allSalesList.add(mistake);
+        allSalesList.add(refund);
+
+        // SCENARIO 2: A Massive VIP/Corporate Bulk Order (15 days ago)
+        long fifteenDaysAgo = now - (15 * oneDay);
+        Sales bulkOrder = new Sales();
+        bulkOrder.setOrderId("MOCK-VIP-1001");
+        bulkOrder.setProductName("Iced Americano (Bulk Corporate)");
+        bulkOrder.setQuantity(50);
+        bulkOrder.setTotalPrice(6500.0); // Discounted price
+        bulkOrder.setTotalCost(2000.0); // 40 cost each
+        bulkOrder.setDiscountAmount(1000.0); // 1000 discount
+        bulkOrder.setPaymentMethod("GCash (Corporate Account)");
+        bulkOrder.setTimestamp(fifteenDaysAgo);
+        allSalesList.add(bulkOrder);
+
+        // SCENARIO 3: RANDOM DAILY SALES (Over the past 365 days)
+        String[] mockProducts = {"Iced Latte", "Matcha Frappe", "Blueberry Cheesecake", "Espresso", "Mocha", "Strawberry Smoothie"};
+        double[] mockPrices = {140.0, 160.0, 180.0, 110.0, 150.0, 155.0};
+        double[] mockCosts = {45.0, 55.0, 60.0, 30.0, 50.0, 50.0};
+        String[] mockPayments = {"Cash", "GCash", "Cash", "GCash", "PayMaya"};
+
+        Random rand = new Random();
+
+        // Generate exactly 80 random, successful background transactions
+        for (int i = 0; i < 80; i++) {
+            int pIndex = rand.nextInt(mockProducts.length);
+            int qty = rand.nextInt(3) + 1; // 1 to 3 items
+            int daysAgo = rand.nextInt(365); // Random day within the past year
+            long randomTime = now - (daysAgo * oneDay) - (rand.nextInt(24) * 60 * 60 * 1000L);
+
+            Sales randSale = new Sales();
+            randSale.setOrderId("MOCK-RND-" + i);
+            randSale.setProductName(mockProducts[pIndex]);
+            randSale.setQuantity(qty);
+            randSale.setTotalPrice(mockPrices[pIndex] * qty);
+            randSale.setTotalCost(mockCosts[pIndex] * qty);
+            randSale.setPaymentMethod(mockPayments[rand.nextInt(mockPayments.length)]);
+            randSale.setTimestamp(randomTime);
+
+            // Randomly apply a small 10% discount to 1 in every 10 transactions
+            if (rand.nextInt(10) == 0) {
+                double originalPrice = mockPrices[pIndex] * qty;
+                randSale.setDiscountAmount(originalPrice * 0.10);
+                randSale.setTotalPrice(originalPrice * 0.90);
+                randSale.setPaymentMethod(randSale.getPaymentMethod() + " (Discounted)");
+            }
+
+            allSalesList.add(randSale);
+        }
     }
 
     private void fetchBusinessProfile() {
@@ -243,21 +442,15 @@ public class Reports extends BaseActivity {
                 double netPrice = s.getTotalPrice();
                 double cost = s.getTotalCost();
 
-                if (cost <= 0) {
+                if (cost <= 0 && s.getQuantity() > 0 && !s.getOrderId().startsWith("MOCK-")) {
                     String rawName = s.getProductName() != null ? s.getProductName() : "";
                     String baseName = rawName;
-
                     int parenIdx = rawName.indexOf(" (");
                     int bracketIdx = rawName.indexOf(" [");
                     int minIdx = rawName.length();
-
                     if (parenIdx != -1) minIdx = Math.min(minIdx, parenIdx);
                     if (bracketIdx != -1) minIdx = Math.min(minIdx, bracketIdx);
-
-                    if (minIdx != rawName.length()) {
-                        baseName = rawName.substring(0, minIdx).trim();
-                    }
-
+                    if (minIdx != rawName.length()) baseName = rawName.substring(0, minIdx).trim();
                     for (Product p : currentInventory) {
                         if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(baseName)) {
                             cost = p.getCostPrice() * s.getQuantity();
@@ -266,9 +459,7 @@ public class Reports extends BaseActivity {
                     }
                 }
 
-                double discount = 0;
-                try { discount = (double) s.getClass().getMethod("getDiscountAmount").invoke(s); } catch (Exception ignored) {}
-
+                double discount = s.getDiscountAmount();
                 String paymentType = s.getPaymentMethod() != null ? s.getPaymentMethod() : "Unknown";
                 if (paymentType.toLowerCase().contains("cash")) { cashCount++; currentCashSales += netPrice; }
                 else if (paymentType.toLowerCase().contains("gcash")) { gcashCount++; currentGcashSales += netPrice; }
@@ -280,45 +471,122 @@ public class Reports extends BaseActivity {
                 String rawName = s.getProductName() != null ? s.getProductName() : "Unknown Product";
                 String baseName = rawName;
                 String options = "";
-
                 int bracketOrParen = rawName.length();
-                int parenIdx = rawName.indexOf(" (");
-                int bracketIdx = rawName.indexOf(" [");
-
-                if (parenIdx != -1) bracketOrParen = Math.min(bracketOrParen, parenIdx);
-                if (bracketIdx != -1) bracketOrParen = Math.min(bracketOrParen, bracketIdx);
-
-                if (bracketOrParen != rawName.length()) {
-                    baseName = rawName.substring(0, bracketOrParen).trim();
-                    options = rawName.substring(bracketOrParen).trim();
-                }
-
+                int parenIdx2 = rawName.indexOf(" (");
+                int bracketIdx2 = rawName.indexOf(" [");
+                if (parenIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, parenIdx2);
+                if (bracketIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, bracketIdx2);
+                if (bracketOrParen != rawName.length()) { baseName = rawName.substring(0, bracketOrParen).trim(); options = rawName.substring(bracketOrParen).trim(); }
                 String displayName = baseName;
                 String details = paymentType;
-                if (!options.isEmpty()) {
-                    details += "\n" + options;
-                }
-
+                if (!options.isEmpty()) details += "\n" + options;
                 String dateStr = timeFormat.format(new Date(ts));
-                allReportItems.add(new ReportItem(displayName, dateStr, String.valueOf(s.getQuantity()), String.format(Locale.US, "₱%.2f", netPrice), details, discount));
+
+                ReportItem ri = new ReportItem(displayName, dateStr, String.valueOf(s.getQuantity()), String.format(Locale.US, "₱%.2f", netPrice), details, discount);
+                if (netPrice < 0) ri.isRefund = true;
+                allReportItems.add(ri);
 
                 if (!bsMap.containsKey(displayName)) bsMap.put(displayName, new BestSellerItem(displayName));
                 BestSellerItem bsItem = bsMap.get(displayName);
-                bsItem.quantitySold += s.getQuantity();
-                bsItem.totalRevenue += netPrice;
-                bsItem.totalCost += cost;
+                bsItem.quantitySold += s.getQuantity(); bsItem.totalRevenue += netPrice; bsItem.totalCost += cost;
             }
         }
 
         bestSellersList.addAll(bsMap.values());
         Collections.sort(bestSellersList, (a, b) -> Integer.compare(b.quantitySold, a.quantitySold));
+        Collections.sort(allReportItems, (a, b) -> b.date.compareTo(a.date));
 
+        generateDetailedStrings(startMillis, endMillis);
+
+        if (!bestSellersList.isEmpty()) tvOverviewBestSeller.setText(bestSellersList.get(0).productName + "\n(" + bestSellersList.get(0).quantitySold + " sold)");
+        else tvOverviewBestSeller.setText("-");
+        tvOverviewPayment.setText(gcashCount > cashCount ? "GCash" : (cashCount == 0 ? "-" : "Cash"));
+        currentTransactionCount = uniqueOrderIds.isEmpty() ? fallbackTxCount : (uniqueOrderIds.size() + fallbackTxCount);
+        if (tvOverviewTransaction != null) tvOverviewTransaction.setText(String.valueOf(currentTransactionCount));
+
+        currentGrossSales = currentNetSales + currentTotalDiscounts;
+        currentGrossProfit = currentNetSales - currentTotalCOGS;
+
+        tvISGrossSales.setText(String.format(Locale.US, "₱ %,.2f", currentGrossSales));
+        tvISDiscounts.setText(String.format(Locale.US, "%,.2f", currentTotalDiscounts));
+        tvISNetSales.setText(String.format(Locale.US, "%,.2f", currentNetSales));
+        tvISCogs.setText(String.format(Locale.US, "%,.2f", currentTotalCOGS));
+        tvISGrossProfit.setText(String.format(Locale.US, "%,.2f", currentGrossProfit));
+
+        adapter.notifyDataSetChanged();
+
+        fetchOperationsData(startMillis, endMillis);
+        fetchPODetailsData(startMillis, endMillis);
+        fetchOperatingExpensesAndRenderIS(startMillis, endMillis);
+    }
+
+    private void fetchOperatingExpensesAndRenderIS(long startMillis, long endMillis) {
+        if (currentOwnerId == null || currentOwnerId.isEmpty()) {
+            if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+            return;
+        }
+
+        DatabaseReference opexRef = FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId);
+        opexRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                databaseExpenses.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    Long dateLogged = ds.child("dateLogged").getValue(Long.class);
+                    if (dateLogged != null && dateLogged >= startMillis && dateLogged <= endMillis) {
+                        DataSnapshot itemsSnapshot = ds.child("items");
+                        for (DataSnapshot itemDs : itemsSnapshot.getChildren()) {
+                            String expName = itemDs.getKey();
+                            Object val = itemDs.getValue();
+                            if (val != null && expName != null) {
+                                try {
+                                    double amt = Double.parseDouble(val.toString());
+                                    databaseExpenses.put(expName, databaseExpenses.getOrDefault(expName, 0.0) + amt);
+                                } catch (NumberFormatException ignored) {}
+                            }
+                        }
+                    }
+                }
+                mergeAndRenderOperatingExpenses();
+                if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                mergeAndRenderOperatingExpenses();
+                if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+            }
+        });
+    }
+
+    private void mergeAndRenderOperatingExpenses() {
+        if (containerISExpenses == null) return;
+        containerISExpenses.removeAllViews();
+        Map<String, Double> mergedExpenses = new HashMap<>();
+
+        for (Map.Entry<String, Double> entry : databaseExpenses.entrySet()) {
+            mergedExpenses.put(entry.getKey(), mergedExpenses.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
+        }
+        for (Map.Entry<String, Double> entry : temporarySessionExpenses.entrySet()) {
+            mergedExpenses.put(entry.getKey(), mergedExpenses.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
+        }
+
+        currentTotalOpex = 0.0;
+        for (Map.Entry<String, Double> entry : mergedExpenses.entrySet()) {
+            currentTotalOpex += entry.getValue();
+            addExpenseRowToIncomeStatement(entry.getKey(), entry.getValue());
+        }
+
+        currentNetIncome = currentGrossProfit - currentTotalOpex;
+        tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
+        tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
+    }
+
+    private void generateDetailedStrings(long startMillis, long endMillis) {
         detailedProductsStr.setLength(0);
         Map<String, List<DetailedProductReport>> catGrouped = new HashMap<>();
         List<String> sortedCategories = new ArrayList<>();
         Map<String, DetailedProductReport> allProductsMap = new HashMap<>();
 
-        // 1. Register ALL newly added products and existing inventory first (even with 0 sales)
         for (Product p : currentInventory) {
             if (p != null && p.getProductName() != null && !"Menu".equals(p.getProductType())) {
                 String catName = p.getCategoryName() != null && !p.getCategoryName().isEmpty() ? p.getCategoryName() : "Uncategorized";
@@ -326,7 +594,6 @@ public class Reports extends BaseActivity {
             }
         }
 
-        // 2. Overlay actual sales data onto the registered inventory items
         for (BestSellerItem b : bestSellersList) {
             if (allProductsMap.containsKey(b.productName)) {
                 DetailedProductReport dp = allProductsMap.get(b.productName);
@@ -334,7 +601,6 @@ public class Reports extends BaseActivity {
                 dp.totalRevenue = b.totalRevenue;
                 dp.totalCost = b.totalCost;
             } else {
-                // If a product was sold but later deleted from inventory
                 DetailedProductReport dp = new DetailedProductReport(b.productName, "Deleted Products", 0);
                 dp.quantitySold = b.quantitySold;
                 dp.totalRevenue = b.totalRevenue;
@@ -343,7 +609,6 @@ public class Reports extends BaseActivity {
             }
         }
 
-        // 3. Group them by category for the Detailed Report
         for (DetailedProductReport dp : allProductsMap.values()) {
             if (!sortedCategories.contains(dp.category)) sortedCategories.add(dp.category);
             if (!catGrouped.containsKey(dp.category)) catGrouped.put(dp.category, new ArrayList<>());
@@ -364,122 +629,99 @@ public class Reports extends BaseActivity {
                         .append(" | Total Cost: ₱").append(String.format(Locale.US, "%,.2f", dp.totalCost)).append("\n\n");
             }
         }
-
-        if (!bestSellersList.isEmpty()) tvOverviewBestSeller.setText(bestSellersList.get(0).productName + "\n(" + bestSellersList.get(0).quantitySold + " sold)");
-        else tvOverviewBestSeller.setText("-");
-
-        tvOverviewPayment.setText(gcashCount > cashCount ? "GCash" : (cashCount == 0 ? "-" : "Cash"));
-
-        currentTransactionCount = uniqueOrderIds.isEmpty() ? fallbackTxCount : (uniqueOrderIds.size() + fallbackTxCount);
-        if (tvOverviewTransaction != null) tvOverviewTransaction.setText(String.valueOf(currentTransactionCount));
-
-        currentGrossSales = currentNetSales + currentTotalDiscounts;
-        currentGrossProfit = currentNetSales - currentTotalCOGS;
-
-        // Safety initialization before OPEX loads
-        if (currentTotalOpex == 0.0) {
-            currentNetIncome = currentGrossProfit;
-        } else {
-            currentNetIncome = currentGrossProfit - currentTotalOpex;
-        }
-
-        tvISGrossSales.setText(String.format(Locale.US, "₱ %,.2f", currentGrossSales));
-        tvISDiscounts.setText(String.format(Locale.US, "%,.2f", currentTotalDiscounts));
-        tvISNetSales.setText(String.format(Locale.US, "%,.2f", currentNetSales));
-        tvISCogs.setText(String.format(Locale.US, "%,.2f", currentTotalCOGS));
-        tvISGrossProfit.setText(String.format(Locale.US, "%,.2f", currentGrossProfit));
-        tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
-        tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
-
-        adapter.notifyDataSetChanged();
-
-        fetchOperationsData(startMillis, endMillis);
-        fetchPODetailsData(startMillis, endMillis);
-
-        fetchOperatingExpenses(startMillis, endMillis);
     }
 
-    private void fetchOperatingExpenses(long startMillis, long endMillis) {
-        if (currentOwnerId == null || currentOwnerId.isEmpty()) return;
+    private void addExpenseRowToIncomeStatement(String name, double amount) {
+        RelativeLayout row = new RelativeLayout(this);
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        row.setLayoutParams(params);
+        row.setPadding(0, 4, 0, 4);
+        TextView tvName = new TextView(this); tvName.setText("   " + name); tvName.setTextColor(Color.parseColor("#000000"));
+        TextView tvAmt = new TextView(this); tvAmt.setText(String.format(Locale.US, "%,.2f", amount)); tvAmt.setTextColor(Color.parseColor("#000000"));
+        RelativeLayout.LayoutParams amtParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); amtParams.addRule(RelativeLayout.ALIGN_PARENT_END); tvAmt.setLayoutParams(amtParams);
+        row.addView(tvName); row.addView(tvAmt);
+        containerISExpenses.addView(row);
+    }
 
-        DatabaseReference opexRef = FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId);
-        opexRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                currentTotalOpex = 0.0;
-
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Long dateLogged = ds.child("dateLogged").getValue(Long.class);
-                    // Check if the expense was logged within the selected date range
-                    if (dateLogged != null && dateLogged >= startMillis && dateLogged <= endMillis) {
-                        DataSnapshot itemsSnapshot = ds.child("items");
-                        for (DataSnapshot itemDs : itemsSnapshot.getChildren()) {
-                            Number amount = itemDs.getValue(Number.class);
-                            if (amount != null) {
-                                currentTotalOpex += amount.doubleValue();
-                            }
-                        }
+    private void resetOperatingExpensesDatabase() {
+        new AlertDialog.Builder(this)
+                .setTitle("Reset Operating Expenses")
+                .setMessage("Are you sure you want to permanently delete all saved Operating Expenses data from the database?")
+                .setPositiveButton("Reset & Clear", (dialog, which) -> {
+                    if (currentOwnerId != null && !currentOwnerId.isEmpty()) {
+                        FirebaseDatabase.getInstance().getReference("OperatingExpenses")
+                                .child(currentOwnerId).removeValue()
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(Reports.this, "Operating Expenses reset!", Toast.LENGTH_SHORT).show();
+                                    databaseExpenses.clear();
+                                    mergeAndRenderOperatingExpenses();
+                                });
                     }
-                }
-
-                // Recalculate Net Income asynchronously
-                currentNetIncome = currentGrossProfit - currentTotalOpex;
-
-                // Update UI visually
-                tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
-                tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
-        });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void showOperatingExpensesDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_operating_expenses, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
 
         EditText etExpenseName = dialogView.findViewById(R.id.etExpenseName);
         EditText etExpenseAmount = dialogView.findViewById(R.id.etExpenseAmount);
         Button btnAddExpense = dialogView.findViewById(R.id.btnAddExpense);
         LinearLayout containerExpenses = dialogView.findViewById(R.id.containerExpenses);
-
         Button btnCancel = dialogView.findViewById(R.id.btnCancelExpenses);
         Button btnSave = dialogView.findViewById(R.id.btnSaveExpenses);
 
-        Map<String, Double> pendingExpenses = new HashMap<>();
+        Button btnClearDb = new Button(this);
+        btnClearDb.setText("RESET ALL SAVED EXPENSES (WIPE DATA)");
+        btnClearDb.setTextColor(android.graphics.Color.RED);
+        btnClearDb.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        btnClearDb.setOnClickListener(v -> {
+            dialog.dismiss();
+            resetOperatingExpensesDatabase();
+        });
+        containerExpenses.addView(btnClearDb);
+
+        for(Map.Entry<String, Double> entry : temporarySessionExpenses.entrySet()){
+            addExpenseRowToUI(containerExpenses, temporarySessionExpenses, entry.getKey(), entry.getValue());
+        }
 
         btnAddExpense.setOnClickListener(v -> {
             String name = etExpenseName.getText().toString().trim();
             String amountStr = etExpenseAmount.getText().toString().trim();
-
-            if (name.isEmpty() || amountStr.isEmpty()) {
-                Toast.makeText(this, "Please enter both name and amount", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (name.isEmpty() || amountStr.isEmpty()) { Toast.makeText(this, "Enter name and amount", Toast.LENGTH_SHORT).show(); return; }
 
             try {
                 double amount = Double.parseDouble(amountStr);
-                pendingExpenses.put(name, amount);
-                addExpenseRowToUI(containerExpenses, pendingExpenses, name, amount);
+                temporarySessionExpenses.put(name, temporarySessionExpenses.getOrDefault(name, 0.0) + amount);
+                addExpenseRowToUI(containerExpenses, temporarySessionExpenses, name, amount);
+                etExpenseName.setText(""); etExpenseAmount.setText(""); etExpenseName.requestFocus();
+                mergeAndRenderOperatingExpenses();
+            } catch (NumberFormatException e) { Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show(); }
+        });
 
-                etExpenseName.setText("");
-                etExpenseAmount.setText("");
-                etExpenseName.requestFocus();
-            } catch (NumberFormatException e) {
-                Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+        btnCancel.setOnClickListener(v -> {
+            if(!temporarySessionExpenses.isEmpty()){
+                new AlertDialog.Builder(this)
+                        .setTitle("Unsaved Expenses")
+                        .setMessage("You added expenses to the list but did not click SAVE. These temporary items will be lost. Continue?")
+                        .setPositiveButton("Discard", (di, wh) -> {
+                            temporarySessionExpenses.clear();
+                            mergeAndRenderOperatingExpenses();
+                            dialog.dismiss();
+                        })
+                        .setNegativeButton("Wait, Save Them", null)
+                        .show();
+            } else {
+                dialog.dismiss();
             }
         });
 
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-
         btnSave.setOnClickListener(v -> {
-            if (pendingExpenses.isEmpty()) {
-                Toast.makeText(this, "No expenses to save", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            saveExpensesToDatabase(pendingExpenses);
+            if (temporarySessionExpenses.isEmpty()) { Toast.makeText(this, "No unsaved expenses found.", Toast.LENGTH_SHORT).show(); return; }
+            saveExpensesToDatabase();
             dialog.dismiss();
         });
 
@@ -488,24 +730,20 @@ public class Reports extends BaseActivity {
 
     private void addExpenseRowToUI(LinearLayout container, Map<String, Double> pendingMap, String name, double amount) {
         View row = LayoutInflater.from(this).inflate(R.layout.item_expense_row, null);
-
         TextView tvName = row.findViewById(R.id.tvRowExpenseName);
         TextView tvAmount = row.findViewById(R.id.tvRowExpenseAmount);
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteExpenseRow);
-
-        tvName.setText(name);
-        tvAmount.setText(String.format(Locale.US, "₱%,.2f", amount));
-
+        tvName.setText(name); tvAmount.setText(String.format(Locale.US, "₱%,.2f", amount));
         btnDelete.setOnClickListener(v -> {
             container.removeView(row);
             pendingMap.remove(name);
+            mergeAndRenderOperatingExpenses();
         });
-
         container.addView(row);
     }
 
-    private void saveExpensesToDatabase(Map<String, Double> expensesMap) {
-        if (currentOwnerId == null || currentOwnerId.isEmpty()) return;
+    private void saveExpensesToDatabase() {
+        if (currentOwnerId == null || currentOwnerId.isEmpty() || temporarySessionExpenses.isEmpty()) return;
 
         DatabaseReference expensesRef = FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId);
         String expenseId = expensesRef.push().getKey();
@@ -513,11 +751,15 @@ public class Reports extends BaseActivity {
             Map<String, Object> data = new HashMap<>();
             data.put("id", expenseId);
             data.put("dateLogged", System.currentTimeMillis());
-            data.put("items", expensesMap);
+            data.put("items", temporarySessionExpenses);
 
             expensesRef.child(expenseId).setValue(data).addOnSuccessListener(aVoid -> {
-                Toast.makeText(this, "Operating Expenses Saved!", Toast.LENGTH_SHORT).show();
-                calculateMetricsAndList();
+                Toast.makeText(this, "Operating Expenses Saved to Database!", Toast.LENGTH_SHORT).show();
+                for (Map.Entry<String, Double> entry : temporarySessionExpenses.entrySet()) {
+                    databaseExpenses.put(entry.getKey(), databaseExpenses.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
+                }
+                temporarySessionExpenses.clear();
+                mergeAndRenderOperatingExpenses();
             });
         }
     }
@@ -695,30 +937,65 @@ public class Reports extends BaseActivity {
         dialog.show();
     }
 
-    private void exportAccountingPdf() {
+    private void showExportOptionsDialog() {
+        String[] exportOptions = {
+                "📄 Financial & Income Statement",
+                "📦 Inventory Master (Stock Value)",
+                "🚚 Operations, POs & Adjustments"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Select Report to Export")
+                .setItems(exportOptions, (dialog, which) -> exportSelectedReport(which))
+                .show();
+    }
+
+    private void exportSelectedReport(int reportTypeIndex) {
         try {
             ReportExportUtil exportUtil = new ReportExportUtil(this);
             File exportDir = exportUtil.getExportDirectory();
             if (exportDir == null) return;
-            String pdfName = exportUtil.generateFileName("Financial_Report", ReportExportUtil.EXPORT_PDF);
+
+            String prefix = "";
+            if (reportTypeIndex == 0) prefix = "Financial_Statement_";
+            else if (reportTypeIndex == 1) prefix = "Inventory_Master_";
+            else if (reportTypeIndex == 2) prefix = "Operations_PO_";
+
+            String pdfName = exportUtil.generateFileName(prefix, ReportExportUtil.EXPORT_PDF);
             tempPdfFile = new File(exportDir, pdfName);
 
             PDFGenerator generator = new PDFGenerator(this);
-            generator.generateAccountingReportPDF(
-                    tempPdfFile,
-                    btnStartDate.getText().toString() + " to " + btnEndDate.getText().toString(),
-                    businessName,
-                    currentGrossSales, currentTotalDiscounts, currentNetSales,
-                    currentTotalCOGS, currentGrossProfit, currentTotalOpex, currentNetIncome,
-                    currentCashSales, currentGcashSales, currentTransactionCount, currentInventoryValue,
-                    allReportItems
-            );
+            String dateRange = btnStartDate.getText().toString() + " to " + btnEndDate.getText().toString();
 
+            if (reportTypeIndex == 0) {
+                // 1. Financial Report (Income Statement)
+                generator.generateAccountingReportPDF(
+                        tempPdfFile, dateRange, businessName,
+                        currentGrossSales, currentTotalDiscounts, currentNetSales,
+                        currentTotalCOGS, currentGrossProfit, currentTotalOpex, currentNetIncome,
+                        currentCashSales, currentGcashSales, currentTransactionCount, currentInventoryValue,
+                        allReportItems
+                );
+            } else if (reportTypeIndex == 1) {
+                // 2. Inventory Master Report
+                generator.generateInventoryMasterPDF(
+                        tempPdfFile, businessName, currentInventory, currentInventoryValue
+                );
+            } else if (reportTypeIndex == 2) {
+                // 3. Operations, Receiving & Adjustments Report
+                generator.generateOperationsAndReceivingReportPDF(
+                        tempPdfFile, dateRange, businessName,
+                        detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), detailedDamagesStr.toString()
+                );
+            }
+
+            // Launch the Android Document Saver
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("application/pdf");
             intent.putExtra(Intent.EXTRA_TITLE, pdfName);
             createDocumentLauncher.launch(intent);
+
         } catch (Exception e) {
             Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
@@ -740,6 +1017,7 @@ public class Reports extends BaseActivity {
     public static class ReportItem {
         public String name, date, quantity, amount, details;
         public double discount;
+        public boolean isRefund = false;
         public ReportItem(String n, String d, String q, String a, String det, double disc) {
             name = n; date = d; quantity = q; amount = a; details = det; discount = disc;
         }
@@ -769,6 +1047,12 @@ public class Reports extends BaseActivity {
 
             ReportItem item = items.get(position);
             rowName.setText(item.name); rowDate.setText(item.date); rowQty.setText(item.quantity); rowTotal.setText(item.amount);
+
+            if (item.isRefund) {
+                rowTotal.setTextColor(Color.RED);
+            } else {
+                rowTotal.setTextColor(Color.BLACK);
+            }
 
             if (item.details != null && !item.details.isEmpty()) { rowDetails.setVisibility(View.VISIBLE); rowDetails.setText(item.details); }
             else rowDetails.setVisibility(View.GONE);

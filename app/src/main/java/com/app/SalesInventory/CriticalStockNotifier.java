@@ -29,13 +29,28 @@ public class CriticalStockNotifier {
 
         String name = product.getProductName() == null ? "" : product.getProductName();
 
-        // FIX: Accept the new double format and format it nicely for the user
+        // Safely format decimal quantities
         double qty = product.getQuantity();
         String qtyDisplay = (qty % 1 == 0) ? String.valueOf((long) qty) : String.valueOf(qty);
 
+        // Dynamically determine if it's Low Stock (Reorder) or Critical
+        String alertTitle = "Stock Alert";
+        String alertMessage = "";
+
+        if (product.getCriticalLevel() > 0 && qty <= product.getCriticalLevel()) {
+            alertTitle = "🚨 CRITICAL STOCK ALERT";
+            alertMessage = "Product \"" + name + "\" has hit the Minimum Critical Level!\n\nCurrent quantity: " + qtyDisplay + "\n\nYou must restock immediately to avoid stockouts.";
+        } else if (product.getReorderLevel() > 0 && qty <= product.getReorderLevel()) {
+            alertTitle = "⚠️ LOW STOCK (REORDER)";
+            alertMessage = "Product \"" + name + "\" has reached the Safety Reorder Point.\n\nCurrent quantity: " + qtyDisplay + "\n\nPlease prepare to order more from your supplier.";
+        } else {
+            // If it's not actually low, don't show the dialog
+            return;
+        }
+
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setTitle("Critical Stock Alert");
-        builder.setMessage("Product \"" + name + "\" is at critical level.\nCurrent quantity: " + qtyDisplay + "\n\nPlease restock soon.");
+        builder.setTitle(alertTitle);
+        builder.setMessage(alertMessage);
 
         builder.setPositiveButton("Confirm", (dialog, which) -> {
             dismissedForProduct.add(productId);

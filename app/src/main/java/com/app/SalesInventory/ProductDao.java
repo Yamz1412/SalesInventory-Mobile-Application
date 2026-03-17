@@ -24,6 +24,12 @@ public interface ProductDao {
     @Query("SELECT * FROM products WHERE localId = :localId LIMIT 1")
     ProductEntity getByLocalId(long localId);
 
+    @Query("SELECT * FROM products WHERE quantity <= reorderLevel")
+    LiveData<List<ProductEntity>> getLowStockProductsLive();
+
+    @Query("SELECT * FROM products WHERE quantity <= reorderLevel")
+    List<ProductEntity> getLowStockProductsSync();
+
     @Insert
     long insert(ProductEntity entity);
 

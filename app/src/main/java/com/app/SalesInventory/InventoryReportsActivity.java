@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -22,8 +23,8 @@ import java.util.concurrent.Executors;
 
 public class InventoryReportsActivity extends BaseActivity  {
 
-    private Button btnStockValue, btnStockMovement, btnAdjustmentSummary, btnExport;
-    private Button btnDeliveryReport, btnReceivingReport;
+    private Button btnFmiSmi, btnStockMovement, btnAdjustmentSummary, btnMasterSummary;
+    private Button btnDeliveryReport, btnReceivingReport, btnDamagedReport;
 
     private DatabaseReference adjustmentRef;
 
@@ -56,12 +57,13 @@ public class InventoryReportsActivity extends BaseActivity  {
     }
 
     private void initializeViews() {
-        btnStockValue = findViewById(R.id.btnStockValue);
+        btnDamagedReport = findViewById(R.id.btnDamagedReport);
+        btnFmiSmi = findViewById(R.id.btnFmiSmi);
         btnStockMovement = findViewById(R.id.btnStockMovement);
         btnAdjustmentSummary = findViewById(R.id.btnAdjustmentSummary);
-        btnExport = findViewById(R.id.btnExport);
         btnDeliveryReport = findViewById(R.id.btnDeliveryReport);
         btnReceivingReport = findViewById(R.id.btnReceivingReport);
+        btnMasterSummary = findViewById(R.id.btnMasterSummary);
 
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
         exportUtil = new ReportExportUtil(this);
@@ -83,21 +85,13 @@ public class InventoryReportsActivity extends BaseActivity  {
     }
 
     private void setupClickListeners() {
-        btnStockValue.setOnClickListener(v -> startActivity(new android.content.Intent(this, StockValueReportActivity.class)));
+        btnFmiSmi.setOnClickListener(v -> startActivity(new android.content.Intent(this, FmiSmiReportActivity.class)));
         btnStockMovement.setOnClickListener(v -> startActivity(new android.content.Intent(this, StockMovementReportActivity.class)));
         btnAdjustmentSummary.setOnClickListener(v -> startActivity(new android.content.Intent(this, AdjustmentSummaryReportActivity.class)));
         btnReceivingReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, ReceivingReportActivity.class)));
         btnDeliveryReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, DeliveryReportActivity.class)));
-
-        btnExport.setOnClickListener(v -> {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-                    return;
-                }
-            }
-            exportAllReportsPdf();
-        });
+        btnDamagedReport.setOnClickListener(v -> startActivity(new Intent(this, DamagedProductsReportActivity.class)));
+        btnMasterSummary.setOnClickListener(v -> startActivity(new Intent(this, InventoryMasterSummaryActivity.class)));
     }
 
     private void exportAllReportsPdf() {
@@ -151,6 +145,10 @@ public class InventoryReportsActivity extends BaseActivity  {
                     List<AdjustmentSummaryData> adjustmentSummaries = new ArrayList<>();
 
                     for (Product p : cachedProducts) {
+                        if ("Menu".equalsIgnoreCase(p.getProductType())) {
+                            continue;
+                        }
+
                         StockValueReport vr = new StockValueReport(
                                 p.getProductId(), p.getProductName(), p.getCategoryName(),
                                 p.getQuantity(), p.getCostPrice(), p.getSellingPrice(),

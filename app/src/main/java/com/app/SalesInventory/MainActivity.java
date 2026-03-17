@@ -14,6 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.cardview.widget.CardView;
 import androidx.lifecycle.ViewModelProvider;
@@ -30,6 +31,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
@@ -41,8 +44,8 @@ import java.util.Locale;
 
 public class MainActivity extends BaseActivity {
     // UI Components
-    private CardView cardSalesAmount, cardGrossProfit, cardLowStock, cardPendingOrders, cardNearExpiry;
-    private TextView tvSalesAmount, tvGrossProfit, tvLowStockCount, tvPendingOrdersCount, tvNearExpiryCount;
+    private CardView cardSalesAmount, cardGrossProfit, cardOpex, cardNetIncome, cardLowStock, cardPendingOrders, cardNearExpiry;
+    private TextView tvSalesAmount, tvGrossProfit, tvOpex, tvNetIncome, tvLowStockList, tvPendingOrdersCount, tvNearExpiryCount;
     private TextView tvOverviewLabel;
     private LineChart salesTrendChart;
     private BarChart topProductsChart;
@@ -83,12 +86,15 @@ public class MainActivity extends BaseActivity {
 
     // Data Cache for Filtering
     private List<Sales> cachedSalesList = new ArrayList<>();
-    private List<Product> cachedProductList = new ArrayList<>(); // NEW: Needed to verify accurate costs
+    private List<Product> cachedProductList = new ArrayList<>();
 
     private LinearLayout layoutImpersonationBanner;
     private TextView tvImpersonationText;
     private Button btnExitImpersonation;
     private boolean isImpersonating = false;
+
+    // REAL-TIME RESET LISTENER
+    private com.google.firebase.firestore.ListenerRegistration resetSignalListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,6 +102,26 @@ public class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
 
         AuthManager.getInstance().init(getApplication());
+        // --- START FIREBASE PRESENCE TRACKING ---
+        String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+        if (currentUid != null) {
+            DatabaseReference userStatusRef = FirebaseDatabase.getInstance().getReference("UsersStatus").child(currentUid);
+            DatabaseReference connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected");
+
+            connectedRef.addValueEventListener(new com.google.firebase.database.ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                    Boolean connected = snapshot.getValue(Boolean.class);
+                    if (connected != null && connected) {
+                        userStatusRef.onDisconnect().setValue("offline");
+                        userStatusRef.setValue("online");
+                    }
+                }
+                @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+            });
+        }
+        // --- END FIREBASE PRESENCE TRACKING ---
+
 
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
@@ -103,7 +129,7 @@ public class MainActivity extends BaseActivity {
 
         initializeUI();
         setupNearExpiryCard();
-        setupProductObserver(); // NEW: Fetch inventory to calculate accurate costs
+        setupProductObserver();
         setupViewModel();
         setupSalesObserver();
         setupCharts();
@@ -112,27 +138,80 @@ public class MainActivity extends BaseActivity {
         notificationBadgeManager = new NotificationBadgeManager(this);
         notificationBadgeManager.start();
 
+        listenForFactoryReset(); // <--- LISTENS FOR ADMIN RESET
+
         startEntryAnimation();
         loadDashboardData();
+    }
+
+    // ========================================================
+    // THE KILL SWITCH LISTENER (Detects Admin Reset Signal)
+    // ========================================================
+    private void listenForFactoryReset() {
+        resetSignalListener = FirestoreManager.getInstance().getResetSignalRef()
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) return;
+                    if (snapshot != null && snapshot.exists()) {
+                        com.google.firebase.Timestamp ts = snapshot.getTimestamp("lastResetTime");
+                        if (ts != null) {
+                            long resetTimeMillis = ts.toDate().getTime();
+                            android.content.SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+                            long localLastReset = prefs.getLong("localLastReset", 0);
+
+                            if (resetTimeMillis > localLastReset) {
+                                // The Admin clicked Reset!
+                                prefs.edit().putLong("localLastReset", resetTimeMillis).apply();
+
+                                // Wipe local cache on a background thread so it doesn't freeze the UI
+                                new Thread(() -> {
+                                    try {
+                                        if (SalesInventoryApplication.getProductRepository() != null) {
+                                            SalesInventoryApplication.getProductRepository().clearLocalData();
+                                        }
+                                        if (SalesInventoryApplication.getSalesRepository() != null) {
+                                            SalesInventoryApplication.getSalesRepository().clearData();
+                                        }
+                                        try {
+                                            AlertRepository.getInstance(getApplication()).clearAllAlerts();
+                                        } catch (Exception ignored) {}
+                                    } catch (Exception ex) {
+                                        android.util.Log.e("MainActivity", "Local wipe error: " + ex.getMessage());
+                                    }
+
+                                    // Update the Staff's screen instantly
+                                    runOnUiThread(() -> {
+                                        Toast.makeText(MainActivity.this, "Admin performed a system reset. Local data cleared.", Toast.LENGTH_LONG).show();
+                                        NotificationHelper.clearAllNotifications(MainActivity.this);
+                                        if (activityAdapter != null) activityAdapter.setActivities(new ArrayList<>());
+                                        loadDashboardData();
+                                    });
+                                }).start();
+                            }
+                        }
+                    }
+                });
     }
 
     private void initializeUI() {
         swipeRefresh = findViewById(R.id.swipe_refresh);
         cardSalesAmount = findViewById(R.id.card_sales_amount);
         cardGrossProfit = findViewById(R.id.card_gross_profit);
+        cardOpex = findViewById(R.id.card_opex);
         cardLowStock = findViewById(R.id.card_low_stock);
         cardPendingOrders = findViewById(R.id.card_pending_orders);
         cardNearExpiry = findViewById(R.id.card_near_expiry);
+        cardNetIncome = findViewById(R.id.card_net_income);
 
         tvSalesAmount = findViewById(R.id.tv_sales_amount);
         tvGrossProfit = findViewById(R.id.tv_gross_profit);
-        tvLowStockCount = findViewById(R.id.tv_low_stock_count);
+        tvOpex = findViewById(R.id.tv_opex);
+        tvNetIncome = findViewById(R.id.tv_net_income);
+        tvLowStockList = findViewById(R.id.tv_low_stock_list);
         tvPendingOrdersCount = findViewById(R.id.tv_pending_orders_count);
         tvNearExpiryCount = findViewById(R.id.tv_near_expiry_count);
         tvOverviewLabel = findViewById(R.id.tv_overview_label);
         tvLastUpdated = findViewById(R.id.tv_last_updated);
 
-        // Map Business UI
         ivBusinessLogo = findViewById(R.id.ivBusinessLogo);
         tvBusinessName = findViewById(R.id.tvBusinessName);
 
@@ -283,15 +362,11 @@ public class MainActivity extends BaseActivity {
         Toast.makeText(this, "Restored Admin View", Toast.LENGTH_SHORT).show();
     }
 
-    // =========================================================================
-    // NEW: FETCH PRODUCTS TO ENSURE ACCURATE HISTORICAL COSTS
-    // =========================================================================
     private void setupProductObserver() {
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 cachedProductList = products;
 
-                // Reapply filters to update Gross Profit if sales were loaded before products
                 if (!cachedSalesList.isEmpty() && toggleTimeFilter != null) {
                     int checkedId = toggleTimeFilter.getCheckedButtonId();
                     if (checkedId == R.id.btn_filter_daily) applyFilter(0);
@@ -318,39 +393,17 @@ public class MainActivity extends BaseActivity {
         });
     }
 
-    // =========================================================================
-    // FIXED: GROSS PROFIT CALCULATION MATCHES REPORT.JAVA
-    // =========================================================================
     private void applyFilter(int mode) {
         long startTime = 0;
         Calendar cal = Calendar.getInstance();
-
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
 
         String label = "Overview";
-
         switch (mode) {
-            case 0:
-                startTime = cal.getTimeInMillis();
-                label = "Overview (Today)";
-                break;
-            case 1:
-                cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
-                startTime = cal.getTimeInMillis();
-                label = "Overview (This Week)";
-                break;
-            case 2:
-                cal.set(Calendar.DAY_OF_MONTH, 1);
-                startTime = cal.getTimeInMillis();
-                label = "Overview (This Month)";
-                break;
-            case 3:
-                startTime = 0;
-                label = "Overview (All Time)";
-                break;
+            case 0: startTime = cal.getTimeInMillis(); label = "Overview (Today)"; break;
+            case 1: cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek()); startTime = cal.getTimeInMillis(); label = "Overview (This Week)"; break;
+            case 2: cal.set(Calendar.DAY_OF_MONTH, 1); startTime = cal.getTimeInMillis(); label = "Overview (This Month)"; break;
+            case 3: startTime = 0; label = "Overview (All Time)"; break;
         }
 
         if (tvOverviewLabel != null) tvOverviewLabel.setText(label);
@@ -361,43 +414,60 @@ public class MainActivity extends BaseActivity {
         for (Sales sale : cachedSalesList) {
             long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : sale.getDate();
             if (ts >= startTime) {
-                double netPrice = sale.getTotalPrice();
+                totalSales += sale.getTotalPrice();
+
                 double cost = sale.getTotalCost();
-
-                // SMART FALLBACK: Look up the product cost locally if the sale missed it (Just like Reports)
                 if (cost <= 0) {
-                    String rawName = sale.getProductName() != null ? sale.getProductName() : "";
-                    String baseName = rawName;
-
-                    int parenIdx = rawName.indexOf(" (");
-                    int bracketIdx = rawName.indexOf(" [");
-                    int minIdx = rawName.length();
-
-                    if (parenIdx != -1) minIdx = Math.min(minIdx, parenIdx);
-                    if (bracketIdx != -1) minIdx = Math.min(minIdx, bracketIdx);
-
-                    if (minIdx != rawName.length()) {
-                        baseName = rawName.substring(0, minIdx).trim();
-                    }
-
+                    String baseName = sale.getProductName() != null ? sale.getProductName() : "";
+                    if (baseName.contains(" (")) baseName = baseName.substring(0, baseName.indexOf(" (")).trim();
                     for (Product p : cachedProductList) {
                         if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(baseName)) {
-                            cost = p.getCostPrice() * sale.getQuantity();
-                            break;
+                            cost = p.getCostPrice() * sale.getQuantity(); break;
                         }
                     }
                 }
-
-                totalSales += netPrice;
                 totalCost += cost;
             }
         }
 
+        double grossProfit = totalSales - totalCost;
         if (tvSalesAmount != null) tvSalesAmount.setText(String.format(Locale.US, "₱%,.2f", totalSales));
-        if (tvGrossProfit != null) {
-            double grossProfit = totalSales - totalCost;
-            tvGrossProfit.setText(String.format(Locale.US, "₱%,.2f", grossProfit));
-        }
+        if (tvGrossProfit != null) tvGrossProfit.setText(String.format(Locale.US, "₱%,.2f", grossProfit));
+
+        // Fetch Opex from Firebase for the selected timeframe
+        fetchOperatingExpensesAndCalculateNet(startTime, grossProfit);
+    }
+
+    private void fetchOperatingExpensesAndCalculateNet(long startTime, double grossProfit) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) return;
+
+        FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(ownerId)
+                .addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                        double totalOpex = 0.0;
+                        for (com.google.firebase.database.DataSnapshot ds : snapshot.getChildren()) {
+                            Long dateLogged = ds.child("dateLogged").getValue(Long.class);
+                            if (dateLogged != null && dateLogged >= startTime) {
+                                com.google.firebase.database.DataSnapshot itemsSnapshot = ds.child("items");
+                                for (com.google.firebase.database.DataSnapshot itemDs : itemsSnapshot.getChildren()) {
+                                    Object val = itemDs.getValue();
+                                    if (val != null) {
+                                        try { totalOpex += Double.parseDouble(val.toString()); }
+                                        catch (NumberFormatException ignored) {}
+                                    }
+                                }
+                            }
+                        }
+
+                        double netIncome = grossProfit - totalOpex;
+
+                        if (tvOpex != null) tvOpex.setText(String.format(Locale.US, "₱%,.2f", totalOpex));
+                        if (tvNetIncome != null) tvNetIncome.setText(String.format(Locale.US, "₱%,.2f", netIncome));
+                    }
+                    @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+                });
     }
 
     private void setupNearExpiryCard() {
@@ -453,20 +523,38 @@ public class MainActivity extends BaseActivity {
     }
 
     private void updateStaticCards(DashboardMetrics metrics) {
-        if (tvLowStockCount != null && cardLowStock != null) {
-            int lowCount = metrics.getLowStockCount();
-            tvLowStockCount.setText(String.valueOf(lowCount));
-            cardLowStock.setVisibility(View.VISIBLE);
+        // Build the Actionable List of Critical Items
+        if (cardLowStock != null && tvLowStockList != null) {
+            StringBuilder lowStockItemsList = new StringBuilder();
+            int criticalCount = 0;
+
+            for (Product p : cachedProductList) {
+                if (p.isActive() && p.isCriticalStock()) {
+                    criticalCount++;
+                    if (criticalCount <= 3) {
+                        String unit = p.getUnit().isEmpty() ? "Units" : p.getUnit();
+                        lowStockItemsList.append("• ").append(p.getProductName())
+                                .append(" (").append(p.getQuantity()).append(" ").append(unit).append(" left)\n");
+                    }
+                }
+            }
+
+            if (criticalCount > 0) {
+                if (criticalCount > 3) {
+                    lowStockItemsList.append("+ ").append(criticalCount - 3).append(" other items running low.");
+                }
+                tvLowStockList.setText(lowStockItemsList.toString().trim());
+                cardLowStock.setVisibility(View.VISIBLE);
+            } else {
+                cardLowStock.setVisibility(View.GONE);
+            }
         }
 
         if (tvPendingOrdersCount != null) {
             int pendingCount = metrics.getPendingOrdersCount();
             tvPendingOrdersCount.setText(String.valueOf(pendingCount));
-            if (pendingCount > 0) {
-                tvPendingOrdersCount.setTextColor(getColor(R.color.info_primary));
-            } else {
-                tvPendingOrdersCount.setTextColor(getColor(R.color.text_primary));
-            }
+            if (pendingCount > 0) tvPendingOrdersCount.setTextColor(getColor(R.color.info_primary));
+            else tvPendingOrdersCount.setTextColor(getColor(R.color.text_primary));
         }
     }
 
@@ -651,12 +739,17 @@ public class MainActivity extends BaseActivity {
         resolveUserRoleAndConfigureUI();
         loadDashboardData();
 
-        // REFRESH BUSINESS PROFILE EVERY TIME DASHBOARD IS OPENED
         loadBusinessProfile();
     }
 
     @Override
     protected void onDestroy() {
+        // Prevent Memory Leak on the Listener
+        if (resetSignalListener != null) {
+            resetSignalListener.remove();
+            resetSignalListener = null;
+        }
+
         if (notificationBadgeManager != null) {
             notificationBadgeManager.stop();
             notificationBadgeManager = null;

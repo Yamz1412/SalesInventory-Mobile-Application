@@ -16,6 +16,56 @@ const syncCollections = [
   "alerts"
 ];
 
+// ============================================================================
+// HELPER: SMART ADMIN VERIFICATION
+// Fixes the "Only admins can create staff" error by cross-checking all databases
+// ============================================================================
+async function verifyAdminStatus(context) {
+  if (!context.auth || !context.auth.uid) return false;
+  const adminUid = context.auth.uid;
+  
+  // 1. Check Custom Auth Claims
+  const callerClaims = context.auth.token || {};
+  if (callerClaims.admin === true) return true;
+
+  // 2. Check the 'admin' collection
+  const adminDoc = await db.collection("admin").doc(adminUid).get();
+  if (adminDoc.exists) {
+    const d = adminDoc.data() || {};
+    if (d.approved === true || String(d.approved).toLowerCase() === "true") return true;
+  }
+
+  // 3. FALLBACK: Check 'users' collection (Auto-Repair)
+  const userDoc = await db.collection("users").doc(adminUid).get();
+  if (userDoc.exists) {
+    const ud = userDoc.data() || {};
+    const r = String(ud.role || ud.Role || "").toLowerCase();
+    const app = ud.approved === true || String(ud.approved).toLowerCase() === "true";
+    
+    if (r === "admin" && app) {
+      try {
+        // Automatically repair the backend if they are a valid admin in the users table!
+        await admin.auth().setCustomUserClaims(adminUid, { admin: true });
+        await db.collection("admin").doc(adminUid).set({
+          uid: adminUid,
+          role: "Admin",
+          approved: true,
+          email: ud.email || "",
+          name: ud.name || ""
+        }, { merge: true });
+      } catch (e) {
+        console.error("Auto-repair admin failed:", e);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+// ============================================================================
+// SYNC LOGIC
+// ============================================================================
+
 async function getStaffUidsForAdmin(adminUid) {
   const q = await db.collection("users").where("ownerAdminId", "==", adminUid).get();
   return q.docs.map(d => d.id);
@@ -134,18 +184,14 @@ exports.syncCollections = functions.firestore.document("{collection}/{owner}/ite
   return null;
 });
 
+// ============================================================================
+// ADMIN ACCOUNT & STAFF MANAGEMENT
+// ============================================================================
+
 exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError("unauthenticated", "No auth");
-  }
-
-  const callerClaims = context.auth.token || {};
-
-  if (!callerClaims.admin) {
-    const adminDoc = await db.collection("admin").doc(context.auth.uid).get();
-    if (!(adminDoc.exists && adminDoc.data().approved === true)) {
-      throw new functions.https.HttpsError("permission-denied", "Only admins");
-    }
+  const isAdmin = await verifyAdminStatus(context);
+  if (!isAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Only admins can update users");
   }
 
   const { uid, approved, role, setAsAdmin } = data || {};
@@ -162,17 +208,11 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
 
   const updateUserFields = {};
   if (approved !== undefined) {
-    if (typeof approved !== "boolean") {
-      throw new functions.https.HttpsError("invalid-argument", "approved must be boolean");
-    }
-    updateUserFields.approved = approved;
+    updateUserFields.approved = approved === true || String(approved).toLowerCase() === "true";
   }
 
   if (role !== undefined) {
-    if (typeof role !== "string") {
-      throw new functions.https.HttpsError("invalid-argument", "role must be string");
-    }
-    updateUserFields.role = role;
+    updateUserFields.role = String(role);
   }
 
   try {
@@ -181,11 +221,8 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
     }
 
     if (setAsAdmin !== undefined) {
-      if (typeof setAsAdmin !== "boolean") {
-        throw new functions.https.HttpsError("invalid-argument", "setAsAdmin must be boolean");
-      }
-
-      if (setAsAdmin) {
+      const isSetAdmin = setAsAdmin === true || String(setAsAdmin).toLowerCase() === "true";
+      if (isSetAdmin) {
         await admin.auth().setCustomUserClaims(uid, { admin: true });
         const userRecord = await admin.auth().getUser(uid).catch(() => null);
 
@@ -220,21 +257,12 @@ exports.adminUpdateUser = functions.https.onCall(async (data, context) => {
 });
 
 exports.adminCreateStaffUser = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError("unauthenticated", "Authentication required");
-  }
-
-  const adminUid = context.auth.uid;
-
-  const adminDoc = await db.collection("admin").doc(adminUid).get();
-  const callerClaims = context.auth.token || {};
-  const isAdminClaim = callerClaims.admin === true;
-  const isAdminDoc = adminDoc.exists && adminDoc.data()?.approved === true;
-
-  if (!isAdminClaim && !isAdminDoc) {
+  const isAdmin = await verifyAdminStatus(context);
+  if (!isAdmin) {
     throw new functions.https.HttpsError("permission-denied", "Only admins can create staff");
   }
 
+  const adminUid = context.auth.uid;
   const email = (data?.email || "").trim();
   const password = data?.password || "";
   const name = (data?.name || "").trim();
@@ -275,21 +303,12 @@ exports.adminCreateStaffUser = functions.https.onCall(async (data, context) => {
 });
 
 exports.adminSetUserPassword = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError("unauthenticated", "Authentication required");
-  }
-
-  const adminUid = context.auth.uid;
-
-  const adminDoc = await db.collection("admin").doc(adminUid).get();
-  const callerClaims = context.auth.token || {};
-  const isAdminClaim = callerClaims.admin === true;
-  const isAdminDoc = adminDoc.exists && adminDoc.data()?.approved === true;
-
-  if (!isAdminClaim && !isAdminDoc) {
+  const isAdmin = await verifyAdminStatus(context);
+  if (!isAdmin) {
     throw new functions.https.HttpsError("permission-denied", "Only admins can set staff passwords");
   }
 
+  const adminUid = context.auth.uid;
   const targetUid = data?.uid || "";
   const newPassword = data?.password || "";
 
@@ -358,6 +377,43 @@ exports.createAdminOwner = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", err.message || "Failed to create admin owner");
   }
 });
+
+exports.deleteUser = functions.https.onCall(async (data, context) => {
+  const isAdmin = await verifyAdminStatus(context);
+  if (!isAdmin) {
+    throw new functions.https.HttpsError("permission-denied", "Only admins can delete users");
+  }
+
+  const adminUid = context.auth.uid;
+  const targetUid = data?.uid || "";
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError("invalid-argument", "uid is required");
+  }
+
+  const staffDoc = await db.collection("users").doc(targetUid).get();
+  if (staffDoc.exists) {
+    const staffData = staffDoc.data() || {};
+    const ownerAdminId = staffData.ownerAdminId || "";
+    
+    if (ownerAdminId !== adminUid) {
+      throw new functions.https.HttpsError("permission-denied", "You can only delete your own staff");
+    }
+  }
+
+  try {
+    await admin.auth().deleteUser(targetUid);
+    console.log(`User ${targetUid} deleted from Auth`);
+    return { success: true };
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    throw new functions.https.HttpsError("internal", err.message || "Failed to delete user");
+  }
+});
+
+// ============================================================================
+// AUTOMATED ALERTS & TRIGGERS
+// ============================================================================
 
 exports.onAlertCreated = functions.firestore
   .document("alerts/{owner}/items/{alertId}")
@@ -594,44 +650,3 @@ exports.onDocumentDeletedArchive = functions.firestore
       return null;
     }
   });
-
-  exports.deleteUser = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError("unauthenticated", "Authentication required");
-  }
-
-  const adminUid = context.auth.uid;
-  const targetUid = data?.uid || "";
-
-  if (!targetUid) {
-    throw new functions.https.HttpsError("invalid-argument", "uid is required");
-  }
-
-  const adminDoc = await db.collection("admin").doc(adminUid).get();
-  const callerClaims = context.auth.token || {};
-  const isAdminClaim = callerClaims.admin === true;
-  const isAdminDoc = adminDoc.exists && adminDoc.data()?.approved === true;
-
-  if (!isAdminClaim && !isAdminDoc) {
-    throw new functions.https.HttpsError("permission-denied", "Only admins can delete users");
-  }
-
-  const staffDoc = await db.collection("users").doc(targetUid).get();
-  if (staffDoc.exists) {
-    const staffData = staffDoc.data() || {};
-    const ownerAdminId = staffData.ownerAdminId || "";
-    
-    if (ownerAdminId !== adminUid) {
-      throw new functions.https.HttpsError("permission-denied", "You can only delete your own staff");
-    }
-  }
-
-  try {
-    await admin.auth().deleteUser(targetUid);
-    console.log(`User ${targetUid} deleted from Auth`);
-    return { success: true };
-  } catch (err) {
-    console.error("Error deleting user:", err);
-    throw new functions.https.HttpsError("internal", err.message || "Failed to delete user");
-  }
-});
