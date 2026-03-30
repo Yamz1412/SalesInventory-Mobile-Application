@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
@@ -60,8 +61,8 @@ public class EditProfil extends BaseActivity {
         user = fAuth.getCurrentUser();
         storageRef = FirebaseStorage.getInstance().getReference();
 
-        ProfilName = findViewById(R.id.ProfilNameE);
-        ProfilUsername = findViewById(R.id.ProfilUsernameTE); // Bind Username Field
+        ProfilName = findViewById(R.id.ProfilNameTE);
+        ProfilUsername = findViewById(R.id.ProfilUsernameTE);
         ProfilEmail = findViewById(R.id.ProfilEmailTE);
         ProfilPhone = findViewById(R.id.ProfilPhoneTE);
         savebtn = findViewById(R.id.SaveProfile);
@@ -78,6 +79,7 @@ public class EditProfil extends BaseActivity {
                 new ActivityResultContracts.GetContent(),
                 uri -> {
                     if (uri != null) {
+                        if (isDestroyed() || isFinishing()) return; // SAFEGUARD
                         selectedImageUri = uri;
                         Glide.with(this).load(uri).circleCrop().into(imgAvatarEdit);
                     }
@@ -101,10 +103,14 @@ public class EditProfil extends BaseActivity {
         if (user == null) return;
         fStore.collection("users").document(user.getUid()).get().addOnSuccessListener(doc -> {
             if (doc.exists()) {
-                currentUsernameFetched = doc.getString("username");
-                if (currentUsernameFetched != null) ProfilUsername.setText(currentUsernameFetched);
+                String rawUsername = doc.getString("username");
+                currentUsernameFetched = (rawUsername != null) ? rawUsername.toLowerCase().trim() : "";
+                if (!currentUsernameFetched.isEmpty()) ProfilUsername.setText(currentUsernameFetched);
 
                 currentPhotoUrl = doc.getString("photoUrl");
+
+                if (isDestroyed() || isFinishing()) return; // SAFEGUARD
+
                 if (currentPhotoUrl != null && !currentPhotoUrl.isEmpty()) {
                     Glide.with(this).load(currentPhotoUrl).placeholder(R.drawable.avatarprofil).circleCrop().into(imgAvatarEdit);
                 } else if (user.getPhotoUrl() != null) {
@@ -116,7 +122,7 @@ public class EditProfil extends BaseActivity {
 
     private void handleSave() {
         String name = ProfilName.getText().toString().trim();
-        String newUsername = ProfilUsername.getText().toString().trim().toLowerCase(); // Force lowercase for safety
+        String newUsername = ProfilUsername.getText().toString().trim().toLowerCase();
         String mail = ProfilEmail.getText().toString().trim();
         String pNum = ProfilPhone.getText().toString().trim();
 
@@ -128,30 +134,47 @@ public class EditProfil extends BaseActivity {
         savebtn.setEnabled(false);
         savebtn.setText("Saving...");
 
-        // 1. Check Username Uniqueness (if changed)
+        if (newUsername.length() < 3 || newUsername.length() > 20) {
+            ProfilUsername.setError("Username must be 3-20 characters");
+            savebtn.setEnabled(true);
+            savebtn.setText("Save Changes");
+            return;
+        }
+        if (!newUsername.matches("^[a-z0-9_]+$")) {
+            ProfilUsername.setError("Only letters, numbers, and underscores allowed");
+            savebtn.setEnabled(true);
+            savebtn.setText("Save Changes");
+            return;
+        }
+
         if (!newUsername.equals(currentUsernameFetched)) {
-            fStore.collection("users").whereEqualTo("username", newUsername).get().addOnSuccessListener(snap -> {
-                if (!snap.isEmpty()) {
-                    Toast.makeText(this, "Username is already taken", Toast.LENGTH_SHORT).show();
-                    savebtn.setEnabled(true);
-                    savebtn.setText("Save Changes");
-                } else {
-                    processEmailAndDatabase(name, newUsername, mail, pNum);
-                }
-            });
+            fStore.collection("users").whereEqualTo("username", newUsername).get()
+                    .addOnSuccessListener(snap -> {
+                        if (!snap.isEmpty()) {
+                            ProfilUsername.setError("Username is already taken");
+                            Toast.makeText(this, "Username is already taken", Toast.LENGTH_SHORT).show();
+                            savebtn.setEnabled(true);
+                            savebtn.setText("Save Changes");
+                        } else {
+                            processEmailAndDatabase(name, newUsername, mail, pNum);
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Toast.makeText(this, "Could not verify username. Please try again.", Toast.LENGTH_SHORT).show();
+                        savebtn.setEnabled(true);
+                        savebtn.setText("Save Changes");
+                    });
         } else {
             processEmailAndDatabase(name, newUsername, mail, pNum);
         }
     }
 
     private void processEmailAndDatabase(String name, String username, String mail, String phone) {
-        // 2. If email changed, prompt Auth and Send Verification Link
         if (!mail.equals(user.getEmail())) {
             promptReAuthentication(password -> {
                 updateEmailAndProfile(password, name, username, mail, phone);
             });
         } else {
-            // 3. Normal save (no email change)
             if (selectedImageUri != null) {
                 uploadImageAndSaveProfile(name, username, mail, phone);
             } else {
@@ -160,7 +183,6 @@ public class EditProfil extends BaseActivity {
         }
     }
 
-    // --- RE-AUTHENTICATION DIALOG ---
     private interface OnReAuthSuccess {
         void onSuccess(String password);
     }
@@ -172,6 +194,11 @@ public class EditProfil extends BaseActivity {
 
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        // FIX: Adaptive Text Color
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        input.setTextColor(isDark ? Color.WHITE : Color.BLACK);
+
         builder.setView(input);
 
         builder.setPositiveButton("Verify", (dialog, which) -> {
@@ -192,18 +219,13 @@ public class EditProfil extends BaseActivity {
         builder.show();
     }
 
-    // ADDED "final" TO ALL PARAMETERS HERE:
     private void updateEmailAndProfile(final String password, final String name, final String username, final String newEmail, final String phone) {
         AuthCredential credential = EmailAuthProvider.getCredential(user.getEmail(), password);
         user.reauthenticate(credential).addOnSuccessListener(aVoid -> {
-
-            // Re-auth successful, update email
-            user.updateEmail(newEmail).addOnSuccessListener(unused -> {
-
-                // Send verification link to the new email
-                user.sendEmailVerification().addOnSuccessListener(sendTask -> {
-                    Toast.makeText(EditProfil.this, "Email updated! Verification link sent to " + newEmail, Toast.LENGTH_LONG).show();
-                });
+            user.verifyBeforeUpdateEmail(newEmail).addOnSuccessListener(unused -> {
+                Toast.makeText(EditProfil.this,
+                        "Verification link sent to " + newEmail + ". Your email will update after you confirm it.",
+                        Toast.LENGTH_LONG).show();
 
                 if (selectedImageUri != null) {
                     uploadImageAndSaveProfile(name, username, newEmail, phone);
@@ -213,7 +235,7 @@ public class EditProfil extends BaseActivity {
             }).addOnFailureListener(e -> {
                 savebtn.setEnabled(true);
                 savebtn.setText("Save Changes");
-                Toast.makeText(EditProfil.this, "Failed to update email: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(EditProfil.this, "Failed to send verification: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
         }).addOnFailureListener(e -> {
             savebtn.setEnabled(true);
@@ -247,7 +269,7 @@ public class EditProfil extends BaseActivity {
         edited.put("fName", name);
         edited.put("name", name);
         edited.put("Name", name);
-        edited.put("username", username); // Log new username
+        edited.put("username", username);
         edited.put("email", email);
         edited.put("phone", phone);
         edited.put("Phone", phone);
@@ -257,6 +279,7 @@ public class EditProfil extends BaseActivity {
         }
 
         docRef.set(edited, SetOptions.merge()).addOnSuccessListener(aVoid -> {
+            currentUsernameFetched = username;
             Toast.makeText(EditProfil.this, "Profile Updated", Toast.LENGTH_SHORT).show();
             finish();
         }).addOnFailureListener(e -> {
@@ -272,15 +295,22 @@ public class EditProfil extends BaseActivity {
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(30, 20, 30, 20);
+        layout.setPadding(50, 40, 50, 20);
+
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
 
         final EditText etCurrentPass = new EditText(this);
         etCurrentPass.setHint("Current Password");
+        etCurrentPass.setTextColor(textColor);
+        etCurrentPass.setHintTextColor(Color.GRAY);
         etCurrentPass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         layout.addView(etCurrentPass);
 
         final EditText etNewPass = new EditText(this);
         etNewPass.setHint("New Password");
+        etNewPass.setTextColor(textColor);
+        etNewPass.setHintTextColor(Color.GRAY);
         etNewPass.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         layout.addView(etNewPass);
 

@@ -12,13 +12,6 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Firebase messaging service — delegates notification display to NotificationHelper so
- * all notifications (local + push) use the same channel and tap-behavior.
- *
- * Tapping a notification that contains an "alertId" will open StockAlertsActivity with that extra.
- * StockAlertsActivity will mark that alert as read automatically when opened.
- */
 public class AppFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "AppFirebaseMsgSvc";

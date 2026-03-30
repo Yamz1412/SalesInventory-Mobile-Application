@@ -1,5 +1,6 @@
 package com.app.SalesInventory;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.view.LayoutInflater;
@@ -9,7 +10,6 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
@@ -19,12 +19,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
     public interface OnProductClickListener {
-        void onProductClick(Product product);
+        void onProductClick(Product product, int maxServings);
     }
 
     public interface OnSelectionChangeListener {
@@ -33,78 +34,160 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
 
     private final Context ctx;
     private final List<Product> items = new ArrayList<>();
+    private final List<Product> masterInventory = new ArrayList<>();
     private OnProductClickListener clickListener;
     private OnSelectionChangeListener selectionChangeListener;
 
     private Set<String> selectedIds = new HashSet<>();
     private boolean isSelectionMode = false;
+    private boolean isAdmin = false;
 
-    public SellAdapter(Context ctx, List<Product> initial, OnProductClickListener clickListener, OnSelectionChangeListener selectionChangeListener) {
+    public SellAdapter(Context ctx, List<Product> initial, List<Product> inventory, OnProductClickListener clickListener, OnSelectionChangeListener selectionChangeListener) {
         this.ctx = ctx;
-        if (initial != null) {
-            this.items.addAll(initial);
-        }
+        if (initial != null) this.items.addAll(initial);
+        if (inventory != null) this.masterInventory.addAll(inventory);
         this.clickListener = clickListener;
         this.selectionChangeListener = selectionChangeListener;
     }
 
-    // FIXED: Added the missing updateData method
-    public void updateData(List<Product> newItems) {
-        items.clear();
-        if (newItems != null) {
-            items.addAll(newItems);
+    public void setAdminStatus(boolean isAdmin) {
+        this.isAdmin = isAdmin;
+        notifyDataSetChanged();
+    }
+
+    public void filterList(List<Product> filtered, List<Product> inventory) {
+        this.items.clear();
+        if (filtered != null) this.items.addAll(filtered);
+
+        this.masterInventory.clear();
+        if (inventory != null) this.masterInventory.addAll(inventory);
+
+        notifyDataSetChanged();
+    }
+
+    private Product findInventoryProduct(String name) {
+        for (Product p : masterInventory) {
+            if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(name)) return p;
         }
-        notifyDataSetChanged();
+        return null;
     }
 
-    public void clearSelection() {
-        selectedIds.clear();
-        isSelectionMode = false;
-        notifyDataSetChanged();
-        if (selectionChangeListener != null) selectionChangeListener.onSelectionChanged(selectedIds);
-    }
+    private int calculateMaxServings(Product menuProduct) {
+        int baseMaxServings = 9999;
 
-    public Set<String> getSelectedIds() {
-        return selectedIds;
+        if (menuProduct.getBomList() != null && !menuProduct.getBomList().isEmpty()) {
+            baseMaxServings = Integer.MAX_VALUE;
+            for (Map<String, Object> bomItem : menuProduct.getBomList()) {
+                boolean isEssential = true;
+                if (bomItem.containsKey("isEssential")) {
+                    Object essObj = bomItem.get("isEssential");
+                    if (essObj instanceof Boolean) isEssential = (Boolean) essObj;
+                    else if (essObj instanceof String) isEssential = Boolean.parseBoolean((String) essObj);
+                }
+
+                if (!isEssential) continue;
+
+                String matName = (String) bomItem.get("materialName");
+                double reqQty = 0;
+                try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+                String reqUnit = (String) bomItem.get("unit");
+
+                Product rawMat = findInventoryProduct(matName);
+                if (rawMat == null || reqQty <= 0) {
+                    return 0;
+                }
+
+                int ppu = rawMat.getPiecesPerUnit() > 0 ? rawMat.getPiecesPerUnit() : 1;
+                String invUnit = rawMat.getUnit() != null ? rawMat.getUnit() : "pcs";
+
+                Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(rawMat.getQuantity(), invUnit, reqUnit, ppu);
+                double convertedInvQty = (double) conversion[0];
+                String newInvUnit = (String) conversion[1];
+
+                double actualReqQty = UnitConverterUtil.calculateDeductionAmount(reqQty, newInvUnit, reqUnit, ppu);
+
+                if (actualReqQty > 0) {
+                    int possibleServings = (int) (convertedInvQty / actualReqQty);
+                    if (possibleServings < baseMaxServings) {
+                        baseMaxServings = possibleServings;
+                    }
+                }
+            }
+            if (baseMaxServings == Integer.MAX_VALUE) baseMaxServings = 0;
+        }
+
+        if (baseMaxServings == 0) return 0;
+
+        if (menuProduct.getSizesList() != null && !menuProduct.getSizesList().isEmpty()) {
+            int maxServingsFromSizes = 0;
+
+            for (Map<String, Object> sizeItem : menuProduct.getSizesList()) {
+                String linkedMat = (String) sizeItem.get("linkedMaterial");
+                double deductQty = 0;
+                try { deductQty = Double.parseDouble(String.valueOf(sizeItem.get("deductQty"))); } catch (Exception ignored) {}
+
+                if (linkedMat == null || linkedMat.isEmpty() || deductQty <= 0) {
+                    maxServingsFromSizes = 9999;
+                    break;
+                }
+
+                Product sizeMat = findInventoryProduct(linkedMat);
+                if (sizeMat != null) {
+                    int possibleCups = (int) (sizeMat.getQuantity() / deductQty);
+                    if (possibleCups > maxServingsFromSizes) {
+                        maxServingsFromSizes = possibleCups;
+                    }
+                }
+            }
+            return Math.min(baseMaxServings, maxServingsFromSizes);
+        }
+
+        return baseMaxServings;
     }
 
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(ctx).inflate(R.layout.productsell, parent, false);
-        return new VH(view);
+        View v = LayoutInflater.from(ctx).inflate(R.layout.productsell, parent, false);
+        return new VH(v);
     }
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         Product p = items.get(position);
+
         holder.name.setText(p.getProductName());
-        holder.price.setText(String.format(Locale.getDefault(), "₱%.2f", p.getSellingPrice()));
+        holder.code.setText(p.getCategoryName());
+        holder.price.setText(String.format(Locale.US, "₱%.2f", p.getSellingPrice()));
 
-        if (p.getBarcode() != null && !p.getBarcode().isEmpty()) {
-            holder.code.setVisibility(View.VISIBLE);
-            holder.code.setText("Code: " + p.getBarcode());
+        boolean hasOptions = (p.getSizesList() != null && !p.getSizesList().isEmpty()) ||
+                (p.getAddonsList() != null && !p.getAddonsList().isEmpty()) ||
+                (p.getNotesList() != null && !p.getNotesList().isEmpty());
+
+        if (hasOptions) {
+            holder.badgeSell.setVisibility(View.VISIBLE);
+            holder.badgeSell.setText("Customizable");
+            holder.badgeSell.setTextColor(Color.WHITE);
+            holder.badgeSell.setBackgroundColor(Color.parseColor("#FF9800"));
+            holder.badgeSell.setPadding(12, 4, 12, 4);
         } else {
-            holder.code.setVisibility(View.GONE);
+            holder.badgeSell.setVisibility(View.GONE);
         }
 
-        String currentId = p.getProductId() != null ? p.getProductId() : "local:" + p.getLocalId();
-        boolean isSelected = selectedIds.contains(currentId);
-
-        if (isSelected) {
-            holder.cardView.setCardBackgroundColor(Color.parseColor("#D3E3FD"));
-            holder.itemView.setAlpha(0.8f);
-        } else {
-            holder.cardView.setCardBackgroundColor(Color.WHITE);
-            holder.itemView.setAlpha(1.0f);
+        String imageToLoad = p.getImageUrl();
+        if (imageToLoad == null || imageToLoad.isEmpty()) {
+            imageToLoad = p.getImagePath();
         }
 
-        String onlineUrl = p.getImageUrl();
-        if (onlineUrl != null && !onlineUrl.isEmpty()) {
-            Glide.with(ctx).load(onlineUrl)
+        // FIX: The Crash Fix! Prevent Glide from loading if the activity is changing themes!
+        if (ctx instanceof Activity) {
+            if (((Activity) ctx).isDestroyed() || ((Activity) ctx).isFinishing()) return;
+        }
+
+        if (imageToLoad != null && !imageToLoad.isEmpty()) {
+            Glide.with(ctx)
+                    .load(imageToLoad)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .override(200, 200)
-                    .thumbnail(0.25f)
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .centerCrop()
@@ -113,15 +196,37 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
             holder.productImage.setImageResource(R.drawable.ic_image_placeholder);
         }
 
+        int maxServings = calculateMaxServings(p);
+        boolean isAvailable = maxServings > 0;
+
+        if (!isAvailable) {
+            holder.productImage.setAlpha(0.3f);
+            holder.cardView.setCardBackgroundColor(Color.parseColor("#EEEEEE"));
+            if (holder.unavailableBadge != null) holder.unavailableBadge.setVisibility(View.VISIBLE);
+        } else {
+            holder.productImage.setAlpha(1.0f);
+            holder.cardView.setCardBackgroundColor(Color.WHITE);
+            if (holder.unavailableBadge != null) holder.unavailableBadge.setVisibility(View.GONE);
+        }
+
+        String currentId = p.getProductId() != null ? p.getProductId() : "local:" + p.getLocalId();
+        if (selectedIds.contains(currentId)) {
+            holder.cardView.setCardBackgroundColor(Color.parseColor("#E3F2FD"));
+        } else {
+            if (isAvailable) holder.cardView.setCardBackgroundColor(Color.WHITE);
+        }
+
         holder.itemView.setOnClickListener(v -> {
+            if (!isAvailable) return;
             if (isSelectionMode) {
                 toggleSelection(currentId);
             } else {
-                if (clickListener != null) clickListener.onProductClick(p);
+                if (clickListener != null) clickListener.onProductClick(p, maxServings);
             }
         });
 
         holder.itemView.setOnLongClickListener(v -> {
+            if (!isAvailable) return false;
             if (!isSelectionMode) {
                 isSelectionMode = true;
                 toggleSelection(currentId);
@@ -131,15 +236,18 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
         });
     }
 
+    public void clearSelection() {
+        selectedIds.clear();
+        isSelectionMode = false;
+        notifyDataSetChanged();
+        if (selectionChangeListener != null) selectionChangeListener.onSelectionChanged(selectedIds);
+    }
+
     private void toggleSelection(String id) {
-        if (selectedIds.contains(id)) {
-            selectedIds.remove(id);
-        } else {
-            selectedIds.add(id);
-        }
-        if (selectedIds.isEmpty()) {
-            isSelectionMode = false;
-        }
+        if (selectedIds.contains(id)) selectedIds.remove(id);
+        else selectedIds.add(id);
+
+        if (selectedIds.isEmpty()) isSelectionMode = false;
         notifyDataSetChanged();
         if (selectionChangeListener != null) selectionChangeListener.onSelectionChanged(selectedIds);
     }
@@ -150,17 +258,19 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name, code, price;
+        TextView name, code, price, unavailableBadge, badgeSell;
         ImageView productImage;
-        CardView cardView;
+        com.google.android.material.card.MaterialCardView cardView;
 
         VH(@NonNull View itemView) {
             super(itemView);
-            cardView = (CardView) itemView;
+            cardView = (com.google.android.material.card.MaterialCardView) itemView;
             productImage = itemView.findViewById(R.id.ivProductImageSell);
             name = itemView.findViewById(R.id.NameTVS11);
             code = itemView.findViewById(R.id.CodeTVS11);
             price = itemView.findViewById(R.id.SellPriceTVS11);
+            unavailableBadge = itemView.findViewById(R.id.tvUnavailableBadge);
+            badgeSell = itemView.findViewById(R.id.BadgeSell);
         }
     }
 }

@@ -1,15 +1,16 @@
 package com.app.SalesInventory;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.lifecycle.MutableLiveData;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -23,12 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class FmiSmiReportActivity extends AppCompatActivity {
+public class FmiSmiReportActivity extends BaseActivity {
 
     private RecyclerView rvFmiSmi;
     private MaterialButtonToggleGroup toggleGroup;
     private FmiSmiAdapter adapter;
-    private Spinner spinnerProductLine; // NEW
+    private Spinner spinnerProductLine;
 
     private ProductRepository productRepository;
     private SalesRepository salesRepository;
@@ -50,7 +51,7 @@ public class FmiSmiReportActivity extends AppCompatActivity {
 
         rvFmiSmi = findViewById(R.id.rvFmiSmi);
         toggleGroup = findViewById(R.id.toggleGroup);
-        spinnerProductLine = findViewById(R.id.spinnerProductLine); // NEW
+        spinnerProductLine = findViewById(R.id.spinnerProductLine);
 
         rvFmiSmi.setLayoutManager(new LinearLayoutManager(this));
         adapter = new FmiSmiAdapter();
@@ -74,9 +75,36 @@ public class FmiSmiReportActivity extends AppCompatActivity {
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
-        // Load the lines from the database
+
         loadProductLinesFilter();
         loadData();
+    }
+
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     private void loadProductLinesFilter() {
@@ -87,21 +115,19 @@ public class FmiSmiReportActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
                 List<String> lines = new ArrayList<>();
-                lines.add("All Product Lines"); // Default option
+                lines.add("All Product Lines");
 
-                // Add Defaults
                 lines.add("Core Products"); lines.add("Specialty / Unique Offerings");
                 lines.add("Complementary Goods"); lines.add("Retail / Merchandise");
                 lines.add("Seasonal Items"); lines.add("Grab-and-Go");
 
-                // Add Custom lines from DB
                 for (com.google.firebase.database.DataSnapshot ds : snapshot.getChildren()) {
                     String lineName = ds.child("lineName").getValue(String.class);
                     if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
                 }
 
-                android.widget.ArrayAdapter<String> lineAdapter = new android.widget.ArrayAdapter<>(FmiSmiReportActivity.this, android.R.layout.simple_spinner_item, lines);
-                lineAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                // Apply Adaptive Adapter
+                ArrayAdapter<String> lineAdapter = getAdaptiveAdapter(lines);
                 spinnerProductLine.setAdapter(lineAdapter);
             }
             @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
@@ -109,7 +135,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
     }
 
     private void loadData() {
-        // Load Products
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 allProducts = products;
@@ -117,7 +142,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
             }
         });
 
-        // Load Sales from the last 30 days
         long now = System.currentTimeMillis();
         long thirtyDaysAgo = now - (30L * 24L * 60L * 60L * 1000L);
         MutableLiveData<List<Sales>> salesLiveData = new MutableLiveData<>();
@@ -141,7 +165,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
     private void calculateAndDisplayData(boolean isFmi) {
         Map<String, Integer> salesCountMap = new HashMap<>();
 
-        // Aggregate quantities sold per product
         for (Sales s : last30DaysSales) {
             String baseName = cleanProductName(s.getProductName());
             int currentQty = salesCountMap.containsKey(baseName) ? salesCountMap.get(baseName) : 0;
@@ -151,7 +174,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
         List<ReportItem> reportItems = new ArrayList<>();
         String selectedLine = spinnerProductLine.getSelectedItem() != null ? spinnerProductLine.getSelectedItem().toString() : "All Product Lines";
 
-        // Match with inventory to include items that have ZERO sales
         for (Product p : allProducts) {
             if (!p.isActive()) continue;
 
@@ -159,21 +181,17 @@ public class FmiSmiReportActivity extends AppCompatActivity {
                 String pLine = p.getProductLine() != null ? p.getProductLine() : "";
                 if (!pLine.equalsIgnoreCase(selectedLine)) continue;
             }
-            
+
             String pName = p.getProductName();
             int qtySold = salesCountMap.containsKey(pName) ? salesCountMap.get(pName) : 0;
 
             reportItems.add(new ReportItem(p, qtySold));
         }
 
-        // Sort Data
         if (isFmi) {
-            // FMI: Sort Highest to Lowest
             Collections.sort(reportItems, (a, b) -> Integer.compare(b.qtySold, a.qtySold));
-            // Optional: Remove items with 0 sales from the FMI view
             reportItems.removeIf(item -> item.qtySold == 0);
         } else {
-            // SMI: Sort Lowest to Highest (Zeroes first)
             Collections.sort(reportItems, (a, b) -> Integer.compare(a.qtySold, b.qtySold));
         }
 
@@ -199,8 +217,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
-
-    // --- INNER CLASSES FOR ADAPTER & DATA ---
 
     class ReportItem {
         Product product;
@@ -228,7 +244,6 @@ public class FmiSmiReportActivity extends AppCompatActivity {
             holder.tvQtySold.setText(item.qtySold + " Sold");
             holder.tvCurrentStock.setText("Stock Left: " + item.product.getQuantity());
 
-            // Highlight SMI in red, FMI in green
             if (item.qtySold == 0) {
                 holder.tvQtySold.setTextColor(android.graphics.Color.parseColor("#D32F2F")); // Red
             } else {

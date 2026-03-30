@@ -12,7 +12,6 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.google.android.material.textfield.TextInputEditText;
@@ -61,11 +60,11 @@ public class BusinessSetupActivity extends BaseActivity {
         btnSaveBusiness = findViewById(R.id.btnSaveBusiness);
         progressBar = findViewById(R.id.progressBar);
 
-        // Image picker setup
         ActivityResultLauncher<Intent> imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
                     if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+                        if (isDestroyed() || isFinishing()) return; // SAFEGUARD
                         imageUri = result.getData().getData();
                         Glide.with(this).load(imageUri).circleCrop().into(ivBusinessLogo);
                     }
@@ -111,7 +110,6 @@ public class BusinessSetupActivity extends BaseActivity {
         setLoading(true);
 
         if (imageUri != null) {
-            // Upload Image first if selected
             String fileName = user.getUid() + ".jpg";
             StorageReference fileRef = storageReference.child(fileName);
 
@@ -127,7 +125,6 @@ public class BusinessSetupActivity extends BaseActivity {
                         Toast.makeText(BusinessSetupActivity.this, "Failed to upload logo: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     });
         } else {
-            // No image selected
             saveToFirestore(user.getUid(), businessName, address, landmark, null);
         }
     }
@@ -137,7 +134,6 @@ public class BusinessSetupActivity extends BaseActivity {
         businessData.put("businessName", name);
         businessData.put("address", address);
         businessData.put("landmark", landmark);
-        // Automatically assign the business type!
         businessData.put("businessType", "Coffee Shop");
 
         if (imageUrl != null) {
@@ -158,7 +154,6 @@ public class BusinessSetupActivity extends BaseActivity {
     }
 
     private void navigateToDashboard() {
-        // Change MainActivity.class to your actual main dashboard activity if it's named differently
         Intent intent = new Intent(BusinessSetupActivity.this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);

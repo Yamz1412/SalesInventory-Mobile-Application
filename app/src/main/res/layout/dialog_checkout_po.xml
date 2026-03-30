@@ -5,7 +5,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@android:color/white">
+    android:background="?attr/colorSurface"
+    >
 
     <TextView
         android:layout_width="wrap_content"
@@ -35,6 +36,7 @@
         android:layout_height="wrap_content"
         android:text="Cart Items (Tap to Edit Qty)"
         android:textStyle="bold"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="8dp"/>
 
     <androidx.recyclerview.widget.RecyclerView
@@ -72,6 +74,7 @@
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnBackground"
             android:text="Back" />
 
         <Button
@@ -79,6 +82,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="CONFIRM &amp; SEND P.O" />
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
+            android:text="CONFIRM &amp; SEND P.O"
+            />
     </LinearLayout>
 </LinearLayout>

@@ -34,7 +34,6 @@ public class FirestoreSyncListener {
     }
 
     private void initializeSyncStatus() {
-        // FIX: Replaced setValue with postValue for thread-safety
         productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
         salesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
         adjustmentsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
@@ -42,38 +41,41 @@ public class FirestoreSyncListener {
         categoriesSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Initializing"));
     }
 
+    // Replace this method inside FirestoreSyncListener.java
     public void listenToProducts(OnProductsChangedListener listener) {
         if (!firestoreManager.isUserAuthenticated()) {
             Log.w(TAG, "User not authenticated for products listener");
+            productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.OFFLINE, "Not authenticated"));
             return;
         }
-        productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to products"));
+        android.util.Log.d("SalesInventory_SYNC", "Attempting to listen to Products at path: " + firestoreManager.getUserProductsPath());
+        productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCING, "Connecting to products..."));
 
         ListenerRegistration registration = firestoreManager.getDb().collection(firestoreManager.getUserProductsPath()).addSnapshotListener((value, error) -> {
             if (error != null) {
+                // *** THE MOST IMPORTANT LOG ***
+                // If you see this error in Logcat, your Firebase config is still broken.
+                android.util.Log.e("SalesInventory_SYNC", "*** ERROR Connecting to Products Firestore Path! ***", error);
                 productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.ERROR, error.getMessage()));
-                return; // Safely exit without crashing
+                return;
             }
             if (value != null) {
+                // *** SYNC SUCCESS LOG ***
+                // This proves the cloud has data and it's being downloaded!
+                android.util.Log.d("SalesInventory_SYNC", "SYNC SUCCESS: Products downloaded from Firebase! Count: " + value.size());
+
                 productsSyncStatus.postValue(new SyncStatus(SyncStatus.Status.SYNCED, "Products synced: " + value.size()));
                 if (listener != null) {
-                    try {
-                        listener.onProductsChanged(value);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error in products listener callback", e);
-                    }
+                    try { listener.onProductsChanged(value); } catch (Exception e) {}
                 }
+
                 try {
-                    ProductRepository repo = ProductRepository.getInstance(SalesInventoryApplication.getInstance());
-                    for (DocumentSnapshot document : value.getDocuments()) {
-                        Product p = document.toObject(Product.class);
-                        if (p != null) {
-                            p.setProductId(document.getId());
-                            repo.upsertFromRemote(p);
-                        }
+                    if (SalesInventoryApplication.getInstance() != null) {
+                        ProductRemoteSyncer syncer = new ProductRemoteSyncer(SalesInventoryApplication.getInstance());
+                        syncer.syncAllProducts(null);
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error processing products", e);
+                    Log.e(TAG, "Error processing products via Syncer", e);
                 }
             }
         });
@@ -174,6 +176,15 @@ public class FirestoreSyncListener {
     public void reset() {
         stopAllListeners();
         instance = null;
+    }
+
+    public void restartAllListeners() {
+        stopAllListeners();
+        listenToProducts(null);
+        listenToSales(null);
+        listenToCategories(null);
+        listenToAdjustments(null);
+        listenToAlerts(null);
     }
 
     public interface OnProductsChangedListener { void onProductsChanged(QuerySnapshot snapshot); }

@@ -7,9 +7,11 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -37,7 +39,7 @@ public class StockMovementReportActivity extends BaseActivity {
     private RecyclerView recyclerViewReport;
     private ProgressBar progressBar;
     private TextView tvNoData, tvTotalReceived, tvTotalSold, tvTotalAdjustments;
-    private Button btnExportPDF, btnExportCSV, btnDateFilter;
+    private Button btnExportPDF, btnDateFilter;
     private Spinner spinnerCategory;
 
     private StockMovementAdapter adapter;
@@ -50,17 +52,14 @@ public class StockMovementReportActivity extends BaseActivity {
 
     private ReportExportUtil exportUtil;
     private PDFGenerator pdfGenerator;
-    private CSVGenerator csvGenerator;
 
     private double grandTotalReceived = 0.0;
     private double grandTotalSold = 0.0;
     private double grandTotalAdjusted = 0.0;
 
     private static final int PERMISSION_REQUEST_CODE = 200;
-    private int pendingExportType = 0;
     private String currentOwnerId;
 
-    // Filters
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
     private String selectedCategory = "All Categories";
@@ -91,12 +90,10 @@ public class StockMovementReportActivity extends BaseActivity {
         tvTotalSold = findViewById(R.id.tvTotalSold);
         tvTotalAdjustments = findViewById(R.id.tvTotalAdjustments);
         btnExportPDF = findViewById(R.id.btnExportPDF);
-        btnExportCSV = findViewById(R.id.btnExportCSV);
         btnDateFilter = findViewById(R.id.btnDateFilter);
         spinnerCategory = findViewById(R.id.spinnerCategory);
 
         exportUtil = new ReportExportUtil(this);
-        csvGenerator = new CSVGenerator();
 
         try {
             pdfGenerator = new PDFGenerator(this);
@@ -113,30 +110,53 @@ public class StockMovementReportActivity extends BaseActivity {
         recyclerViewReport.setLayoutManager(new LinearLayoutManager(this));
         recyclerViewReport.setAdapter(adapter);
 
-        btnExportPDF.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_PDF));
-        btnExportCSV.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_CSV));
+        btnExportPDF.setOnClickListener(v -> startExportPDF());
+    }
+
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     private void setupFilters() {
-        // Date Picker
         btnDateFilter.setOnClickListener(v -> {
             Calendar calendar = Calendar.getInstance();
             new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
                 calendar.set(year, month, dayOfMonth, 0, 0, 0);
                 filterStartDate = calendar.getTimeInMillis();
 
-                // End date is end of that selected day
                 calendar.set(year, month, dayOfMonth, 23, 59, 59);
                 filterEndDate = calendar.getTimeInMillis();
 
                 SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
                 btnDateFilter.setText(sdf.format(calendar.getTime()));
 
-                applyFilters(); // Re-filter data
+                applyFilters();
             }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
         });
 
-        // Long press to clear date filter
         btnDateFilter.setOnLongClickListener(v -> {
             filterStartDate = 0;
             filterEndDate = System.currentTimeMillis();
@@ -144,8 +164,6 @@ public class StockMovementReportActivity extends BaseActivity {
             applyFilters();
             return true;
         });
-
-        // Category Spinner setup will happen inside loadData once categories are known
     }
 
     private void loadData() {
@@ -166,7 +184,6 @@ public class StockMovementReportActivity extends BaseActivity {
                         );
                         reportMap.put(p.getProductId(), report);
 
-                        // Populate dynamic category list
                         String cat = p.getCategoryName();
                         if (cat != null && !cat.isEmpty() && !categoryList.contains(cat)) {
                             categoryList.add(cat);
@@ -180,15 +197,15 @@ public class StockMovementReportActivity extends BaseActivity {
     }
 
     private void setupCategorySpinner() {
-        ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoryList);
-        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Use the adaptive adapter here!
+        ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(categoryList);
         spinnerCategory.setAdapter(spinAdapter);
 
         spinnerCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedCategory = categoryList.get(position);
-                applyFilters(); // Re-filter when category changes
+                applyFilters();
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -198,7 +215,7 @@ public class StockMovementReportActivity extends BaseActivity {
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales != null) {
                 for (Sales s : sales) {
-                    if (s == null || s.getProductId() == null) continue; // ← null check FIRST
+                    if (s == null || s.getProductId() == null) continue;
 
                     Long ts = s.getTimestamp();
                     long saleDate = (ts != null && ts > 0) ? ts : s.getDate();
@@ -231,7 +248,6 @@ public class StockMovementReportActivity extends BaseActivity {
                     if (productId == null || qtyObj == null || dateLogged == null) continue;
 
                     if (reportMap.containsKey(productId)) {
-                        // Check Date Filter
                         if (filterStartDate == 0 || (dateLogged >= filterStartDate && dateLogged <= filterEndDate)) {
                             StockMovementReport report = reportMap.get(productId);
 
@@ -262,10 +278,9 @@ public class StockMovementReportActivity extends BaseActivity {
             return n1.compareToIgnoreCase(n2);
         });
 
-        applyFilters(); // Display final UI
+        applyFilters();
     }
 
-    // NEW: Applies Category Filter and Recalculates Totals
     private void applyFilters() {
         filteredReportList.clear();
         grandTotalReceived = 0.0;
@@ -274,8 +289,6 @@ public class StockMovementReportActivity extends BaseActivity {
 
         for (StockMovementReport report : masterReportList) {
             boolean matchesCategory = selectedCategory.equals("All Categories") || selectedCategory.equals(report.getCategory());
-
-            // Only show items that actually have movement in this date range, OR if we are looking at "All Time"
             boolean hasMovement = (report.getReceived() > 0 || report.getSold() > 0 || report.getAdjusted() > 0);
 
             if (matchesCategory && (filterStartDate == 0 || hasMovement)) {
@@ -301,13 +314,12 @@ public class StockMovementReportActivity extends BaseActivity {
         return String.format(Locale.US, "%.2f", value);
     }
 
-    private void startExport(int exportType) {
+    private void startExportPDF() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            pendingExportType = exportType;
             requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
             return;
         }
-        if (exportType == ReportExportUtil.EXPORT_PDF) exportToPDF(); else exportToCSV();
+        exportToPDF();
     }
 
     private void exportToPDF() {
@@ -315,20 +327,13 @@ public class StockMovementReportActivity extends BaseActivity {
             String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
             ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
             if (r == null || r.outputStream == null) return;
-            // PDF generator now uses the FILTERED list so exports match what the user sees
-            pdfGenerator.generateStockMovementReportPDF(r.outputStream, filteredReportList, (int) grandTotalReceived, (int) grandTotalSold, (int) grandTotalAdjusted);
-            exportUtil.showExportSuccess(r.displayPath);
-        } catch (Exception e) {}
-    }
 
-    private void exportToCSV() {
-        try {
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_CSV);
-            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
-            if (r == null || r.outputStream == null) return;
-            csvGenerator.generateStockMovementReportCSV(r.outputStream, filteredReportList, (int) grandTotalReceived, (int) grandTotalSold, (int) grandTotalAdjusted);
-            exportUtil.showExportSuccess(r.displayPath);
-        } catch (Exception e) {}
+            pdfGenerator.generateStockMovementReportPDF(r.outputStream, filteredReportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
+            exportUtil.shareFileViaEmail(r.file, "Stock Movement Report - " + btnDateFilter.getText().toString());
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to generate PDF", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override

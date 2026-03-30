@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -29,6 +30,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Create Staff"
+            style="@style/CustomButtonOutlined"
             android:backgroundTint="?attr/colorPrimary"
             android:textColor="?attr/colorOnPrimary" />
     </LinearLayout>
@@ -48,6 +50,7 @@
         android:text="No staff accounts found"
         android:textSize="14sp"
         android:textColor="?attr/colorOnBackground"
+        android:alpha="0.7"
         android:padding="10dp"
         android:layout_marginTop="8dp"
         android:visibility="gone" />
@@ -60,7 +63,7 @@
         android:clipToPadding="false"
         android:padding="8dp"
         tools:listitem="@layout/item_staff_account"
-        tools:itemCount="8" />
+        tools:itemCount="3" />
 
     <Button
         android:id="@+id/btnEditStaffAccount"
@@ -68,7 +71,9 @@
         android:layout_height="wrap_content"
         android:text="Edit Account"
         android:layout_marginTop="8dp"
-        android:backgroundTint="@android:color/darker_gray"
-        android:textColor="@android:color/white" />
+        style="@style/CustomButtonOutlined"
+        app:cornerRadius="6dp"
+        app:backgroundTint="?attr/colorSecondary"
+        android:textColor="?attr/colorOnSecondary" />
 
 </LinearLayout>

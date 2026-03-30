@@ -5,15 +5,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/backgroundColor">
+    android:background="?android:colorBackground">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Select Item to Delete / Archived Items"
         android:padding="20dp"
-        android:background="#D32F2F"
-        android:textColor="#FFFFFF"
+        android:background="?attr/colorError"
+        android:textColor="?attr/colorOnError"
         android:textStyle="bold"
         android:textSize="18sp"
         android:gravity="center"/>
@@ -33,7 +33,7 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:queryHint="Search products..."
-            android:iconifiedByDefault="false" />
+            android:background="@drawable/search_background" />
 
         <Button
             android:id="@+id/clearSearchBtn"
@@ -41,8 +41,8 @@
             android:layout_height="48dp"
             android:layout_marginStart="8dp"
             android:text="Clear"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@android:color/white" />
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary" />
     </LinearLayout>
 
     <TextView
@@ -51,7 +51,8 @@
         android:layout_height="wrap_content"
         android:text="No archived items"
         android:textSize="16sp"
-        android:textColor="@color/textColorSecondary"
+        android:textColor="?attr/colorOnBackground"
+        android:alpha="0.7"
         android:gravity="center"
         android:padding="16dp"
         android:visibility="gone" />
@@ -72,8 +73,7 @@
         android:layout_height="60dp"
         android:layout_margin="16dp"
         android:text="Refresh"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:backgroundTint="@color/colorPrimary"
-        android:textColor="@android:color/white"/>
+        android:backgroundTint="?attr/colorPrimary"
+        android:textColor="?attr/colorOnPrimary" />
+
 </LinearLayout>

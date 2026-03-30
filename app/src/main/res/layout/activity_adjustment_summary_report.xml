@@ -4,7 +4,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F4F6F8">
+    android:background="?android:colorBackground">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        app:title="Adjustment Summary"
+        app:titleTextColor="?attr/colorOnPrimary" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,6 +26,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="6dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
             <LinearLayout
@@ -26,26 +35,8 @@
                 android:orientation="vertical"
                 android:padding="12dp"
                 android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Items Adjusted" android:textSize="12sp" android:textColor="#757575" />
-                <TextView android:id="@+id/tvTotalItems" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:layout_marginTop="4dp" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <androidx.cardview.widget.CardView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="6dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp"
-                android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Additions (+)" android:textSize="12sp" android:textColor="#757575" />
-                <TextView android:id="@+id/tvTotalAdditions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#4CAF50" android:layout_marginTop="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Items Adjusted" android:textSize="12sp" android:textColor="?attr/colorOnSurface" android:alpha="0.7" />
+                <TextView android:id="@+id/tvTotalAdjustedItems" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?attr/colorPrimary" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -54,6 +45,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="6dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
             <LinearLayout
@@ -62,8 +54,8 @@
                 android:orientation="vertical"
                 android:padding="12dp"
                 android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Removals (-)" android:textSize="12sp" android:textColor="#757575" />
-                <TextView android:id="@+id/tvTotalRemovals" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#F44336" android:layout_marginTop="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Est. Loss Value" android:textSize="12sp" android:textColor="?attr/colorOnSurface" android:alpha="0.7" />
+                <TextView android:id="@+id/tvTotalLossValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textSize="20sp" android:textStyle="bold" android:textColor="?attr/colorError" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
     </LinearLayout>
@@ -101,14 +93,14 @@
         android:text="No adjustment data available for this filter."
         android:gravity="center"
         android:textSize="16sp"
-        android:textColor="#9E9E9E"
+        android:textColor="?attr/colorOnBackground"
+        android:alpha="0.6"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewReport"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:padding="8dp"
         android:clipToPadding="false" />
 

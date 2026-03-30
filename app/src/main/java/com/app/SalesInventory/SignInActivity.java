@@ -39,7 +39,7 @@ public class SignInActivity extends BaseActivity {
     private static final String KEY_REMEMBER = "remember";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_ID = "user_id";
-    private static final String KEY_USER_ROLE = "user_role"; // Used for offline routing
+    private static final String KEY_USER_ROLE = "user_role";
     private static final String KEY_BUSINESS_OWNER = "business_owner";
     private static final String KEY_LAST_LOGIN = "last_login";
 
@@ -64,13 +64,12 @@ public class SignInActivity extends BaseActivity {
         boolean remembered = prefs.getBoolean(KEY_REMEMBER, false);
         String cachedUserId = prefs.getString(KEY_USER_ID, null);
         String cachedBusinessOwner = prefs.getString(KEY_BUSINESS_OWNER, null);
-        String cachedRole = prefs.getString(KEY_USER_ROLE, "Staff"); // Default to staff for safety
+        String cachedRole = prefs.getString(KEY_USER_ROLE, "Staff");
 
         if (remembered && cachedUserId != null) {
             FirebaseUser currentUser = fAuth.getCurrentUser();
 
             if (currentUser != null && currentUser.getUid().equals(cachedUserId)) {
-                // FAST PATH: Auto-login based on cached role
                 proceedToNextScreen(cachedUserId, cachedBusinessOwner, cachedRole);
             } else if (currentUser != null) {
                 progressBar.setVisibility(View.VISIBLE);
@@ -101,9 +100,6 @@ public class SignInActivity extends BaseActivity {
         }
     }
 
-    // =========================================================================
-    // THE ROUTING ENGINE (Admin goes to Dashboard, Staff goes to POS)
-    // =========================================================================
     private void proceedToNextScreen(String userId, String businessOwner, String role) {
         FirestoreManager.getInstance().updateCurrentUserId(userId);
         if (businessOwner != null && !businessOwner.isEmpty()) {
@@ -112,10 +108,8 @@ public class SignInActivity extends BaseActivity {
 
         Intent intent;
         if ("Admin".equalsIgnoreCase(role)) {
-            // Admin gets the full Dashboard
             intent = new Intent(getApplicationContext(), MainActivity.class);
         } else {
-            // Cashiers/Staff bypass the dashboard and go straight to the Point of Sale
             intent = new Intent(getApplicationContext(), MainActivity.class);
         }
 
@@ -179,7 +173,6 @@ public class SignInActivity extends BaseActivity {
                         SalesRepository.getInstance(getApplication()).clearData();
 
                         if ("Admin".equalsIgnoreCase(role)) {
-                            // --- ADMIN LOGIN LOGIC ---
                             if (reloaded.isEmailVerified()) {
                                 if (!approved) fStore.collection("users").document(uid).update("approved", true);
 
@@ -189,7 +182,8 @@ public class SignInActivity extends BaseActivity {
                                 FirestoreManager.getInstance().setBusinessOwnerId(uid);
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
-                                syncer.startRealtimeSync(uid);
+
+                                syncer.startListening();
 
                                 if (rememberCheck != null && rememberCheck.isChecked()) {
                                     cacheUserData(uid, uid, "Admin");
@@ -206,7 +200,6 @@ public class SignInActivity extends BaseActivity {
                                 cb.onProceed(false, "");
                             }
                         } else {
-                            // --- STAFF LOGIN LOGIC ---
                             if (!approved) {
                                 cb.onProceed(false, "");
                                 Toast.makeText(SignInActivity.this, "Please wait for admin approval", Toast.LENGTH_LONG).show();
@@ -223,7 +216,8 @@ public class SignInActivity extends BaseActivity {
                             if (owner != null && !owner.isEmpty()) {
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
-                                syncer.startRealtimeSync(owner);
+
+                                syncer.startListening();
                             }
 
                             if (rememberCheck != null && rememberCheck.isChecked()) {
@@ -242,15 +236,16 @@ public class SignInActivity extends BaseActivity {
         });
     }
 
+    // FIXED: Removed the deleted custom color methods and only sync the theme name
     private void applyRemoteTheme(DocumentSnapshot doc) {
         if (doc == null) return;
         String themeName = doc.getString("themeName");
-        Long primary = doc.getLong("primaryColor");
-        Long secondary = doc.getLong("secondaryColor");
-        Long accent = doc.getLong("accentColor");
-        ThemeManager tm = ThemeManager.getInstance(this);
-        if (themeName != null && !themeName.isEmpty()) tm.setCurrentThemeLocalOnly(themeName);
-        if (primary != null && secondary != null && accent != null) tm.setCustomColors(primary.intValue(), secondary.intValue(), accent.intValue());
+        if (themeName != null && !themeName.isEmpty()) {
+            getSharedPreferences("theme_prefs", MODE_PRIVATE)
+                    .edit()
+                    .putString("selected_theme", themeName)
+                    .apply();
+        }
     }
 
     private void updateUserProfileFromAuth(com.google.firebase.auth.FirebaseUser user, DocumentSnapshot existingDoc) {
@@ -280,7 +275,7 @@ public class SignInActivity extends BaseActivity {
         editor.putString(KEY_USER_ID, userId);
         editor.putString(KEY_USER_EMAIL, Email.getText().toString().trim());
         editor.putString(KEY_BUSINESS_OWNER, businessOwner != null ? businessOwner : userId);
-        editor.putString(KEY_USER_ROLE, role); // Caches the role for fast routing
+        editor.putString(KEY_USER_ROLE, role);
         editor.putLong(KEY_LAST_LOGIN, System.currentTimeMillis());
         editor.apply();
     }
@@ -355,8 +350,6 @@ public class SignInActivity extends BaseActivity {
 
                                             if ("Admin".equalsIgnoreCase(role)) {
                                                 startActivity(new Intent(SignInActivity.this, MainActivity.class));
-                                            } else {
-                                                startActivity(new Intent(SignInActivity.this, SellList.class));
                                             }
                                             finish();
                                         }

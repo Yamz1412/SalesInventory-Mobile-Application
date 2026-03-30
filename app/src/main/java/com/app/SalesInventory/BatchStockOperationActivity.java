@@ -32,7 +32,7 @@ public class BatchStockOperationActivity extends BaseActivity {
 
     private Spinner spinnerOperationType;
     private EditText etOperationName, etQuantity, etRemarks;
-    private TextView tvSelectedProducts, tvProductCount;
+    private TextView tvProductCount;
     private Button btnSelectProducts, btnExecute, btnClear;
     private RecyclerView recyclerViewSelected;
     private ProgressBar progressBar;
@@ -79,7 +79,6 @@ public class BatchStockOperationActivity extends BaseActivity {
         etOperationName = findViewById(R.id.etOperationName);
         etQuantity = findViewById(R.id.etQuantity);
         etRemarks = findViewById(R.id.etRemarks);
-        tvSelectedProducts = findViewById(R.id.tvSelectedProducts);
         tvProductCount = findViewById(R.id.tvProductCount);
         btnSelectProducts = findViewById(R.id.btnSelectProducts);
         btnExecute = findViewById(R.id.btnExecute);
@@ -208,7 +207,6 @@ public class BatchStockOperationActivity extends BaseActivity {
             return;
         }
 
-        // FIX: Now parses Double to support decimals
         double quantity;
         try {
             quantity = Double.parseDouble(quantityStr);
@@ -315,15 +313,11 @@ public class BatchStockOperationActivity extends BaseActivity {
                                 newQuantity = oldQuantity;
                         }
 
-                        // Final Update passed as Double to the repository
                         productRepository.updateProductQuantity(product.getProductId(), newQuantity, new ProductRepository.OnProductUpdatedListener() {
                             @Override
-                            public void onProductUpdated() {
-                            }
-
+                            public void onProductUpdated() {}
                             @Override
-                            public void onError(String error) {
-                            }
+                            public void onError(String error) {}
                         });
                     }
                     progressBar.setVisibility(View.GONE);

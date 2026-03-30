@@ -35,9 +35,18 @@ public interface SalesDao {
     @Query("DELETE FROM sales_orders")
     void deleteAllOrders();
 
-    // NEW: Automated Reorder Point Query
     @Query("SELECT SUM(items.quantity) FROM sales_order_items AS items " +
             "INNER JOIN sales_orders AS orders ON items.orderLocalId = orders.localId " +
             "WHERE items.productId = :productId AND orders.orderDate >= :sinceTimestamp")
     Double getTotalQuantitySoldSince(String productId, long sinceTimestamp);
+
+    // ==========================================
+    // NEW: OFFLINE SYNC QUERIES
+    // ==========================================
+    @Transaction
+    @Query("SELECT * FROM sales_orders WHERE remoteId IS NULL OR remoteId = ''")
+    List<SalesOrderWithItems> getPendingOrdersSync();
+
+    @Query("UPDATE sales_orders SET remoteId = :remoteId WHERE localId = :localId")
+    void updateOrderRemoteId(long localId, String remoteId);
 }

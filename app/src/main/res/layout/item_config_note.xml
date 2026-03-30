@@ -6,34 +6,46 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:layout_marginBottom="8dp"
-    android:weightSum="2">
+    android:weightSum="3">
 
-    <EditText
-        android:id="@+id/etNoteType"
+    <TextView
+        android:id="@+id/tvNoteType"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:hint="Type (e.g. Sugar)"
+        android:layout_weight="1.2"
+        android:text="Sugar Level"
         android:textSize="14sp"
-        android:background="@drawable/edite_round"
-        android:padding="12dp"
-        android:layout_marginEnd="4dp"/>
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:paddingStart="4dp"
+        android:layout_marginEnd="8dp"/>
 
     <EditText
         android:id="@+id/etNoteValue"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:hint="Value (e.g. 25%)"
+        android:layout_height="40dp"
+        android:layout_weight="1.5"
+        android:hint="Amount (e.g. 50)"
         android:textSize="14sp"
+        android:inputType="number"
         android:background="@drawable/edite_round"
-        android:padding="12dp"
+        android:padding="8dp"
+        android:textAlignment="center"
         android:layout_marginEnd="4dp"/>
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.3"
+        android:text="%"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginEnd="8dp"/>
 
     <ImageButton
         android:id="@+id/btnDelete"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:src="@android:drawable/ic_menu_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
         app:tint="@color/errorRed"/>

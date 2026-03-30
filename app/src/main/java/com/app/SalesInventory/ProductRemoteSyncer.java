@@ -43,56 +43,57 @@ public class ProductRemoteSyncer {
                 });
     }
 
-    private void handleSnapshot(QuerySnapshot snapshot) {
-        if (snapshot == null) return;
-        for (DocumentSnapshot doc : snapshot.getDocuments()) {
-            Product p = mapDocToProduct(doc);
-            if (p != null) {
-                productRepository.upsertFromRemote(p);
-            }
-        }
+    public void startListening() {
+        if (productsListener != null) return;
+        String path = FirestoreManager.getInstance().getUserProductsPath();
+        productsListener = db.collection(path)
+                .addSnapshotListener((value, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Listen failed.", error);
+                        return;
+                    }
+                    if (value != null) {
+                        for (DocumentChange dc : value.getDocumentChanges()) {
+                            switch (dc.getType()) {
+                                case ADDED:
+                                case MODIFIED:
+                                    Product p = documentToProduct(dc.getDocument());
+                                    productRepository.upsertFromRemote(p);
+                                    break;
+                                case REMOVED:
+                                    break;
+                            }
+                        }
+                    }
+                });
     }
 
-    public void startRealtimeSync(String ownerAdminUid) {
-        stopRealtimeSync();
-        if (ownerAdminUid == null || ownerAdminUid.isEmpty()) return;
-        String path = "products/" + ownerAdminUid + "/items";
-        productsListener = db.collection(path).addSnapshotListener(new EventListener<QuerySnapshot>() {
-            @Override
-            public void onEvent(@Nullable QuerySnapshot snapshots, @Nullable com.google.firebase.firestore.FirebaseFirestoreException error) {
-                if (error != null) {
-                    Log.e(TAG, "Realtime listener error", error);
-                    return;
-                }
-                if (snapshots == null) return;
-                for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                    DocumentSnapshot doc = dc.getDocument();
-                    Product p = mapDocToProduct(doc);
-                    if (p == null) continue;
-                    productRepository.upsertFromRemote(p);
-                }
-            }
-        });
-    }
-
-    public void stopRealtimeSync() {
+    public void stopListening() {
         if (productsListener != null) {
             productsListener.remove();
             productsListener = null;
         }
     }
 
-    private Product mapDocToProduct(DocumentSnapshot doc) {
-        if (doc == null || !doc.exists()) return null;
+    private void handleSnapshot(QuerySnapshot snapshot) {
+        if (snapshot == null) return;
+        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+            Product p = documentToProduct(doc);
+            productRepository.upsertFromRemote(p);
+        }
+    }
+
+    private Product documentToProduct(DocumentSnapshot doc) {
         Product p = new Product();
         p.setProductId(doc.getId());
         p.setProductName(getString(doc, "productName"));
         p.setCategoryId(getString(doc, "categoryId"));
         p.setCategoryName(getString(doc, "categoryName"));
+        p.setProductLine(getString(doc, "productLine"));
         p.setDescription(getString(doc, "description"));
         p.setCostPrice(getDouble(doc, "costPrice"));
         p.setSellingPrice(getDouble(doc, "sellingPrice"));
-        p.setQuantity(getInt(doc, "quantity"));
+        p.setQuantity(getDouble(doc, "quantity"));
         p.setReorderLevel(getInt(doc, "reorderLevel"));
         p.setCriticalLevel(getInt(doc, "criticalLevel"));
         p.setCeilingLevel(getInt(doc, "ceilingLevel"));
@@ -106,31 +107,27 @@ public class ProductRemoteSyncer {
         p.setExpiryDate(getLong(doc, "expiryDate"));
         p.setProductType(getString(doc, "productType"));
         p.setImageUrl(getString(doc, "imageUrl"));
-        p.setImagePath(null);
+        p.setImagePath(getString(doc, "imagePath"));
 
-        // MAP LISTS
-        p.setSizesList(getListObj(doc, "sizesList", "sizesListJson"));
-        p.setAddonsList(getListObj(doc, "addonsList", "addonsListJson"));
-        p.setVariantsList(getListObj(doc, "variantsList", "variantsListJson"));
         p.setBomList(getListObj(doc, "bomList", "bomListJson"));
-        p.setNotesList(getListStr(doc, "notesList", "notesListJson"));
+
+        p.setUnifiedVariations(getListObj(doc, "variantsList", "variantsListJson"));
 
         return p;
     }
 
-    // =======================================================
-    // JSON & ARRAY FETCH HELPERS
-    // =======================================================
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getListObj(DocumentSnapshot doc, String arrayField, String jsonField) {
-        try {
-            if (doc.contains(arrayField) && doc.get(arrayField) instanceof List) {
-                return (List<Map<String, Object>>) doc.get(arrayField);
-            } else if (doc.contains(jsonField)) {
-                String json = doc.getString(jsonField);
-                if (json == null || json.isEmpty()) return null;
-                List<Map<String, Object>> list = new ArrayList<>();
+    private List<Map<String, Object>> getListObj(DocumentSnapshot doc, String field, String jsonField) {
+        Object val = doc.get(field);
+        if (val instanceof List) {
+            try {
+                return (List<Map<String, Object>>) val;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        String json = doc.getString(jsonField);
+        if (json != null && !json.isEmpty()) {
+            try {
                 org.json.JSONArray array = new org.json.JSONArray(json);
+                List<Map<String, Object>> list = new ArrayList<>();
                 for (int i = 0; i < array.length(); i++) {
                     org.json.JSONObject obj = array.getJSONObject(i);
                     Map<String, Object> map = new HashMap<>();
@@ -142,35 +139,30 @@ public class ProductRemoteSyncer {
                     list.add(map);
                 }
                 return list;
-            }
-        } catch (Exception e) { e.printStackTrace(); }
-        return null;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        return new ArrayList<>();
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, String>> getListStr(DocumentSnapshot doc, String arrayField, String jsonField) {
-        try {
-            if (doc.contains(arrayField) && doc.get(arrayField) instanceof List) {
-                return (List<Map<String, String>>) doc.get(arrayField);
-            } else if (doc.contains(jsonField)) {
-                String json = doc.getString(jsonField);
-                if (json == null || json.isEmpty()) return null;
-                List<Map<String, String>> list = new ArrayList<>();
+    private List<String> getListStr(DocumentSnapshot doc, String field, String jsonField) {
+        Object val = doc.get(field);
+        if (val instanceof List) {
+            try {
+                return (List<String>) val;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        String json = doc.getString(jsonField);
+        if (json != null && !json.isEmpty()) {
+            try {
                 org.json.JSONArray array = new org.json.JSONArray(json);
+                List<String> list = new ArrayList<>();
                 for (int i = 0; i < array.length(); i++) {
-                    org.json.JSONObject obj = array.getJSONObject(i);
-                    Map<String, String> map = new HashMap<>();
-                    java.util.Iterator<String> keys = obj.keys();
-                    while (keys.hasNext()) {
-                        String key = keys.next();
-                        map.put(key, obj.getString(key));
-                    }
-                    list.add(map);
+                    list.add(array.getString(i));
                 }
                 return list;
-            }
-        } catch (Exception e) { e.printStackTrace(); }
-        return null;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        return new ArrayList<>();
     }
 
     private String getString(DocumentSnapshot doc, String field) {
@@ -178,21 +170,47 @@ public class ProductRemoteSyncer {
         return v == null ? "" : v;
     }
 
+    // Replace these methods at the bottom of ProductRemoteSyncer.java
+
     private double getDouble(DocumentSnapshot doc, String field) {
-        Double d = doc.getDouble(field);
-        if (d != null) return d;
-        Long l = doc.getLong(field);
-        return l == null ? 0.0 : l.doubleValue();
+        Object val = doc.get(field);
+        if (val instanceof Number) return ((Number) val).doubleValue();
+        if (val instanceof String) {
+            try { return Double.parseDouble((String) val); } catch (Exception ignored) {}
+        }
+        return 0.0;
     }
 
     private int getInt(DocumentSnapshot doc, String field) {
-        Long l = doc.getLong(field);
-        return l == null ? 0 : l.intValue();
+        Object val = doc.get(field);
+        if (val instanceof Number) return ((Number) val).intValue();
+        if (val instanceof String) {
+            try { return Integer.parseInt((String) val); } catch (Exception ignored) {}
+        }
+        return 0;
     }
 
     private long getLong(DocumentSnapshot doc, String field) {
-        Long l = doc.getLong(field);
-        return l == null ? 0L : l;
+        Object val = doc.get(field);
+        // 1. Handle standard Number (Long/Integer)
+        if (val instanceof Number) return ((Number) val).longValue();
+
+        // 2. FIX: Handle Firebase Timestamp safely
+        if (val instanceof com.google.firebase.Timestamp) {
+            return ((com.google.firebase.Timestamp) val).toDate().getTime();
+        }
+
+        // 3. Handle standard Java Date
+        if (val instanceof java.util.Date) {
+            return ((java.util.Date) val).getTime();
+        }
+
+        // 4. Handle String fallback
+        if (val instanceof String) {
+            try { return Long.parseLong((String) val); } catch (Exception ignored) {}
+        }
+
+        return 0L;
     }
 
     private boolean getBoolean(DocumentSnapshot doc, String field, boolean def) {

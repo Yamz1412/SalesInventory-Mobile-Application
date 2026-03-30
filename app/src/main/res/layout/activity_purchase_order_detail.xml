@@ -5,22 +5,24 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F5F5"> <LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?attr/colorPrimary"
-    android:padding="20dp"
-    android:elevation="4dp"
-    android:orientation="vertical">
+    android:background="?android:colorBackground">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Purchase Order Details"
-        android:textColor="?attr/colorOnPrimary"
-        android:textSize="22sp"
-        android:textStyle="bold" />
-</LinearLayout>
+        android:background="?attr/colorPrimary"
+        android:padding="20dp"
+        android:elevation="4dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Purchase Order Details"
+            android:textColor="?attr/colorOnPrimary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -37,6 +39,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_margin="16dp"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="2dp">
 
@@ -47,31 +50,31 @@
                     android:padding="16dp">
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="PO Number" android:textColor="#757575" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvPONumber" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PO-123" android:textSize="16sp" android:textStyle="bold" android:textColor="#212121"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="PO Number" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvPONumber" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PO-123" android:textSize="16sp" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
                     </LinearLayout>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Supplier" android:textColor="#757575" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvSupplier" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Supplier" android:textSize="14sp" android:textColor="#424242"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Supplier" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvSupplier" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Supplier" android:textSize="14sp" android:textColor="?attr/colorOnSurface"/>
                     </LinearLayout>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Date" android:textColor="#757575" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Date" android:textSize="14sp" android:textColor="#424242"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Date" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Date" android:textSize="14sp" android:textColor="?attr/colorOnSurface"/>
                     </LinearLayout>
 
-                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginVertical="12dp"/>
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#40888888" android:layout_marginVertical="12dp"/>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Current Status" android:textColor="#757575" android:textSize="12sp"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Current Status" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            app:cardBackgroundColor="#E3F2FD"
+                            app:cardBackgroundColor="?attr/colorSecondary"
                             app:cardCornerRadius="6dp"
                             app:cardElevation="0dp">
-                            <TextView android:id="@+id/tvStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PENDING" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:paddingHorizontal="10dp" android:paddingVertical="4dp"/>
+                            <TextView android:id="@+id/tvStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PENDING" android:textStyle="bold" android:textColor="?attr/colorOnSecondary" android:paddingHorizontal="10dp" android:paddingVertical="4dp"/>
                         </com.google.android.material.card.MaterialCardView>
                     </LinearLayout>
 
@@ -83,7 +86,7 @@
                 android:layout_height="wrap_content"
                 android:text="Order Items"
                 android:textStyle="bold"
-                android:textColor="#212121"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginBottom="8dp"/>
 
@@ -124,7 +127,7 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp"
         android:text="📤 Send to Supplier (Dispatch)"
-        android:textColor="@color/white"
+        android:textColor="?attr/colorOnPrimary"
         android:backgroundTint="?attr/colorPrimary"
         android:visibility="gone" />
 
@@ -143,7 +146,8 @@
             android:layout_weight="1"
             android:layout_marginEnd="4dp"
             android:text="Receive"
-            android:backgroundTint="@color/successGreen" />
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2E7D32" />
 
         <Button
             android:id="@+id/btnForceClose"
@@ -153,7 +157,8 @@
             android:layout_marginEnd="4dp"
             android:text="Force Close"
             android:visibility="gone"
-            android:backgroundTint="@color/warningYellow" />
+            android:textColor="@android:color/white"
+            android:backgroundTint="#F57F17" />
 
         <Button
             android:id="@+id/btnCancelOrder"
@@ -161,6 +166,7 @@
             android:layout_height="50dp"
             android:layout_weight="1"
             android:text="Cancel"
-            android:backgroundTint="@color/errorRed" />
+            android:textColor="?attr/colorOnError"
+            android:backgroundTint="?attr/colorError" />
     </LinearLayout>
 </LinearLayout>

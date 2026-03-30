@@ -46,6 +46,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
+                android:textColor="?attr/colorOnBackground"
                 android:hint="Select Supplier">
 
                 <AutoCompleteTextView
@@ -53,6 +54,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textNoSuggestions"
+                    android:textColor="?attr/colorOnBackground"
                     android:completionThreshold="1" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -61,6 +63,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
+                android:textColor="?attr/colorOnBackground"
                 android:hint="Reason for Return">
 
                 <AutoCompleteTextView
@@ -68,6 +71,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="none"
+                    android:textColor="?attr/colorOnBackground"
                     android:focusable="false"
                     android:clickable="true" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -86,13 +90,13 @@
                     android:text="Products to Return"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary" />
+                    android:textColor="?attr/colorOnBackground" />
 
                 <ImageButton
                     android:id="@+id/btnAddReturnItem"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:background="?attr/colorPrimary"
+                    android:background="?attr/colorOnBackground"
                     android:src="@android:drawable/ic_input_add"
                     app:tint="@android:color/white" />
             </LinearLayout>
@@ -116,6 +120,8 @@
                     style="@style/CustomButton"
                     android:layout_width="match_parent"
                     android:layout_height="60dp"
+                    android:textColor="?attr/colorOnPrimary"
+                    android:backgroundTint="?attr/colorPrimary"
                     android:text="Submit Return &amp; Deduct Stock"
                     android:layout_marginBottom="8dp" />
 
@@ -123,6 +129,8 @@
                     android:id="@+id/btnCancelReturn"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
+                    android:textColor="?attr/colorOnBackground"
+                    app:strokeColor="?attr/colorOnBackground"
                     android:layout_height="60dp"
                     android:text="Cancel" />
             </LinearLayout>

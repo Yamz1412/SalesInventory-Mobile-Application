@@ -1,25 +1,21 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.pdf.PdfDocument;
-import androidx.core.content.FileProvider;
-import java.io.File;
-import java.io.FileOutputStream;
-
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.pdf.PdfDocument;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -41,15 +37,18 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -68,10 +67,8 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
     private Button btnReviewCheckout;
     private ImageButton btnQuickAddSupplier;
 
-    // Split Screen Layouts
     private LinearLayout mainSplitLayout, layoutSupplierPane, layoutProductsPane;
 
-    // Notification Badge Variables
     private MaterialCardView cvCartBadge;
     private TextView tvCartBadgeCount;
 
@@ -89,6 +86,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
 
     private SupplierAdapter supplierAdapter;
     private SupplierProductAdapter productAdapter;
+    private DatabaseReference suppliersRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,15 +99,44 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
+        suppliersRef = FirebaseDatabase.getInstance().getReference("Suppliers");
         productRepository = SalesInventoryApplication.getProductRepository();
 
         initViews();
-
         applySplitScreenLayout(getResources().getConfiguration().orientation);
 
+        supplierAdapter = new SupplierAdapter(new ArrayList<>(), new SupplierAdapter.OnSupplierClickListener() {
+            @Override
+            public void onSupplierSelected(SupplierItem supplier) {
+                selectSupplier(supplier);
+            }
+
+            @Override
+            public void onSupplierDoubleClicked(SupplierItem supplier) {
+                showSupplierDetailsDialog(supplier);
+            }
+
+            @Override
+            public void onSupplierLongClicked(SupplierItem supplier) {
+                showSupplierOptionsDialog(supplier);
+            }
+        });
+
+        productAdapter = new SupplierProductAdapter(new ArrayList<>(), new SupplierProductAdapter.OnProductClickListener() {
+            @Override
+            public void onProductClick(Product product) {
+                showAddProductToPODialog(product);
+            }
+
+            @Override
+            public void onProductLongClick(Product product) {
+                showProductOptionsDialog(product);
+            }
+        });
+
         setupRecyclerViews();
+        loadSuppliersAndProducts();
         setupSearchListeners();
-        fetchRealDataFromDatabase();
 
         btnReviewCheckout.setOnClickListener(v -> {
             if (cartItems.isEmpty()) {
@@ -125,6 +152,146 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         SyncScheduler.enqueueImmediateSync(this);
     }
 
+    // =========================================================================================
+    // FIX: Color-Adaptive Helpers for Dropdowns to Ensure Text is Visible in Dark/Light Mode
+    // =========================================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
+    private ArrayAdapter<String> getAdaptiveDropdownAdapter(String[] items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        return new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+    }
+
+    private void selectSupplier(SupplierItem supplier) {
+        selectedSupplier = supplier;
+        if (tvSelectedSupplierName != null) {
+            tvSelectedSupplierName.setText(supplier.name);
+        }
+        loadProductsForSupplier(supplier);
+    }
+
+    private void showAddProductToPODialog(Product product) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_to_po, null);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+
+        TextView tvName = dialogView.findViewById(R.id.tvDialogProductName);
+        EditText etQty = dialogView.findViewById(R.id.etDialogQty);
+        EditText etCost = dialogView.findViewById(R.id.etDialogCost);
+        Button btnAdd = dialogView.findViewById(R.id.btnDialogAdd);
+        Button btnCancel = dialogView.findViewById(R.id.btnDialogCancel);
+
+        // Force text colors to match the theme dynamically
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        if (tvName != null) tvName.setTextColor(textColor);
+        if (etQty != null) { etQty.setTextColor(textColor); etQty.setHintTextColor(Color.GRAY); }
+        if (etCost != null) { etCost.setTextColor(textColor); etCost.setHintTextColor(Color.GRAY); }
+
+        tvName.setText(product.getProductName());
+
+        double defaultCost = product.getCostPrice();
+        if (product.getQuantity() > 0) {
+            defaultCost = product.getCostPrice() / product.getQuantity();
+        }
+        etCost.setText(String.format(Locale.US, "%.2f", defaultCost));
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnAdd.setOnClickListener(v -> {
+            String qtyStr = etQty.getText().toString().trim();
+            String costStr = etCost.getText().toString().trim();
+
+            if (!qtyStr.isEmpty() && !costStr.isEmpty()) {
+                try {
+                    double qty = Double.parseDouble(qtyStr);
+                    double cost = Double.parseDouble(costStr);
+
+                    if (qty <= 0) {
+                        Toast.makeText(this, "Quantity must be greater than zero", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String displayName = product.getProductName() + " [" + selectedSupplier.name + "]";
+                    boolean exists = false;
+
+                    for (POItem item : cartItems) {
+                        if (item.getProductName().equals(displayName)) {
+                            item.setQuantity(item.getQuantity() + qty);
+                            item.setUnitPrice(cost);
+                            exists = true;
+                            break;
+                        }
+                    }
+
+                    if (!exists) {
+                        cartItems.add(new POItem(
+                                product.getProductId(),
+                                displayName,
+                                qty,
+                                cost,
+                                product.getUnit()
+                        ));
+                    }
+
+                    updateCartTotals();
+                    Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "Invalid number entered", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(this, "Please enter both quantity and cost", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        dialog.show();
+    }
+
     private void initViews() {
         rvSuppliers = findViewById(R.id.rvSuppliers);
         rvSupplierProducts = findViewById(R.id.rvSupplierProducts);
@@ -133,9 +300,8 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         tvSelectedSupplierName = findViewById(R.id.tvSelectedSupplierName);
         btnReviewCheckout = findViewById(R.id.btnReviewCheckout);
         btnQuickAddSupplier = findViewById(R.id.btnQuickAddSupplier);
+
         currentSupplierProducts = new ArrayList<>();
-        rvSupplierProducts.setLayoutManager(new GridLayoutManager(this, 2));
-        rvSupplierProducts.setAdapter(productAdapter);
 
         mainSplitLayout = findViewById(R.id.mainSplitLayout);
         layoutSupplierPane = findViewById(R.id.layoutSupplierPane);
@@ -155,9 +321,105 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         }
     }
 
-    // =========================================================================
-    // DYNAMIC SPLIT SCREEN LOGIC
-    // =========================================================================
+    private void showSupplierOptionsDialog(SupplierItem supplier) {
+        String[] options = {"✏️ Edit Supplier", "🗑️ Delete Supplier"};
+        new AlertDialog.Builder(this)
+                .setTitle("Manage: " + supplier.name)
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        Intent intent = new Intent(this, AddSupplierActivity.class);
+                        intent.putExtra("EDIT_SUPPLIER_ID", supplier.id);
+                        startActivity(intent);
+                    } else if (which == 1) {
+                        confirmSupplierDeletion(supplier);
+                    }
+                }).show();
+    }
+
+    private void showProductOptionsDialog(Product product) {
+        String[] options = {"✏️ Edit Product Details", "📦 Archive Product"};
+        new AlertDialog.Builder(this)
+                .setTitle("Manage: " + product.getProductName())
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        Intent intent = new Intent(this, AddProductActivity.class);
+                        intent.putExtra("EDIT_PRODUCT_ID", product.getProductId());
+                        startActivity(intent);
+                    } else if (which == 1) {
+                        confirmProductArchiving(product);
+                    }
+                }).show();
+    }
+
+    private void loadSuppliersAndProducts() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null) ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
+
+        final String finalOwnerId = ownerId;
+
+        DatabaseReference supplierRef = FirebaseDatabase.getInstance().getReference("Suppliers");
+        supplierRef.keepSynced(true);
+
+        supplierRef.orderByChild("ownerAdminId").equalTo(finalOwnerId)
+                .addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        uiSupplierItems.clear();
+                        dbSuppliersList.clear();
+
+                        for (DataSnapshot ds : snapshot.getChildren()) {
+                            String supId = ds.getKey();
+                            String name = ds.child("name").getValue(String.class);
+                            String email = ds.child("email").getValue(String.class);
+                            String phone = ds.child("contact").getValue(String.class);
+                            String address = ds.child("address").getValue(String.class);
+                            String categories = ds.child("categories").getValue(String.class);
+
+                            if (name != null) {
+                                Supplier supplier = new Supplier();
+                                supplier.setId(supId);
+                                supplier.setName(name);
+                                supplier.setEmail(email);
+                                supplier.setContact(phone);
+                                supplier.setAddress(address);
+                                supplier.setCategories(categories);
+                                supplier.setOwnerAdminId(finalOwnerId);
+                                dbSuppliersList.add(supplier);
+
+                                SupplierItem item = new SupplierItem(supId, name, email, phone, address, categories, new ArrayList<>());
+                                uiSupplierItems.add(item);
+                            }
+                        }
+
+                        if (supplierAdapter != null) {
+                            supplierAdapter.filterList(new ArrayList<>(uiSupplierItems));
+                        }
+                        populateSupplierSpinner();
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                    }
+                });
+
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                dbInventoryProducts.clear();
+
+                for (Product product : products) {
+                    if (product.isActive() && !"Menu".equalsIgnoreCase(product.getProductType())) {
+                        dbInventoryProducts.add(product);
+                    }
+                }
+
+                if (selectedSupplier != null) {
+                    loadProductsForSupplier(selectedSupplier);
+                }
+            }
+        });
+    }
+
     private void applySplitScreenLayout(int orientation) {
         if (mainSplitLayout == null || layoutSupplierPane == null || layoutProductsPane == null) return;
 
@@ -182,120 +444,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         applySplitScreenLayout(newConfig.orientation);
     }
 
-    // =========================================================================
-    // DATA FETCHING & UI SETUP
-    // =========================================================================
-    private void fetchRealDataFromDatabase() {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null || ownerId.isEmpty()) {
-            ownerId = AuthManager.getInstance().getCurrentUserId();
-        }
-        if (ownerId == null) return;
-
-        final String finalOwnerId = ownerId;
-
-        // Suppliers from Realtime DB
-        DatabaseReference supRef = FirebaseDatabase.getInstance().getReference("Suppliers");
-        supRef.orderByChild("ownerAdminId").equalTo(finalOwnerId).addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                dbSuppliersList.clear();
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Supplier s = ds.getValue(Supplier.class);
-                    if (s != null) dbSuppliersList.add(s);
-                }
-                buildCatalogModels();
-            }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
-
-        // Products — try Room LiveData first
-        productRepository.getAllProducts().observe(this, products -> {
-            dbInventoryProducts.clear();
-            if (products != null) {
-                for (Product p : products) {
-                    if (p.isActive()
-                            && !"Menu".equals(p.getProductType())
-                            && p.getSupplier() != null
-                            && !p.getSupplier().trim().isEmpty()) {
-                        dbInventoryProducts.add(p);
-                    }
-                }
-            }
-
-            if (dbInventoryProducts.isEmpty()) {
-                fetchProductsDirectlyFromFirestore(finalOwnerId);
-            } else {
-                buildCatalogModels();
-            }
-        });
-    }
-
-    private void fetchProductsDirectlyFromFirestore(String ownerId) {
-        ProductRepository repo = SalesInventoryApplication.getProductRepository();
-        com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                .collection("users").document(ownerId).collection("products")
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
-                        Product p = doc.toObject(Product.class);
-                        if (p != null) {
-                            p.setProductId(doc.getId());
-                            Object isActiveObj = doc.get("isActive");
-                            boolean isActive = p.isActive()
-                                    || Boolean.TRUE.equals(isActiveObj);
-                            if (!isActive) continue;
-                            if ("Menu".equals(p.getProductType())) continue;
-                            if (p.getSupplier() == null || p.getSupplier().trim().isEmpty()) continue;
-                            dbInventoryProducts.add(p);
-                            repo.upsertFromRemote(p);
-                        }
-                    }
-                    runOnUiThread(this::buildCatalogModels);
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Could not load products: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
-    }
-
-    private void buildCatalogModels() {
-        if (dbSuppliersList.isEmpty()) {
-            uiSupplierItems.clear();
-            if (supplierAdapter != null) supplierAdapter.filterList(uiSupplierItems);
-            return;
-        }
-
-        uiSupplierItems.clear();
-        for (Supplier s : dbSuppliersList) {
-            List<Product> catalog = new ArrayList<>();
-            for (Product p : dbInventoryProducts) {
-                boolean matchesSupplier = p.getSupplier() != null
-                        && p.getSupplier().equalsIgnoreCase(s.getName());
-                if (matchesSupplier) catalog.add(p);
-            }
-            uiSupplierItems.add(new SupplierItem(
-                    s.getId(), s.getName(), s.getEmail(),
-                    s.getContact(), s.getAddress(), s.getCategories(), catalog));
-        }
-
-        populateSupplierSpinner();
-
-        if (supplierAdapter != null) supplierAdapter.filterList(uiSupplierItems);
-
-        if (selectedSupplier != null) {
-            for (SupplierItem item : uiSupplierItems) {
-                if (item.id.equals(selectedSupplier.id)) {
-                    selectedSupplier = item;
-                    loadProductsForSupplier(item);
-                    break;
-                }
-            }
-        }
-    }
-
-    // =========================================================================
-    // SEARCH AND FILTER LOGIC
-    // =========================================================================
     private void setupSearchListeners() {
         etSearchSupplier.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -343,8 +491,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         list.remove("All");
         list.add(0, "All");
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, list);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> adapter = getAdaptiveAdapter(list);
         if (spinnerSupplierFilter != null) spinnerSupplierFilter.setAdapter(adapter);
     }
 
@@ -365,8 +512,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         list.remove("All");
         list.add(0, "All");
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, list);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        ArrayAdapter<String> adapter = getAdaptiveAdapter(list);
         if (spinnerProductFilter != null) spinnerProductFilter.setAdapter(adapter);
     }
 
@@ -413,131 +559,64 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                 filteredList.add(item);
             }
         }
+
         if (productAdapter != null) productAdapter.filterList(filteredList);
     }
 
     private void setupRecyclerViews() {
         rvSuppliers.setLayoutManager(new LinearLayoutManager(this));
+        if (supplierAdapter != null) {
+            rvSuppliers.setAdapter(supplierAdapter);
+        }
 
-        supplierAdapter = new SupplierAdapter(uiSupplierItems, new SupplierAdapter.OnSupplierClickListener() {
-            @Override
-            public void onSupplierSelected(SupplierItem supplier) {
-                selectedSupplier = supplier;
-                tvSelectedSupplierName.setText("Products for " + supplier.name);
-                etSearchProduct.setText("");
+        int spanCount = 1;
+        int orientation = getResources().getConfiguration().orientation;
+        boolean isTablet = (getResources().getConfiguration().screenLayout
+                & Configuration.SCREENLAYOUT_SIZE_MASK) >= Configuration.SCREENLAYOUT_SIZE_LARGE;
 
-                if (!cartItems.isEmpty()) {
-                    new AlertDialog.Builder(CreatePurchaseOrderActivity.this)
-                            .setTitle("Change Supplier?")
-                            .setMessage("Switching suppliers will clear your current cart. Continue?")
-                            .setPositiveButton("Yes", (dialog, which) -> {
-                                cartItems.clear();
-                                updateCartTotals();
-                                loadProductsForSupplier(supplier);
-                            })
-                            .setNegativeButton("No", null)
-                            .show();
-                } else {
-                    loadProductsForSupplier(supplier);
-                }
-            }
+        if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            spanCount = isTablet ? 3 : 2;
+        } else {
+            spanCount = isTablet ? 2 : 1;
+        }
 
-            @Override
-            public void onSupplierDoubleClicked(SupplierItem supplier) {
-                showSupplierDetailsDialog(supplier);
-            }
-
-            @Override
-            public void onSupplierLongClicked(SupplierItem supplier) {
-                promptDeleteSupplier(supplier);
-            }
-        });
-        rvSuppliers.setAdapter(supplierAdapter);
-        rvSupplierProducts.setLayoutManager(new GridLayoutManager(this, 2));
-    }
-
-    private void onProductSelected(Product product) {
-        if (product != null) {
-            promptForQuantityAndAddToCart(product);
+        rvSupplierProducts.setLayoutManager(new GridLayoutManager(this, spanCount));
+        if (productAdapter != null) {
+            rvSupplierProducts.setAdapter(productAdapter);
         }
     }
 
     private void loadProductsForSupplier(SupplierItem supplier) {
-        currentSupplierProducts = supplier.catalog != null
-                ? new ArrayList<>(supplier.catalog)
-                : new ArrayList<>();
+        currentSupplierProducts.clear();
+        String supCats = supplier.categories != null ? supplier.categories.toLowerCase() : "";
 
-        productAdapter = new SupplierProductAdapter(currentSupplierProducts,
-                new SupplierProductAdapter.OnProductClickListener() {
-                    @Override
-                    public void onProductClick(Product product) {
-                        promptForQuantityAndAddToCart(product);
-                    }
-                    @Override
-                    public void onProductLongClick(Product product) {
-                        promptDeleteProduct(product);
-                    }
-                });
-        rvSupplierProducts.setAdapter(productAdapter);
+        for (Product p : dbInventoryProducts) {
+            boolean matchesSupplierName = p.getSupplier() != null && p.getSupplier().equalsIgnoreCase(supplier.name);
+            boolean matchesCategory = false;
+            if (p.getCategoryName() != null && !supCats.isEmpty()) {
+                matchesCategory = supCats.contains(p.getCategoryName().toLowerCase());
+            }
+
+            if (matchesSupplierName || matchesCategory) {
+                currentSupplierProducts.add(p);
+            }
+        }
+
+        productAdapter.filterList(currentSupplierProducts);
         populateProductSpinner(currentSupplierProducts);
         filterProducts();
 
         if (currentSupplierProducts.isEmpty()) {
-            Toast.makeText(this,
-                    "No products found for " + supplier.name + ". Sync may still be in progress.",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No products found for " + supplier.name, Toast.LENGTH_SHORT).show();
         }
-    }
-
-    // =========================================================================
-    // CART & CHECKOUT LOGIC
-    // =========================================================================
-    private void promptForQuantityAndAddToCart(Product product) {
-        EditText input = new EditText(this);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        input.setHint("Quantity");
-
-        new AlertDialog.Builder(this)
-                .setTitle("Add to Cart")
-                .setMessage("Enter order quantity for " + product.getProductName())
-                .setView(input)
-                .setPositiveButton("Add", (dialog, which) -> {
-                    String qtyStr = input.getText().toString().trim();
-                    if (!qtyStr.isEmpty()) {
-                        int qty = Integer.parseInt(qtyStr);
-                        addToCart(product, qty);
-                    } else {
-                        Toast.makeText(this, "Quantity cannot be empty", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void addToCart(Product product, int qty) {
-        boolean exists = false;
-        for (POItem item : cartItems) {
-            if (item.getProductName().equals(product.getProductName())) {
-                item.setQuantity(item.getQuantity() + qty);
-                exists = true;
-                break;
-            }
-        }
-
-        if (!exists) {
-            cartItems.add(new POItem(product.getProductId(), product.getProductName(), qty, product.getCostPrice(), product.getUnit()));
-        }
-
-        updateCartTotals();
-        Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
     }
 
     private void updateCartTotals() {
         double total = 0;
-        int itemCount = 0;
+        int itemCount = cartItems.size();
+
         for (POItem item : cartItems) {
             total += item.getSubtotal();
-            itemCount += item.getQuantity();
         }
 
         tvCartSummary.setText(itemCount + " Items in PO");
@@ -561,7 +640,28 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         TextView tvEmail = view.findViewById(R.id.dlgSupplierEmail);
         TextView tvAddress = view.findViewById(R.id.dlgSupplierAddress);
 
-        if (selectedSupplier != null) {
+        // Force text colors to match the theme
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        if (tvName != null) tvName.setTextColor(textColor);
+        if (tvContact != null) tvContact.setTextColor(textColor);
+        if (tvEmail != null) tvEmail.setTextColor(textColor);
+        if (tvAddress != null) tvAddress.setTextColor(textColor);
+
+        Set<String> uniqueSuppliers = new HashSet<>();
+        for (POItem item : cartItems) {
+            String name = item.getProductName();
+            if (name.contains("[") && name.endsWith("]")) {
+                uniqueSuppliers.add(name.substring(name.lastIndexOf("[") + 1, name.length() - 1));
+            }
+        }
+
+        if (uniqueSuppliers.size() > 1) {
+            tvName.setText("Multiple Suppliers (" + uniqueSuppliers.size() + ")");
+            tvContact.setText("Combined Purchase Order");
+            tvEmail.setText("");
+            tvAddress.setText("");
+        } else if (selectedSupplier != null) {
             tvName.setText(selectedSupplier.name);
             tvContact.setText("Phone: " + selectedSupplier.phone);
             tvEmail.setText("Email: " + selectedSupplier.email);
@@ -580,8 +680,11 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         rvCart.setAdapter(dialogAdapter);
 
         AutoCompleteTextView actvPayment = view.findViewById(R.id.actvPaymentMethod);
+        if (actvPayment != null) actvPayment.setTextColor(textColor);
         String[] paymentOptions = {"Cash", "GCash", "Custom (Bank Transfer / Credit Card)"};
-        ArrayAdapter<String> paymentAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, paymentOptions);
+
+        // Use Adaptive adapter so dropdown entries are visible
+        ArrayAdapter<String> paymentAdapter = getAdaptiveDropdownAdapter(paymentOptions);
         actvPayment.setAdapter(paymentAdapter);
 
         final String[] finalPaymentMethod = {"Cash"};
@@ -593,6 +696,8 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                 EditText input = new EditText(this);
                 input.setHint("e.g. BDO Transfer, BPI Credit Card");
                 input.setPadding(30, 40, 30, 40);
+                input.setTextColor(textColor);
+                input.setHintTextColor(Color.GRAY);
 
                 new AlertDialog.Builder(this)
                         .setTitle("Custom Payment Method")
@@ -629,7 +734,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
     }
 
     private void createPurchaseOrder(String paymentMethod) {
-        if (selectedSupplier == null) { Toast.makeText(this, "No supplier selected", Toast.LENGTH_SHORT).show(); return; }
         if (cartItems.isEmpty()) { Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show(); return; }
 
         String id = poRef.push().getKey();
@@ -641,8 +745,19 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
 
         final double finalTotal = total;
 
+        Set<String> uniqueSuppliers = new HashSet<>();
+        for (POItem item : cartItems) {
+            String name = item.getProductName();
+            if (name.contains("[") && name.endsWith("]")) {
+                uniqueSuppliers.add(name.substring(name.lastIndexOf("[") + 1, name.length() - 1));
+            }
+        }
+
+        String supplierNames = uniqueSuppliers.size() == 1 ? uniqueSuppliers.iterator().next() : "Multiple Suppliers (" + String.join(", ", uniqueSuppliers) + ")";
+        String phoneStr = uniqueSuppliers.size() == 1 && selectedSupplier != null ? selectedSupplier.phone : "Multiple Contacts";
+
         PurchaseOrder po = new PurchaseOrder(
-                id, poNumber, selectedSupplier.name, selectedSupplier.phone, PurchaseOrder.STATUS_PENDING,
+                id, poNumber, supplierNames, phoneStr, PurchaseOrder.STATUS_PENDING,
                 System.currentTimeMillis(), total, new ArrayList<>(cartItems)
         );
         po.setOwnerAdminId(AuthManager.getInstance().getCurrentUserId());
@@ -654,17 +769,21 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         poRef.child(id).setValue(poData)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Purchase Order Created Successfully", Toast.LENGTH_LONG).show();
-                    fetchBusinessDetailsAndPrompt(poNumber, finalTotal, paymentMethod);
+
+                    if (uniqueSuppliers.size() > 1) {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                        builder.setTitle("Combined PO Saved");
+                        builder.setMessage("This Purchase Order contains items from multiple suppliers. It has been saved to your records.");
+                        builder.setPositiveButton("OK", (d, which) -> finish());
+                        builder.setCancelable(false);
+                        builder.show();
+                    } else {
+                        fetchBusinessDetailsAndPrompt(poNumber, finalTotal, paymentMethod);
+                    }
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    // =========================================================================
-    // AUTOMATED EMAIL AND SMS COMMUNICATION LOGIC (WITH FIRESTORE CONTEXT)
-    // =========================================================================
-    // =========================================================================
-    // PROFESSIONAL PDF GENERATION & COMMUNICATION ENGINE
-    // =========================================================================
     private void fetchBusinessDetailsAndPrompt(String poNumber, double total, String paymentMethod) {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (ownerId == null || ownerId.isEmpty()) {
@@ -846,32 +965,12 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                 .show();
     }
 
-    private void promptDeleteProduct(Product product) {
-        new AlertDialog.Builder(this)
-                .setTitle("Delete Product")
-                .setMessage("Are you sure you want to completely delete " + product.getProductName() + " from your system inventory?")
-                .setPositiveButton("Delete", (dialog, which) -> {
-                    productRepository.deleteProduct(product.getProductId(), new ProductRepository.OnProductDeletedListener() {
-                        @Override
-                        public void onProductDeleted(String archiveFilename) {
-                            runOnUiThread(() -> Toast.makeText(CreatePurchaseOrderActivity.this, "Product deleted", Toast.LENGTH_SHORT).show());
-                        }
-                        @Override
-                        public void onError(String error) {
-                            runOnUiThread(() -> Toast.makeText(CreatePurchaseOrderActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show());
-                        }
-                    });
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
     private void showSupplierDetailsDialog(SupplierItem supplier) {
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.dialog_supplier_details);
         if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.CYAN));
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
 
@@ -881,6 +980,15 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         TextView tvEmail = dialog.findViewById(R.id.tvDialogSupplierEmail);
         TextView tvAddress = dialog.findViewById(R.id.tvDialogSupplierAddress);
         Button btnClose = dialog.findViewById(R.id.btnDialogClose);
+
+        // Force text colors to match the theme
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        if (tvName != null) tvName.setTextColor(textColor);
+        if (tvCategories != null) tvCategories.setTextColor(textColor);
+        if (tvPhone != null) tvPhone.setTextColor(textColor);
+        if (tvEmail != null) tvEmail.setTextColor(textColor);
+        if (tvAddress != null) tvAddress.setTextColor(textColor);
 
         tvName.setText(supplier.name);
         tvCategories.setText(supplier.categories);
@@ -910,5 +1018,35 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
             this.categories = categories;
             this.catalog = catalog;
         }
+    }
+
+    private void confirmSupplierDeletion(SupplierItem supplier) {
+        new AlertDialog.Builder(this)
+                .setTitle("Confirm Deletion")
+                .setMessage("Are you sure you want to delete " + supplier.name + "?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    suppliersRef.child(supplier.id).removeValue()
+                            .addOnSuccessListener(aVoid -> Toast.makeText(this, "Supplier removed", Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void confirmProductArchiving(Product product) {
+        new AlertDialog.Builder(this)
+                .setTitle("Archive Product")
+                .setMessage("Are you sure you want to archive   " + product.getProductName() + "?")
+                .setPositiveButton("Archive", (dialog, which) -> {
+                    SalesInventoryApplication.getProductRepository().deleteProduct(product.getProductId(), new ProductRepository.OnProductDeletedListener() {
+                        @Override
+                        public void onProductDeleted(String msg) {
+                            runOnUiThread(() -> Toast.makeText(CreatePurchaseOrderActivity.this, "Product archived", Toast.LENGTH_SHORT).show());
+                        }
+                        @Override
+                        public void onError(String error) {
+                            runOnUiThread(() -> Toast.makeText(CreatePurchaseOrderActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show());
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null).show();
     }
 }

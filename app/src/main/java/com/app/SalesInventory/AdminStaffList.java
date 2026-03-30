@@ -2,6 +2,7 @@ package com.app.SalesInventory;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -24,7 +25,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AdminStaffList extends AppCompatActivity {
+public class AdminStaffList extends BaseActivity {
 
     private RecyclerView rvStaff;
     private StaffListAdapter adapter;
@@ -101,11 +102,20 @@ public class AdminStaffList extends AppCompatActivity {
         Button btnCancel = dialogView.findViewById(R.id.btnCancelEditStaff);
         Button btnUpdate = dialogView.findViewById(R.id.btnUpdateStaff);
 
+        // FIX: Force text colors so inputs are perfectly visible in Dark Mode
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        etName.setTextColor(textColor);
+        etEmail.setTextColor(textColor);
+        etPhone.setTextColor(textColor);
+        etPassword.setTextColor(textColor);
+
         etName.setText(staff.getName() != null ? staff.getName() : "");
         etEmail.setText(staff.getEmail() != null ? staff.getEmail() : "");
         etPhone.setText(staff.getPhone() != null ? staff.getPhone() : "");
 
         AlertDialog dlg = new AlertDialog.Builder(this).setView(dialogView).create();
+        if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         btnCancel.setOnClickListener(v -> dlg.dismiss());
         btnUpdate.setOnClickListener(v -> {
@@ -234,21 +244,5 @@ public class AdminStaffList extends AppCompatActivity {
         if (selected instanceof AdminUserItem) {
             showEditDialog((AdminUserItem) selected);
         }
-    }
-
-    private String extractString(Object obj, String fieldName, String getterName) {
-        if (obj == null) return null;
-        try {
-            Method m = obj.getClass().getMethod(getterName);
-            Object r = m.invoke(obj);
-            return r == null ? null : String.valueOf(r);
-        } catch (Exception ignored) {}
-        try {
-            Field f = obj.getClass().getDeclaredField(fieldName);
-            f.setAccessible(true);
-            Object r = f.get(obj);
-            return r == null ? null : String.valueOf(r);
-        } catch (Exception ignored) {}
-        return null;
     }
 }

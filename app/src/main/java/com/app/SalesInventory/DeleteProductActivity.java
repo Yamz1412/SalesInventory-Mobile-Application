@@ -1,9 +1,11 @@
 package com.app.SalesInventory;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.SearchView;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,13 +15,14 @@ import com.google.android.material.snackbar.Snackbar;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeleteProductActivity extends AppCompatActivity {
+public class DeleteProductActivity extends BaseActivity { // Changed to BaseActivity to support themes
     private ProductRepository productRepository;
     private View rootView;
     private RecyclerView recyclerView;
     private ArchivedProductAdapter adapter;
     private Button btnRefresh;
     private SearchView searchView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -29,6 +32,7 @@ public class DeleteProductActivity extends AppCompatActivity {
         btnRefresh = findViewById(R.id.btn_refresh_archives);
         searchView = findViewById(R.id.searchView);
         productRepository = ProductRepository.getInstance(getApplication());
+
         adapter = new ArchivedProductAdapter(this, new ArchivedProductAdapter.Listener() {
             @Override
             public void onRestore(String filename) {
@@ -39,6 +43,7 @@ public class DeleteProductActivity extends AppCompatActivity {
                 confirmPermanentDelete(filename);
             }
         });
+
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
         btnRefresh.setOnClickListener(v -> loadArchives());
@@ -46,12 +51,26 @@ public class DeleteProductActivity extends AppCompatActivity {
             searchView.setQuery("", false);
             loadArchives();
         });
+
+        setupSearchView(); // FIX: Make Search text visible
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override public boolean onQueryTextSubmit(String query) { filter(query); return true; }
             @Override public boolean onQueryTextChange(String newText) { filter(newText); return true; }
         });
         loadArchives();
     }
+
+    private void setupSearchView() {
+        int id = searchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
+        TextView searchEditText = searchView.findViewById(id);
+        if (searchEditText != null) {
+            boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+            searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
+            searchEditText.setHintTextColor(Color.GRAY);
+        }
+    }
+
     private void loadArchives() {
         List<String> files = productRepository.listLocalArchives();
         adapter.setFiles(files);

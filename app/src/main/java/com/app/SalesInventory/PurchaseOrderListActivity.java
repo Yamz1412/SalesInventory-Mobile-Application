@@ -2,12 +2,16 @@ package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -42,13 +46,21 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_purchase_order_list);
 
+        // SAFETY: Preserving your Toolbar and Back Arrow
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            setSupportActionBar(toolbar);
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            }
+        }
+
         recyclerView = findViewById(R.id.recyclerViewPurchaseOrders);
         btnCreatePO = findViewById(R.id.btnCreatePO);
         btnAddSupplier = findViewById(R.id.btnAddSupplier);
         btnReturnProduct = findViewById(R.id.btnReturnProduct);
 
         purchaseOrderList = new ArrayList<>();
-
         adapter = new PurchaseOrderAdapter(this, purchaseOrderList, this::viewPurchaseOrder, this::showManageOptions);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -56,7 +68,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
 
-        // TRIGGER MOCK DATA INJECTIONS FOR PANELISTS
+        // TRIGGER MOCK DATA INJECTIONS FOR PANELISTS AUTOMATICALLY
         injectMockPOs();
         injectMockReturns();
 
@@ -80,7 +92,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
     /**
      * MOCK DATA INJECTOR FOR SUPPLIER RETURNS
-     * Creates realistic returns for damaged/expired products
      */
     private void injectMockReturns() {
         String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
@@ -157,7 +168,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         items3.add(item3a);
         ret3.put("items", items3);
 
-        // Save to Firebase
         returnsRef.push().setValue(ret1);
         returnsRef.push().setValue(ret2);
         returnsRef.push().setValue(ret3);
@@ -200,7 +210,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
         List<PurchaseOrder> mockPOs = new ArrayList<>();
 
-        // 1. COMPLETED - Coffee Beans
         List<POItem> items1 = new ArrayList<>();
         items1.add(new POItem("MOCK-P1", "Arabica Beans", 10, 800.0, "kg"));
         items1.get(0).setReceivedQuantity(10);
@@ -210,18 +219,16 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po1.setOwnerAdminId(adminId); po1.setExpectedDeliveryDate(now - (28 * oneDay));
         mockPOs.add(po1);
 
-        // 2. PARTIAL - Packaging
         List<POItem> items2 = new ArrayList<>();
         items2.add(new POItem("MOCK-P3", "16oz Plastic Cups", 20, 150.0, "box"));
-        items2.get(0).setReceivedQuantity(10); // Missing 10
+        items2.get(0).setReceivedQuantity(10);
         items2.add(new POItem("MOCK-P4", "Dome Lids", 20, 100.0, "box"));
-        items2.get(1).setReceivedQuantity(20); // Fully received
+        items2.get(1).setReceivedQuantity(20);
         PurchaseOrder po2 = new PurchaseOrder("MOCK-PO-2", "PO-MOCK-1002", "Packaging Pros", "09179876543", PurchaseOrder.STATUS_PARTIAL, now - (15 * oneDay), 5000.0, items2);
         po2.setOwnerAdminId(adminId); po2.setExpectedDeliveryDate(now - (10 * oneDay));
         po2.setDeliveryNote("Supplier ran out of 16oz cups. Will deliver remaining next week.");
         mockPOs.add(po2);
 
-        // 3. PENDING - Syrups
         List<POItem> items3 = new ArrayList<>();
         items3.add(new POItem("MOCK-P5", "Vanilla Syrup", 12, 350.0, "bottle"));
         items3.add(new POItem("MOCK-P6", "Caramel Sauce", 6, 450.0, "bottle"));
@@ -229,7 +236,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po3.setOwnerAdminId(adminId); po3.setExpectedDeliveryDate(now + (2 * oneDay));
         mockPOs.add(po3);
 
-        // 4. COMPLETED - Dairy
         List<POItem> items4 = new ArrayList<>();
         items4.add(new POItem("MOCK-P7", "Fresh Whole Milk", 50, 95.0, "L"));
         items4.get(0).setReceivedQuantity(50);
@@ -239,7 +245,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po4.setOwnerAdminId(adminId); po4.setExpectedDeliveryDate(now - (19 * oneDay));
         mockPOs.add(po4);
 
-        // 5. CANCELLED - Cleaning Supplies
         List<POItem> items5 = new ArrayList<>();
         items5.add(new POItem("MOCK-P9", "Bleach", 5, 120.0, "gal"));
         PurchaseOrder po5 = new PurchaseOrder("MOCK-PO-5", "PO-MOCK-1005", "Clean & Clear Goods", "09205556666", PurchaseOrder.STATUS_CANCELLED, now - (40 * oneDay), 600.0, items5);
@@ -247,7 +252,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po5.setDeliveryNote("Cancelled due to extreme delay in shipping. Ordered from elsewhere.");
         mockPOs.add(po5);
 
-        // 6. COMPLETED - Pastries
         List<POItem> items6 = new ArrayList<>();
         items6.add(new POItem("MOCK-P10", "Butter Croissants", 100, 45.0, "pcs"));
         items6.get(0).setReceivedQuantity(100);
@@ -257,7 +261,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po6.setOwnerAdminId(adminId); po6.setExpectedDeliveryDate(now - (4 * oneDay));
         mockPOs.add(po6);
 
-        // 7. PENDING - Matcha & Cocoa
         List<POItem> items7 = new ArrayList<>();
         items7.add(new POItem("MOCK-P12", "Premium Matcha Powder", 5, 1200.0, "kg"));
         items7.add(new POItem("MOCK-P13", "Dutch Cocoa Powder", 10, 600.0, "kg"));
@@ -265,18 +268,16 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po7.setOwnerAdminId(adminId); po7.setExpectedDeliveryDate(now + (4 * oneDay));
         mockPOs.add(po7);
 
-        // 8. PARTIAL - Paper Straws & Napkins
         List<POItem> items8 = new ArrayList<>();
         items8.add(new POItem("MOCK-P14", "Paper Straws", 30, 100.0, "box"));
         items8.get(0).setReceivedQuantity(30);
         items8.add(new POItem("MOCK-P15", "Branded Tissue Napkins", 50, 80.0, "pack"));
-        items8.get(1).setReceivedQuantity(10); // Missing 40 packs
+        items8.get(1).setReceivedQuantity(10);
         PurchaseOrder po8 = new PurchaseOrder("MOCK-PO-8", "PO-MOCK-1008", "Packaging Pros", "09179876543", PurchaseOrder.STATUS_PARTIAL, now - (12 * oneDay), 7000.0, items8);
         po8.setOwnerAdminId(adminId); po8.setExpectedDeliveryDate(now - (8 * oneDay));
         po8.setDeliveryNote("Tissues are on backorder.");
         mockPOs.add(po8);
 
-        // 9. COMPLETED - Premium Espresso
         List<POItem> items9 = new ArrayList<>();
         items9.add(new POItem("MOCK-P16", "House Blend Espresso", 20, 900.0, "kg"));
         items9.get(0).setReceivedQuantity(20);
@@ -284,19 +285,9 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         po9.setOwnerAdminId(adminId); po9.setExpectedDeliveryDate(now - (58 * oneDay));
         mockPOs.add(po9);
 
-        // 10. PENDING - Sugar & Sweeteners
-        List<POItem> items10 = new ArrayList<>();
-        items10.add(new POItem("MOCK-P17", "White Sugar", 50, 65.0, "kg"));
-        items10.add(new POItem("MOCK-P18", "Brown Sugar", 50, 70.0, "kg"));
-        PurchaseOrder po10 = new PurchaseOrder("MOCK-PO-10", "PO-MOCK-1010", "Sweet Syrups Inc.", "09181112222", PurchaseOrder.STATUS_PENDING, now, 6750.0, items10);
-        po10.setOwnerAdminId(adminId); po10.setExpectedDeliveryDate(now + (3 * oneDay));
-        mockPOs.add(po10);
-
-        // Save all to database using toMap() safely
         for (PurchaseOrder po : mockPOs) {
             poRef.child(po.getPoId()).setValue(po.toMap());
         }
-        Toast.makeText(this, "Mock Purchase Orders & Returns Injected!", Toast.LENGTH_LONG).show();
     }
 
     private void loadPurchaseOrders() {
@@ -304,11 +295,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         if (currentAdminId == null || currentAdminId.isEmpty()) {
             currentAdminId = AuthManager.getInstance().getCurrentUserId();
         }
-
-        if (currentAdminId == null) {
-            Toast.makeText(this, "Session error: Cannot identify business owner.", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (currentAdminId == null) return;
 
         poRef.orderByChild("ownerAdminId").equalTo(currentAdminId).addValueEventListener(new ValueEventListener() {
             @Override
@@ -323,11 +310,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                 Collections.reverse(purchaseOrderList);
                 adapter.notifyDataSetChanged();
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(PurchaseOrderListActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
-            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
 
@@ -339,7 +322,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
     private void showManageOptions(PurchaseOrder po) {
         CharSequence[] options = {"Cancel Order", "Delete Order", "Close"};
-
         new AlertDialog.Builder(this)
                 .setTitle("Manage Purchase Order: " + po.getPoNumber())
                 .setItems(options, (dialog, which) -> {
@@ -347,52 +329,36 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                         if (!"Pending".equalsIgnoreCase(po.getStatus())) {
                             Toast.makeText(this, "Only pending orders can be cancelled.", Toast.LENGTH_SHORT).show();
                         } else {
-                            cancelOrder(po);
+                            poRef.child(po.getPoId()).child("status").setValue("Cancelled");
                         }
                     } else if (which == 1) {
-                        confirmDelete(po);
-                    } else {
-                        dialog.dismiss();
-                    }
+                        poRef.child(po.getPoId()).removeValue();
+                    } else dialog.dismiss();
                 })
                 .show();
     }
 
-    private void cancelOrder(PurchaseOrder po) {
-        poRef.child(po.getPoId()).child("status").setValue("Cancelled")
-                .addOnSuccessListener(aVoid -> Toast.makeText(PurchaseOrderListActivity.this, "Order Cancelled Successfully", Toast.LENGTH_SHORT).show())
-                .addOnFailureListener(e -> Toast.makeText(PurchaseOrderListActivity.this, "Failed to cancel order: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    // SAFETY: Handle the back button click for the Toolbar
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
-    private void confirmDelete(PurchaseOrder po) {
-        new AlertDialog.Builder(this)
-                .setTitle("Delete Purchase Order")
-                .setMessage("Are you sure you want to permanently delete this order: " + po.getPoNumber() + "?")
-                .setPositiveButton("Delete", (dialog, which) -> deleteOrder(po))
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void deleteOrder(PurchaseOrder po) {
-        poRef.child(po.getPoId()).removeValue()
-                .addOnSuccessListener(aVoid -> Toast.makeText(PurchaseOrderListActivity.this, "Order Deleted Successfully", Toast.LENGTH_SHORT).show())
-                .addOnFailureListener(e -> Toast.makeText(PurchaseOrderListActivity.this, "Failed to delete order: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-    }
-
-    public interface OnItemClickListener {
-        void onItemClick(PurchaseOrder po);
-    }
-
-    public interface OnItemLongClickListener {
-        void onItemLongClick(PurchaseOrder po);
-    }
+    public interface OnItemClickListener { void onItemClick(PurchaseOrder po); }
+    public interface OnItemLongClickListener { void onItemLongClick(PurchaseOrder po); }
 
     private class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdapter.POViewHolder> {
+        private PurchaseOrderListActivity context;
         private List<PurchaseOrder> orders;
         private OnItemClickListener clickListener;
         private OnItemLongClickListener longClickListener;
 
         public PurchaseOrderAdapter(PurchaseOrderListActivity context, List<PurchaseOrder> orders, OnItemClickListener clickListener, OnItemLongClickListener longClickListener) {
+            this.context = context;
             this.orders = orders;
             this.clickListener = clickListener;
             this.longClickListener = longClickListener;
@@ -411,7 +377,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
             holder.tvPoNumber.setText("PO #: " + po.getPoNumber());
             holder.tvSupplier.setText(po.getSupplierName());
             holder.tvStatus.setText(po.getStatus().toUpperCase());
-
             holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%.2f", po.getTotalAmount()));
 
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
@@ -426,28 +391,25 @@ public class PurchaseOrderListActivity extends BaseActivity  {
             int color;
             switch (po.getStatus().toUpperCase()) {
                 case "RECEIVED":
-                case "COMPLETED": // ADDED: Completed shares success color
-                    color = getResources().getColor(R.color.successGreen);
-                    break;
+                case "COMPLETED":
+                    color = getResources().getColor(R.color.successGreen); break;
                 case "PENDING":
                 case "PARTIAL":
-                    color = getResources().getColor(R.color.warningYellow);
-                    break;
+                    color = getResources().getColor(R.color.warningYellow); break;
                 case "CANCELLED":
-                    color = getResources().getColor(R.color.errorRed);
-                    break;
+                    color = getResources().getColor(R.color.errorRed); break;
                 default:
-                    color = getResources().getColor(R.color.textColorSecondary);
+                    // FIX: Dynamically resolve the theme's text color so it's perfectly visible in Light/Dark mode!
+                    TypedValue typedValue = new TypedValue();
+                    context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true);
+                    color = typedValue.data;
             }
             holder.tvStatus.setTextColor(color);
         }
-
-        @Override
-        public int getItemCount() { return orders.size(); }
+        @Override public int getItemCount() { return orders.size(); }
 
         class POViewHolder extends RecyclerView.ViewHolder {
             TextView tvPoNumber, tvSupplier, tvStatus, tvDate, tvTotalAmount;
-
             public POViewHolder(@NonNull View itemView) {
                 super(itemView);
                 tvPoNumber = itemView.findViewById(R.id.tvPONumber);

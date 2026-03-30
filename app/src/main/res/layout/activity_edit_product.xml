@@ -3,373 +3,87 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground"
-    >
+    android:background="?android:colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="20dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Edit Product"
-            android:textSize="24sp"
+            android:textSize="22sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorPrimary"
-            android:layout_marginBottom="20dp"/>
-
-        <ImageButton
-            android:id="@+id/btnEditPhoto"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_gravity="center_horizontal"
-            android:background="@android:color/transparent"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_image_placeholder"
-            android:layout_marginBottom="16dp"/>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            android:layout_marginBottom="15dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/productNameET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnBackground"
-                android:hint="Product Name"/>
-        </com.google.android.material.textfield.TextInputLayout>
+            android:textColor="?attr/colorOnBackground"
+            android:layout_marginBottom="20dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2"
-            android:layout_marginBottom="15dp">
+            android:gravity="center"
+            android:layout_marginBottom="20dp">
 
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                android:layout_width="0dp"
-                android:layout_weight="1.2"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/productGroupET"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="?attr/colorOnBackground"
-                    android:hint="Product Group" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="55dp"
-                android:layout_weight="0.8"
+            <ImageButton
+                android:id="@+id/btnEditPhoto"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
                 android:background="@drawable/edite_round"
-                android:backgroundTint="#EEEEEE"
-                android:layout_gravity="center_vertical"
-                android:padding="5dp">
-                <Spinner
-                    android:id="@+id/existingGroupSpinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:spinnerMode="dropdown"/>
-            </LinearLayout>
+                android:backgroundTint="?attr/colorSurface"
+                android:scaleType="centerCrop"
+                android:contentDescription="Upload product photo"
+                android:src="@drawable/ic_image_placeholder"
+                android:elevation="2dp"/>
         </LinearLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="15dp"
-            app:boxStrokeColor="@color/colorPrimary">
-
-            <AutoCompleteTextView
-                android:id="@+id/productLineET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnBackground"
-                android:hint="Product Line (e.g. Core, Seasonal, Retail)"
-                android:inputType="text" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <LinearLayout
-            android:id="@+id/layout_buying_unit_qty_critical"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:baselineAligned="false">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:textColorHint="#757575"
-                    app:hintTextColor="@color/colorPrimary"
-                    app:boxStrokeColor="@color/colorPrimary">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/costPriceET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Cost Price"/>
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColorHint="#757575"
-                    app:hintTextColor="@color/colorPrimary"
-                    app:boxStrokeColor="@color/colorPrimary">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/quantityET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Quantity"/>
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:weightSum="2"
-                android:layout_marginTop="15dp"
-                android:baselineAligned="false">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    android:textColorHint="#757575"
-                    app:hintTextColor="@color/colorPrimary"
-                    app:boxStrokeColor="@color/colorPrimary">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/leadTimeDaysET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Lead Time (Days)" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:textColorHint="#757575"
-                    app:hintTextColor="@color/colorPrimary"
-                    app:boxStrokeColor="@color/colorPrimary">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/safetyStockET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Safety Stock Qty" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/layoutAutomatedStock"
-                android:layout_marginTop="20dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/edite_round"
-                android:padding="20dp"
-                android:layout_marginBottom="18dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Automated Stock Levels"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:textColor="?attr/colorPrimary"
-                    android:layout_marginBottom="8dp"/>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Replaces manual counting with real-time digital tracking. Levels are managed automatically as items are sold or received."
-                    android:textSize="12sp"
-                    android:textColor="#757575"
-                    android:layout_marginBottom="16dp"/>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Maximum Stock (Ceiling):"
-                        android:textColor="#333333"
-                        android:textSize="14sp"/>
-                    <TextView
-                        android:id="@+id/tvAutoCeiling"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textStyle="bold"
-                        android:textColor="?attr/colorPrimary"
-                        android:textSize="16sp"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Safety Stock (Reorder):"
-                        android:textColor="#333333"
-                        android:textSize="14sp"/>
-                    <TextView
-                        android:id="@+id/tvAutoReorder"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textStyle="bold"
-                        android:textColor="#F57C00"
-                        android:textSize="16sp"/>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Minimum Stock (Critical):"
-                        android:textColor="#333333"
-                        android:textSize="14sp"/>
-                    <TextView
-                        android:id="@+id/tvAutoCritical"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textStyle="bold"
-                        android:textColor="#D32F2F"
-                        android:textSize="16sp"/>
-                </LinearLayout>
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Unit of Measurement"
-                android:textColor="?attr/colorOnBackground"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="4dp"/>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:background="@drawable/edite_round"
-                android:backgroundTint="#E3F2FD"
-                android:layout_marginBottom="15dp"
-                android:padding="5dp">
-                <Spinner
-                    android:id="@+id/unitSpinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:spinnerMode="dropdown"/>
-            </LinearLayout>
-        </LinearLayout>
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="5dp"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/sellingPriceET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="numberDecimal"
-                android:textColor="?attr/colorOnBackground"
-                android:hint="Selling Price"/>
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <TextView
-            android:id="@+id/tvMarkupPercentage"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Markup: 0.00%"
-            android:textAlignment="viewEnd"
-            android:textColor="@android:color/darker_gray"
-            android:textStyle="bold"
-            android:layout_marginBottom="15dp"
-            android:paddingEnd="5dp"/>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="20dp"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            app:helperText="Optional, DD/MM/YYYY">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/expiryDateET"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:focusable="false"
-                android:clickable="true"
-                android:inputType="none"
-                android:textColor="?attr/colorOnBackground"
-                android:hint="Expiry Date (DD/MM/YYYY)"/>
-        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:layout_marginBottom="16dp"
-            android:padding="12dp"
             android:background="@drawable/edite_round"
-            android:backgroundTint="#F8F9FA">
+            android:backgroundTint="?attr/colorSurface"
+            android:padding="16dp"
+            android:elevation="1dp"
+            android:layout_marginBottom="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Product Configurations"
+                android:text="Basic Details"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="12dp"/>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/CustomTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/productNameET"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Product Name" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorSurface"
+            android:padding="16dp"
+            android:elevation="1dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Organization"
                 android:textStyle="bold"
                 android:textColor="?attr/colorPrimary"
                 android:layout_marginBottom="12dp"/>
@@ -378,67 +92,314 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:weightSum="4">
+                android:weightSum="2">
 
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp"/>
-                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                </LinearLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp">
 
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp"/>
-                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                </LinearLayout>
+                    <AutoCompleteTextView
+                        android:id="@+id/productLineET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Product Line" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Notes" android:textSize="12sp"/>
-                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                </LinearLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp">
 
-                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="BOM" android:textColor="?attr/colorPrimary" android:textStyle="bold" android:textSize="12sp"/>
-                    <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                </LinearLayout>
+                    <AutoCompleteTextView
+                        android:id="@+id/productTypeET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Product Type"
+                        android:inputType="text" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="25dp"
-            android:gravity="center_vertical">
+            android:orientation="vertical"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorSurface"
+            android:padding="16dp"
+            android:elevation="1dp"
+            android:layout_marginBottom="16dp">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Non-Inventory / For Sale Only"
-                android:textSize="16sp"
-                android:textColor="?attr/colorOnBackground" />
+                android:text="Sales Visibility"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Turn ON to sell this item directly to customers. Keep OFF if this is a raw ingredient."
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7"
+                android:layout_marginBottom="8dp"/>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchForSaleOnly"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:id="@+id/switchSellOnPOS"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Display on Sales (Menu Item)"
+                android:checked="false" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/updateBtn"
+        <LinearLayout
+            android:id="@+id/layout_buying_unit_qty_critical"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Update Product"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="@color/colorPrimary"
-            android:layout_marginBottom="10dp"/>
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorSurface"
+            android:padding="16dp"
+            android:elevation="1dp"
+            android:layout_marginBottom="16dp">
 
-        <Button
-            android:id="@+id/cancelBtn"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pricing &amp; Inventory"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="12dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/costPriceET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Total Cost (₱)" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/layoutSellingPrice"
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/sellingPriceET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Selling Price (₱)" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="?android:colorBackground"
+                android:padding="12dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Auto Low-Stock Alert at:"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorSecondary" />
+
+                <TextView
+                    android:id="@+id/tvStockLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorSecondary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
+                android:layout_marginBottom="12dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/quantityET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Inventory Stock" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:padding="4dp">
+
+                    <Spinner
+                        android:id="@+id/unitSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:backgroundTint="?attr/colorControlHighlight"
+                        android:background="@drawable/edite_round"
+                        android:spinnerMode="dropdown" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layoutPiecesPerUnit"
+                style="@style/CustomTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPiecesPerUnit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Sub-units per item (e.g., 50 scoops per Pack)" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/CustomTextInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/expiryDateET"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none"
+                    android:textColor="?attr/colorOnBackground"
+                    android:hint="Expiry Date (optional, DD/MM/YYYY)" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutConfigurations"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:text="Cancel"
-            android:textColor="#757575"
-            android:backgroundTint="#EEEEEE"/>
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorSurface"
+            android:padding="16dp"
+            android:elevation="1dp"
+            android:layout_marginBottom="24dp"
+            android:visibility="visible">
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Menu Configurations"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:layout_marginBottom="12dp"/>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchBOM"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Standard Recipe (Auto-Deduct)"
+                android:checked="false" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchSizes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Multiple Sizes"
+                android:checked="false" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchAddons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Has Add-ons / Sinkers"
+                android:checked="false" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/switchNotes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Custom Notes (e.g. Sugar Level)"
+                android:checked="false" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="2"
+            android:layout_gravity="center">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/updateBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="60dp"
+                android:text="Update Product"
+                android:layout_marginEnd="8dp"
+                style="@style/CustomButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cancelBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="60dp"
+                android:text="Cancel"
+                android:layout_marginStart="8dp"
+                style="@style/CustomButtonOutlined" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

@@ -42,7 +42,7 @@
                 android:orientation="vertical"
                 android:padding="16dp"
                 android:background="@drawable/edite_round"
-                android:backgroundTint="#F8F9FA"
+                android:backgroundTint="?attr/colorSurface"
                 android:elevation="2dp"
                 android:layout_marginBottom="12dp">
 
@@ -52,15 +52,15 @@
                     android:text="Select Product"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/colorOnBackground"
                     android:layout_marginBottom="8dp" />
 
                 <Spinner
                     android:id="@+id/spinnerProduct"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
+                    android:backgroundTint="?attr/colorControlHighlight"
                     android:background="@drawable/edite_round"
-                    android:backgroundTint="#FFFFFF"
                     android:padding="12dp" />
 
             </LinearLayout>
@@ -71,7 +71,8 @@
                 android:orientation="horizontal"
                 android:padding="16dp"
                 android:background="@drawable/edite_round"
-                android:backgroundTint="#FFFFFF"
+                android:backgroundTint="?attr/colorSurface"
+                android:textColor="?attr/colorOnBackground"
                 android:elevation="2dp"
                 android:layout_marginBottom="12dp">
 
@@ -87,7 +88,7 @@
                         android:layout_height="wrap_content"
                         android:text="Current Stock"
                         android:textSize="12sp"
-                        android:textColor="#757575"
+                        android:textColor="?attr/colorOnBackground"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
@@ -97,7 +98,8 @@
                         android:text="0.0"
                         android:textSize="22sp"
                         android:textStyle="bold"
-                        android:textColor="?attr/colorOnBackground" />
+                        android:textColor="?attr/colorOnPrimary"
+                        />
                 </LinearLayout>
 
                 <View
@@ -119,7 +121,7 @@
                         android:layout_height="wrap_content"
                         android:text="New Stock"
                         android:textSize="12sp"
-                        android:textColor="#757575"
+                        android:textColor="?attr/colorOnBackground"
                         android:layout_marginBottom="4dp" />
 
                     <TextView
@@ -129,7 +131,8 @@
                         android:text="0.0"
                         android:textSize="22sp"
                         android:textStyle="bold"
-                        android:textColor="#4CAF50" />
+                        android:textColor="?attr/colorOnSecondary"
+                        />
                 </LinearLayout>
             </LinearLayout>
 
@@ -170,7 +173,7 @@
                 android:orientation="vertical"
                 android:padding="16dp"
                 android:background="@drawable/edite_round"
-                android:backgroundTint="#F8F9FA"
+                android:backgroundTint="?attr/colorSurface"
                 android:elevation="2dp"
                 android:layout_marginBottom="12dp">
 
@@ -180,15 +183,15 @@
                     android:text="Adjustment Details"
                     android:textSize="14sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/colorOnBackground"
                     android:layout_marginBottom="8dp" />
 
                 <Spinner
                     android:id="@+id/spinnerAdjustmentType"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
+                    android:backgroundTint="?attr/colorControlHighlight"
                     android:background="@drawable/edite_round"
-                    android:backgroundTint="#FFFFFF"
                     android:padding="12dp"
                     android:layout_marginBottom="12dp" />
 
@@ -197,15 +200,15 @@
                     android:layout_height="wrap_content"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                     android:layout_marginBottom="12dp"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorOnBackground">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etQuantity"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:hint="Adjustment Quantity"
+                        android:inputType="number"
                         android:textColor="?attr/colorOnBackground"
+                        android:hint="Adjustment Quantity"
                         android:textSize="16sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
@@ -213,8 +216,8 @@
                     android:id="@+id/spinnerReason"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
+                    android:backgroundTint="?attr/colorControlHighlight"
                     android:background="@drawable/edite_round"
-                    android:backgroundTint="#FFFFFF"
                     android:padding="12dp"
                     android:layout_marginBottom="12dp" />
 
@@ -222,7 +225,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    app:boxStrokeColor="?attr/colorPrimary">
+                    app:boxStrokeColor="?attr/colorOnBackground">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etRemarks"
@@ -257,9 +260,10 @@
             android:layout_height="60dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="History"
-            android:textColor="#757575"
-            android:backgroundTint="#EEEEEE"
+            android:text="Cancel"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="?attr/colorOnBackground"
+            android:textColor="?attr/colorOnBackground"
             android:textStyle="bold" />
 
         <Button
@@ -269,8 +273,9 @@
             android:layout_weight="1.5"
             android:layout_marginStart="8dp"
             android:text="CONFIRM ADJUSTMENT"
-            android:textColor="@color/white"
-            android:backgroundTint="?attr/colorPrimary" />
+            style="@style/CustomButtonOutlined"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary" />
 
     </LinearLayout>
 

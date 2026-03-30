@@ -23,7 +23,7 @@
         android:paddingBottom="100dp"
         android:textSize="32sp"
         android:textStyle="bold"
-        android:textColor="@color/colorPrimary"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="10dp"/>
 
     <Button
@@ -35,6 +35,7 @@
         android:textColor="@color/LightBlue"
         android:textSize="18sp"
         android:textStyle="bold"
+        style="@style/CustomButton"
         android:backgroundTint="@color/colorPrimary"
         android:layout_marginBottom="16dp"/>
 
@@ -46,8 +47,8 @@
         android:onClick="OpenSingUp"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="?attr/colorOnPrimary"
-        style="?android:attr/borderlessButtonStyle"
+        android:textColor="?attr/colorOnBackground"
+        style="@style/CustomButtonOutlined"
         android:background="@drawable/edite_round"
         android:backgroundTint="?attr/colorPrimary" />
 </LinearLayout>

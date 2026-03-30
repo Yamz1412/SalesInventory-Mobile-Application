@@ -42,20 +42,21 @@
                 android:layout_marginBottom="16dp" />
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:hint="Supplier / Company Name">
+                android:hint="Supplier / Business Name">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etSupplierName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textCapWords" />
+                    android:textColor="?attr/colorOnBackground"
+                    android:inputType="textPersonName" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
@@ -64,87 +65,139 @@
                     android:id="@+id/etSupplierContact"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnBackground"
                     android:inputType="phone" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:hint="Email Address">
+                android:hint="Email Address (Optional)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etSupplierEmail"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnBackground"
                     android:inputType="textEmailAddress" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:hint="Physical Address">
+                android:layout_marginBottom="16dp"
+                android:hint="Office / Warehouse Address">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etSupplierAddress"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="textMultiLine"
+                    android:textColor="?attr/colorOnBackground"
                     android:minLines="2" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/CustomTextInputLayout"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Supply Categories"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="?attr/colorOnBackground"
+                android:layout_marginBottom="4dp"/>
+
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="24dp"
-                android:hint="Categories Handled (e.g. Coffee, Milk)">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etSupplierCategories"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="text" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:text="Select the types of goods provided by this supplier:"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnBackground"
+                android:alpha="0.7"
+                android:layout_marginBottom="8dp"/>
 
-            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginBottom="16dp"/>
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupCategories"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="false">
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Coffee Beans"/>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Syrups &amp; Flavors"/>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Dairy &amp; Milks"/>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Cups &amp; Packaging"/>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Pastries &amp; Food"/>
+                <com.google.android.material.chip.Chip
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/Widget.MaterialComponents.Chip.Filter"
+                    android:text="Equipment"/>
+            </com.google.android.material.chip.ChipGroup>
+
+            <Button
+                android:id="@+id/btnAddCustomCategory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ Add Custom Category"
+                android:textColor="?attr/colorPrimary"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_marginBottom="24dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
+                android:layout_marginBottom="8dp">
 
-                <LinearLayout
+                <TextView
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Products Supplied"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:textColor="?attr/colorPrimary" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Link existing inventory or create new items"
-                        android:textSize="12sp"
-                        android:textColor="#757575" />
-                </LinearLayout>
+                    android:text="Initial Linked Products"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:textColor="?attr/colorOnBackground" />
 
                 <ImageButton
                     android:id="@+id/btnAddProductRow"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:background="@drawable/edite_round"
-                    android:backgroundTint="?attr/colorPrimary"
                     android:src="@android:drawable/ic_input_add"
-                    app:tint="@android:color/white" />
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="?attr/colorPrimary" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvEmptyProducts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No products linked yet."
+                android:textAlignment="center"
+                android:textColor="?attr/colorOnBackground"
+                android:alpha="0.7"
+                android:padding="16dp"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
 
             <LinearLayout
                 android:id="@+id/containerSupplierProducts"
@@ -177,6 +230,8 @@
                     android:layout_weight="1"
                     android:layout_height="60dp"
                     android:text="Cancel"
+                    android:textColor="?attr/colorOnBackground"
+                    app:strokeColor="?attr/colorOnBackground"
                     android:layout_marginStart="8dp" />
             </LinearLayout>
         </LinearLayout>

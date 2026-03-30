@@ -10,6 +10,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.MetadataChanges;
+import com.google.firebase.firestore.Transaction;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -205,7 +206,6 @@ public class SalesRepository {
                         @Override
                         public void onProductFetched(Product p) {
                             if (p != null) {
-                                // FIX: Casted correctly to double
                                 double newQty = p.getQuantity() + sale.getQuantity();
                                 pr.updateProductQuantity(p.getProductId(), newQty, null);
                             }
@@ -243,11 +243,8 @@ public class SalesRepository {
         void onError(String error);
     }
 
-    public void addSale(Sales sale, OnSaleAddedListener listener) {
-        if (!AuthManager.getInstance().isCurrentUserApproved()) {
-            listener.onError("User not approved");
-            return;
-        }
+    // Helper method to keep data mapping identical for both addSale and processSaleWithInventoryDeduction
+    private Map<String, Object> createSaleDataMap(Sales sale) {
         long now = System.currentTimeMillis();
         long date = sale.getDate() > 0 ? sale.getDate() : now;
         long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : date;
@@ -270,6 +267,18 @@ public class SalesRepository {
         map.put("date", date);
         map.put("timestamp", ts);
 
+        return map;
+    }
+
+    // Standard Add Sale (No Inventory Deduction)
+    public void addSale(Sales sale, OnSaleAddedListener listener) {
+        if (!AuthManager.getInstance().isCurrentUserApproved()) {
+            listener.onError("User not approved");
+            return;
+        }
+
+        Map<String, Object> map = createSaleDataMap(sale);
+
         DocumentReference ref = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).document();
         String saleId = ref.getId();
         sale.setId(saleId);
@@ -277,6 +286,59 @@ public class SalesRepository {
         ref.set(map)
                 .addOnSuccessListener(aVoid -> { if (listener != null) listener.onSaleAdded(saleId); })
                 .addOnFailureListener(e -> { if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to add sale"); });
+    }
+
+    // NEW: Advanced Add Sale (With Automatic Inventory Deduction via Transaction)
+    public void processSaleWithInventoryDeduction(Sales sale, List<RecipeItem> ingredientsUsed, OnSaleAddedListener listener) {
+        if (!AuthManager.getInstance().isCurrentUserApproved()) {
+            listener.onError("User not approved");
+            return;
+        }
+
+        DocumentReference newSaleRef = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).document();
+        String saleId = newSaleRef.getId();
+        sale.setId(saleId);
+
+        Map<String, Object> saleMap = createSaleDataMap(sale);
+
+        firestoreManager.getDb().runTransaction((Transaction.Function<Void>) transaction -> {
+
+            // 1. Loop through ingredients and deduct stock based on the quantity of finished goods sold
+            if (ingredientsUsed != null && !ingredientsUsed.isEmpty()) {
+                for (RecipeItem ingredient : ingredientsUsed) {
+                    // NOTE: Ensure your inventory path is correct for your schema
+                    DocumentReference inventoryRef = firestoreManager.getDb()
+                            .collection("users")
+                            .document(firestoreManager.getBusinessOwnerId())
+                            .collection("products") // Or "inventory" depending on where raw materials live
+                            .document(ingredient.getRawMaterialId());
+
+                    DocumentSnapshot snapshot = transaction.get(inventoryRef);
+                    Double currentStock = snapshot.getDouble("quantity"); // Adjust if your field is named differently
+
+                    if (currentStock == null) currentStock = 0.0;
+
+                    double totalDeduction = ingredient.getQuantityRequired() * sale.getQuantity();
+                    double newStock = currentStock - totalDeduction;
+
+                    if (newStock < 0) {
+                        throw new RuntimeException("Insufficient stock for ingredient ID: " + ingredient.getRawMaterialId());
+                    }
+
+                    transaction.update(inventoryRef, "quantity", newStock);
+                }
+            }
+
+            // 2. Save the sale record
+            transaction.set(newSaleRef, saleMap);
+
+            return null; // Transaction successful
+        }).addOnSuccessListener(aVoid -> {
+            if (listener != null) listener.onSaleAdded(saleId);
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Transaction failed: ", e);
+            if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to process sale");
+        });
     }
 
     public void deleteSale(String saleId, OnSalesDeletedListener listener) {
@@ -375,5 +437,44 @@ public class SalesRepository {
         if (data.containsKey("deliveryPaymentMethod")) sale.setDeliveryPaymentMethod((String) data.get("deliveryPaymentMethod"));
 
         return sale;
+    }
+    // ==========================================
+    // NEW: OFFLINE-FIRST LOCAL SAVE
+    // ==========================================
+    public void saveOrderOfflineFirst(SalesOrderEntity order, List<SalesOrderItemEntity> items, OnSaleAddedListener listener) {
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                AppDatabase db = AppDatabase.getInstance(application);
+
+                // 1. Save to Local Room DB instantly
+                long localOrderId = db.salesDao().insertOrder(order);
+                for(SalesOrderItemEntity item : items) {
+                    item.orderLocalId = localOrderId;
+                }
+                db.salesDao().insertOrderItems(items);
+
+                // 2. Tell the background worker to sync to Firebase when internet is available
+                SyncScheduler.enqueueImmediateSync(application);
+
+                // 3. Return success to UI immediately
+                if(listener != null) listener.onSaleAdded(String.valueOf(localOrderId));
+
+            } catch (Exception e) {
+                if(listener != null) listener.onError(e.getMessage());
+            }
+        });
+    }
+    public void reloadAllData() {
+        loadAllSales();
+        loadTodaySales();
+        loadOverallRevenue();
+        loadRecentSales();
+    }
+
+    public static synchronized void resetInstance() {
+        if (instance != null) {
+            instance.clearData();
+            instance = null;
+        }
     }
 }

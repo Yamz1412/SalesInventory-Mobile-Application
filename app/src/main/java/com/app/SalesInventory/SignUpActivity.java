@@ -50,7 +50,7 @@ public class SignUpActivity extends BaseActivity {
         tilCPassword = findViewById(R.id.tilCPassword);
 
         mName = findViewById(R.id.mName);
-        mUserName = findViewById(R.id.mUserName); // Bound Username
+        mUserName = findViewById(R.id.mUserName);
         mEmail = findViewById(R.id.mEmail);
         mPhone = findViewById(R.id.mPhone);
         mPassword = findViewById(R.id.mPassword);
@@ -138,13 +138,16 @@ public class SignUpActivity extends BaseActivity {
         });
     }
 
+    // FIX: Adaptive text colors for the requirement checklist!
     private void updateRequirementUI(TextView tv, boolean isValid, String text) {
         if (isValid) {
             tv.setText("✓ " + text);
-            tv.setTextColor(Color.parseColor("#4CAF50"));
+            tv.setTextColor(Color.parseColor("#4CAF50")); // Green for success
         } else {
             tv.setText("✗ " + text);
-            tv.setTextColor(Color.parseColor("#757575"));
+            boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+            // Use Light Gray for Dark Mode, Dark Gray for Light Mode
+            tv.setTextColor(isDark ? Color.LTGRAY : Color.parseColor("#757575"));
         }
     }
 
@@ -200,14 +203,12 @@ public class SignUpActivity extends BaseActivity {
 
         progressBar.setVisibility(android.view.View.VISIBLE);
 
-        // 1. Check if Username is already taken
         firestore.collection("users").whereEqualTo("username", username).get().addOnCompleteListener(task -> {
             if (task.isSuccessful() && !task.getResult().isEmpty()) {
                 progressBar.setVisibility(View.GONE);
                 Toast.makeText(this, "Username is already taken, please choose another.", Toast.LENGTH_LONG).show();
                 mUserName.setError("Taken");
             } else {
-                // 2. If unique, proceed to Firebase Auth
                 createAccountAndSave(name, username, email, fullPhone, password);
             }
         });
@@ -219,7 +220,6 @@ public class SignUpActivity extends BaseActivity {
                 FirebaseUser createdUser = firebaseAuth.getCurrentUser();
                 if (createdUser == null) return;
 
-                // 3. Save ALL data (including Username) to Firestore so Login-by-Username works later
                 Map<String, Object> userMap = new HashMap<>();
                 userMap.put("name", name);
                 userMap.put("Name", name);

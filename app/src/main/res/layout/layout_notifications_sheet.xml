@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/card_background"
+    android:background="?android:attr/windowBackground"
     android:paddingBottom="16dp">
 
     <View
@@ -13,9 +13,8 @@
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp"
-        android:background="@android:color/darker_gray"
-        android:alpha="0.5"
-        android:backgroundTint="#E0E0E0"/>
+        android:background="#9E9E9E"
+        android:alpha="0.5"/>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -32,7 +31,7 @@
             android:text="Notifications"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorOnBackground" />
+            android:textColor="?attr/colorOnBackground"/>
 
         <Button
             android:id="@+id/btn_clear_all"
@@ -40,16 +39,27 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Clear All"
-            android:textColor="@color/text_secondary"
+            android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
             android:minHeight="0dp"
             android:padding="0dp"/>
     </LinearLayout>
 
+    <Spinner
+        android:id="@+id/spinnerNotificationFilter"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:autofillHints="All Notification"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/edite_round"
+        android:paddingHorizontal="12dp" />
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#E0E0E0"
+        android:background="?android:attr/textColorSecondary"
+        android:alpha="0.2"
         android:layout_marginBottom="8dp"/>
 
     <LinearLayout
@@ -63,15 +73,15 @@
         <ImageView
             android:layout_width="64dp"
             android:layout_height="64dp"
-            android:src="@drawable/ic_notifications"
-            app:tint="@color/text_secondary"
+            android:src="@android:drawable/ic_dialog_info"
+            app:tint="?android:attr/textColorSecondary"
             android:alpha="0.3"/>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="No new notifications"
-            android:textColor="@color/text_secondary"
+            android:text="No notifications found"
+            android:textColor="?android:attr/textColorSecondary"
             android:layout_marginTop="12dp"/>
     </LinearLayout>
 
@@ -80,9 +90,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="24dp"
-        android:scrollbars="vertical"
-        android:overScrollMode="never" />
+        android:paddingBottom="50dp"/>
 
 </LinearLayout>

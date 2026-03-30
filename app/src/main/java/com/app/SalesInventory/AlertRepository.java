@@ -6,6 +6,7 @@ import android.util.Log;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.WriteBatch;
 
@@ -70,6 +71,44 @@ public class AlertRepository {
             Log.d(TAG, "Alerts synced from Firestore: " + alertList.size() + " (Unread: " + unreadCount + ")");
         });
     }
+
+//    public void createOrUpdateStockAlert(String productId, String productName, String type, double currentQty) {
+//        CollectionReference alertsRef = firestore.collection("alerts");
+//        String businessId = getBusinessId(); // Ensure user is logged in
+//
+//        // Query for existing alert: Same business, product, and alert type (e.g., 'LOW_STOCK')
+//        alertsRef.whereEqualTo("businessId", businessId)
+//                .whereEqualTo("productId", productId)
+//                .whereEqualTo("type", type)
+//                .get()
+//                .addOnSuccessListener(querySnapshot -> {
+//                    String message = "Stock Alert: " + productName + " (" + currentQty + " remaining)";
+//                    long timestamp = System.currentTimeMillis();
+//
+//                    if (!querySnapshot.isEmpty()) {
+//                        // 1. UPDATE EXISTING ALERT
+//                        String docId = querySnapshot.getDocuments().get(0).getId();
+//                        Map<String, Object> updates = new HashMap<>();
+//                        updates.put("message", message);
+//                        updates.put("timestamp", timestamp);
+//                        updates.put("isRead", false); // Optional: reset to unread on updates
+//
+//                        alertsRef.document(docId).update(updates);
+//                    } else {
+//                        // 2. CREATE NEW ALERT
+//                        Map<String, Object> newAlert = new HashMap<>();
+//                        newAlert.put("businessId", businessId);
+//                        newAlert.put("productId", productId);
+//                        newAlert.put("productName", productName);
+//                        newAlert.put("type", type);
+//                        newAlert.put("message", message);
+//                        newAlert.put("timestamp", timestamp);
+//                        newAlert.put("isRead", false);
+//
+//                        alertsRef.add(newAlert);
+//                    }
+//                });
+//    }
 
     private Alert createAlertFromSnapshot(DocumentSnapshot document) {
         // We skip toObject() to prevent log spam about Timestamp conversion
@@ -177,17 +216,27 @@ public class AlertRepository {
             listener.onError("User not authenticated");
             return;
         }
+
+        // This query finds ANY existing alert for this product & type to UPDATE it instead of duplicating
         firestoreManager.getDb()
                 .collection(firestoreManager.getUserAlertsPath())
                 .whereEqualTo("productId", productId)
                 .whereEqualTo("type", type)
-                .whereEqualTo("read", false)
-                .limit(1)
                 .get()
                 .addOnSuccessListener(snapshot -> {
                     if (snapshot != null && !snapshot.isEmpty()) {
-                        listener.onAlertAdded(snapshot.getDocuments().get(0).getId());
+                        // UPDATE EXISTING (Prevents Duplication!)
+                        String docId = snapshot.getDocuments().get(0).getId();
+                        java.util.Map<String, Object> updates = new java.util.HashMap<>();
+                        updates.put("message", message);
+                        updates.put("timestamp", timestamp);
+                        updates.put("read", false); // Bring it back to unread status so it alerts the user again
+
+                        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath())
+                                .document(docId).update(updates)
+                                .addOnSuccessListener(aVoid -> listener.onAlertAdded(docId));
                     } else {
+                        // CREATE NEW ONLY IF IT DOESN'T EXIST YET
                         Alert alert = new Alert();
                         alert.setProductId(productId);
                         alert.setType(type);
@@ -197,10 +246,7 @@ public class AlertRepository {
                         addAlert(alert, listener);
                     }
                 })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error checking existing alerts", e);
-                    listener.onError(e.getMessage());
-                });
+                .addOnFailureListener(e -> listener.onError(e.getMessage()));
     }
 
     public void markAlertAsRead(String alertId, OnAlertUpdatedListener listener) {

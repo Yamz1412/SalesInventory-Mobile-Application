@@ -1,6 +1,8 @@
 package com.app.SalesInventory;
 
 import android.app.Application;
+import android.content.Context;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.Observer;
@@ -46,15 +48,21 @@ public class ProductRepository {
         allProducts.addSource(currentSource, entities -> {
             List<Product> list = new ArrayList<>();
             Set<String> seenIds = new HashSet<>();
+            Set<String> seenNames = new HashSet<>();
 
             if (entities != null) {
                 for (ProductEntity e : entities) {
                     Product p = mapEntityToProduct(e);
-                    if (p.getProductId() != null && !seenIds.contains(p.getProductId())) {
+                    String nameKey = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
+
+                    // FIX: Extremely Strict Deduplication Logic prevents ghost duplicates
+                    boolean isIdUnique = p.getProductId() == null || !seenIds.contains(p.getProductId());
+                    boolean isNameUnique = nameKey.isEmpty() || !seenNames.contains(nameKey);
+
+                    if (isIdUnique && isNameUnique) {
                         list.add(p);
-                        seenIds.add(p.getProductId());
-                    } else if (p.getProductId() == null) {
-                        list.add(p);
+                        if (p.getProductId() != null) seenIds.add(p.getProductId());
+                        if (!nameKey.isEmpty()) seenNames.add(nameKey);
                     }
                 }
             }
@@ -110,6 +118,33 @@ public class ProductRepository {
             db.clearAllTables();
             allProducts.postValue(new ArrayList<>());
         });
+    }
+
+    public void deductStockFIFO(String productId, double quantityToDeduct, Context context) {
+        new Thread(() -> {
+            AppDatabase db = AppDatabase.getInstance(context);
+            BatchDao batchDao = db.batchDao();
+            ProductDao productDao = db.productDao();
+
+            List<BatchEntity> batches = batchDao.getAvailableBatchesFIFO(productId);
+            double remainingToDeduct = quantityToDeduct;
+
+            for (BatchEntity batch : batches) {
+                if (remainingToDeduct <= 0) break;
+
+                if (batch.remainingQuantity <= remainingToDeduct) {
+                    remainingToDeduct -= batch.remainingQuantity;
+                    batch.remainingQuantity = 0;
+                } else {
+                    batch.remainingQuantity -= remainingToDeduct;
+                    remainingToDeduct = 0;
+                }
+                batchDao.updateBatch(batch);
+            }
+
+            double newTotalQuantity = batchDao.getTotalBatchQuantity(productId);
+            updateProductQuantity(productId, newTotalQuantity, null);
+        }).start();
     }
 
     public void updateProductImage(String productId, String imagePath, String imageUrl, OnProductUpdatedListener listener) {
@@ -227,6 +262,45 @@ public class ProductRepository {
         });
     }
 
+    public void insert(Product product, OnProductInsertedListener listener) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            if (!AuthManager.getInstance().isCurrentUserApproved()) {
+                listener.onError("User not approved");
+                return;
+            }
+
+            try {
+                long now = System.currentTimeMillis();
+                ProductEntity e = mapProductToEntity(product);
+
+                if (e.floorLevel < 1) e.floorLevel = 1;
+                if (e.criticalLevel < 1) e.criticalLevel = 1;
+                if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
+                if (e.ceilingLevel > 9999) e.ceilingLevel = 9999;
+                if (e.quantity > e.ceilingLevel) e.ceilingLevel = (int) Math.ceil(e.quantity);
+
+                e.dateAdded = now;
+                e.lastUpdated = now;
+                e.syncState = "PENDING";
+
+                long localId = productDao.insert(e);
+
+                String resultId = product.getProductId();
+                if (resultId == null || resultId.isEmpty()) {
+                    resultId = "local:" + localId;
+                }
+
+                checkExpiryForEntity(e);
+                checkFloorForEntity(e);
+                SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
+
+                listener.onProductInserted(resultId);
+            } catch (Exception e) {
+                listener.onError("Insert failed: " + e.getMessage());
+            }
+        });
+    }
+
     public void updateProduct(Product product, OnProductUpdatedListener listener) {
         updateProduct(product, null, listener);
     }
@@ -258,11 +332,9 @@ public class ProductRepository {
                 existing.dateAdded = product.getDateAdded();
                 existing.expiryDate = product.getExpiryDate();
                 existing.productType = product.getProductType();
-
+                existing.bomListJson = serializeListObj(product.getBomList());
                 existing.sizesListJson = serializeListObj(product.getSizesList());
                 existing.addonsListJson = serializeListObj(product.getAddonsList());
-                existing.variantsListJson = serializeListObj(product.getVariantsList());
-                existing.bomListJson = serializeListObj(product.getBomList());
                 existing.notesListJson = serializeListStr(product.getNotesList());
 
                 if (existing.floorLevel < 1) existing.floorLevel = 1;
@@ -413,7 +485,6 @@ public class ProductRepository {
             o.put("sizesListJson", e.sizesListJson);
             o.put("addonsListJson", e.addonsListJson);
             o.put("notesListJson", e.notesListJson);
-            o.put("variantsListJson", e.variantsListJson);
             o.put("bomListJson", e.bomListJson);
             FileWriter fw = new FileWriter(out);
             fw.write(o.toString());
@@ -443,7 +514,7 @@ public class ProductRepository {
     }
 
     public void updateProductQuantity(String productId, double newQuantity, OnProductUpdatedListener listener) {
-        updateProductQuantityAndCost(productId, newQuantity, 0, listener);
+        updateProductQuantityAndCost(productId, newQuantity, -1, listener);
     }
 
     public void updateProductQuantityAndCost(String productId, double newQuantity, double newCostPrice, OnProductUpdatedListener listener) {
@@ -452,7 +523,6 @@ public class ProductRepository {
                 ProductEntity existing = findEntityByIdSafe(productId);
                 if (existing != null) {
                     double oldQuantity = existing.quantity;
-
                     double clamped = Math.max(0.0, newQuantity);
                     if (clamped > 99999) clamped = 99999.0;
 
@@ -463,11 +533,8 @@ public class ProductRepository {
                         existing.floorLevel = 1;
                     }
 
-                    // 1. Update Quantity
                     existing.quantity = clamped;
-
-                    // 2. Synchronize Cost Price from the Purchase Order!
-                    if (newCostPrice > 0) {
+                    if (newCostPrice >= 0) {
                         existing.costPrice = newCostPrice;
                     }
 
@@ -475,7 +542,19 @@ public class ProductRepository {
                     existing.syncState = "PENDING";
                     productDao.update(existing);
 
-                    SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
+                    if (productId != null && !productId.startsWith("local:")) {
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                .collection(FirestoreManager.getInstance().getUserProductsPath())
+                                .document(productId)
+                                .update(
+                                        "quantity", existing.quantity,
+                                        "costPrice", existing.costPrice,
+                                        "reorderLevel", existing.reorderLevel,
+                                        "criticalLevel", existing.criticalLevel
+                                );
+                    } else {
+                        SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
+                    }
 
                     boolean wasCritical = existing.criticalLevel > 0 && oldQuantity <= existing.criticalLevel;
                     boolean isNowCritical = existing.criticalLevel > 0 && clamped <= existing.criticalLevel;
@@ -495,14 +574,14 @@ public class ProductRepository {
                         createFloorLevelAlert(existing);
                     }
                     if (listener != null) {
-                        listener.onProductUpdated();
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> listener.onProductUpdated());
                     }
                     checkExpiryForEntity(existing);
                 } else {
-                    if (listener != null) listener.onError("Product not found locally");
+                    if (listener != null) new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> listener.onError("Product not found locally"));
                 }
             } catch (Exception e) {
-                if (listener != null) listener.onError("Update failed: " + e.getMessage());
+                if (listener != null) new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> listener.onError("Update failed: " + e.getMessage()));
             }
         });
     }
@@ -517,7 +596,8 @@ public class ProductRepository {
     private void createLowStockAlert(ProductEntity e) {
         if (alertRepository == null) return;
         String name = e.productName == null ? "" : e.productName;
-        String message = "Low stock for " + name + " (Qty: " + e.quantity + ")";
+        // Clean, precise text without "Qty" or "Floor" jargon
+        String message = "Reorder level reached: " + name + " (" + e.quantity + " left)";
         alertRepository.addAlertIfNotExists(e.productId, "LOW_STOCK", message, System.currentTimeMillis(), new AlertRepository.OnAlertAddedListener() {
             @Override
             public void onAlertAdded(String alertId) {}
@@ -529,7 +609,7 @@ public class ProductRepository {
     private void createCriticalStockAlert(ProductEntity e) {
         if (alertRepository == null) return;
         String name = e.productName == null ? "" : e.productName;
-        String message = "Critical stock for " + name + " (Qty: " + e.quantity + ")";
+        String message = "Critical stock: " + name + " (" + e.quantity + " left)";
         alertRepository.addAlertIfNotExists(e.productId, "CRITICAL_STOCK", message, System.currentTimeMillis(), new AlertRepository.OnAlertAddedListener() {
             @Override
             public void onAlertAdded(String alertId) {}
@@ -541,7 +621,7 @@ public class ProductRepository {
     private void createFloorLevelAlert(ProductEntity e) {
         if (alertRepository == null) return;
         String name = e.productName == null ? "" : e.productName;
-        String message = "Stock at or below floor level for " + name + " (Qty: " + e.quantity + ", Floor: " + e.floorLevel + ")";
+        String message = "Floor level reached: " + name + " (" + e.quantity + " left)";
         alertRepository.addAlertIfNotExists(e.productId, "FLOOR_STOCK", message, System.currentTimeMillis(), new AlertRepository.OnAlertAddedListener() {
             @Override
             public void onAlertAdded(String alertId) {}
@@ -702,11 +782,10 @@ public class ProductRepository {
         p.setProductType(e.productType);
         p.setOwnerAdminId(e.ownerAdminId);
         p.setExpiryDate(e.expiryDate);
+        p.setBomList(deserializeListObj(e.bomListJson));
 
         p.setSizesList(deserializeListObj(e.sizesListJson));
         p.setAddonsList(deserializeListObj(e.addonsListJson));
-        p.setVariantsList(deserializeListObj(e.variantsListJson));
-        p.setBomList(deserializeListObj(e.bomListJson));
         p.setNotesList(deserializeListStr(e.notesListJson));
 
         return p;
@@ -741,11 +820,10 @@ public class ProductRepository {
         e.productType = p.getProductType();
         e.ownerAdminId = p.getOwnerAdminId();
         e.expiryDate = p.getExpiryDate();
+        e.bomListJson = serializeListObj(p.getBomList());
 
         e.sizesListJson = serializeListObj(p.getSizesList());
         e.addonsListJson = serializeListObj(p.getAddonsList());
-        e.variantsListJson = serializeListObj(p.getVariantsList());
-        e.bomListJson = serializeListObj(p.getBomList());
         e.notesListJson = serializeListStr(p.getNotesList());
 
         return e;
@@ -769,14 +847,20 @@ public class ProductRepository {
         allProducts.addSource(currentSource, entities -> {
             List<Product> list = new ArrayList<>();
             Set<String> seenIds = new HashSet<>();
+            Set<String> seenNames = new HashSet<>();
+
             if (entities != null) {
                 for (ProductEntity e : entities) {
                     Product p = mapEntityToProduct(e);
-                    if (p.getProductId() != null && !seenIds.contains(p.getProductId())) {
+                    String nameKey = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
+
+                    boolean isIdUnique = p.getProductId() == null || !seenIds.contains(p.getProductId());
+                    boolean isNameUnique = nameKey.isEmpty() || !seenNames.contains(nameKey);
+
+                    if (isIdUnique && isNameUnique) {
                         list.add(p);
-                        seenIds.add(p.getProductId());
-                    } else if (p.getProductId() == null) {
-                        list.add(p);
+                        if (p.getProductId() != null) seenIds.add(p.getProductId());
+                        if (!nameKey.isEmpty()) seenNames.add(nameKey);
                     }
                 }
             }
@@ -791,7 +875,24 @@ public class ProductRepository {
                 ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
                 long now = System.currentTimeMillis();
 
+                if (existing == null) {
+                    List<ProductEntity> all = productDao.getAllProductsSync();
+                    if (all != null) {
+                        for (ProductEntity e : all) {
+                            if (e.productId == null && e.productName != null &&
+                                    e.productName.trim().equalsIgnoreCase(p.getProductName().trim())) {
+                                existing = e;
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 if (existing != null) {
+                    if ("PENDING".equalsIgnoreCase(existing.syncState) || "DELETE_PENDING".equalsIgnoreCase(existing.syncState)) {
+                        return;
+                    }
+
                     ProductEntity updated = mapProductToEntity(p);
                     updated.localId = existing.localId;
                     updated.syncState = "SYNCED";
@@ -837,7 +938,7 @@ public class ProductRepository {
                 e.description = o.optString("description", null);
                 e.costPrice = o.optDouble("costPrice", 0.0);
                 e.sellingPrice = o.optDouble("sellingPrice", 0.0);
-                e.quantity = o.optDouble("quantity", 0.0); // Now supports decimal pulls
+                e.quantity = o.optDouble("quantity", 0.0);
                 e.reorderLevel = o.optInt("reorderLevel", 0);
                 e.criticalLevel = o.optInt("criticalLevel", 0);
                 e.ceilingLevel = o.optInt("ceilingLevel", 0);
@@ -858,7 +959,6 @@ public class ProductRepository {
                 e.sizesListJson = o.optString("sizesListJson", null);
                 e.addonsListJson = o.optString("addonsListJson", null);
                 e.notesListJson = o.optString("notesListJson", null);
-                e.variantsListJson = o.optString("variantsListJson", null);
                 e.bomListJson = o.optString("bomListJson", null);
 
                 if (e.floorLevel < 1) e.floorLevel = 1;
@@ -896,7 +996,6 @@ public class ProductRepository {
                     existing.sizesListJson = e.sizesListJson;
                     existing.addonsListJson = e.addonsListJson;
                     existing.notesListJson = e.notesListJson;
-                    existing.variantsListJson = e.variantsListJson;
                     existing.bomListJson = e.bomListJson;
                     productDao.update(existing);
                 } else {
@@ -999,6 +1098,11 @@ public class ProductRepository {
         void onError(String error);
     }
 
+    public interface OnProductInsertedListener {
+        void onProductInserted(String productId);
+        void onError(String error);
+    }
+
     public interface OnPermanentDeleteListener {
         void onPermanentDeleted();
         void onError(String error);
@@ -1007,5 +1111,14 @@ public class ProductRepository {
     public interface OnCleanupListener {
         void onCleanupComplete(int count);
         void onError(String error);
+    }
+
+    public static synchronized void resetInstance() {
+        if (instance != null) {
+            if (instance.currentSource != null) {
+                instance.allProducts.removeSource(instance.currentSource);
+            }
+            instance = null;
+        }
     }
 }

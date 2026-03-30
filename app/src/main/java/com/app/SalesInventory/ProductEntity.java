@@ -2,10 +2,13 @@ package com.app.SalesInventory;
 
 import androidx.room.ColumnInfo;
 import androidx.room.Entity;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-@Entity(tableName = "products")
-public class ProductEntity {
+@Entity(
+        tableName = "products",
+        indices = {@Index(value = {"productId"}, unique = true)}
+)public class ProductEntity {
 
     public String sizesListJson;
     public String addonsListJson;

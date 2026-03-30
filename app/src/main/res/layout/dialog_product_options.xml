@@ -31,14 +31,13 @@
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#757575"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="16dp"/>
 
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:fadeScrollbars="false"
-            android:scrollbars="vertical">
+            android:fadeScrollbars="false">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -50,19 +49,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Select Variant:"
+                        android:text="Select Variant"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp"/>
+                        android:layout_marginBottom="8dp"/>
                     <RadioGroup
                         android:id="@+id/rgVariants"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"/>
                 </LinearLayout>
 
                 <LinearLayout
@@ -70,19 +69,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Select Size:"
+                        android:text="Select Size"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp"/>
+                        android:layout_marginBottom="8dp"/>
                     <RadioGroup
                         android:id="@+id/rgSizes"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"/>
                 </LinearLayout>
 
                 <LinearLayout
@@ -90,19 +89,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Add-ons:"
+                        android:text="Add-ons"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp"/>
+                        android:layout_marginBottom="8dp"/>
                     <LinearLayout
-                        android:id="@+id/addonsList"
+                        android:id="@+id/containerAddonsList"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"/>
                 </LinearLayout>
 
                 <LinearLayout
@@ -110,19 +109,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Notes / Preferences:"
+                        android:text="Preferences"
                         android:textStyle="bold"
-                        android:layout_marginBottom="4dp"/>
-                    <RadioGroup
-                        android:id="@+id/rgNotes"
+                        android:layout_marginBottom="8dp"/>
+                    <LinearLayout
+                        android:id="@+id/containerNotesList"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"/>
                 </LinearLayout>
 
                 <com.google.android.material.textfield.TextInputLayout

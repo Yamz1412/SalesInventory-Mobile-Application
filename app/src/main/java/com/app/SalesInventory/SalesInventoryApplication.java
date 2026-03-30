@@ -17,7 +17,8 @@ public class SalesInventoryApplication extends Application {
         salesRepository = SalesRepository.getInstance(this);
         String owner = FirestoreManager.getInstance().getBusinessOwnerId();
         if (owner != null && !owner.isEmpty()) {
-            productRemoteSyncer.startRealtimeSync(owner);
+            // UPDATED: Changed to startListening()
+            productRemoteSyncer.startListening();
         }
     }
 

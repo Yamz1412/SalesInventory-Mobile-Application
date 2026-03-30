@@ -25,6 +25,7 @@ public class PurchaseOrder {
 
     // NEW: Needed for Firebase to map the schedule correctly
     private long expectedDeliveryDate;
+    private String purchaseOrderId;
 
     @ServerTimestamp
     public Date orderDate;
@@ -80,6 +81,8 @@ public class PurchaseOrder {
 
     public String getOwnerAdminId() { return ownerAdminId; }
     public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
+    public String getPurchaseOrderId() { return purchaseOrderId; }
+    public void setPurchaseOrderId(String purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();

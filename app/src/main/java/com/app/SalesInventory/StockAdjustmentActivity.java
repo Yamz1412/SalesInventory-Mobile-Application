@@ -62,8 +62,7 @@ public class StockAdjustmentActivity extends BaseActivity {
             public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
                 if (position > 0 && productList != null && productList.size() > position - 1) {
                     selectedProduct = productList.get(position - 1);
-                    // Append the unit of measurement dynamically
-                    String unit = selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
+                    String unit = selectedProduct.getUnit() == null || selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
                     tvCurrentStock.setText(String.format(Locale.getDefault(), "%.2f %s", selectedProduct.getQuantity(), unit));
                     calculateNewStock();
                 } else {
@@ -90,7 +89,9 @@ public class StockAdjustmentActivity extends BaseActivity {
         });
 
         btnAdjust.setOnClickListener(v -> performAdjustment());
-        btnViewHistory.setOnClickListener(v -> startActivity(new android.content.Intent(this, AdjustmentHistoryActivity.class)));
+
+        // FIXED: Changed the History button to function as a Cancel button
+        btnViewHistory.setOnClickListener(v -> finish());
     }
 
     private void setupSpinners() {
@@ -99,7 +100,6 @@ public class StockAdjustmentActivity extends BaseActivity {
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAdjustmentType.setAdapter(typeAdapter);
 
-        // Updated Professional Reason Codes
         String[] reasons = {
                 "Manual Restock / Found Stock",
                 "Spoilage / Expired",
@@ -149,6 +149,10 @@ public class StockAdjustmentActivity extends BaseActivity {
         });
     }
 
+    // =========================================================================
+    // FIX: Accurate Financial Impact Calculation
+    // Calculates EXACT fractional cost instead of treating Total Cost as Unit Cost
+    // =========================================================================
     private void calculateNewStock() {
         if (selectedProduct == null) {
             tvNewStock.setText("0.0");
@@ -158,7 +162,7 @@ public class StockAdjustmentActivity extends BaseActivity {
         }
 
         String quantityStr = etQuantity.getText().toString().trim();
-        String unit = selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
+        String unit = selectedProduct.getUnit() == null || selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
 
         if (quantityStr.isEmpty()) {
             tvNewStock.setText(String.format(Locale.getDefault(), "%.2f %s", selectedProduct.getQuantity(), unit));
@@ -169,12 +173,16 @@ public class StockAdjustmentActivity extends BaseActivity {
 
         try {
             double currentStock = selectedProduct.getQuantity();
-            // CHANGED: Parse as Double to support fractions
+            double currentTotalCost = selectedProduct.getCostPrice();
+
+            // Protect against dividing by zero if stock is somehow 0
+            double unitCost = currentStock > 0 ? (currentTotalCost / currentStock) : 0.0;
+
             double adjustmentQty = Double.parseDouble(quantityStr);
             String adjustmentType = spinnerAdjustmentType.getSelectedItem().toString();
 
             double newStock;
-            double valueImpact = adjustmentQty * selectedProduct.getCostPrice();
+            double valueImpact = adjustmentQty * unitCost; // Exact fractional value!
 
             if ("Add Stock".equals(adjustmentType)) {
                 newStock = currentStock + adjustmentQty;
@@ -213,7 +221,6 @@ public class StockAdjustmentActivity extends BaseActivity {
         }
 
         try {
-            // CHANGED: Parse as Double
             double adjustmentQty = Double.parseDouble(quantityStr);
             if (adjustmentQty <= 0) {
                 etQuantity.setError("Quantity must be greater than 0");
@@ -249,6 +256,9 @@ public class StockAdjustmentActivity extends BaseActivity {
         }
     }
 
+    // =========================================================================
+    // UPGRADE: Perfectly Syncs Quantity, Total Value, and History
+    // =========================================================================
     private void saveAdjustment(String adjustmentType, double adjustmentQty, double currentStock, double newStock, String reason, String remarks) {
         String userId = AuthManager.getInstance().getCurrentUserId();
         if (userId == null || userId.isEmpty()) {
@@ -262,6 +272,18 @@ public class StockAdjustmentActivity extends BaseActivity {
         if (adjustmentId == null) {
             Toast.makeText(this, "Error generating adjustment ID", Toast.LENGTH_SHORT).show();
             return;
+        }
+
+        // Calculate the Exact New Total Cost
+        double currentTotalCost = selectedProduct.getCostPrice();
+        double unitCost = currentStock > 0 ? (currentTotalCost / currentStock) : 0.0;
+        double valueImpact = adjustmentQty * unitCost;
+
+        double newTotalCost;
+        if ("Add Stock".equals(adjustmentType)) {
+            newTotalCost = currentTotalCost + valueImpact;
+        } else {
+            newTotalCost = Math.max(0.0, currentTotalCost - valueImpact);
         }
 
         StockAdjustment adjustment = new StockAdjustment(
@@ -278,26 +300,64 @@ public class StockAdjustmentActivity extends BaseActivity {
                 userId
         );
 
-        productRepository.updateProductQuantity(selectedProduct.getProductId(), newStock, new ProductRepository.OnProductUpdatedListener() {
-            @Override
-            public void onProductUpdated() {
-                ref.child(adjustmentId).setValue(adjustment)
-                        .addOnSuccessListener(aVoid -> {
-                            runOnUiThread(() -> {
-                                Toast.makeText(StockAdjustmentActivity.this, "Stock adjusted successfully", Toast.LENGTH_SHORT).show();
-                                clearForm();
-                            });
-                        })
-                        .addOnFailureListener(e -> runOnUiThread(() ->
-                                Toast.makeText(StockAdjustmentActivity.this, "Stock updated, but history log failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                        ));
-            }
+        // Update Database directly using our super-method!
+        productRepository.updateProductQuantityAndCost(
+                selectedProduct.getProductId(),
+                newStock,
+                newTotalCost,
+                new ProductRepository.OnProductUpdatedListener() {
+                    @Override
+                    public void onProductUpdated() {
 
-            @Override
-            public void onError(String error) {
-                runOnUiThread(() -> Toast.makeText(StockAdjustmentActivity.this, "Error updating inventory: " + error, Toast.LENGTH_SHORT).show());
-            }
-        });
+                        // Handle Offline Room Database Batches securely in the background
+                        new Thread(() -> {
+                            AppDatabase db = AppDatabase.getInstance(StockAdjustmentActivity.this);
+                            if ("Add Stock".equals(adjustmentType)) {
+                                BatchEntity newBatch = new BatchEntity();
+                                newBatch.productId = selectedProduct.getProductId();
+                                newBatch.initialQuantity = adjustmentQty;
+                                newBatch.remainingQuantity = adjustmentQty;
+                                newBatch.receiveDate = System.currentTimeMillis();
+                                newBatch.expiryDate = System.currentTimeMillis() + (14L * 24 * 60 * 60 * 1000);
+                                newBatch.costPrice = unitCost;
+                                db.batchDao().insertBatch(newBatch);
+                            } else {
+                                // Manual FIFO deduction for batches
+                                List<BatchEntity> batches = db.batchDao().getAvailableBatchesFIFO(selectedProduct.getProductId());
+                                double remainingToDeduct = adjustmentQty;
+                                for (BatchEntity batch : batches) {
+                                    if (remainingToDeduct <= 0) break;
+                                    if (batch.remainingQuantity <= remainingToDeduct) {
+                                        remainingToDeduct -= batch.remainingQuantity;
+                                        batch.remainingQuantity = 0;
+                                    } else {
+                                        batch.remainingQuantity -= remainingToDeduct;
+                                        remainingToDeduct = 0;
+                                    }
+                                    db.batchDao().updateBatch(batch);
+                                }
+                            }
+                        }).start();
+
+                        // Log History to Firebase
+                        ref.child(adjustmentId).setValue(adjustment)
+                                .addOnSuccessListener(aVoid -> {
+                                    runOnUiThread(() -> {
+                                        Toast.makeText(StockAdjustmentActivity.this, "Stock & Financials Updated Successfully", Toast.LENGTH_SHORT).show();
+                                        clearForm();
+                                    });
+                                })
+                                .addOnFailureListener(e -> runOnUiThread(() ->
+                                        Toast.makeText(StockAdjustmentActivity.this, "Stock updated, but history log failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                                ));
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        runOnUiThread(() -> Toast.makeText(StockAdjustmentActivity.this, "Error updating inventory: " + error, Toast.LENGTH_SHORT).show());
+                    }
+                }
+        );
     }
 
     private void clearForm() {

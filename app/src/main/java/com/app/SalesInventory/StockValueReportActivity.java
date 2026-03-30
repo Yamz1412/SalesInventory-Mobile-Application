@@ -37,8 +37,6 @@ public class StockValueReportActivity extends BaseActivity  {
     private DatabaseReference productRef;
     private ReportExportUtil exportUtil;
     private PDFGenerator pdfGenerator;
-    private CSVGenerator csvGenerator;
-
     private static final int PERMISSION_REQUEST_CODE = 100;
 
     @Override
@@ -78,10 +76,8 @@ public class StockValueReportActivity extends BaseActivity  {
             btnExportPDF.setEnabled(false);
         }
 
-        csvGenerator = new CSVGenerator();
 
         btnExportPDF.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_PDF));
-        btnExportCSV.setOnClickListener(v -> startExport(ReportExportUtil.EXPORT_CSV));
     }
 
     private void setupRecyclerView() {
@@ -119,13 +115,24 @@ public class StockValueReportActivity extends BaseActivity  {
                         );
                         reportList.add(report);
 
-                        totalCostValue += report.getTotalCostValue();
-                        totalSellingValue += report.getTotalSellingValue();
-                        totalProfit += report.getProfit();
+                        // FIX: Cost Price is already the Total Value.
+                        // Selling Price is per unit, so we multiply Selling Price by Quantity.
+                        double itemTotalCost = product.getCostPrice();
+                        double itemTotalSelling = product.getSellingPrice() * product.getQuantity();
+                        double itemProfit = itemTotalSelling - itemTotalCost;
+
+                        totalCostValue += itemTotalCost;
+                        totalSellingValue += itemTotalSelling;
+                        totalProfit += itemProfit;
                     }
                 }
 
-                Collections.sort(reportList, (a, b) -> Double.compare(b.getProfit(), a.getProfit()));
+                // Safely sort by profitability
+                Collections.sort(reportList, (a, b) -> {
+                    double profitA = (a.getSellingPrice() * a.getQuantity()) - a.getCostPrice();
+                    double profitB = (b.getSellingPrice() * b.getQuantity()) - b.getCostPrice();
+                    return Double.compare(profitB, profitA);
+                });
 
                 progressBar.setVisibility(View.GONE);
 
@@ -207,7 +214,6 @@ public class StockValueReportActivity extends BaseActivity  {
             ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
             if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
             try {
-                csvGenerator.generateStockValueReportCSV(r.outputStream, reportList);
                 exportUtil.showExportSuccess(r.displayPath);
             } finally {
                 try { r.outputStream.close(); } catch (Exception ignored) {}

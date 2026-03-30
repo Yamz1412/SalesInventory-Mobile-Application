@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/edite_round"
-    android:backgroundTint="@android:color/white"
+    android:background="?attr/colorSurface"
+    android:backgroundTint="?attr/colorSurface"
     android:padding="20dp">
 
     <TextView
@@ -14,7 +14,7 @@
         android:text="Purchase Order Report"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="?attr/colorPrimary"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="4dp" />
 
     <TextView
@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:text="Date Range: "
         android:textSize="13sp"
-        android:textColor="#555555"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="16dp" />
 
     <LinearLayout
@@ -41,7 +41,7 @@
             app:cardBackgroundColor="#E8F5E9"
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:backgroundTint="?attr/colorOnBackground" android:gravity="center">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Orders" android:textSize="11sp" android:textColor="#2E7D32"/>
                 <TextView android:id="@+id/tvTotalPOCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="16sp" android:textColor="#1B5E20"/>
             </LinearLayout>
@@ -55,7 +55,7 @@
             app:cardBackgroundColor="#E3F2FD"
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+            <LinearLayout android:layout_width="match_parent" android:backgroundTint="?attr/colorOnBackground" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Spent" android:textSize="11sp" android:textColor="#1565C0"/>
                 <TextView android:id="@+id/tvTotalPOSpent" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textStyle="bold" android:textSize="14sp" android:textColor="#0D47A1"/>
             </LinearLayout>
@@ -69,7 +69,7 @@
             app:cardBackgroundColor="#FFEBEE"
             app:cardCornerRadius="8dp"
             app:cardElevation="0dp">
-            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
+            <LinearLayout android:layout_width="match_parent" android:backgroundTint="?attr/colorOnBackground" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp" android:gravity="center">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Returns/Issues" android:textSize="11sp" android:textColor="#C62828"/>
                 <TextView android:id="@+id/tvTotalReturns" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="16sp" android:textColor="#B71C1C"/>
             </LinearLayout>
@@ -79,6 +79,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="350dp"
+        android:background="?attr/colorSurface"
         android:layout_marginBottom="16dp">
 
         <LinearLayout
@@ -92,7 +93,7 @@
                 android:text="Purchase Orders Overview"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#333333"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginBottom="8dp"/>
 
             <TextView
@@ -100,7 +101,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:textColor="#555555"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginBottom="16dp"/>
 
             <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEEEEE" android:layout_marginBottom="16dp"/>
@@ -111,7 +112,7 @@
                 android:text="Supplier Returns &amp; Damages"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#C62828"
+                android:textColor="?attr/colorOnBackground"
                 android:layout_marginBottom="8dp"/>
 
             <TextView
@@ -119,7 +120,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
-                android:textColor="#555555" />
+                android:textColor="?attr/colorOnBackground" />
 
         </LinearLayout>
     </ScrollView>
@@ -129,5 +130,6 @@
         android:layout_width="match_parent"
         android:layout_height="55dp"
         android:text="Close Report"
+        style="@style/CustomButton"
         app:cornerRadius="8dp" />
 </LinearLayout>

@@ -52,6 +52,11 @@
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
         <activity
+            android:name=".SuggestedSuppliesActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+
+        <activity
             android:name=".CategoryManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
@@ -68,11 +73,6 @@
 
         <activity
             android:name=".ReceivingReportActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-
-        <activity
-            android:name=".CashManagementActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize|stateHidden" />
 
@@ -272,10 +272,14 @@
             android:authorities="${applicationId}.provider"
             android:exported="false"
             android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths"/>
+    </provider>
+
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
 
         <service
             android:name=".AppFirebaseMessagingService"

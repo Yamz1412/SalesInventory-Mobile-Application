@@ -58,9 +58,7 @@ public class CartManager {
             boolean sameAddon = (item.addon == null && addon == null) || (item.addon != null && item.addon.equals(addon));
 
             if (sameId && sameSize && sameAddon) {
-                if (item.quantity + quantity > stock) {
-                    return false;
-                }
+                if (item.quantity + quantity > stock) return false;
                 item.quantity += quantity;
                 item.stock = stock;
                 return true;

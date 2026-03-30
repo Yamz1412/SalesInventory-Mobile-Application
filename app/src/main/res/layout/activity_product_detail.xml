@@ -30,6 +30,13 @@
             android:layout_marginTop="12dp" />
 
         <TextView
+            android:id="@+id/tvDetailSupplier"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Supplier"
+            android:layout_marginTop="4dp" />
+
+        <TextView
             android:id="@+id/tvDetailCategory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

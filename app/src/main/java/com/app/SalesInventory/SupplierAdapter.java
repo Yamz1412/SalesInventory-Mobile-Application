@@ -46,7 +46,7 @@ public class SupplierAdapter extends RecyclerView.Adapter<SupplierAdapter.Suppli
         holder.tvCategories.setText("Supplies: " + supplier.categories);
 
         if (selectedPosition == holder.getAdapterPosition()) {
-            holder.itemView.setBackgroundColor(holder.itemView.getContext().getResources().getColor(R.color.colorAccent, null));
+            holder.itemView.setBackgroundColor(holder.itemView.getContext().getResources().getColor(R.color.CYAN, null));
         } else {
             holder.itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         }

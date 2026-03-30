@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/backgroundColor">
+    android:background="?android:colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,7 +17,7 @@
             android:text="Update Profile"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorPrimary"
             android:gravity="center"
             android:layout_marginBottom="24dp" />
 
@@ -33,43 +33,43 @@
         <Button
             android:id="@+id/btnChangePhoto"
             android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="Change Photo"
-            android:textSize="14sp"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@android:color/white"
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary"
             android:layout_marginBottom="24dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            android:layout_marginBottom="15dp">
+            app:hintTextColor="?attr/colorPrimary"
+            app:boxStrokeColor="?attr/colorPrimary"
+            android:layout_marginBottom="16dp">
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/ProfilNameE"
+                android:id="@+id/ProfilNameTE"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#000000"
+                android:inputType="textPersonName"
+                android:textColor="?attr/colorOnBackground"
                 android:hint="Full Name" />
         </com.google.android.material.textfield.TextInputLayout>
+
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary"
+            app:boxStrokeColor="?attr/colorPrimary"
             android:layout_marginBottom="15dp">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/ProfilUsernameTE"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#000000"
+                android:textColor="?attr/colorOnBackground"
                 android:inputType="textNoSuggestions"
                 android:hint="Username" />
         </com.google.android.material.textfield.TextInputLayout>
@@ -78,16 +78,15 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
-            android:layout_marginBottom="15dp">
+            app:hintTextColor="?attr/colorPrimary"
+            app:boxStrokeColor="?attr/colorPrimary"
+            android:layout_marginBottom="16dp">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/ProfilEmailTE"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="textEmailAddress"
-                android:textColor="#000000"
+                android:textColor="?attr/colorOnBackground"
                 android:hint="Email Address" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -95,16 +94,15 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColorHint="#757575"
-            app:hintTextColor="@color/colorPrimary"
-            app:boxStrokeColor="@color/colorPrimary"
+            app:hintTextColor="?attr/colorPrimary"
+            app:boxStrokeColor="?attr/colorPrimary"
             android:layout_marginBottom="20dp">
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/ProfilPhoneTE"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:inputType="phone"
-                android:textColor="#000000"
+                android:textColor="?attr/colorOnBackground"
                 android:hint="Phone Number" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -114,8 +112,8 @@
             android:layout_height="50dp"
             android:text="Change Password"
             android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="@color/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary"
             android:layout_marginBottom="15dp" />
 
         <Button
@@ -124,8 +122,8 @@
             android:layout_height="60dp"
             android:text="Save Changes"
             android:textSize="18sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="@color/colorPrimary" />
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary" />
 
     </LinearLayout>
 </ScrollView>

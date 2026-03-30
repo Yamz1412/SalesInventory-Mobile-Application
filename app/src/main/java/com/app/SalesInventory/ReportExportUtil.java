@@ -52,6 +52,7 @@ public class ReportExportUtil {
         public OutputStream outputStream;
         public String displayPath;
         public java.net.URI uri;
+        public File file;
     }
 
     public ExportResult createOutputStreamForFile(String filename, int exportType) throws Exception {
@@ -63,6 +64,26 @@ public class ReportExportUtil {
         r.outputStream = os;
         r.uri = out.toURI();
         r.displayPath = out.getAbsolutePath();
+        r.file = out;
         return r;
+    }
+
+    public void shareFileViaEmail(File file, String subject) {
+        try {
+            // Securely share the file via Android's FileProvider
+            android.net.Uri fileUri = androidx.core.content.FileProvider.getUriForFile(
+                    context, context.getPackageName() + ".provider", file);
+
+            android.content.Intent emailIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            emailIntent.setType("application/pdf");
+            emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
+            emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, "Please find the attached report generated from the Sales Inventory App.");
+            emailIntent.putExtra(android.content.Intent.EXTRA_STREAM, fileUri);
+            emailIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            context.startActivity(android.content.Intent.createChooser(emailIntent, "Send Report via..."));
+        } catch (Exception e) {
+            Toast.makeText(context, "Error opening email app. Ensure FileProvider is setup.", Toast.LENGTH_SHORT).show();
+        }
     }
 }

@@ -23,8 +23,8 @@ import java.util.concurrent.Executors;
 
 public class InventoryReportsActivity extends BaseActivity  {
 
-    private Button btnFmiSmi, btnStockMovement, btnAdjustmentSummary, btnMasterSummary;
-    private Button btnDeliveryReport, btnReceivingReport, btnDamagedReport;
+    private Button btnFmiSmi, btnAdjustmentSummary, btnMasterSummary;
+    private Button btnDeliveryReport, btnReceivingReport;
 
     private DatabaseReference adjustmentRef;
 
@@ -57,9 +57,7 @@ public class InventoryReportsActivity extends BaseActivity  {
     }
 
     private void initializeViews() {
-        btnDamagedReport = findViewById(R.id.btnDamagedReport);
         btnFmiSmi = findViewById(R.id.btnFmiSmi);
-        btnStockMovement = findViewById(R.id.btnStockMovement);
         btnAdjustmentSummary = findViewById(R.id.btnAdjustmentSummary);
         btnDeliveryReport = findViewById(R.id.btnDeliveryReport);
         btnReceivingReport = findViewById(R.id.btnReceivingReport);
@@ -86,11 +84,9 @@ public class InventoryReportsActivity extends BaseActivity  {
 
     private void setupClickListeners() {
         btnFmiSmi.setOnClickListener(v -> startActivity(new android.content.Intent(this, FmiSmiReportActivity.class)));
-        btnStockMovement.setOnClickListener(v -> startActivity(new android.content.Intent(this, StockMovementReportActivity.class)));
         btnAdjustmentSummary.setOnClickListener(v -> startActivity(new android.content.Intent(this, AdjustmentSummaryReportActivity.class)));
         btnReceivingReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, ReceivingReportActivity.class)));
         btnDeliveryReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, DeliveryReportActivity.class)));
-        btnDamagedReport.setOnClickListener(v -> startActivity(new Intent(this, DamagedProductsReportActivity.class)));
         btnMasterSummary.setOnClickListener(v -> startActivity(new Intent(this, InventoryMasterSummaryActivity.class)));
     }
 

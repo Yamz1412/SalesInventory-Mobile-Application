@@ -1,8 +1,10 @@
 package com.app.SalesInventory;
 
 import android.app.DatePickerDialog;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -37,7 +39,6 @@ public class DamagedProductsReportActivity extends BaseActivity {
 
     private String currentOwnerId;
 
-    // Filters
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
     private String currentProductLineFilter = "All Lines";
@@ -72,8 +73,8 @@ public class DamagedProductsReportActivity extends BaseActivity {
     }
 
     private void initializeViews() {
-        tvTotalItems = findViewById(R.id.tvTotalItems);
-        tvTotalLoss = findViewById(R.id.tvTotalLoss);
+        tvTotalItems = findViewById(R.id.tvTotalDamagedItems);
+        tvTotalLoss = findViewById(R.id.tvTotalLossValue);
         tvNoData = findViewById(R.id.tvNoData);
         btnDateFilter = findViewById(R.id.btnDateFilter);
         spinnerProductLine = findViewById(R.id.spinnerProductLine);
@@ -111,6 +112,33 @@ public class DamagedProductsReportActivity extends BaseActivity {
         });
     }
 
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
     private void loadProductLinesFilter() {
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
         ref.orderByChild("ownerAdminId").equalTo(currentOwnerId).addListenerForSingleValueEvent(new ValueEventListener() {
@@ -124,8 +152,8 @@ public class DamagedProductsReportActivity extends BaseActivity {
                     if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
                 }
 
-                ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(DamagedProductsReportActivity.this, android.R.layout.simple_spinner_item, lines);
-                spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                // Use the adaptive adapter here!
+                ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(lines);
                 spinnerProductLine.setAdapter(spinAdapter);
 
                 spinnerProductLine.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -170,36 +198,32 @@ public class DamagedProductsReportActivity extends BaseActivity {
         for (StockAdjustment adj : masterAdjustmentList) {
             long ts = adj.getTimestamp();
 
-            // Apply Date Filter
             if (filterStartDate == 0 || (ts >= filterStartDate && ts <= filterEndDate)) {
 
                 String reason = adj.getReason() != null ? adj.getReason().toLowerCase() : "";
 
-                // Condition: Look for damage/spoilage keywords and ONLY negative removals
                 if ("Remove Stock".equalsIgnoreCase(adj.getAdjustmentType()) &&
                         (reason.contains("damage") || reason.contains("spoil") || reason.contains("expire") || reason.contains("waste"))) {
 
                     double qtyLost = Math.abs(adj.getQuantityAdjusted());
-                    double costPrice = 0.0;
+                    double unitCost = 0.0;
                     String productLine = "";
 
-                    // Find corresponding inventory product to get exact cost price
                     for (Product p : currentInventory) {
                         if (p.getProductId().equals(adj.getProductId())) {
-                            costPrice = p.getCostPrice();
+                            unitCost = p.getQuantity() > 0 ? (p.getCostPrice() / p.getQuantity()) : 0.0;
                             productLine = p.getProductLine() != null ? p.getProductLine() : "";
                             break;
                         }
                     }
 
-                    // Apply Product Line Filter
                     if (!"All Lines".equals(currentProductLineFilter)) {
                         if (!currentProductLineFilter.equalsIgnoreCase(productLine)) {
                             continue;
                         }
                     }
 
-                    double lossAmount = qtyLost * costPrice;
+                    double lossAmount = qtyLost * unitCost;
                     totalMonetaryLoss += lossAmount;
                     itemsDamagedCount++;
 
@@ -214,10 +238,8 @@ public class DamagedProductsReportActivity extends BaseActivity {
             }
         }
 
-        // Sort newest first
         damagedLogs.sort((a, b) -> Long.compare(b.timestamp, a.timestamp));
 
-        // Update UI
         tvTotalItems.setText(String.valueOf(itemsDamagedCount));
         tvTotalLoss.setText(String.format(Locale.US, "₱%,.2f", totalMonetaryLoss));
 

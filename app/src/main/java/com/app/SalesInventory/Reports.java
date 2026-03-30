@@ -201,13 +201,41 @@ public class Reports extends BaseActivity {
         });
     }
 
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
     private void setupDateFilterSpinner() {
         String[] options = {
                 "Today", "Yesterday", "This Week", "Last Week",
                 "This Month", "Last Month", "This Year", "Last Year to Now", "Custom Range"
         };
-        ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, options);
-        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        // Use the adaptive adapter here!
+        ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(options);
         spinnerDateFilter.setAdapter(spinAdapter);
 
         // Set default to "Last Year to Now"
@@ -229,9 +257,7 @@ public class Reports extends BaseActivity {
                 startCalendar.setTime(now.getTime());
                 endCalendar.setTime(now.getTime());
 
-                // Reset End Time to end of day
                 endCalendar.set(Calendar.HOUR_OF_DAY, 23); endCalendar.set(Calendar.MINUTE, 59); endCalendar.set(Calendar.SECOND, 59);
-                // Reset Start Time to beginning of day
                 startCalendar.set(Calendar.HOUR_OF_DAY, 0); startCalendar.set(Calendar.MINUTE, 0); startCalendar.set(Calendar.SECOND, 0);
 
                 switch (selection) {
@@ -298,10 +324,6 @@ public class Reports extends BaseActivity {
         });
     }
 
-    /**
-     * MOCK DATA INJECTOR FOR REALISTIC DEFENSE PRESENTATION
-     * Fills the reports with random data from the past year.
-     */
     private void injectAdviserMockData() {
         boolean exists = false;
         for (Sales s : allSalesList) {
@@ -316,7 +338,6 @@ public class Reports extends BaseActivity {
         long oneDay = 24L * 60 * 60 * 1000L;
         long oneMonth = 30L * oneDay;
 
-        // SCENARIO 1: The Cashier Mistake & Refund (from 2 months ago)
         long twoMonthsAgo = now - (2 * oneMonth);
         Sales mistake = new Sales();
         mistake.setOrderId("MOCK-ERR-99991");
@@ -339,20 +360,18 @@ public class Reports extends BaseActivity {
         allSalesList.add(mistake);
         allSalesList.add(refund);
 
-        // SCENARIO 2: A Massive VIP/Corporate Bulk Order (15 days ago)
         long fifteenDaysAgo = now - (15 * oneDay);
         Sales bulkOrder = new Sales();
         bulkOrder.setOrderId("MOCK-VIP-1001");
         bulkOrder.setProductName("Iced Americano (Bulk Corporate)");
         bulkOrder.setQuantity(50);
-        bulkOrder.setTotalPrice(6500.0); // Discounted price
-        bulkOrder.setTotalCost(2000.0); // 40 cost each
-        bulkOrder.setDiscountAmount(1000.0); // 1000 discount
+        bulkOrder.setTotalPrice(6500.0);
+        bulkOrder.setTotalCost(2000.0);
+        bulkOrder.setDiscountAmount(1000.0);
         bulkOrder.setPaymentMethod("GCash (Corporate Account)");
         bulkOrder.setTimestamp(fifteenDaysAgo);
         allSalesList.add(bulkOrder);
 
-        // SCENARIO 3: RANDOM DAILY SALES (Over the past 365 days)
         String[] mockProducts = {"Iced Latte", "Matcha Frappe", "Blueberry Cheesecake", "Espresso", "Mocha", "Strawberry Smoothie"};
         double[] mockPrices = {140.0, 160.0, 180.0, 110.0, 150.0, 155.0};
         double[] mockCosts = {45.0, 55.0, 60.0, 30.0, 50.0, 50.0};
@@ -360,11 +379,10 @@ public class Reports extends BaseActivity {
 
         Random rand = new Random();
 
-        // Generate exactly 80 random, successful background transactions
         for (int i = 0; i < 80; i++) {
             int pIndex = rand.nextInt(mockProducts.length);
-            int qty = rand.nextInt(3) + 1; // 1 to 3 items
-            int daysAgo = rand.nextInt(365); // Random day within the past year
+            int qty = rand.nextInt(3) + 1;
+            int daysAgo = rand.nextInt(365);
             long randomTime = now - (daysAgo * oneDay) - (rand.nextInt(24) * 60 * 60 * 1000L);
 
             Sales randSale = new Sales();
@@ -376,7 +394,6 @@ public class Reports extends BaseActivity {
             randSale.setPaymentMethod(mockPayments[rand.nextInt(mockPayments.length)]);
             randSale.setTimestamp(randomTime);
 
-            // Randomly apply a small 10% discount to 1 in every 10 transactions
             if (rand.nextInt(10) == 0) {
                 double originalPrice = mockPrices[pIndex] * qty;
                 randSale.setDiscountAmount(originalPrice * 0.10);
@@ -451,9 +468,30 @@ public class Reports extends BaseActivity {
                     if (parenIdx != -1) minIdx = Math.min(minIdx, parenIdx);
                     if (bracketIdx != -1) minIdx = Math.min(minIdx, bracketIdx);
                     if (minIdx != rawName.length()) baseName = rawName.substring(0, minIdx).trim();
+
                     for (Product p : currentInventory) {
                         if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(baseName)) {
-                            cost = p.getCostPrice() * s.getQuantity();
+
+                            if ("Menu".equalsIgnoreCase(p.getProductType()) && p.getBomList() != null && !p.getBomList().isEmpty()) {
+                                double recipeCost = 0.0;
+                                for (Map<String, Object> bomItem : p.getBomList()) {
+                                    String materialName = (String) bomItem.get("materialName");
+                                    double qtyUsed = 0.0;
+                                    try {
+                                        qtyUsed = Double.parseDouble(String.valueOf(bomItem.get("quantity")));
+                                    } catch (Exception ignored) {}
+
+                                    for (Product raw : currentInventory) {
+                                        if (materialName != null && materialName.equalsIgnoreCase(raw.getProductName())) {
+                                            recipeCost += (raw.getCostPrice() * qtyUsed);
+                                            break;
+                                        }
+                                    }
+                                }
+                                cost = recipeCost * s.getQuantity();
+                            } else {
+                                cost = p.getCostPrice() * s.getQuantity();
+                            }
                             break;
                         }
                     }
@@ -632,14 +670,28 @@ public class Reports extends BaseActivity {
     }
 
     private void addExpenseRowToIncomeStatement(String name, double amount) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
         RelativeLayout row = new RelativeLayout(this);
         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         row.setLayoutParams(params);
         row.setPadding(0, 4, 0, 4);
-        TextView tvName = new TextView(this); tvName.setText("   " + name); tvName.setTextColor(Color.parseColor("#000000"));
-        TextView tvAmt = new TextView(this); tvAmt.setText(String.format(Locale.US, "%,.2f", amount)); tvAmt.setTextColor(Color.parseColor("#000000"));
-        RelativeLayout.LayoutParams amtParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT); amtParams.addRule(RelativeLayout.ALIGN_PARENT_END); tvAmt.setLayoutParams(amtParams);
-        row.addView(tvName); row.addView(tvAmt);
+
+        TextView tvName = new TextView(this);
+        tvName.setText("   " + name);
+        tvName.setTextColor(textColor);
+
+        TextView tvAmt = new TextView(this);
+        tvAmt.setText(String.format(Locale.US, "%,.2f", amount));
+        tvAmt.setTextColor(textColor);
+
+        RelativeLayout.LayoutParams amtParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        amtParams.addRule(RelativeLayout.ALIGN_PARENT_END);
+        tvAmt.setLayoutParams(amtParams);
+
+        row.addView(tvName);
+        row.addView(tvAmt);
         containerISExpenses.addView(row);
     }
 
@@ -667,12 +719,20 @@ public class Reports extends BaseActivity {
         AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
 
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
         EditText etExpenseName = dialogView.findViewById(R.id.etExpenseName);
         EditText etExpenseAmount = dialogView.findViewById(R.id.etExpenseAmount);
         Button btnAddExpense = dialogView.findViewById(R.id.btnAddExpense);
         LinearLayout containerExpenses = dialogView.findViewById(R.id.containerExpenses);
         Button btnCancel = dialogView.findViewById(R.id.btnCancelExpenses);
         Button btnSave = dialogView.findViewById(R.id.btnSaveExpenses);
+
+        etExpenseName.setTextColor(textColor);
+        etExpenseName.setHintTextColor(Color.GRAY);
+        etExpenseAmount.setTextColor(textColor);
+        etExpenseAmount.setHintTextColor(Color.GRAY);
 
         Button btnClearDb = new Button(this);
         btnClearDb.setText("RESET ALL SAVED EXPENSES (WIPE DATA)");
@@ -732,6 +792,12 @@ public class Reports extends BaseActivity {
         View row = LayoutInflater.from(this).inflate(R.layout.item_expense_row, null);
         TextView tvName = row.findViewById(R.id.tvRowExpenseName);
         TextView tvAmount = row.findViewById(R.id.tvRowExpenseAmount);
+
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        tvName.setTextColor(textColor);
+        tvAmount.setTextColor(textColor);
+
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteExpenseRow);
         tvName.setText(name); tvAmount.setText(String.format(Locale.US, "₱%,.2f", amount));
         btnDelete.setOnClickListener(v -> {
@@ -968,7 +1034,6 @@ public class Reports extends BaseActivity {
             String dateRange = btnStartDate.getText().toString() + " to " + btnEndDate.getText().toString();
 
             if (reportTypeIndex == 0) {
-                // 1. Financial Report (Income Statement)
                 generator.generateAccountingReportPDF(
                         tempPdfFile, dateRange, businessName,
                         currentGrossSales, currentTotalDiscounts, currentNetSales,
@@ -977,19 +1042,16 @@ public class Reports extends BaseActivity {
                         allReportItems
                 );
             } else if (reportTypeIndex == 1) {
-                // 2. Inventory Master Report
                 generator.generateInventoryMasterPDF(
                         tempPdfFile, businessName, currentInventory, currentInventoryValue
                 );
             } else if (reportTypeIndex == 2) {
-                // 3. Operations, Receiving & Adjustments Report
                 generator.generateOperationsAndReceivingReportPDF(
                         tempPdfFile, dateRange, businessName,
                         detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), detailedDamagesStr.toString()
                 );
             }
 
-            // Launch the Android Document Saver
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("application/pdf");
@@ -1051,7 +1113,8 @@ public class Reports extends BaseActivity {
             if (item.isRefund) {
                 rowTotal.setTextColor(Color.RED);
             } else {
-                rowTotal.setTextColor(Color.BLACK);
+                boolean isDark = ThemeManager.getInstance(getContext()).getCurrentTheme().name.equals("dark");
+                rowTotal.setTextColor(isDark ? Color.WHITE : Color.BLACK);
             }
 
             if (item.details != null && !item.details.isEmpty()) { rowDetails.setVisibility(View.VISIBLE); rowDetails.setText(item.details); }

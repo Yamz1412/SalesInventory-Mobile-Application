@@ -44,4 +44,10 @@ public interface ProductDao {
 
     @Query("SELECT * FROM products ORDER BY lastUpdated DESC")
     List<ProductEntity> getAllProductsSync();
+
+    // =========================================================================
+    // NEW: Instantly applies the exact cost calculation locally
+    // =========================================================================
+    @Query("UPDATE products SET quantity = :newQty, costPrice = :newCost WHERE productId = :productId")
+    void updateQuantityAndCost(String productId, double newQty, double newCost);
 }

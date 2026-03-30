@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F5F5F5">
+    android:background="?android:colorBackground">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -28,7 +28,7 @@
         android:paddingHorizontal="12dp"
         android:paddingVertical="8dp"
         android:weightSum="3"
-        android:background="@android:color/white"
+        android:background="?attr/colorSurface"
         android:elevation="2dp">
 
         <com.google.android.material.button.MaterialButton
@@ -39,6 +39,9 @@
             android:layout_marginEnd="4dp"
             android:text="Create PO"
             android:textSize="11sp"
+            style="@style/CustomButtonOutlined"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             app:cornerRadius="6dp"/>
@@ -52,7 +55,9 @@
             android:text="Add Supplier"
             android:textSize="11sp"
             android:insetTop="0dp"
+            style="@style/CustomButtonOutlined"
             android:insetBottom="0dp"
+            android:textColor="@android:color/white"
             app:backgroundTint="#4CAF50"
             app:cornerRadius="6dp"/>
 
@@ -64,9 +69,11 @@
             android:layout_marginStart="4dp"
             android:text="Returns"
             android:textSize="11sp"
-            app:backgroundTint="@color/errorRed"
+            app:backgroundTint="?attr/colorError"
+            android:textColor="?attr/colorOnError"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            style="@style/CustomButtonOutlined"
             app:cornerRadius="6dp"/>
     </LinearLayout>
 

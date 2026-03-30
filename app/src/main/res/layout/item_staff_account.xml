@@ -6,7 +6,10 @@
     android:orientation="vertical"
     android:padding="12dp"
     android:layout_marginBottom="8dp"
-    android:background="@android:color/white">
+    app:cardCornerRadius="8dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    >
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -21,7 +24,7 @@
             android:layout_weight="1"
             android:text="Staff Name"
             android:textStyle="bold"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnBackground"
             android:textSize="16sp" />
 
         <View
@@ -38,7 +41,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="email@example.com"
-        android:textColor="@color/gray"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginTop="2dp"
         android:textSize="14sp" />
 
@@ -47,7 +50,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="+63 912 345 6789"
-        android:textColor="@color/gray"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginTop="2dp"
         android:textSize="14sp" />
 

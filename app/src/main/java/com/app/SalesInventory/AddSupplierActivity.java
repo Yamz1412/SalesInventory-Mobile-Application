@@ -1,45 +1,52 @@
 package com.app.SalesInventory;
 
 import android.app.AlertDialog;
-import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class AddSupplierActivity extends BaseActivity {
 
-    private TextInputEditText etSupplierName, etSupplierContact, etSupplierEmail, etSupplierAddress, etSupplierCategories;
+    private TextInputEditText etSupplierName, etSupplierContact, etSupplierEmail, etSupplierAddress;
     private MaterialButton btnSaveSupplier, btnCancelSupplier;
     private DatabaseReference suppliersRef;
+
+    private ChipGroup chipGroupCategories;
+    private Button btnAddCustomCategory;
 
     private LinearLayout containerSupplierProducts;
     private ImageButton btnAddProductRow;
 
     private ProductRepository productRepository;
-    private ArrayAdapter<String> unitAdapter;
+    private ArrayAdapter<String> measurementAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,7 +64,10 @@ public class AddSupplierActivity extends BaseActivity {
         etSupplierContact = findViewById(R.id.etSupplierContact);
         etSupplierEmail = findViewById(R.id.etSupplierEmail);
         etSupplierAddress = findViewById(R.id.etSupplierAddress);
-        etSupplierCategories = findViewById(R.id.etSupplierCategories);
+
+        chipGroupCategories = findViewById(R.id.chipGroupCategories);
+        btnAddCustomCategory = findViewById(R.id.btnAddCustomCategory);
+
         btnSaveSupplier = findViewById(R.id.btnSaveSupplier);
         btnCancelSupplier = findViewById(R.id.btnCancelSupplier);
 
@@ -66,27 +76,108 @@ public class AddSupplierActivity extends BaseActivity {
 
         setupAdapters();
 
+        btnAddCustomCategory.setOnClickListener(v -> showCustomCategoryDialog());
         btnAddProductRow.setOnClickListener(v -> addProductRow());
         btnSaveSupplier.setOnClickListener(v -> saveSupplier());
         btnCancelSupplier.setOnClickListener(v -> finish());
     }
 
+    // ================================================================
+    // FIX: Adaptive Adapters for Dropdowns and Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
     private void setupAdapters() {
-        String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
-        unitAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
-        unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        List<String> measurements = Arrays.asList("pcs", "ml", "L", "g", "kg", "box", "pack");
+        measurementAdapter = getAdaptiveAdapter(measurements);
+    }
+
+    private void showCustomCategoryDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Custom Category");
+
+        final EditText input = new EditText(this);
+        input.setHint("e.g. Cleaning Supplies");
+
+        // FIX: Force text color so it's perfectly visible in Dark Mode
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        input.setTextColor(textColor);
+        input.setHintTextColor(Color.GRAY);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setPadding(50, 20, 50, 20);
+        layout.addView(input, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        builder.setView(layout);
+
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String newCategory = input.getText().toString().trim();
+            if (!newCategory.isEmpty()) {
+                addCustomChip(newCategory);
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        builder.show();
+    }
+
+    private void addCustomChip(String categoryName) {
+        Chip chip = new Chip(this);
+        chip.setText(categoryName);
+        chip.setCheckable(true);
+        chip.setChecked(true);
+        chipGroupCategories.addView(chip);
     }
 
     private void addProductRow() {
         View row = LayoutInflater.from(this).inflate(R.layout.item_supplier_product_entry, null);
 
-        Spinner spinnerUnit = row.findViewById(R.id.spinnerProductUnit);
+        Spinner spinnerMeasurement = row.findViewById(R.id.spinnerMeasurementType);
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteProductRow);
+        EditText etPcsPerPack = row.findViewById(R.id.etPcsPerPack);
 
-        spinnerUnit.setAdapter(unitAdapter);
+        spinnerMeasurement.setAdapter(measurementAdapter);
 
+        spinnerMeasurement.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedUnit = parent.getItemAtPosition(position).toString().toLowerCase();
+
+                if (selectedUnit.contains("pack") || selectedUnit.contains("box")) {
+                    etPcsPerPack.setVisibility(View.VISIBLE);
+                } else {
+                    etPcsPerPack.setVisibility(View.GONE);
+                    etPcsPerPack.setText("");
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                etPcsPerPack.setVisibility(View.GONE);
+            }
+        });
         btnDelete.setOnClickListener(v -> containerSupplierProducts.removeView(row));
-
         containerSupplierProducts.addView(row);
     }
 
@@ -95,11 +186,30 @@ public class AddSupplierActivity extends BaseActivity {
         String contact = etSupplierContact.getText().toString().trim();
         String email = etSupplierEmail.getText().toString().trim();
         String address = etSupplierAddress.getText().toString().trim();
-        String categories = etSupplierCategories.getText().toString().trim();
 
         if (name.isEmpty()) {
             etSupplierName.setError("Supplier Name is required");
             etSupplierName.requestFocus();
+            return;
+        }
+
+        StringBuilder categoriesBuilder = new StringBuilder();
+        for (int i = 0; i < chipGroupCategories.getChildCount(); i++) {
+            View child = chipGroupCategories.getChildAt(i);
+            if (child instanceof Chip) {
+                Chip chip = (Chip) child;
+                if (chip.isChecked()) {
+                    if (categoriesBuilder.length() > 0) {
+                        categoriesBuilder.append(", ");
+                    }
+                    categoriesBuilder.append(chip.getText().toString());
+                }
+            }
+        }
+
+        String categories = categoriesBuilder.toString();
+        if (categories.isEmpty()) {
+            Toast.makeText(this, "Please select or add at least one category.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -121,172 +231,121 @@ public class AddSupplierActivity extends BaseActivity {
 
         suppliersRef.child(id).setValue(supplierData)
                 .addOnSuccessListener(aVoid -> {
-                    // Process products — this will add stock to existing ones
-                    // and open AddProductActivity for any brand-new products.
-                    processSuppliedProducts(name);
+                    processSuppliedProducts(name, categories);
                     Toast.makeText(AddSupplierActivity.this, "Supplier Saved Successfully", Toast.LENGTH_SHORT).show();
-                    // Note: finish() is called inside processSuppliedProducts
-                    // after handling the product rows so we don't close too early.
                 })
                 .addOnFailureListener(e -> Toast.makeText(AddSupplierActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    // -------------------------------------------------------------------------
-    // UPDATED: processSuppliedProducts
-    //
-    // For each product row the user filled in:
-    //   • If a product with the same name (case-insensitive) already exists in
-    //     the inventory for this owner → just add the entered quantity to its
-    //     current stock (no duplicate created).
-    //   • If it does NOT exist yet → collect it into a "registration queue" and
-    //     open AddProductActivity with the data pre-filled so the user can
-    //     properly register it.  Only products that go through AddProductActivity
-    //     get a supplier tag, which means they will show up in the supplier
-    //     product panel later.
-    //
-    // Products added manually from the dashboard button (without a supplier
-    // name set) will NEVER appear in the supplier product panel because
-    // CreatePurchaseOrderActivity now filters by supplier != null/empty.
-    // -------------------------------------------------------------------------
-    private void processSuppliedProducts(String supplierName) {
+    private void processSuppliedProducts(String supplierName, String supplierCategories) {
         String adminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (adminId == null || adminId.isEmpty()) adminId = AuthManager.getInstance().getCurrentUserId();
         final String finalAdminId = adminId;
 
-        // Collect all filled-in product rows from the form
         List<ProductRow> rows = collectProductRows();
 
         if (rows.isEmpty()) {
-            // No product rows entered — just close the screen
             finish();
             return;
         }
 
-        // We need the current inventory to check for existing products.
-        // Fetch once from Firestore so we always have the latest state.
         com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 .collection("users").document(finalAdminId).collection("products")
                 .whereEqualTo("isActive", true)
                 .get()
                 .addOnSuccessListener(snapshot -> {
 
-                    // Build a name → productId map of existing inventory products
-                    Map<String, String> existingByName = new HashMap<>();   // lowerName → productId
-                    Map<String, Double> existingQtyById = new HashMap<>();  // productId → currentQty
+                    Map<String, String> existingByName = new HashMap<>();
 
                     for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
                         Product p = doc.toObject(Product.class);
                         if (p == null) continue;
-                        p.setProductId(doc.getId());
-                        String lowerName = p.getProductName() != null
-                                ? p.getProductName().trim().toLowerCase()
-                                : "";
+                        String lowerName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
                         if (!lowerName.isEmpty()) {
                             existingByName.put(lowerName, doc.getId());
-                            existingQtyById.put(doc.getId(), p.getQuantity());
                         }
                     }
-
-                    // Separate rows into "existing" (add stock) vs "new" (register)
-                    ArrayList<Bundle> registrationQueue = new ArrayList<>();
 
                     for (ProductRow row : rows) {
                         String lowerName = row.name.toLowerCase();
 
                         if (existingByName.containsKey(lowerName)) {
-                            // ---- Product already exists → increment stock ----
                             String productId = existingByName.get(lowerName);
-                            double currentQty = existingQtyById.containsKey(productId)
-                                    ? existingQtyById.get(productId) : 0;
-                            double newQty = currentQty + row.qty;
-
-                            // Update quantity in both Firestore and the local Room cache
-                            // via the existing updateProductQuantityAndCost method.
-                            // Passing 0 for cost price means the cost won't be overwritten.
-                            productRepository.updateProductQuantityAndCost(
-                                    productId,
-                                    newQty,
-                                    0,  // 0 = keep existing cost price unchanged
-                                    new ProductRepository.OnProductUpdatedListener() {
-                                        @Override
-                                        public void onProductUpdated() {
-                                            // Also push the new quantity to Firestore
-                                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                                    .collection("users").document(finalAdminId)
-                                                    .collection("products").document(productId)
-                                                    .update("quantity", newQty);
-                                        }
-                                        @Override
-                                        public void onError(String error) {
-                                            runOnUiThread(() -> Toast.makeText(
-                                                    AddSupplierActivity.this,
-                                                    "Failed to update stock for " + row.name,
-                                                    Toast.LENGTH_SHORT).show());
-                                        }
-                                    });
-
+                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                    .collection("users").document(finalAdminId)
+                                    .collection("products").document(productId)
+                                    .update("costPrice", row.cost, "supplier", supplierName);
                         } else {
-                            // ---- Product does not exist → queue for registration ----
-                            Bundle b = new Bundle();
-                            b.putString("PREFILL_NAME", row.name);
-                            b.putDouble("PREFILL_COST", row.cost);
-                            b.putInt("PREFILL_QTY", row.qty);
-                            b.putString("PREFILL_UNIT", row.unit);
-                            // Pass supplier name so AddProductActivity can tag it
-                            b.putString("PREFILL_SUPPLIER", supplierName);
-                            registrationQueue.add(b);
+                            Product newProduct = new Product();
+                            String newId = java.util.UUID.randomUUID().toString();
+
+                            String inheritedCategory = "Supplies";
+                            if (supplierCategories != null && !supplierCategories.isEmpty()) {
+                                inheritedCategory = supplierCategories.split(",")[0].trim();
+                            }
+
+                            newProduct.setProductId(newId);
+                            newProduct.setProductName(row.name);
+                            newProduct.setQuantity(0);
+                            newProduct.setCostPrice(row.cost);
+                            newProduct.setSellingPrice(row.cost * 1.5);
+                            newProduct.setUnit(row.unit);
+                            newProduct.setSupplier(supplierName);
+                            newProduct.setOwnerAdminId(finalAdminId);
+                            newProduct.setActive(true);
+                            newProduct.setProductType("raw");
+                            newProduct.setCategoryName(inheritedCategory);
+                            newProduct.setDateAdded(System.currentTimeMillis());
+
+                            productRepository.addProduct(newProduct, (String) null, null);
                         }
                     }
 
-                    runOnUiThread(() -> {
-                        if (!registrationQueue.isEmpty()) {
-                            // Open AddProductActivity with the queue so each new
-                            // product gets properly registered in the inventory.
-                            Intent intent = new Intent(AddSupplierActivity.this, AddProductActivity.class);
-                            intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
-                            startActivity(intent);
-                        }
-                        // Close AddSupplierActivity — supplier is already saved.
-                        finish();
-                    });
+                    runOnUiThread(this::finish);
                 })
                 .addOnFailureListener(e -> runOnUiThread(() -> {
-                    Toast.makeText(this, "Could not verify existing products. Please try again.", Toast.LENGTH_SHORT).show();
-                    // Still close; the supplier was saved successfully.
+                    Toast.makeText(this, "Could not verify existing products.", Toast.LENGTH_SHORT).show();
                     finish();
                 }));
     }
 
-    // -------------------------------------------------------------------------
-    // Helper: read every filled product row from the form into a plain list.
-    // -------------------------------------------------------------------------
     private List<ProductRow> collectProductRows() {
         List<ProductRow> rows = new ArrayList<>();
         for (int i = 0; i < containerSupplierProducts.getChildCount(); i++) {
             View row = containerSupplierProducts.getChildAt(i);
 
             EditText etName = row.findViewById(R.id.etProductNameEntry);
+            Spinner spinMeasurement = row.findViewById(R.id.spinnerMeasurementType);
             EditText etQty  = row.findViewById(R.id.etProductQty);
             EditText etCost = row.findViewById(R.id.etProductCost);
-            Spinner  spinUnit = row.findViewById(R.id.spinnerProductUnit);
+            EditText etPcsPerPack = row.findViewById(R.id.etPcsPerPack);
 
-            String name = etName.getText().toString().trim();
-            if (name.isEmpty()) continue; // Skip blank rows
+            String baseName = etName.getText().toString().trim();
+            if (baseName.isEmpty()) continue;
+
+            String measurement = spinMeasurement.getSelectedItem() != null
+                    ? spinMeasurement.getSelectedItem().toString() : "pcs";
 
             String qtyStr  = etQty.getText().toString().trim();
             String costStr = etCost.getText().toString().trim();
-            String unit    = spinUnit.getSelectedItem() != null
-                    ? spinUnit.getSelectedItem().toString() : "pcs";
 
             int qty     = qtyStr.isEmpty()  ? 0   : Integer.parseInt(qtyStr);
             double cost = costStr.isEmpty() ? 0.0 : Double.parseDouble(costStr);
 
-            rows.add(new ProductRow(name, qty, cost, unit));
+            String finalProductName = baseName;
+            boolean isPackOrBox = measurement.equals("pack") || measurement.equals("box");
+            if (isPackOrBox && etPcsPerPack != null) {
+                String pcsStr = etPcsPerPack.getText().toString().trim();
+                if (!pcsStr.isEmpty()) {
+                    finalProductName = baseName + " (" + pcsStr + "pcs/" + measurement + ")";
+                }
+            }
+
+            rows.add(new ProductRow(finalProductName, qty, cost, measurement));
         }
         return rows;
     }
 
-    // Simple data-holder for one product row
     private static class ProductRow {
         final String name;
         final int    qty;

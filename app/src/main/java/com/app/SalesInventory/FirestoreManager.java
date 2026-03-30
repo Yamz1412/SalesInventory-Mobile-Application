@@ -65,6 +65,11 @@ public class FirestoreManager {
         return ensureCurrentUserId();
     }
 
+    public void clearCachedIds() {
+        this.currentUserId = null;
+        this.businessOwnerId = null;
+    }
+
     // --- ADDED RESET SIGNAL PATH ---
     public com.google.firebase.firestore.DocumentReference getResetSignalRef() {
         return getDb().collection("users").document(getBusinessOwnerId()).collection("system").document("reset_signal");
@@ -72,23 +77,33 @@ public class FirestoreManager {
     // -------------------------------
 
     public String getUserProductsPath() {
-        return "products/" + getBusinessOwnerId() + "/items";
+        String ownerId = getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        return "users/" + ownerId + "/products";
     }
 
     public String getUserSalesPath() {
-        return "sales/" + getBusinessOwnerId() + "/items";
+        String ownerId = getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        return "users/" + ownerId + "/sales";
     }
 
     public String getUserAdjustmentsPath() {
-        return "adjustments/" + getBusinessOwnerId() + "/items";
+        String ownerId = getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        return "users/" + ownerId + "/adjustments";
     }
 
     public String getUserAlertsPath() {
-        return "alerts/" + getBusinessOwnerId() + "/items";
+        String ownerId = getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        return "users/" + ownerId + "/alerts";
     }
 
     public String getUserCategoriesPath() {
-        return "categories/" + getBusinessOwnerId() + "/items";
+        String ownerId = getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        return "users/" + ownerId + "/categories";
     }
 
     public String getUserPurchaseOrdersPath() {

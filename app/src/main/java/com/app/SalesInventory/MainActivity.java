@@ -1,22 +1,31 @@
 package com.app.SalesInventory;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.cardview.widget.CardView;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -43,24 +52,26 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends BaseActivity {
-    // UI Components
-    private CardView cardSalesAmount, cardGrossProfit, cardOpex, cardNetIncome, cardLowStock, cardPendingOrders, cardNearExpiry;
-    private TextView tvSalesAmount, tvGrossProfit, tvOpex, tvNetIncome, tvLowStockList, tvPendingOrdersCount, tvNearExpiryCount;
-    private TextView tvOverviewLabel;
+
+    // CAFE OVERVIEW UI COMPONENTS
+    private TextView tvTotalSales, tvTotalProfit, tvLowStock, tvPendingOrders;
+
+    // ALERTS & OTHER UI
+    private CardView cardNearExpiry;
+    private TextView tvNearExpiryCount;
+
     private LineChart salesTrendChart;
     private BarChart topProductsChart;
     private PieChart inventoryStatusChart;
     private LinearLayout btnCreateSale, btnCreatePO, btnViewReports, btnInventory;
 
-    private FloatingActionButton btnAddProduct;
-
-    // FAB MENU VARIABLES
-    private FloatingActionButton btnButtons, fabCashMenu, fabHistory;
+    // FAB Menu Components
+    private FloatingActionButton btnAddProduct, fabAddManual, fabSuggestedProduct;
     private View dimOverlay;
     private LinearLayout layoutFabMenu;
     private boolean isFabOpen = false;
 
-    private MaterialButton btnCustomers, btnManageUsers;
+    private MaterialButton btnManageUsers;
     private MaterialButtonToggleGroup toggleTimeFilter;
     private RecyclerView rvRecentActivity;
     private RecentActivityAdapter activityAdapter;
@@ -74,14 +85,14 @@ public class MainActivity extends BaseActivity {
     private TextView tvBusinessName;
 
     // Layout Containers for Animation
-    private GridLayout statsGrid, quickActionsGrid;
+    private GridLayout dashboardGrid, quickActionsGrid;
 
     // Logic & Data
     private DashboardViewModel viewModel;
     private AuthManager authManager;
     private ProductRepository productRepository;
     private SalesRepository salesRepository;
-    private NotificationBadgeManager notificationBadgeManager;
+    private NotificationBadgeManager badgeManager;
     private boolean isAdminFlag = false;
 
     // Data Cache for Filtering
@@ -102,7 +113,14 @@ public class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
 
         AuthManager.getInstance().init(getApplication());
-        // --- START FIREBASE PRESENCE TRACKING ---
+        badgeManager = new NotificationBadgeManager(this);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
+
         String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
         if (currentUid != null) {
             DatabaseReference userStatusRef = FirebaseDatabase.getInstance().getReference("UsersStatus").child(currentUid);
@@ -120,8 +138,6 @@ public class MainActivity extends BaseActivity {
                 @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
             });
         }
-        // --- END FIREBASE PRESENCE TRACKING ---
-
 
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
@@ -135,18 +151,28 @@ public class MainActivity extends BaseActivity {
         setupCharts();
         setupClickListeners();
 
-        notificationBadgeManager = new NotificationBadgeManager(this);
-        notificationBadgeManager.start();
-
-        listenForFactoryReset(); // <--- LISTENS FOR ADMIN RESET
+        listenForFactoryReset();
 
         startEntryAnimation();
         loadDashboardData();
+
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                new androidx.appcompat.app.AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Exit Application")
+                        .setMessage("Are you sure you want to exit the application?")
+                        .setCancelable(false)
+                        .setPositiveButton("Exit", (dialog, which) -> {
+                            finishAffinity();
+                            System.exit(0);
+                        })
+                        .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                        .show();
+            }
+        });
     }
 
-    // ========================================================
-    // THE KILL SWITCH LISTENER (Detects Admin Reset Signal)
-    // ========================================================
     private void listenForFactoryReset() {
         resetSignalListener = FirestoreManager.getInstance().getResetSignalRef()
                 .addSnapshotListener((snapshot, e) -> {
@@ -159,10 +185,8 @@ public class MainActivity extends BaseActivity {
                             long localLastReset = prefs.getLong("localLastReset", 0);
 
                             if (resetTimeMillis > localLastReset) {
-                                // The Admin clicked Reset!
                                 prefs.edit().putLong("localLastReset", resetTimeMillis).apply();
 
-                                // Wipe local cache on a background thread so it doesn't freeze the UI
                                 new Thread(() -> {
                                     try {
                                         if (SalesInventoryApplication.getProductRepository() != null) {
@@ -178,7 +202,6 @@ public class MainActivity extends BaseActivity {
                                         android.util.Log.e("MainActivity", "Local wipe error: " + ex.getMessage());
                                     }
 
-                                    // Update the Staff's screen instantly
                                     runOnUiThread(() -> {
                                         Toast.makeText(MainActivity.this, "Admin performed a system reset. Local data cleared.", Toast.LENGTH_LONG).show();
                                         NotificationHelper.clearAllNotifications(MainActivity.this);
@@ -194,22 +217,14 @@ public class MainActivity extends BaseActivity {
 
     private void initializeUI() {
         swipeRefresh = findViewById(R.id.swipe_refresh);
-        cardSalesAmount = findViewById(R.id.card_sales_amount);
-        cardGrossProfit = findViewById(R.id.card_gross_profit);
-        cardOpex = findViewById(R.id.card_opex);
-        cardLowStock = findViewById(R.id.card_low_stock);
-        cardPendingOrders = findViewById(R.id.card_pending_orders);
-        cardNearExpiry = findViewById(R.id.card_near_expiry);
-        cardNetIncome = findViewById(R.id.card_net_income);
 
-        tvSalesAmount = findViewById(R.id.tv_sales_amount);
-        tvGrossProfit = findViewById(R.id.tv_gross_profit);
-        tvOpex = findViewById(R.id.tv_opex);
-        tvNetIncome = findViewById(R.id.tv_net_income);
-        tvLowStockList = findViewById(R.id.tv_low_stock_list);
-        tvPendingOrdersCount = findViewById(R.id.tv_pending_orders_count);
+        tvTotalSales = findViewById(R.id.tvTotalSales);
+        tvTotalProfit = findViewById(R.id.tvTotalProfit);
+        tvLowStock = findViewById(R.id.tvLowStock);
+        tvPendingOrders = findViewById(R.id.tvPendingOrders);
+
+        cardNearExpiry = findViewById(R.id.card_near_expiry);
         tvNearExpiryCount = findViewById(R.id.tv_near_expiry_count);
-        tvOverviewLabel = findViewById(R.id.tv_overview_label);
         tvLastUpdated = findViewById(R.id.tv_last_updated);
 
         ivBusinessLogo = findViewById(R.id.ivBusinessLogo);
@@ -222,18 +237,21 @@ public class MainActivity extends BaseActivity {
         inventoryStatusChart = findViewById(R.id.chart_inventory_status);
 
         btnCreateSale = findViewById(R.id.btn_create_sale);
+
         btnAddProduct = findViewById(R.id.btn_add_product);
+        fabAddManual = findViewById(R.id.fab_add_manual);
+        fabSuggestedProduct = findViewById(R.id.fab_suggested_product);
         dimOverlay = findViewById(R.id.dim_overlay);
+        layoutFabMenu = findViewById(R.id.layout_fab_menu);
 
         btnCreatePO = findViewById(R.id.btn_create_po);
         btnViewReports = findViewById(R.id.btn_view_reports);
         btnInventory = findViewById(R.id.btn_inventory);
-        btnCustomers = findViewById(R.id.btn_customers);
         btnManageUsers = findViewById(R.id.btn_manage_users);
         btnSettings = findViewById(R.id.btn_settings);
         btnProfile = findViewById(R.id.btn_profile);
 
-        statsGrid = findViewById(R.id.stats_grid);
+        dashboardGrid = findViewById(R.id.dashboard_grid);
         quickActionsGrid = findViewById(R.id.quick_actions_grid);
         progressBar = findViewById(R.id.progress_bar);
 
@@ -278,7 +296,8 @@ public class MainActivity extends BaseActivity {
                         if (documentSnapshot.exists()) {
                             String bName = documentSnapshot.getString("businessName");
                             String bLogo = documentSnapshot.getString("businessLogoUrl");
-
+                            if (isDestroyed() || isFinishing()) {
+                                return; }
                             if (bName != null && !bName.isEmpty()) tvBusinessName.setText(bName);
                             if (bLogo != null && !bLogo.isEmpty()) {
                                 ivBusinessLogo.setVisibility(View.VISIBLE);
@@ -292,7 +311,7 @@ public class MainActivity extends BaseActivity {
     }
 
     private void startEntryAnimation() {
-        animateView(statsGrid, 0);
+        animateView(dashboardGrid, 0);
         animateView(quickActionsGrid, 100);
         animateView(salesTrendChart, 200);
         animateView(topProductsChart, 300);
@@ -332,21 +351,17 @@ public class MainActivity extends BaseActivity {
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.VISIBLE);
             if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
             if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnCustomers != null) btnCustomers.setVisibility(View.VISIBLE);
             if (btnManageUsers != null) btnManageUsers.setVisibility(View.VISIBLE);
-            if (btnButtons != null) btnButtons.setVisibility(View.VISIBLE);
         } else {
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
             if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
             if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnCustomers != null) btnCustomers.setVisibility(View.GONE);
             if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
-            if (btnButtons != null) btnButtons.setVisibility(View.GONE);
 
-            if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
             if (dimOverlay != null) dimOverlay.setVisibility(View.GONE);
+            if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
             isFabOpen = false;
         }
         arrangeQuickActions();
@@ -398,15 +413,12 @@ public class MainActivity extends BaseActivity {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0);
 
-        String label = "Overview";
         switch (mode) {
-            case 0: startTime = cal.getTimeInMillis(); label = "Overview (Today)"; break;
-            case 1: cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek()); startTime = cal.getTimeInMillis(); label = "Overview (This Week)"; break;
-            case 2: cal.set(Calendar.DAY_OF_MONTH, 1); startTime = cal.getTimeInMillis(); label = "Overview (This Month)"; break;
-            case 3: startTime = 0; label = "Overview (All Time)"; break;
+            case 0: startTime = cal.getTimeInMillis(); break;
+            case 1: cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek()); startTime = cal.getTimeInMillis(); break;
+            case 2: cal.set(Calendar.DAY_OF_MONTH, 1); startTime = cal.getTimeInMillis(); break;
+            case 3: startTime = 0; break;
         }
-
-        if (tvOverviewLabel != null) tvOverviewLabel.setText(label);
 
         double totalSales = 0.0;
         double totalCost = 0.0;
@@ -430,44 +442,10 @@ public class MainActivity extends BaseActivity {
             }
         }
 
-        double grossProfit = totalSales - totalCost;
-        if (tvSalesAmount != null) tvSalesAmount.setText(String.format(Locale.US, "₱%,.2f", totalSales));
-        if (tvGrossProfit != null) tvGrossProfit.setText(String.format(Locale.US, "₱%,.2f", grossProfit));
+        double profit = totalSales - totalCost;
 
-        // Fetch Opex from Firebase for the selected timeframe
-        fetchOperatingExpensesAndCalculateNet(startTime, grossProfit);
-    }
-
-    private void fetchOperatingExpensesAndCalculateNet(long startTime, double grossProfit) {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null || ownerId.isEmpty()) return;
-
-        FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(ownerId)
-                .addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
-                        double totalOpex = 0.0;
-                        for (com.google.firebase.database.DataSnapshot ds : snapshot.getChildren()) {
-                            Long dateLogged = ds.child("dateLogged").getValue(Long.class);
-                            if (dateLogged != null && dateLogged >= startTime) {
-                                com.google.firebase.database.DataSnapshot itemsSnapshot = ds.child("items");
-                                for (com.google.firebase.database.DataSnapshot itemDs : itemsSnapshot.getChildren()) {
-                                    Object val = itemDs.getValue();
-                                    if (val != null) {
-                                        try { totalOpex += Double.parseDouble(val.toString()); }
-                                        catch (NumberFormatException ignored) {}
-                                    }
-                                }
-                            }
-                        }
-
-                        double netIncome = grossProfit - totalOpex;
-
-                        if (tvOpex != null) tvOpex.setText(String.format(Locale.US, "₱%,.2f", totalOpex));
-                        if (tvNetIncome != null) tvNetIncome.setText(String.format(Locale.US, "₱%,.2f", netIncome));
-                    }
-                    @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
-                });
+        if (tvTotalSales != null) tvTotalSales.setText(String.format(Locale.US, "₱%,.2f", totalSales));
+        if (tvTotalProfit != null) tvTotalProfit.setText(String.format(Locale.US, "₱%,.2f", profit));
     }
 
     private void setupNearExpiryCard() {
@@ -523,38 +501,13 @@ public class MainActivity extends BaseActivity {
     }
 
     private void updateStaticCards(DashboardMetrics metrics) {
-        // Build the Actionable List of Critical Items
-        if (cardLowStock != null && tvLowStockList != null) {
-            StringBuilder lowStockItemsList = new StringBuilder();
-            int criticalCount = 0;
-
-            for (Product p : cachedProductList) {
-                if (p.isActive() && p.isCriticalStock()) {
-                    criticalCount++;
-                    if (criticalCount <= 3) {
-                        String unit = p.getUnit().isEmpty() ? "Units" : p.getUnit();
-                        lowStockItemsList.append("• ").append(p.getProductName())
-                                .append(" (").append(p.getQuantity()).append(" ").append(unit).append(" left)\n");
-                    }
-                }
-            }
-
-            if (criticalCount > 0) {
-                if (criticalCount > 3) {
-                    lowStockItemsList.append("+ ").append(criticalCount - 3).append(" other items running low.");
-                }
-                tvLowStockList.setText(lowStockItemsList.toString().trim());
-                cardLowStock.setVisibility(View.VISIBLE);
-            } else {
-                cardLowStock.setVisibility(View.GONE);
-            }
+        if (tvLowStock != null) {
+            int lowCount = metrics.getLowStockCount();
+            tvLowStock.setText(lowCount + (lowCount == 1 ? " Item" : " Items"));
         }
-
-        if (tvPendingOrdersCount != null) {
-            int pendingCount = metrics.getPendingOrdersCount();
-            tvPendingOrdersCount.setText(String.valueOf(pendingCount));
-            if (pendingCount > 0) tvPendingOrdersCount.setTextColor(getColor(R.color.info_primary));
-            else tvPendingOrdersCount.setTextColor(getColor(R.color.text_primary));
+        if (tvPendingOrders != null) {
+            int poCount = metrics.getPendingOrdersCount();
+            tvPendingOrders.setText(poCount + (poCount == 1 ? " Order" : " Orders"));
         }
     }
 
@@ -567,20 +520,47 @@ public class MainActivity extends BaseActivity {
     }
 
     private void setupCharts() {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
         if (salesTrendChart != null) {
             salesTrendChart.getDescription().setEnabled(false);
             salesTrendChart.setDrawGridBackground(false);
             salesTrendChart.setNoDataText("Loading Data...");
+            salesTrendChart.getAxisLeft().setTextColor(textColor);
+            salesTrendChart.getAxisRight().setTextColor(textColor);
+            salesTrendChart.getXAxis().setTextColor(textColor);
+            salesTrendChart.getLegend().setTextColor(textColor);
         }
         if (topProductsChart != null) {
             topProductsChart.getDescription().setEnabled(false);
             topProductsChart.setDrawGridBackground(false);
             topProductsChart.setNoDataText("Loading Data...");
+            topProductsChart.getAxisLeft().setTextColor(textColor);
+            topProductsChart.getAxisRight().setTextColor(textColor);
+            topProductsChart.getXAxis().setTextColor(textColor);
+            topProductsChart.getLegend().setTextColor(textColor);
         }
         if (inventoryStatusChart != null) {
             inventoryStatusChart.getDescription().setEnabled(false);
             inventoryStatusChart.setNoDataText("Loading Data...");
+            inventoryStatusChart.getLegend().setTextColor(textColor);
+            inventoryStatusChart.setEntryLabelColor(textColor);
         }
+    }
+
+    private void showFabMenu() {
+        isFabOpen = true;
+        if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.VISIBLE);
+        if (dimOverlay != null) dimOverlay.setVisibility(View.VISIBLE);
+        if (btnAddProduct != null) btnAddProduct.animate().rotation(45f).setDuration(200).start();
+    }
+
+    private void closeFabMenu() {
+        isFabOpen = false;
+        if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
+        if (dimOverlay != null) dimOverlay.setVisibility(View.GONE);
+        if (btnAddProduct != null) btnAddProduct.animate().rotation(0f).setDuration(200).start();
     }
 
     private void setupClickListeners() {
@@ -588,10 +568,34 @@ public class MainActivity extends BaseActivity {
         if (btnProfile != null) btnProfile.setOnClickListener(v -> startActivity(new Intent(this, Profile.class)));
         if (btnCreateSale != null) btnCreateSale.setOnClickListener(v -> startActivity(new Intent(this, SellList.class)));
 
-        if (btnAddProduct != null) btnAddProduct.setOnClickListener(v -> {
-            if (isAdminFlag) startActivity(new Intent(this, AddProductActivity.class));
-            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
-        });
+        if (btnAddProduct != null) {
+            btnAddProduct.setOnClickListener(v -> {
+                if (!isAdminFlag) {
+                    Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!isFabOpen) showFabMenu();
+                else closeFabMenu();
+            });
+        }
+
+        if (dimOverlay != null) {
+            dimOverlay.setOnClickListener(v -> closeFabMenu());
+        }
+
+        if (fabAddManual != null) {
+            fabAddManual.setOnClickListener(v -> {
+                closeFabMenu();
+                startActivity(new Intent(this, AddProductActivity.class));
+            });
+        }
+
+        if (fabSuggestedProduct != null) {
+            fabSuggestedProduct.setOnClickListener(v -> {
+                closeFabMenu();
+                startActivity(new Intent(this, SuggestedSuppliesActivity.class));
+            });
+        }
 
         if (btnCreatePO != null) btnCreatePO.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
@@ -605,15 +609,18 @@ public class MainActivity extends BaseActivity {
             startActivity(i);
         });
 
-        if (btnCustomers != null) btnCustomers.setOnClickListener(v -> {
-            if (isAdminFlag) startActivity(new Intent(MainActivity.this, CategoryManagementActivity.class));
-            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
-        });
-
-        if (cardSalesAmount != null) cardSalesAmount.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
-        if (cardGrossProfit != null) cardGrossProfit.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
-        if (cardLowStock != null) cardLowStock.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class)));
-        if (cardPendingOrders != null) cardPendingOrders.setOnClickListener(v -> startActivity(new Intent(MainActivity.this, PurchaseOrderListActivity.class)));
+        if (tvTotalSales != null && tvTotalSales.getParent() != null) {
+            ((View) tvTotalSales.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
+        }
+        if (tvTotalProfit != null && tvTotalProfit.getParent() != null) {
+            ((View) tvTotalProfit.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
+        }
+        if (tvLowStock != null && tvLowStock.getParent() != null) {
+            ((View) tvLowStock.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class)));
+        }
+        if (tvPendingOrders != null && tvPendingOrders.getParent() != null) {
+            ((View) tvPendingOrders.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, PurchaseOrderListActivity.class)));
+        }
 
         if (btnManageUsers != null) btnManageUsers.setOnClickListener(v -> {
             if (isAdminFlag) authManager.isCurrentUserAdminAsync(success -> runOnUiThread(() -> {
@@ -648,6 +655,31 @@ public class MainActivity extends BaseActivity {
         showNotificationBottomSheet();
     }
 
+    // Helper to keep dropdown text white in dark mode
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? android.graphics.Color.WHITE : android.graphics.Color.BLACK;
+
+        ArrayAdapter<String> dropdownAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @androidx.annotation.NonNull
+            @Override
+            public android.view.View getView(int position, android.view.View convertView, @androidx.annotation.NonNull android.view.ViewGroup parent) {
+                android.view.View v = super.getView(position, convertView, parent);
+                ((android.widget.TextView) v).setTextColor(textColor);
+                return v;
+            }
+
+            @Override
+            public android.view.View getDropDownView(int position, android.view.View convertView, @androidx.annotation.NonNull android.view.ViewGroup parent) {
+                android.view.View v = super.getDropDownView(position, convertView, parent);
+                ((android.widget.TextView) v).setTextColor(textColor);
+                return v;
+            }
+        };
+        dropdownAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return dropdownAdapter;
+    }
+
     private void showNotificationBottomSheet() {
         BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog);
         View sheetView = LayoutInflater.from(this).inflate(R.layout.layout_notifications_sheet, null);
@@ -668,41 +700,60 @@ public class MainActivity extends BaseActivity {
         rvNotifications.setLayoutManager(new LinearLayoutManager(this));
 
         AlertRepository repo = AlertRepository.getInstance(getApplication());
-        NotificationAdapter adapter = new NotificationAdapter(this, alert -> {
-            repo.markAlertAsRead(alert.getId(), null);
-            bottomSheetDialog.dismiss();
 
-            String type = alert.getType() != null ? alert.getType() : "";
+        // FIX: Replaced with 3-parameter lambda to match updated Adapter
+        NotificationAdapter adapter = new NotificationAdapter(this, (alert, product, exactCategory) -> {
+            bottomSheetDialog.dismiss();
             Intent intent;
 
-            if (type.equals("LOW_STOCK") || type.equals("CRITICAL_STOCK")) {
-                intent = new Intent(MainActivity.this, LowStockItemsActivity.class);
-            } else if (type.contains("EXPIRY") || type.equals("EXPIRED")) {
-                intent = new Intent(MainActivity.this, NearExpiryItemsActivity.class);
-            } else if (type.equals("PO_RECEIVED")) {
-                intent = new Intent(MainActivity.this, PurchaseOrderListActivity.class);
-            } else {
-                intent = new Intent(MainActivity.this, StockAlertsActivity.class);
+            // Route pure products directly to Product Details
+            if (product != null && "Expiration".equals(exactCategory)) {
+                intent = new Intent(MainActivity.this, ProductDetailActivity.class);
+                intent.putExtra("productId", product.getProductId());
+                startActivity(intent);
+                return;
             }
 
-            intent.putExtra("alertId", alert.getId());
-            startActivity(intent);
+            // Route Firebase Alerts
+            if (alert != null) {
+                repo.markAlertAsRead(alert.getId(), null);
+
+                if ("Low Stock".equals(exactCategory)) {
+                    intent = new Intent(MainActivity.this, LowStockItemsActivity.class);
+                } else if ("Damaged".equals(exactCategory)) {
+                    intent = new Intent(MainActivity.this, DamagedProductsReportActivity.class);
+                } else if ("Supplier".equals(exactCategory)) {
+                    intent = new Intent(MainActivity.this, PurchaseOrderListActivity.class);
+                } else {
+                    intent = new Intent(MainActivity.this, StockAlertsActivity.class);
+                }
+                intent.putExtra("alertId", alert.getId());
+                startActivity(intent);
+            }
         });
 
         rvNotifications.setAdapter(adapter);
 
+        List<Alert> currentAlerts = new ArrayList<>();
+        List<Product> currentProducts = new ArrayList<>();
+
         productRepository.getAllProducts().observe(this, products -> {
-            adapter.setProducts(products);
+            currentProducts.clear();
+            if (products != null) currentProducts.addAll(products);
+            adapter.setAlertsAndProducts(currentAlerts, currentProducts);
         });
 
         repo.getAllAlerts().observe(this, alerts -> {
-            if (alerts == null || alerts.isEmpty()) {
+            currentAlerts.clear();
+            if (alerts != null) currentAlerts.addAll(alerts);
+
+            if (currentAlerts.isEmpty() && currentProducts.isEmpty()) {
                 emptyState.setVisibility(View.VISIBLE);
                 rvNotifications.setVisibility(View.GONE);
             } else {
                 emptyState.setVisibility(View.GONE);
                 rvNotifications.setVisibility(View.VISIBLE);
-                adapter.setAlerts(alerts);
+                adapter.setAlertsAndProducts(currentAlerts, currentProducts);
             }
         });
 
@@ -719,12 +770,32 @@ public class MainActivity extends BaseActivity {
                     .show();
         });
 
+        Spinner spinnerFilter = sheetView.findViewById(R.id.spinnerNotificationFilter);
+        String[] filterOptionsArray = {"All Notifications", "Low Stock", "Expiration", "Damaged/Spoiled", "Supplier Updates"};
+        ArrayAdapter<String> spinnerAdapter = getAdaptiveAdapter(java.util.Arrays.asList(filterOptionsArray));
+        spinnerFilter.setAdapter(spinnerAdapter);
+        spinnerFilter.setSelection(0);
+
+
+        spinnerFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                adapter.filter(filterOptionsArray[position]);
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
         bottomSheetDialog.show();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+
+        if (badgeManager != null) {
+            badgeManager.start();
+        }
 
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("IMPERSONATE_STAFF_NAME")) {
@@ -743,16 +814,18 @@ public class MainActivity extends BaseActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if (badgeManager != null) {
+            badgeManager.stop();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
-        // Prevent Memory Leak on the Listener
         if (resetSignalListener != null) {
             resetSignalListener.remove();
             resetSignalListener = null;
-        }
-
-        if (notificationBadgeManager != null) {
-            notificationBadgeManager.stop();
-            notificationBadgeManager = null;
         }
         super.onDestroy();
     }

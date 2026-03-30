@@ -114,6 +114,9 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         });
     }
 
+    // =========================================================================
+    // FIX: Accurate Master Category Valuation
+    // =========================================================================
     private void calculateDashboardMetrics() {
         // 1. Calculate Total Warehouse Value & Group By Category
         double totalCostValue = 0.0;
@@ -122,7 +125,8 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         for (Product p : cachedProducts) {
             if ("Menu".equalsIgnoreCase(p.getProductType())) continue; // Skip BOM double-counting
 
-            double pValue = p.getCostPrice() * p.getQuantity();
+            // FIX: Cost Price IS the total value. No multiplication needed!
+            double pValue = p.getCostPrice();
             totalCostValue += pValue;
 
             String catName = p.getCategoryName() != null && !p.getCategoryName().isEmpty() ? p.getCategoryName() : "Uncategorized";
@@ -288,7 +292,6 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         return true;
     }
 
-    // --- NEW: Category Valuation Data Model & Adapter ---
     private static class CategoryValuation {
         String categoryName;
         double totalItems = 0;
@@ -318,7 +321,6 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
             CategoryValuation cat = items.get(position);
             holder.tvCategoryName.setText(cat.categoryName);
 
-            // Format to remove decimals if whole number
             String countStr = (cat.totalItems % 1 == 0) ? String.valueOf((long)cat.totalItems) : String.format(Locale.US, "%.2f", cat.totalItems);
             holder.tvItemCount.setText(countStr + " units in stock");
 

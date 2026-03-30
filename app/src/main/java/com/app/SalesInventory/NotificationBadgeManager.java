@@ -33,7 +33,7 @@ public class NotificationBadgeManager {
 
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(Color.parseColor("#DD2C2C")); // Red color
+        bg.setColor(Color.parseColor("#DD2C2C")); // Red color for the badge
         badgeView.setBackground(bg);
 
         badgeView.setElevation(dpToPx(4));

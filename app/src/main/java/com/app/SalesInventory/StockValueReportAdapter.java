@@ -35,10 +35,20 @@ public class StockValueReportAdapter extends RecyclerView.Adapter<StockValueRepo
         holder.tvCategory.setText("Category: " + report.getCategory());
         holder.tvQuantity.setText("Qty: " + report.getQuantity() + " units");
 
-        holder.tvCostValue.setText(String.format(Locale.getDefault(), "Cost: ₱%,.2f", report.getTotalCostValue()));
-        holder.tvSellingValue.setText(String.format(Locale.getDefault(), "Selling: ₱%,.2f", report.getTotalSellingValue()));
-        holder.tvProfit.setText(String.format(Locale.getDefault(), "Profit: ₱%,.2f", report.getProfit()));
-        holder.tvMargin.setText("Margin: " + report.getProfitMargin());
+        // FIX: Display exact Cost Price, calculate accurate Selling and Profit
+        double exactCost = report.getCostPrice();
+        double exactSellingValue = report.getSellingPrice() * report.getQuantity();
+        double exactProfit = exactSellingValue - exactCost;
+
+        String margin = "0%";
+        if (exactSellingValue > 0) {
+            margin = String.format(Locale.getDefault(), "%.1f%%", (exactProfit / exactSellingValue) * 100);
+        }
+
+        holder.tvCostValue.setText(String.format(Locale.getDefault(), "Cost: ₱%,.2f", exactCost));
+        holder.tvSellingValue.setText(String.format(Locale.getDefault(), "Selling: ₱%,.2f", exactSellingValue));
+        holder.tvProfit.setText(String.format(Locale.getDefault(), "Profit: ₱%,.2f", exactProfit));
+        holder.tvMargin.setText("Margin: " + margin);
 
         // Display the Automated Stock Numbers
         if (holder.tvCeiling != null) holder.tvCeiling.setText("Max: " + report.getCeilingLevel());

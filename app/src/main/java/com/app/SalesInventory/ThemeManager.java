@@ -15,9 +15,6 @@ import com.google.firebase.firestore.FirebaseFirestore;
 public class ThemeManager {
     private static final String THEME_PREFS = "theme_prefs";
     private static final String SELECTED_THEME = "selected_theme";
-    private static final String PRIMARY_COLOR = "primary_color";
-    private static final String SECONDARY_COLOR = "secondary_color";
-    private static final String ACCENT_COLOR = "accent_color";
 
     private static ThemeManager instance;
     private SharedPreferences sharedPreferences;
@@ -28,13 +25,9 @@ public class ThemeManager {
     }
 
     public enum Theme {
-        LIGHT("light", 0xFF2196F3, 0xFF1976D2, 0xFFFF5722),
-        DARK("dark", 0xFF1E1E1E, 0xFF121212, 0xFFBB86FC),
-        OCEAN("ocean", 0xFF006994, 0xFF004D73, 0xFF00BCD4),
-        FOREST("forest", 0xFF2E7D32, 0xFF1B5E20, 0xFF81C784),
-        SUNSET("sunset", 0xFFE65100, 0xFFBF360C, 0xFFFF6F00),
-        PURPLE("purple", 0xFF6A1B9A, 0xFF4A148C, 0xFF9C27B0),
-        CUSTOM("custom", 0xFF2196F3, 0xFF1976D2, 0xFFFF5722);
+        DEFAULT("default", 0xFF4E342E, 0xFF3E2723, 0xFF8D6E63),
+        LIGHT("light", 0xFF4E342E, 0xFF3E2723, 0xFF8D6E63),
+        DARK("dark", 0xFF121212, 0xFF000000, 0xFF8D6E63);
 
         public final String name;
         public final int primaryColor;
@@ -62,134 +55,62 @@ public class ThemeManager {
     }
 
     public Theme getCurrentTheme() {
-        String themeName = sharedPreferences.getString(SELECTED_THEME, Theme.LIGHT.name);
+        String themeName = sharedPreferences.getString(SELECTED_THEME, Theme.DEFAULT.name);
         for (Theme theme : Theme.values()) {
             if (theme.name.equals(themeName)) {
                 return theme;
             }
         }
-        return Theme.LIGHT;
+        return Theme.DEFAULT;
     }
 
-    private void saveLocalTheme(Theme chosen, int primaryColor, int secondaryColor, int accentColor) {
+    private void saveLocalTheme(Theme chosen) {
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putString(SELECTED_THEME, chosen.name);
-        editor.putInt(PRIMARY_COLOR, primaryColor);
-        editor.putInt(SECONDARY_COLOR, secondaryColor);
-        editor.putInt(ACCENT_COLOR, accentColor);
         editor.apply();
     }
 
-    private void saveRemoteTheme(String themeName, int primaryColor, int secondaryColor, int accentColor) {
+    public void setCurrentTheme(String themeName) {
+        Theme chosen = Theme.DEFAULT;
+        for (Theme t : Theme.values()) {
+            if (t.name.equals(themeName)) {
+                chosen = t;
+                break;
+            }
+        }
+        saveLocalTheme(chosen);
+
         String uid = AuthManager.getInstance().getCurrentUserId();
         if (uid != null) {
             FirebaseFirestore.getInstance().collection("users").document(uid)
-                    .update("themeName", themeName,
-                            "primaryColor", primaryColor,
-                            "secondaryColor", secondaryColor,
-                            "accentColor", accentColor);
+                    .update("themeName", chosen.name);
         }
-    }
-
-    public void setCurrentTheme(String themeName) {
-        Theme chosen = Theme.LIGHT;
-        for (Theme t : Theme.values()) {
-            if (t.name.equals(themeName)) {
-                chosen = t;
-                break;
-            }
-        }
-        saveLocalTheme(chosen, chosen.primaryColor, chosen.secondaryColor, chosen.accentColor);
-        saveRemoteTheme(chosen.name, chosen.primaryColor, chosen.secondaryColor, chosen.accentColor);
-    }
-
-    public void setCurrentThemeLocalOnly(String themeName) {
-        Theme chosen = Theme.LIGHT;
-        for (Theme t : Theme.values()) {
-            if (t.name.equals(themeName)) {
-                chosen = t;
-                break;
-            }
-        }
-        saveLocalTheme(chosen, chosen.primaryColor, chosen.secondaryColor, chosen.accentColor);
     }
 
     public void applyTheme(AppCompatActivity activity) {
         Theme current = getCurrentTheme();
         if ("dark".equalsIgnoreCase(current.name)) {
             activity.setTheme(R.style.AppTheme_Dark);
-        } else if ("ocean".equalsIgnoreCase(current.name)) {
-            activity.setTheme(R.style.AppTheme_Ocean);
-        } else if ("forest".equalsIgnoreCase(current.name)) {
-            activity.setTheme(R.style.AppTheme_Forest);
-        } else if ("sunset".equalsIgnoreCase(current.name)) {
-            activity.setTheme(R.style.AppTheme_Sunset);
-        } else if ("purple".equalsIgnoreCase(current.name)) {
-            activity.setTheme(R.style.AppTheme_Purple);
-        } else {
+        } else if ("light".equalsIgnoreCase(current.name)) {
             activity.setTheme(R.style.AppTheme_Light);
+        } else {
+            activity.setTheme(R.style.Theme_SalesInventory); // Default
         }
-    }
-
-    public int getPrimaryColor() {
-        return sharedPreferences.getInt(PRIMARY_COLOR, Theme.LIGHT.primaryColor);
-    }
-
-    public int getSecondaryColor() {
-        return sharedPreferences.getInt(SECONDARY_COLOR, Theme.LIGHT.secondaryColor);
-    }
-
-    public int getAccentColor() {
-        return sharedPreferences.getInt(ACCENT_COLOR, Theme.LIGHT.accentColor);
-    }
-
-    public void setCustomColors(int primaryColor, int secondaryColor, int accentColor) {
-        saveLocalTheme(Theme.CUSTOM, primaryColor, secondaryColor, accentColor);
-        saveRemoteTheme(Theme.CUSTOM.name, primaryColor, secondaryColor, accentColor);
-    }
-
-    public Theme[] getAvailableThemes() {
-        return new Theme[]{
-                Theme.LIGHT,
-                Theme.DARK,
-                Theme.OCEAN,
-                Theme.FOREST,
-                Theme.SUNSET,
-                Theme.PURPLE
-        };
     }
 
     public void applySystemColorsToWindow(Activity activity) {
         if (activity == null) return;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
-        int primary = getPrimaryColor();
-        int secondary = getSecondaryColor();
-        Window window = activity.getWindow();
-        window.setStatusBarColor(primary);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            window.setNavigationBarColor(secondary);
-        } else {
-            window.setNavigationBarColor(primary);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            View decor = window.getDecorView();
-            int flags = decor.getSystemUiVisibility();
-            boolean lightStatusIcons = isColorLight(primary);
-            if (lightStatusIcons) {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            } else {
-                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            }
-            decor.setSystemUiVisibility(flags);
-        }
-    }
 
-    private boolean isColorLight(int color) {
-        double r = android.graphics.Color.red(color) / 255.0;
-        double g = android.graphics.Color.green(color) / 255.0;
-        double b = android.graphics.Color.blue(color) / 255.0;
-        double luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        return luminance > 0.5;
+        Theme current = getCurrentTheme();
+        Window window = activity.getWindow();
+
+        window.setStatusBarColor(current.primaryColor);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            window.setNavigationBarColor(current.secondaryColor);
+        } else {
+            window.setNavigationBarColor(current.primaryColor);
+        }
     }
 
     public void loadUserThemeFromRemote(ThemeLoadCallback callback) {
@@ -201,30 +122,19 @@ public class ThemeManager {
         FirebaseFirestore.getInstance().collection("users").document(uid)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    applyRemoteThemeDoc(doc);
+                    if (doc != null && doc.exists() && doc.contains("themeName")) {
+                        String themeName = doc.getString("themeName");
+                        for (Theme t : Theme.values()) {
+                            if (t.name.equals(themeName)) {
+                                saveLocalTheme(t);
+                                break;
+                            }
+                        }
+                    }
                     if (callback != null) callback.onLoaded();
                 })
                 .addOnFailureListener(e -> {
                     if (callback != null) callback.onLoaded();
                 });
-    }
-
-    private void applyRemoteThemeDoc(DocumentSnapshot doc) {
-        if (doc == null || !doc.exists()) return;
-        String themeName = doc.contains("themeName") ? doc.getString("themeName") : null;
-        int primary = doc.contains("primaryColor") ? doc.getLong("primaryColor").intValue() : Theme.LIGHT.primaryColor;
-        int secondary = doc.contains("secondaryColor") ? doc.getLong("secondaryColor").intValue() : Theme.LIGHT.secondaryColor;
-        int accent = doc.contains("accentColor") ? doc.getLong("accentColor").intValue() : Theme.LIGHT.accentColor;
-        if (themeName == null || themeName.isEmpty()) {
-            themeName = Theme.LIGHT.name;
-        }
-        Theme chosen = Theme.LIGHT;
-        for (Theme t : Theme.values()) {
-            if (t.name.equals(themeName)) {
-                chosen = t;
-                break;
-            }
-        }
-        saveLocalTheme(chosen, primary, secondary, accent);
     }
 }

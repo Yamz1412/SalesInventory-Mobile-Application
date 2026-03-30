@@ -131,7 +131,8 @@ public class DashboardRepository {
                 if (p == null || !p.isActive()) continue;
                 if ("Menu".equalsIgnoreCase(p.getProductType())) continue;
 
-                inventoryValue += (p.getQuantity() * p.getCostPrice());
+                // FIX: Cost Price is already the Total Inventory Cash Value for that item!
+                inventoryValue += p.getCostPrice();
 
                 if (p.isCriticalStock() || p.isLowStock()) {
                     lowOrCriticalCount++;
@@ -274,7 +275,6 @@ public class DashboardRepository {
         int inStock = 0, low = 0, critical = 0, out = 0;
         if (products != null) {
             for (Product p : products) {
-                // FIX: Changed int to double
                 double qty = p.getQuantity();
                 if (qty <= 0) out++;
                 else if (p.isCriticalStock()) critical++;

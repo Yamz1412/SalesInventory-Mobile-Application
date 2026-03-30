@@ -4,8 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/edite_round"
-    android:backgroundTint="@android:color/white"
+    android:background="?attr/colorSurface"
+    android:backgroundTint="?attr/colorSurface"
     android:padding="20dp">
 
     <TextView
@@ -14,7 +14,7 @@
         android:text="Operating Expenses"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="?attr/colorPrimary"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="4dp" />
 
     <TextView

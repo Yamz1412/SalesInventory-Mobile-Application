@@ -6,6 +6,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -72,7 +73,7 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         btnProcessDelivery = findViewById(R.id.btnProcessDelivery);
         btnCancelOrder = findViewById(R.id.btnCancelOrder);
         btnForceClose = findViewById(R.id.btnForceClose);
-        btnDispatchPO = findViewById(R.id.btnDispatchPO); // Phase 2: Dispatch Button
+        btnDispatchPO = findViewById(R.id.btnDispatchPO);
         tilDeliveryNote = findViewById(R.id.tilDeliveryNote);
         etDeliveryNote = findViewById(R.id.etDeliveryNote);
         layoutActionButtons = findViewById(R.id.layoutActionButtons);
@@ -112,8 +113,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 Toast.makeText(PurchaseOrderDetailActivity.this, "Database Error", Toast.LENGTH_SHORT).show();
             }
         });
-    }
 
+    }
     private void updateUI() {
         tvPONumber.setText(currentPo.getPoNumber());
         tvSupplier.setText(currentPo.getSupplierName());
@@ -145,7 +146,7 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 }
             }
 
-            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position));
+            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position), null);
             itemsAdapter.setReceiveMode(true);
         } else {
             layoutActionButtons.setVisibility(View.GONE);
@@ -158,8 +159,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                 tvStatus.setTextColor(getResources().getColor(R.color.errorRed));
             }
 
-            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), null);
-            itemsAdapter.setViewOnlyMode(true);
+            itemsAdapter = new POItemAdapter(this, currentPo.getItems(), null, null);
+            itemsAdapter.setReceiveMode(false);
         }
 
         recyclerViewOrderItems.setAdapter(itemsAdapter);
@@ -228,24 +229,31 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
 
         List<POItem> itemsReceivedNow = new ArrayList<>();
 
+        List<Map<String, Object>> inspectionData = new ArrayList<>();
+
         for (int i = 0; i < currentPo.getItems().size(); i++) {
             POItem item = currentPo.getItems().get(i);
 
-            // Extract the quantity the user just inputted for this specific session
-            int newlyReceived = itemsAdapter.getNewlyReceivedMap().containsKey(i) ? itemsAdapter.getNewlyReceivedMap().get(i) : 0;
+            double newlyReceived = itemsAdapter.getNewlyReceivedMap().containsKey(i) ? itemsAdapter.getNewlyReceivedMap().get(i) : 0.0;
+            double remainingExpected = item.getQuantity() - item.getReceivedQuantity();
 
             if (newlyReceived > 0) {
                 hasNewReceives = true;
-                item.setReceivedQuantity(item.getReceivedQuantity() + newlyReceived);
 
-                // Create a temporary POItem to represent exactly what arrived right now
                 POItem tempItem = new POItem(item.getProductId(), item.getProductName(), newlyReceived, item.getUnitPrice(), item.getUnit());
                 itemsReceivedNow.add(tempItem);
             }
 
-            // If the total received is still less than what was ordered, it remains a Partial PO
-            if (item.getReceivedQuantity() < item.getQuantity()) {
+            if ((item.getReceivedQuantity() + newlyReceived) < item.getQuantity()) {
                 isPartial = true;
+            }
+
+            if (remainingExpected > 0) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("name", item.getProductName());
+                map.put("expected", remainingExpected);
+                map.put("received", newlyReceived);
+                inspectionData.add(map);
             }
         }
 
@@ -254,66 +262,128 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             return;
         }
 
-        checkProductsAndFinalize(itemsReceivedNow, isPartial);
+        showDeliveryInspectionDialog(itemsReceivedNow, inspectionData, isPartial);
     }
 
-    private void checkProductsAndFinalize(List<POItem> itemsToCheck, boolean isPartial) {
-        ArrayList<Bundle> registrationQueue = new ArrayList<>();
+    private void showDeliveryInspectionDialog(List<POItem> itemsReceivedNow, List<Map<String, Object>> inspectionData, boolean isPartial) {
+        View view = getLayoutInflater().inflate(R.layout.dialog_delivery_inspection, null);
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
-        // Run on a background thread to prevent UI freezing while querying the local Room Database
-        new Thread(() -> {
-            AppDatabase db = AppDatabase.getInstance(PurchaseOrderDetailActivity.this);
-            ProductDao productDao = db.productDao();
+        LinearLayout layoutInspectionItems = view.findViewById(R.id.layoutInspectionItems);
+        TextView tvInspectionWarning = view.findViewById(R.id.tvInspectionWarning);
+        Button btnInspectCancel = view.findViewById(R.id.btnInspectCancel);
+        Button btnInspectConfirm = view.findViewById(R.id.btnInspectConfirm);
 
-            for (POItem item : itemsToCheck) {
-                // FIX: Query the local Room DB synchronously instead of the deprecated Realtime DB node
-                ProductEntity p = productDao.getByProductIdSync(item.getProductId());
+        // FIX: Ensure Dialog text is perfectly visible in Dark/Light Mode
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
 
-                if (p != null) {
-                    // SCENARIO A: Product exists.
-                    double newlyReceived = item.getQuantity();
+        if (tvInspectionWarning != null) {
+            tvInspectionWarning.setTextColor(textColor);
+        }
 
-                    // 1. Convert units if supplier unit differs from inventory unit (e.g., Box to Pcs)
-                    double addedAmount = calculateConvertedQuantity(newlyReceived, item.getUnit(), p.unit, p.piecesPerUnit);
+        boolean hasDiscrepancy = false;
 
-                    double oldQty = p.quantity;
-                    double finalQty = oldQty + addedAmount;
+        for (Map<String, Object> data : inspectionData) {
+            View row = getLayoutInflater().inflate(R.layout.item_inspection_row, null);
+            TextView tvName = row.findViewById(R.id.tvInspectName);
+            TextView tvExpected = row.findViewById(R.id.tvInspectExpected);
+            TextView tvReceived = row.findViewById(R.id.tvInspectReceived);
 
-                    // 2. ACCOUNTING UPGRADE: Calculate Moving Average Cost (MAC)
-                    double oldTotalValue = oldQty * p.costPrice;
-                    double newReceivedValue = newlyReceived * item.getUnitPrice();
+            String name = (String) data.get("name");
+            double expected = (Double) data.get("expected");
+            double received = (Double) data.get("received");
 
-                    double newAverageCost = p.costPrice; // Default fallback
-                    if (finalQty > 0) {
-                        newAverageCost = (oldTotalValue + newReceivedValue) / finalQty;
-                    }
+            tvName.setText(name);
+            tvExpected.setText(String.valueOf(expected));
+            tvReceived.setText(String.valueOf(received));
 
-                    // 3. Update Inventory using the Repository to ensure it syncs to Firestore
-                    productRepository.updateProductQuantityAndCost(
-                            p.productId,
-                            finalQty,
-                            newAverageCost,
-                            null
-                    );
-                } else {
-                    // SCENARIO B: Product doesn't exist (deleted, or brand new). Send to Queue.
-                    Bundle b = new Bundle();
-                    b.putString("PREFILL_NAME", item.getProductName());
-                    b.putDouble("PREFILL_COST", item.getUnitPrice());
-                    b.putInt("PREFILL_QTY", (int) item.getQuantity());
-                    b.putString("PREFILL_UNIT", item.getUnit());
-                    b.putString("PREFILL_SUPPLIER", currentPo.getSupplierName());
-                    registrationQueue.add(b);
-                }
+            // Force general text coloring to match theme
+            tvName.setTextColor(textColor);
+            tvExpected.setTextColor(textColor);
+
+            if (received < expected) {
+                tvReceived.setTextColor(getResources().getColor(R.color.errorRed));
+                hasDiscrepancy = true;
+            } else {
+                tvReceived.setTextColor(getResources().getColor(R.color.successGreen));
             }
 
-            // Return to Main Thread to update UI and Firebase PO Status
-            runOnUiThread(() -> finalizeDeliveryStatus(isPartial, registrationQueue));
+            layoutInspectionItems.addView(row);
+        }
 
-        }).start();
+        if (isPartial || hasDiscrepancy) {
+            tvInspectionWarning.setVisibility(View.VISIBLE);
+        } else {
+            tvInspectionWarning.setVisibility(View.GONE);
+        }
+
+        btnInspectCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnInspectConfirm.setOnClickListener(v -> {
+            dialog.dismiss();
+
+            for (int i = 0; i < currentPo.getItems().size(); i++) {
+                POItem item = currentPo.getItems().get(i);
+                double newlyReceived = itemsAdapter.getNewlyReceivedMap().containsKey(i) ? itemsAdapter.getNewlyReceivedMap().get(i) : 0.0;
+                item.setReceivedQuantity(item.getReceivedQuantity() + newlyReceived);
+            }
+
+            checkProductsAndFinalize(itemsReceivedNow, isPartial);
+        });
+
+        dialog.show();
     }
 
-    // Helper method to keep conversion math clean and separated
+    private void checkProductsAndFinalize(List<POItem> itemsReceivedNow, boolean isPartial) {
+        ArrayList<Bundle> registrationQueue = new ArrayList<>();
+        int[] processedCount = {0};
+
+        if (itemsReceivedNow.isEmpty()) {
+            finalizeDeliveryStatus(isPartial, registrationQueue);
+            return;
+        }
+
+        for (POItem item : itemsReceivedNow) {
+            productRepository.getProductById(item.getProductId(), new ProductRepository.OnProductFetchedListener() {
+                @Override
+                public void onProductFetched(Product p) {
+                    if (p != null) {
+                        double convertedQty = calculateConvertedQuantity(item.getReceivedQuantity(), item.getUnit(), p.getUnit(), p.getPiecesPerUnit());
+                        double newQty = p.getQuantity() + convertedQty;
+
+                        double conversionRatio = convertedQty / item.getReceivedQuantity();
+                        double newCostPerUnit = item.getUnitPrice() / conversionRatio;
+
+                        productRepository.updateProductQuantityAndCost(p.getProductId(), newQty, newCostPerUnit, null);
+
+                    } else {
+                        Bundle b = new Bundle();
+                        b.putString("productName", item.getProductName());
+                        b.putDouble("quantity", item.getReceivedQuantity());
+                        b.putDouble("costPrice", item.getUnitPrice());
+                        registrationQueue.add(b);
+                    }
+
+                    processedCount[0]++;
+                    if (processedCount[0] == itemsReceivedNow.size()) {
+                        finalizeDeliveryStatus(isPartial, registrationQueue);
+                    }
+                }
+
+                @Override
+                public void onError(String error) {
+                    processedCount[0]++;
+                    if (processedCount[0] == itemsReceivedNow.size()) {
+                        finalizeDeliveryStatus(isPartial, registrationQueue);
+                    }
+                }
+            });
+        }
+    }
+
+
     private double calculateConvertedQuantity(double receivedQty, String inUnit, String invUnit, int piecesPerUnit) {
         if (inUnit == null || invUnit == null) return receivedQty;
 
@@ -331,7 +401,7 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             return receivedQty * 33.814;
         }
 
-        return receivedQty; // Default if units match perfectly
+        return receivedQty;
     }
 
     private void finalizeDeliveryStatus(boolean isPartial, ArrayList<Bundle> registrationQueue) {
@@ -342,13 +412,13 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
 
             Toast.makeText(this, "Delivery updated and inventory synchronized!", Toast.LENGTH_SHORT).show();
 
-            // Fire the Registration Queue if there are missing/new products
+            SyncScheduler.enqueueImmediateSync(getApplicationContext());
+
             if (!registrationQueue.isEmpty()) {
                 Intent intent = new Intent(this, AddProductActivity.class);
                 intent.putParcelableArrayListExtra("REGISTRATION_QUEUE", registrationQueue);
                 startActivity(intent);
             } else {
-                // Only close the activity if we aren't jumping to the AddProductActivity
                 finish();
             }
         });

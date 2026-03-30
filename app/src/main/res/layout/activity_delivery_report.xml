@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical"
-    android:background="#F4F6F8">
+    android:background="?android:colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -19,6 +19,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginEnd="6dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
             <LinearLayout
@@ -27,26 +28,8 @@
                 android:orientation="vertical"
                 android:padding="12dp"
                 android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Deliveries" android:textSize="11sp" android:textColor="#757575" />
-                <TextView android:id="@+id/tvTotalDeliveries" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:layout_marginTop="4dp" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <androidx.cardview.widget.CardView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="6dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp"
-                android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pending" android:textSize="11sp" android:textColor="#757575" />
-                <TextView android:id="@+id/tvTotalPending" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#FF9800" android:layout_marginTop="4dp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Deliveries" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:alpha="0.7" />
+                <TextView android:id="@+id/tvTotalDeliveriesCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?attr/colorPrimary" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -55,6 +38,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="6dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp">
             <LinearLayout
@@ -63,7 +47,26 @@
                 android:orientation="vertical"
                 android:padding="12dp"
                 android:gravity="center">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delivered" android:textSize="11sp" android:textColor="#757575" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pending Delivery" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:alpha="0.7" />
+                <TextView android:id="@+id/tvPendingDeliveriesCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="20sp" android:textStyle="bold" android:textColor="?attr/colorError" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="2dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Delivered" android:textSize="11sp" android:textColor="?attr/colorOnSurface" />
                 <TextView android:id="@+id/tvTotalDelivered" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="18sp" android:textStyle="bold" android:textColor="#4CAF50" android:layout_marginTop="4dp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -74,15 +77,13 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingBottom="8dp"
-        android:gravity="center_vertical">
+        android:paddingBottom="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDateFilter"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1.2"
-            android:text="All Time"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="Today"
             app:icon="@android:drawable/ic_menu_today"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             app:cornerRadius="8dp"
@@ -93,6 +94,7 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
+            android:backgroundTint="?attr/colorControlHighlight"
             android:background="@android:drawable/btn_dropdown"
             android:spinnerMode="dropdown" />
     </LinearLayout>
@@ -112,7 +114,8 @@
         android:text="No delivery orders found for this filter."
         android:gravity="center"
         android:textSize="16sp"
-        android:textColor="#9E9E9E"
+        android:textColor="?attr/colorOnBackground"
+        android:alpha="0.6"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
@@ -120,8 +123,7 @@
         android:layout_width="match_parent"
         tools:listitem="@layout/item_delivery_order"
         tools:itemCount="2"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:padding="8dp"
         android:clipToPadding="false" />
 

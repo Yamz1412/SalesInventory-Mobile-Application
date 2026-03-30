@@ -9,21 +9,22 @@
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="?attr/colorSurface"
         android:elevation="0dp">
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@drawable/ic_arrow_back_black_24dp"
+            app:navigationIconTint="?attr/colorOnSurface"
             app:title="Financial &amp; Operations Reports"
-            app:titleTextColor="@color/black" />
+            app:titleTextColor="?attr/colorOnSurface" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="?attr/colorSurface"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
         android:paddingBottom="12dp">
@@ -33,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="Date Range Filter"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="14sp" />
 
         <Spinner
@@ -41,7 +42,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginBottom="8dp"
-            android:background="@android:drawable/btn_default"/>
+            android:backgroundTint="?attr/colorOnPrimary"/>
 
         <LinearLayout
             android:id="@+id/layoutCustomDate"
@@ -99,7 +100,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Business Overview"
-                    android:textColor="@color/black"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp"/>
@@ -116,12 +117,12 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="4dp"
-                        app:cardBackgroundColor="#E3F2FD"
+                        app:cardBackgroundColor="?attr/colorSurface"
                         app:cardCornerRadius="8dp"
                         app:cardElevation="2dp">
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Top Product" android:textSize="11sp" android:textColor="#1565C0"/>
-                            <TextView android:id="@+id/tvOverviewBestSeller" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="13sp" android:textColor="#0D47A1" android:textAlignment="center" android:maxLines="2" android:ellipsize="end"/>
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Top Product" android:textSize="11sp" android:textColor="?attr/colorPrimary"/>
+                            <TextView android:id="@+id/tvOverviewBestSeller" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="13sp" android:textColor="?attr/colorOnSurface" android:textAlignment="center" android:maxLines="2" android:ellipsize="end"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
@@ -130,12 +131,12 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:layout_marginHorizontal="2dp"
-                        app:cardBackgroundColor="#E8F5E9"
+                        app:cardBackgroundColor="?attr/colorSurface"
                         app:cardCornerRadius="8dp"
                         app:cardElevation="2dp">
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Top Payment" android:textSize="11sp" android:textColor="#2E7D32"/>
-                            <TextView android:id="@+id/tvOverviewPayment" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="14sp" android:textColor="#1B5E20"/>
+                            <TextView android:id="@+id/tvOverviewPayment" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textStyle="bold" android:textSize="14sp" android:textColor="?attr/colorOnSurface"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
@@ -144,12 +145,12 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="4dp"
-                        app:cardBackgroundColor="#FFF3E0"
+                        app:cardBackgroundColor="?attr/colorSurface"
                         app:cardCornerRadius="8dp"
                         app:cardElevation="2dp">
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp" android:gravity="center">
                             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Transactions" android:textSize="11sp" android:textColor="#E65100"/>
-                            <TextView android:id="@+id/tvOverviewTransaction" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="13sp" android:textColor="#BF360C"/>
+                            <TextView android:id="@+id/tvOverviewTransaction" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textStyle="bold" android:textSize="13sp" android:textColor="?attr/colorOnSurface"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>
@@ -161,9 +162,9 @@
                     android:layout_marginBottom="16dp"
                     app:cardCornerRadius="4dp"
                     app:cardElevation="2dp"
-                    app:strokeColor="#CCCCCC"
+                    app:strokeColor="#40888888"
                     app:strokeWidth="1dp"
-                    app:cardBackgroundColor="#FFFFFF">
+                    app:cardBackgroundColor="?attr/colorSurface">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -171,52 +172,52 @@
                         android:orientation="vertical"
                         android:padding="20dp">
 
-                        <TextView android:id="@+id/tvISBusinessName" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="BUSINESS NAME" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="Income Statement" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
-                        <TextView android:id="@+id/tvISDateRange" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp" android:gravity="center" android:text="For the Period Ended..." android:textColor="@color/black" android:textSize="12sp" />
+                        <TextView android:id="@+id/tvISBusinessName" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="BUSINESS NAME" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="Income Statement" android:textColor="?attr/colorOnSurface" android:textSize="14sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/tvISDateRange" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="16dp" android:gravity="center" android:text="For the Period Ended..." android:textColor="?attr/colorOnSurface" android:alpha="0.8" android:textSize="12sp" />
 
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Revenue" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Revenue" android:textColor="?attr/colorOnSurface" android:textSize="14sp" android:textStyle="bold" />
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Gross Sales" android:textColor="#000000" />
-                            <TextView android:id="@+id/tvISGrossSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Gross Sales" android:textColor="?attr/colorOnSurface" />
+                            <TextView android:id="@+id/tvISGrossSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Sales Discounts" android:textColor="#000000" />
-                            <TextView android:id="@+id/tvISDiscounts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Sales Discounts" android:textColor="?attr/colorOnSurface" />
+                            <TextView android:id="@+id/tvISDiscounts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
-                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="?attr/colorOnSurface" />
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Net Sales" android:textColor="#000000" android:textStyle="bold" />
-                            <TextView android:id="@+id/tvISNetSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Net Sales" android:textColor="?attr/colorOnSurface" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvISNetSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
 
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Cost of Goods Sold" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Cost of Goods Sold" android:textColor="?attr/colorOnSurface" android:textSize="14sp" android:textStyle="bold" />
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Cost of Products Sold" android:textColor="#000000" />
-                            <TextView android:id="@+id/tvISCogs" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Cost of Products Sold" android:textColor="?attr/colorOnSurface" />
+                            <TextView android:id="@+id/tvISCogs" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
-                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="?attr/colorOnSurface" />
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gross Profit" android:textColor="#000000" android:textStyle="bold" />
-                            <TextView android:id="@+id/tvISGrossProfit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gross Profit" android:textColor="?attr/colorOnSurface" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvISGrossProfit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
 
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Operating Expenses" android:textColor="#000000" android:textSize="14sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Operating Expenses" android:textColor="?attr/colorOnSurface" android:textSize="14sp" android:textStyle="bold" />
 
                         <LinearLayout android:id="@+id/containerISExpenses" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginTop="4dp" />
 
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Operating Expenses" android:textStyle="bold" android:textColor="#000000" />
-                            <TextView android:id="@+id/tvISOpex" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:textStyle="bold" android:text="0.00" android:textColor="#000000" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="   Total Operating Expenses" android:textStyle="bold" android:textColor="?attr/colorOnSurface" />
+                            <TextView android:id="@+id/tvISOpex" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:textStyle="bold" android:text="0.00" android:textColor="?attr/colorOnSurface" />
                         </RelativeLayout>
-                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="#000000" />
+                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:background="?attr/colorOnSurface" />
 
                         <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NET INCOME" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
-                            <TextView android:id="@+id/tvISNetIncome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="#000000" android:textSize="16sp" android:textStyle="bold" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NET INCOME" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvISNetIncome" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentEnd="true" android:text="₱ 0.00" android:textColor="?attr/colorOnSurface" android:textSize="16sp" android:textStyle="bold" />
                         </RelativeLayout>
-                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:background="#000000" />
-                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="1dp" android:background="#000000" />
+                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="2dp" android:background="?attr/colorOnSurface" />
+                        <View android:layout_width="100dp" android:layout_height="1dp" android:layout_gravity="end" android:layout_marginTop="1dp" android:background="?attr/colorOnSurface" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -234,22 +235,20 @@
                         android:layout_weight="1"
                         android:text="Operations Report"
                         android:textSize="12sp"
-                        android:backgroundTint="?attr/colorPrimary"
                         android:textColor="@color/white"
+                        android:backgroundTint="#D32F2F"
                         android:layout_marginEnd="4dp"
                         app:cornerRadius="8dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnExportPDF"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        style="@style/CustomButtonOutlined"
                         android:layout_width="0dp"
                         android:layout_height="55dp"
                         android:layout_weight="1"
                         android:text="Export PDF"
                         android:textSize="12sp"
-                        android:textColor="?attr/colorPrimary"
                         android:layout_marginStart="4dp"
-                        app:strokeColor="?attr/colorPrimary"
                         app:cornerRadius="8dp" />
 
                     <com.google.android.material.button.MaterialButton
@@ -260,9 +259,9 @@
                         android:layout_weight="1"
                         android:text="Manage Expenses"
                         android:textSize="12sp"
-                        android:textColor="#E53935"
+                        android:textColor="?attr/colorError"
                         android:layout_marginStart="4dp"
-                        app:strokeColor="#E53935"
+                        app:strokeColor="?attr/colorError"
                         app:cornerRadius="8dp" />
                 </LinearLayout>
 
@@ -275,15 +274,13 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnInventoryReport"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        style="@style/CustomButtonOutlined"
                         android:layout_width="0dp"
                         android:layout_height="55dp"
                         android:layout_weight="1"
                         android:text="View Inventory Master Reports"
                         android:textSize="14sp"
                         android:layout_marginStart="5dp"
-                        android:textColor="?attr/colorPrimary"
-                        app:strokeColor="?attr/colorPrimary"
                         app:cornerRadius="8dp"
                         android:layout_marginBottom="8dp" />
 
@@ -308,7 +305,7 @@
                     android:text="Recent Transactions"
                     android:textSize="18sp"
                     android:textStyle="bold"
-                    android:textColor="@color/black"
+                    android:textColor="?attr/colorOnBackground"
                     android:layout_marginBottom="8dp" />
 
                 <ListView

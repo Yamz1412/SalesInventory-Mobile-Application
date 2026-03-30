@@ -146,9 +146,6 @@ public class Profile extends BaseActivity {
         });
     }
 
-    // =====================================================================
-    // TRUE FACTORY RESET LOGIC (TARGETS FIRESTORE + NOTIFICATIONS)
-    // =====================================================================
     private void wipeAllBusinessData() {
         new AlertDialog.Builder(this)
                 .setTitle("⚠️ FULL FACTORY RESET")
@@ -165,17 +162,14 @@ public class Profile extends BaseActivity {
                     pd.setCancelable(false);
                     pd.show();
 
-                    // 1. FORCE CLEAR ANDROID SYSTEM NOTIFICATIONS IMMEDIATELY
                     NotificationHelper.clearAllNotifications(Profile.this);
 
-                    // 2. WIPE FIRESTORE SUBCOLLECTIONS (The Core Data!)
                     String[] firestoreCollections = {
                             "products", "sales", "adjustments", "categories",
                             "suppliers", "purchaseOrders", "deliveries", "alerts"
                     };
 
                     for (String collection : firestoreCollections) {
-                        // Clear under Business Owner ID
                         fStore.collection(collection).document(finalWipeId).collection("items").get()
                                 .addOnCompleteListener(task -> {
                                     if (task.isSuccessful() && task.getResult() != null) {
@@ -185,7 +179,6 @@ public class Profile extends BaseActivity {
                                     }
                                 });
 
-                        // Clear under Specific Admin ID just in case data crossed over
                         if (!finalWipeId.equals(currentUserId)) {
                             fStore.collection(collection).document(currentUserId).collection("items").get()
                                     .addOnCompleteListener(task -> {
@@ -198,7 +191,6 @@ public class Profile extends BaseActivity {
                         }
                     }
 
-                    // 3. Wipe Cash Transactions and Reset Wallet
                     try {
                         fStore.collection("users").document(finalWipeId)
                                 .collection("cash_transactions").get().addOnCompleteListener(task -> {
@@ -218,7 +210,6 @@ public class Profile extends BaseActivity {
                         Log.e("Profile", "Firestore user data wipe error safely ignored.");
                     }
 
-                    // 4. WIPE REALTIME DATABASE (Just in case legacy data is there)
                     DatabaseReference db = FirebaseDatabase.getInstance().getReference();
                     db.child("OperatingExpenses").child(finalWipeId).removeValue();
                     db.child("Cart").child(finalWipeId).removeValue();
@@ -229,12 +220,10 @@ public class Profile extends BaseActivity {
                         deleteRTDBNodes(db.child(node), "ownerAdminId", currentUserId);
                     }
 
-                    // 5. SEND THE KILL SWITCH SIGNAL TO ALL STAFF
                     Map<String, Object> signalData = new HashMap<>();
                     signalData.put("lastResetTime", com.google.firebase.firestore.FieldValue.serverTimestamp());
                     fStore.collection("users").document(finalWipeId).collection("system").document("reset_signal").set(signalData);
 
-                    // 6. Force Local Room Database clear on BACKGROUND THREAD
                     new Thread(() -> {
                         try {
                             if (SalesInventoryApplication.getProductRepository() != null) {
@@ -250,7 +239,6 @@ public class Profile extends BaseActivity {
                             Log.e("Profile", "Local wipe error: " + e.getMessage());
                         }
 
-                        // Return to Main Thread and Restart UI
                         new Handler(Looper.getMainLooper()).postDelayed(() -> {
                             pd.dismiss();
                             Toast.makeText(Profile.this, "✅ SYSTEM FACTORY RESET COMPLETE!", Toast.LENGTH_LONG).show();
@@ -259,7 +247,7 @@ public class Profile extends BaseActivity {
                             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                             startActivity(intent);
                             finish();
-                        }, 3000); // 3-second delay to let Firestore batches finish deleting
+                        }, 3000);
                     }).start();
                 })
                 .setNegativeButton("Cancel", null)
@@ -277,9 +265,6 @@ public class Profile extends BaseActivity {
         });
     }
 
-    // =====================================================================
-    // ACCOUNT DELETION LOGIC (NOW TARGETS FIRESTORE & ALERTS)
-    // =====================================================================
     private void showDeleteAccountDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Account")
@@ -303,7 +288,6 @@ public class Profile extends BaseActivity {
 
         NotificationHelper.clearAllNotifications(Profile.this);
 
-        // Wipe Firestore Subcollections First
         String[] firestoreCollections = {
                 "products", "sales", "adjustments", "categories",
                 "suppliers", "purchaseOrders", "deliveries", "alerts"
@@ -317,12 +301,9 @@ public class Profile extends BaseActivity {
                     });
         }
 
-        // Delete Profile Picture from Storage
         StorageReference avatarRef = fStorage.getReference().child("avatars/" + user.getUid() + ".jpg");
         avatarRef.delete().addOnCompleteListener(task -> {
-            // Delete Firestore user document
             fStore.collection("users").document(user.getUid()).delete().addOnCompleteListener(task2 -> {
-                // Finally, delete Auth Account
                 user.delete().addOnCompleteListener(authTask -> {
                     pd.dismiss();
                     if (authTask.isSuccessful()) {
@@ -392,6 +373,8 @@ public class Profile extends BaseActivity {
     }
 
     private void loadAvatar(String url) {
+        if (isDestroyed() || isFinishing()) return; // SAFEGUARD
+
         if (url != null && !url.isEmpty()) {
             Glide.with(this).load(url).diskCacheStrategy(DiskCacheStrategy.ALL).circleCrop().into(imgAvatar);
         } else {

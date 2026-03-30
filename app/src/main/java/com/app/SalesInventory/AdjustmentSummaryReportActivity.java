@@ -28,7 +28,7 @@ import java.util.Map;
 
 public class AdjustmentSummaryReportActivity extends BaseActivity {
 
-    private TextView tvTotalItems, tvTotalAdditions, tvTotalRemovals, tvNoData;
+    private TextView tvTotalItems, tvTotalLoss, tvNoData;
     private Button btnDateFilter;
     private ProgressBar progressBar;
     private RecyclerView recyclerViewReport;
@@ -36,14 +36,11 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
     private DatabaseReference adjustmentRef;
     private String currentOwnerId;
 
-    // Master list of raw Firebase data
+    private List<Product> currentInventory = new ArrayList<>();
     private List<StockAdjustment> masterAdjustmentList = new ArrayList<>();
-
-    // Processed Summary List for Adapter
     private List<AdjustmentSummaryReport> summaryList = new ArrayList<>();
     private AdjustmentSummaryAdapter adapter;
 
-    // Filter
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
 
@@ -62,13 +59,19 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
         initializeViews();
         setupFilters();
-        loadAdjustments();
+
+        SalesInventoryApplication.getProductRepository().getAllProducts().observe(this, products -> {
+            if (products != null) {
+                currentInventory.clear();
+                currentInventory.addAll(products);
+                loadAdjustments();
+            }
+        });
     }
 
     private void initializeViews() {
-        tvTotalItems = findViewById(R.id.tvTotalItems);
-        tvTotalAdditions = findViewById(R.id.tvTotalAdditions);
-        tvTotalRemovals = findViewById(R.id.tvTotalRemovals);
+        tvTotalItems = findViewById(R.id.tvTotalAdjustedItems);
+        tvTotalLoss = findViewById(R.id.tvTotalLossValue);
         tvNoData = findViewById(R.id.tvNoData);
         btnDateFilter = findViewById(R.id.btnDateFilter);
         progressBar = findViewById(R.id.progressBar);
@@ -96,7 +99,6 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
             }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
         });
 
-        // Long press to reset filter
         btnDateFilter.setOnLongClickListener(v -> {
             filterStartDate = 0;
             filterEndDate = System.currentTimeMillis();
@@ -135,51 +137,48 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
     private void applyFilterAndGroup() {
         Map<String, AdjustmentSummaryReport> groupMap = new HashMap<>();
 
-        double overallAdditions = 0.0;
-        double overallRemovals = 0.0;
+        double overallLossValue = 0.0;
 
         for (StockAdjustment adj : masterAdjustmentList) {
             long adjDate = adj.getTimestamp();
 
-            // Check Date Filter
             if (filterStartDate == 0 || (adjDate >= filterStartDate && adjDate <= filterEndDate)) {
 
                 String pId = adj.getProductId();
                 if (pId == null) continue;
 
-                // Get or Create Report Object for this Product
                 AdjustmentSummaryReport report = groupMap.get(pId);
                 if (report == null) {
                     report = new AdjustmentSummaryReport(pId, adj.getProductName() != null ? adj.getProductName() : "Unknown Item");
                     groupMap.put(pId, report);
                 }
 
-                // Process Additions vs Removals
                 double qty = adj.getQuantityAdjusted();
                 if ("Add Stock".equalsIgnoreCase(adj.getAdjustmentType())) {
                     report.addAddition(qty);
-                    overallAdditions += qty;
                 } else {
-                    report.addRemoval(Math.abs(qty));
-                    overallRemovals += Math.abs(qty);
-                }
+                    double absQty = Math.abs(qty);
+                    report.addRemoval(absQty);
 
-                // Save Reason
+                    double unitCost = 0.0;
+                    for (Product p : currentInventory) {
+                        if (p.getProductId().equals(pId)) {
+                            unitCost = p.getQuantity() > 0 ? (p.getCostPrice() / p.getQuantity()) : 0.0;
+                            break;
+                        }
+                    }
+                    overallLossValue += (absQty * unitCost);
+                }
                 report.addReason(adj.getReason());
             }
         }
 
-        // Convert Map to List for the Adapter
         summaryList.clear();
         summaryList.addAll(groupMap.values());
-
-        // Sort alphabetically by product name
         Collections.sort(summaryList, (r1, r2) -> r1.getProductName().compareToIgnoreCase(r2.getProductName()));
 
-        // Update Dashboard Cards
         tvTotalItems.setText(String.valueOf(summaryList.size()));
-        tvTotalAdditions.setText("+" + formatQuantity(overallAdditions));
-        tvTotalRemovals.setText("-" + formatQuantity(overallRemovals));
+        tvTotalLoss.setText(String.format(Locale.US, "₱%,.2f", overallLossValue));
 
         progressBar.setVisibility(View.GONE);
 
@@ -191,11 +190,6 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
             recyclerViewReport.setVisibility(View.VISIBLE);
             adapter.notifyDataSetChanged();
         }
-    }
-
-    private String formatQuantity(double value) {
-        if (value % 1 == 0) return String.valueOf((long) value);
-        return String.format(Locale.US, "%.2f", value);
     }
 
     @Override

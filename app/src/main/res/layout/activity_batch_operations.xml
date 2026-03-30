@@ -5,23 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/backgroundColor">
+    android:background="?android:colorBackground">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         android:elevation="4dp">
 
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/colorPrimary"
+            android:background="?attr/colorPrimary"
             app:title="Batch Stock Operations"
-            app:titleTextColor="@color/white"
-            android:elevation="4dp" />
-
+            app:titleTextColor="?attr/colorOnPrimary" />
     </com.google.android.material.appbar.AppBarLayout>
 
     <ProgressBar
@@ -29,7 +26,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="16dp"
         android:visibility="gone" />
 
     <ScrollView
@@ -45,132 +42,85 @@
             android:padding="16dp">
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Operation Name"
-                style="@style/CustomTextInputLayout"
-                app:boxStrokeColor="@color/colorPrimary"
-                app:hintTextColor="@color/colorPrimary"
-                android:layout_marginBottom="8dp">
-
+                android:layout_marginBottom="12dp"
+                android:hint="Operation Name / Reference">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etOperationName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textCapWords"
-                    android:textColor="@color/textColorPrimary"
-                    android:textSize="16sp" />
-
+                    android:textColor="?attr/colorOnBackground"
+                    android:inputType="text" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp"
-                android:background="@color/cardBackground"
-                android:elevation="2dp"
-                android:layout_marginBottom="8dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Operation Type"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/colorPrimary"
-                    android:layout_marginBottom="8dp" />
-
-                <Spinner
-                    android:id="@+id/spinnerOperationType"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:background="@drawable/spinner_background"
-                    android:padding="12dp"
-                    android:textColor="@color/textColorPrimary" />
-
-            </LinearLayout>
+                android:text="Operation Type"
+                android:textColor="?attr/colorOnBackground"
+                android:textSize="12sp"
+                android:layout_marginBottom="4dp"/>
+            <Spinner
+                android:id="@+id/spinnerOperationType"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorControlHighlight"
+                android:layout_marginBottom="12dp"/>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Quantity"
-                style="@style/CustomTextInputLayout"
-                app:boxStrokeColor="@color/colorPrimary"
-                app:hintTextColor="@color/colorPrimary"
-                android:layout_marginBottom="8dp">
-
+                android:layout_marginBottom="12dp"
+                android:hint="Quantity to Apply">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etQuantity"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:textColor="@color/textColorPrimary"
-                    android:textSize="16sp" />
-
+                    android:textColor="?attr/colorOnBackground"
+                    android:inputType="numberDecimal" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Remarks (Optional)"
-                style="@style/CustomTextInputLayout"
-                app:boxStrokeColor="@color/colorPrimary"
-                app:hintTextColor="@color/colorPrimary"
-                android:layout_marginBottom="16dp">
-
+                android:layout_marginBottom="16dp"
+                android:hint="Remarks (Optional)">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/etRemarks"
                     android:layout_width="match_parent"
-                    android:layout_height="80dp"
-                    android:gravity="top|start"
-                    android:inputType="textMultiLine"
-                    android:maxLines="4"
-                    android:minLines="2"
-                    android:textColor="@color/textColorPrimary"
-                    android:textSize="16sp" />
-
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/colorOnBackground"
+                    android:inputType="textMultiLine" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <Button
                 android:id="@+id/btnSelectProducts"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="+ SELECT PRODUCTS"
-                android:textColor="@color/white"
-                android:padding="12dp"
-                style="@style/CustomButton"
-                android:layout_marginBottom="16dp" />
-
-            <TextView
-                android:id="@+id/tvProductCount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="0 products selected"
-                android:textSize="14sp"
-                android:textColor="@color/textColorSecondary"
-                android:gravity="center"
-                android:layout_marginBottom="8dp" />
+                android:layout_height="50dp"
+                android:text="Select Products to Update"
+                android:backgroundTint="?attr/colorSecondary"
+                android:textColor="?attr/colorOnSecondary"
+                android:layout_marginBottom="16dp"/>
 
             <LinearLayout
                 android:id="@+id/llProductList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="8dp"
-                android:background="@color/cardBackground"
-                android:elevation="2dp"
-                android:visibility="gone"
-                android:layout_marginBottom="16dp">
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/tvSelectedProducts"
+                    android:id="@+id/tvProductCount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Selected Products"
-                    android:textSize="14sp"
+                    android:text="0 products selected"
+                    android:textColor="?attr/colorOnBackground"
                     android:textStyle="bold"
-                    android:textColor="@color/colorPrimary"
                     android:layout_marginBottom="8dp" />
 
                 <androidx.recyclerview.widget.RecyclerView
@@ -180,11 +130,9 @@
                     android:nestedScrollingEnabled="false"
                     tools:listitem="@layout/item_batch_operation"
                     tools:itemCount="2" />
-
             </LinearLayout>
 
         </LinearLayout>
-
     </ScrollView>
 
     <LinearLayout
@@ -192,31 +140,28 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:padding="16dp"
-        android:background="@color/white"
-        android:elevation="4dp">
+        android:background="?attr/colorSurface"
+        android:elevation="8dp">
 
         <Button
             android:id="@+id/btnClear"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
             android:text="Clear"
-            android:textColor="@color/white"
-            android:background="@drawable/card_background"
-            android:textStyle="bold" />
+            android:textColor="?attr/colorOnBackground"
+            app:strokeColor="?attr/colorOnBackground"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
         <Button
             android:id="@+id/btnExecute"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="EXECUTE"
-            android:textColor="@color/white"
-            android:padding="12dp"
-            style="@style/CustomButton" />
-
+            android:text="EXECUTE BATCH"
+            android:textColor="?attr/colorOnPrimary"
+            android:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
-
 </LinearLayout>

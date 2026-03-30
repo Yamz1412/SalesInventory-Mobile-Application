@@ -74,14 +74,15 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         Product p = items.get(position);
 
         holder.name.setText(p.getProductName());
-        updateStockDisplay(holder, p.getQuantity(), p.getUnit(), p.getPiecesPerUnit());
-        holder.costPriceText.setText("Price: ₱" + String.format(Locale.US, "%.2f", p.getSellingPrice()));
 
-        if (p.getSellingPrice() > 0) {
-            holder.tvSellingPrice.setVisibility(View.VISIBLE);
-            holder.tvSellingPrice.setText(String.format(java.util.Locale.getDefault(), "₱%.2f", p.getSellingPrice()));
+        // Display Menu items appropriately
+        boolean isMenu = p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType());
+
+        if (isMenu) {
+            if (holder.stockText != null) holder.stockText.setText("Recipe");
+            if (holder.quantityText != null) holder.quantityText.setText("Menu Item (No physical stock)");
         } else {
-            holder.tvSellingPrice.setVisibility(View.GONE);
+            updateStockDisplay(holder, p.getQuantity(), p.getUnit(), p.getPiecesPerUnit());
         }
 
         if (p.getCostPrice() > 0) {
@@ -99,19 +100,20 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 Product currentProduct = items.get(currentPos);
                 Intent intent = new Intent(ctx, ProductDetailActivity.class);
                 intent.putExtra("productId", currentProduct.getProductId());
+                intent.putExtra("PRODUCT_ID", currentProduct.getProductId()); // Safety fallback
                 ctx.startActivity(intent);
             }
         });
 
-        // =========================================================
-        // FIX: Routes the Edit Button back to AddProductActivity
-        // =========================================================
         holder.btnEdit.setOnClickListener(v -> {
             int currentPos = holder.getAdapterPosition();
             if (currentPos != RecyclerView.NO_POSITION) {
                 Product currentProduct = items.get(currentPos);
+
+                // FIX: Point to AddProductActivity instead of EditProduct, as this handles the Edit UI
                 Intent intent = new Intent(ctx, AddProductActivity.class);
                 intent.putExtra("EDIT_PRODUCT_ID", currentProduct.getProductId());
+                intent.putExtra("productId", currentProduct.getProductId()); // Safety fallback
                 ctx.startActivity(intent);
             }
         });
@@ -122,30 +124,37 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             holder.btnDecrease.setVisibility(View.GONE);
         } else {
             holder.btnEdit.setVisibility(View.VISIBLE);
-            holder.btnIncrease.setVisibility(View.VISIBLE);
-            holder.btnDecrease.setVisibility(View.VISIBLE);
+
+            // Hides the +/- stock buttons for Menu items
+            holder.btnIncrease.setVisibility(isMenu ? View.GONE : View.VISIBLE);
+            holder.btnDecrease.setVisibility(isMenu ? View.GONE : View.VISIBLE);
 
             holder.btnIncrease.setOnClickListener(v -> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
-                    double newQty = currentProduct.getQuantity() + 1;
+                    double oldQty = currentProduct.getQuantity();
+                    double newQty = oldQty + 1;
+
+                    // 1. OPTIMISTIC UI UPDATE: Change the number instantly so it feels snappy
+                    currentProduct.setQuantity(newQty);
+                    updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
+
+                    // 2. BACKGROUND SYNC: Update the database silently
                     repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                         @Override
                         public void onProductUpdated() {
-                            if (ctx instanceof Activity) {
-                                ((Activity) ctx).runOnUiThread(() -> {
-                                    currentProduct.setQuantity(newQty);
-                                    updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-                                    notifyItemChanged(currentPos);
-                                });
-                            }
+                            // Success! The UI is already updated, do nothing.
                         }
                         @Override
                         public void onError(String error) {
                             if (ctx instanceof Activity) {
-                                ((Activity) ctx).runOnUiThread(() ->
-                                        Toast.makeText(ctx, error, Toast.LENGTH_SHORT).show());
+                                ((Activity) ctx).runOnUiThread(() -> {
+                                    // If database fails, safely revert the UI back to the old number
+                                    currentProduct.setQuantity(oldQty);
+                                    updateStockDisplay(holder, oldQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
+                                    Toast.makeText(ctx, "Sync failed: " + error, Toast.LENGTH_SHORT).show();
+                                });
                             }
                         }
                     });
@@ -156,24 +165,30 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
-                    if (currentProduct.getQuantity() > 0) {
-                        double newQty = currentProduct.getQuantity() - 1;
+                    double oldQty = currentProduct.getQuantity();
+
+                    if (oldQty > 0) {
+                        double newQty = oldQty - 1;
+
+                        // 1. OPTIMISTIC UI UPDATE
+                        currentProduct.setQuantity(newQty);
+                        updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
+
+                        // 2. BACKGROUND SYNC
                         repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
                             @Override
                             public void onProductUpdated() {
-                                if (ctx instanceof Activity) {
-                                    ((Activity) ctx).runOnUiThread(() -> {
-                                        currentProduct.setQuantity(newQty);
-                                        updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-                                        notifyItemChanged(currentPos);
-                                    });
-                                }
+                                // Success!
                             }
                             @Override
                             public void onError(String error) {
                                 if (ctx instanceof Activity) {
-                                    ((Activity) ctx).runOnUiThread(() ->
-                                            Toast.makeText(ctx, error, Toast.LENGTH_SHORT).show());
+                                    ((Activity) ctx).runOnUiThread(() -> {
+                                        // Revert on failure
+                                        currentProduct.setQuantity(oldQty);
+                                        updateStockDisplay(holder, oldQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
+                                        Toast.makeText(ctx, "Sync failed: " + error, Toast.LENGTH_SHORT).show();
+                                    });
                                 }
                             }
                         });
@@ -181,30 +196,51 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 }
             });
 
-            // =========================================================
-            // EXISTING DELETE/ARCHIVE LOGIC (Long Press to Archive)
-            // =========================================================
             holder.itemView.setOnLongClickListener(v -> {
                 int currentPos = holder.getAdapterPosition();
                 if (currentPos != RecyclerView.NO_POSITION) {
                     Product currentProduct = items.get(currentPos);
+
                     new AlertDialog.Builder(ctx)
                             .setTitle("Archive Product")
                             .setMessage("Are you sure you want to archive " + currentProduct.getProductName() + "?")
                             .setPositiveButton("Archive", (dialog, which) -> {
+
+                                final Product archivedProduct = currentProduct;
+                                final int archivedPos = currentPos;
+
                                 repository.deleteProduct(currentProduct.getProductId(), new ProductRepository.OnProductDeletedListener() {
                                     @Override
-                                    public void onProductDeleted(String msg) {
+                                    public void onProductDeleted(String filename) {
                                         if (ctx instanceof Activity) {
-                                            ((Activity) ctx).runOnUiThread(() ->
-                                                    Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show());
+                                            ((Activity) ctx).runOnUiThread(() -> {
+                                                View rootView = ((Activity) ctx).findViewById(android.R.id.content);
+                                                com.google.android.material.snackbar.Snackbar.make(rootView,
+                                                                archivedProduct.getProductName() + " archived",
+                                                                com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                                        .setAction("UNDO", view -> {
+                                                            repository.restoreArchived(filename, new ProductRepository.OnProductRestoreListener() {
+                                                                @Override
+                                                                public void onProductRestored() {
+                                                                    ((Activity) ctx).runOnUiThread(() ->
+                                                                            Toast.makeText(ctx, "Restored!", Toast.LENGTH_SHORT).show());
+                                                                }
+                                                                @Override
+                                                                public void onError(String error) {
+                                                                    ((Activity) ctx).runOnUiThread(() ->
+                                                                            Toast.makeText(ctx, "Failed to undo", Toast.LENGTH_SHORT).show());
+                                                                }
+                                                            });
+                                                        }).show();
+                                            });
                                         }
                                     }
+
                                     @Override
                                     public void onError(String error) {
                                         if (ctx instanceof Activity) {
                                             ((Activity) ctx).runOnUiThread(() ->
-                                                    Toast.makeText(ctx, error, Toast.LENGTH_SHORT).show());
+                                                    Toast.makeText(ctx, "Error: " + error, Toast.LENGTH_SHORT).show());
                                         }
                                     }
                                 });
@@ -218,71 +254,20 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     private void updateStockDisplay(VH holder, double qty, String unit, int ppu) {
-        String qtyStr = (qty % 1 == 0) ? String.valueOf((long) qty) : String.valueOf(qty);
-        String displayStr = qtyStr + (unit != null ? " " + unit : "");
+        String qtyStr = (qty % 1 == 0) ? String.valueOf((long) qty) : String.format(Locale.US, "%.2f", qty).replaceAll("0*$", "").replaceAll("\\.$", "");
+        String displayStr = qtyStr;
 
         if (unit != null && !unit.isEmpty()) {
-            String u = unit.toLowerCase(Locale.ROOT).trim();
+            String u = unit.trim();
 
-            if (u.equals("g") || u.equals("kg")) {
-                long kg = (long) Math.floor(qty);
-                double fractionalPart = qty - kg;
-                long g = (long) Math.round(fractionalPart * 1000);
-
-                if (kg > 0 && g > 0) {
-                    displayStr = kg + "kg " + g + "g";
-                } else if (kg > 0) {
-                    displayStr = kg + "kg";
-                } else {
-                    displayStr = g + "g";
-                }
-            } else if (u.equals("ml") || u.equals("l")) {
-                long l = (long) Math.floor(qty);
-                double fractionalPart = qty - l;
-                long ml = (long) Math.round(fractionalPart * 1000);
-
-                if (l > 0 && ml > 0) {
-                    displayStr = l + "L " + ml + "ml";
-                } else if (l > 0) {
-                    displayStr = l + "L";
-                } else {
-                    displayStr = ml + "ml";
-                }
-            } else if (u.contains("box") || u.contains("pack")) {
-                if (ppu > 1) {
-                    long packages = (long) Math.floor(qty);
-                    double fractionalPart = qty - packages;
-                    long pcs = (long) Math.round(fractionalPart * ppu);
-
-                    String pkgLabel = u.contains("box") ? (packages > 1 ? " boxes" : " box") : (packages > 1 ? " packs" : " pack");
-                    String pcsLabel = (pcs > 1) ? " pcs" : " pc";
-
-                    if (packages > 0 && pcs > 0) {
-                        displayStr = packages + pkgLabel + " " + pcs + pcsLabel;
-                    } else if (packages > 0) {
-                        displayStr = packages + pkgLabel;
-                    } else {
-                        displayStr = pcs + pcsLabel;
-                    }
-                } else {
-                    displayStr = qtyStr + " " + u;
-                }
-            } else if (u.equals("pcs")) {
-                if (ppu > 1) {
-                    long packages = (long) (qty / ppu);
-                    double pcs = qty % ppu;
-                    String pcsStr = (pcs % 1 == 0) ? String.valueOf((long) pcs) : String.format(Locale.US, "%.2f", pcs);
-
-                    if (packages > 0 && pcs > 0) {
-                        displayStr = packages + " boxes " + pcsStr + " pcs";
-                    } else if (packages > 0) {
-                        displayStr = packages + (packages > 1 ? " boxes" : " box");
-                    } else {
-                        displayStr = pcsStr + " pcs";
-                    }
-                } else {
-                    displayStr = qtyStr + " pcs";
-                }
+            if (u.equalsIgnoreCase("pcs") || u.equalsIgnoreCase("box") || u.equalsIgnoreCase("pack")) {
+                displayStr += " " + u;
+            } else if (u.equalsIgnoreCase("g") || u.equalsIgnoreCase("kg") ||
+                    u.equalsIgnoreCase("ml") || u.equalsIgnoreCase("L") ||
+                    u.equalsIgnoreCase("oz")) {
+                displayStr += u;
+            } else {
+                displayStr += " " + u;
             }
         }
 
@@ -291,41 +276,34 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     }
 
     private void loadImage(String localPath, String onlineUrl, ImageView imageView) {
-        if (localPath != null && !localPath.isEmpty()) {
-            File file = new File(localPath);
-            if (file.exists()) {
-                Glide.with(ctx).load(file)
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
-                        .override(200, 200)
-                        .thumbnail(0.25f)
-                        .placeholder(R.drawable.ic_image_placeholder)
-                        .error(R.drawable.ic_image_placeholder)
-                        .centerCrop()
-                        .into(imageView);
-                return;
-            }
-        }
-        if (onlineUrl != null && !onlineUrl.isEmpty()) {
-            Glide.with(ctx).load(onlineUrl)
-                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .override(200, 200)
-                    .thumbnail(0.25f)
-                    .placeholder(R.drawable.ic_image_placeholder)
-                    .error(R.drawable.ic_image_placeholder)
-                    .centerCrop()
-                    .into(imageView);
-            return;
-        }
-        imageView.setImageResource(R.drawable.ic_image_placeholder);
+        // Decide the primary image to load (Online URL first, Local Path second)
+        String primaryLoad = (onlineUrl != null && !onlineUrl.isEmpty()) ? onlineUrl : localPath;
+
+        Glide.with(ctx)
+                .load(primaryLoad)
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // Saves for offline use
+                .override(200, 200)
+                .placeholder(R.drawable.ic_image_placeholder)
+                .centerCrop()
+                .error(
+                        // THE OFFLINE FALLBACK: If the URL fails because of no internet, try the local phone gallery path
+                        Glide.with(ctx)
+                                .load(localPath)
+                                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                .override(200, 200)
+                                .centerCrop()
+                                .error(R.drawable.ic_image_placeholder) // If both fail, show the placeholder
+                )
+                .into(imageView);
     }
 
     @Override
     public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        TextView name, quantityText, costPriceText, stockText, btnEdit, tvSellingPrice;
+        TextView name, quantityText, costPriceText, stockText;
         ImageView productImage;
-        ImageButton btnIncrease, btnDecrease;
+        ImageButton btnIncrease, btnDecrease, btnEdit;
 
         VH(@NonNull View itemView) {
             super(itemView);
@@ -337,7 +315,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             btnEdit = itemView.findViewById(R.id.btnEdit);
             btnDecrease = itemView.findViewById(R.id.btnDecreaseQty);
             btnIncrease = itemView.findViewById(R.id.btnIncreaseQty);
-            tvSellingPrice = itemView.findViewById(R.id.tvSellingPrice);
         }
     }
 }

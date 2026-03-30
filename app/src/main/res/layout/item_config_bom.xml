@@ -3,50 +3,73 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:layout_marginBottom="8dp"
-    android:weightSum="4">
+    android:orientation="vertical"
+    android:background="@drawable/edite_round"
+    android:backgroundTint="#F8F9FA"
+    android:padding="8dp"
+    android:layout_marginBottom="8dp">
 
-    <TextView
-        android:id="@+id/tvRawMaterial"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="2"
-        android:hint="Select Item ▾"
-        android:textColor="?attr/colorOnBackground"
-        android:textSize="14sp"
-        android:background="@drawable/edite_round"
-        android:padding="12dp"
-        android:layout_marginEnd="4dp"
-        android:clickable="true"
-        android:focusable="true"/>
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:weightSum="4">
 
-    <EditText
-        android:id="@+id/etDeductQty"
-        android:layout_width="0dp"
+        <TextView
+            android:id="@+id/tvRawMaterial"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:hint="Select Item ▾"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="14sp"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#FFFFFF"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <EditText
+            android:id="@+id/etDeductQty"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Qty"
+            android:textSize="14sp"
+            android:inputType="numberDecimal"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#FFFFFF"
+            android:padding="12dp"
+            android:layout_marginEnd="4dp"/>
+
+        <Spinner
+            android:id="@+id/spinnerUnit"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="#FFFFFF"
+            android:layout_marginEnd="4dp"/>
+
+        <ImageButton
+            android:id="@+id/btnDelete"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/errorRed"/>
+    </LinearLayout>
+
+    <CheckBox
+        android:id="@+id/cbIsEssential"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:hint="Qty"
-        android:textSize="14sp"
-        android:inputType="numberDecimal"
-        android:background="@drawable/edite_round"
-        android:padding="12dp"
-        android:layout_marginEnd="4dp"/>
-
-    <Spinner
-        android:id="@+id/spinnerUnit"
-        android:layout_width="0dp"
-        android:layout_height="48dp"
-        android:layout_weight="1"
-        android:background="@drawable/edite_round"
-        android:layout_marginEnd="4dp"/>
-
-    <ImageButton
-        android:id="@+id/btnDelete"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:src="@android:drawable/ic_menu_delete"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        app:tint="@color/errorRed"/>
+        android:text="Required Ingredient (Blocks sale if out of stock)"
+        android:textSize="12sp"
+        android:textColor="#555555"
+        android:checked="true"
+        android:layout_marginTop="4dp"
+        android:layout_marginStart="4dp"/>
 </LinearLayout>

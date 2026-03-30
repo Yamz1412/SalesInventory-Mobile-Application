@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -13,9 +14,9 @@ import com.bumptech.glide.Glide;
 
 public class ProductDetailActivity extends BaseActivity {
 
-    private TextView tvName, tvProductLine, tvCategory, tvType, tvPrice, tvCost, tvQty, tvUnit, tvExpiry;
+    private TextView tvName, tvProductLine, tvCategory, tvType, tvPrice, tvCost, tvQty, tvUnit, tvExpiry, tvSupplier;
     private ImageView imgProduct;
-    private Button btnDelete; // btnEdit has been removed to match your XML
+    private Button btnDelete;
 
     private ProductRepository productRepository;
     private String productId;
@@ -26,7 +27,6 @@ public class ProductDetailActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_product_detail);
 
-        // 1. Bind Views (Edit button removed)
         tvName = findViewById(R.id.tvDetailName);
         tvCategory = findViewById(R.id.tvDetailCategory);
         tvType = findViewById(R.id.tvDetailType);
@@ -34,14 +34,14 @@ public class ProductDetailActivity extends BaseActivity {
         tvCost = findViewById(R.id.tvDetailCost);
         tvQty = findViewById(R.id.tvDetailQty);
         tvUnit = findViewById(R.id.tvDetailUnit);
+        tvSupplier = findViewById(R.id.tvDetailSupplier);
         tvExpiry = findViewById(R.id.tvDetailExpiry);
         imgProduct = findViewById(R.id.imgDetailProduct);
         btnDelete = findViewById(R.id.btnDeleteProduct);
-        tvProductLine = findViewById(R.id.tvDetailProductLine); // NEW
+        tvProductLine = findViewById(R.id.tvDetailProductLine);
 
         productRepository = SalesInventoryApplication.getProductRepository();
 
-        // 2. Get Product ID safely
         productId = getIntent().getStringExtra("productId");
         if (productId == null) productId = getIntent().getStringExtra("PRODUCT_ID");
 
@@ -51,10 +51,13 @@ public class ProductDetailActivity extends BaseActivity {
             return;
         }
 
-        // 3. Setup Delete Listener (Edit listener removed)
-        if (btnDelete != null) {
-            btnDelete.setOnClickListener(v -> showDeleteConfirmation());
-        }
+        AuthManager.getInstance().isUserAdmin(isAdmin -> {
+            runOnUiThread(() -> {
+                if (btnDelete != null) {
+                    btnDelete.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+                }
+            });
+        });
 
         loadProductDetails();
     }
@@ -63,7 +66,6 @@ public class ProductDetailActivity extends BaseActivity {
         productRepository.getProductById(productId, new ProductRepository.OnProductFetchedListener() {
             @Override
             public void onProductFetched(Product p) {
-                // FIXED: Must run on Main Thread to prevent crash
                 runOnUiThread(() -> {
                     if (p != null) {
                         currentProduct = p;
@@ -90,6 +92,10 @@ public class ProductDetailActivity extends BaseActivity {
         tvCost.setText("Buying Price: ₱" + String.format(java.util.Locale.US, "%.2f", p.getCostPrice()));
         tvQty.setText("Current Stock: " + p.getQuantity());
         tvUnit.setText("Unit: " + (p.getUnit() != null ? p.getUnit() : ""));
+
+        String supplierName = (p.getSupplier() != null && !p.getSupplier().isEmpty()) ? p.getSupplier() : "No Specific Supplier";
+        tvSupplier.setText("Supplier: " + supplierName);
+
         String pLine = p.getProductLine() != null && !p.getProductLine().isEmpty() ? p.getProductLine() : "None Assigned";
         tvProductLine.setText("Product Line: " + pLine);
 
@@ -100,12 +106,15 @@ public class ProductDetailActivity extends BaseActivity {
             tvExpiry.setText("Expiry: N/A");
         }
 
+        // FIX: The Glide Crash Protection
+        if (isDestroyed() || isFinishing()) return;
+
         String toLoad = (p.getImageUrl() != null && !p.getImageUrl().isEmpty()) ? p.getImageUrl() : p.getImagePath();
         if (toLoad != null && !toLoad.isEmpty()) {
             Glide.with(this)
                     .load(toLoad)
                     .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                    .thumbnail(0.25f) // Instantly loads a low-res thumbnail while the full image decodes
+                    .thumbnail(0.25f)
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .centerCrop()

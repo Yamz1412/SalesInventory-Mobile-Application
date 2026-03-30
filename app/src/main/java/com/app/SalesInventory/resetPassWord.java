@@ -1,7 +1,6 @@
 package com.app.SalesInventory;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -14,7 +13,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 
-public class resetPassWord extends AppCompatActivity {
+public class resetPassWord extends BaseActivity { // FIX: Extends BaseActivity for Theme support
 
     EditText emailreset;
     Button Resetbtn;
@@ -24,8 +23,9 @@ public class resetPassWord extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_reset_pass_word);
-        emailreset =(EditText) findViewById(R.id.resetemail);
-        Resetbtn = (Button)findViewById(R.id.resetpassbtn);
+
+        emailreset = findViewById(R.id.resetemail);
+        Resetbtn = findViewById(R.id.resetpassbtn);
         firebaseAuth = FirebaseAuth.getInstance();
 
         Resetbtn.setOnClickListener(new View.OnClickListener() {
@@ -54,7 +54,5 @@ public class resetPassWord extends AppCompatActivity {
 
         });
     }
-
-
 
 }

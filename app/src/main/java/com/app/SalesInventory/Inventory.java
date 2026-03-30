@@ -1,8 +1,11 @@
 package com.app.SalesInventory;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.SearchView;
@@ -21,6 +24,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -51,10 +55,17 @@ public class Inventory extends BaseActivity {
     private boolean showNearExpiryOnly = false;
     private TextView tvTotalCount, tvLowStockWarning;
 
+    private Button btnArchive;
+
     private DatabaseReference categoryRef;
     private ValueEventListener categoryListener;
 
     private boolean isReadOnly = false;
+    private Spinner spinnerSort;
+    private String currentSortOption = "Alphabetical (A-Z)";
+    private View layoutArchiveContainer;
+    private TextView tvArchiveBadge;
+    private com.google.firebase.firestore.ListenerRegistration archiveListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,8 +75,17 @@ public class Inventory extends BaseActivity {
         authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
 
+        com.google.android.material.button.MaterialButton btnSuggestedSupplies = findViewById(R.id.btnSuggestedSupplies);
+        if (btnSuggestedSupplies != null) {
+            btnSuggestedSupplies.setOnClickListener(v -> {
+                Intent intent = new Intent(Inventory.this, SuggestedSuppliesActivity.class);
+                startActivity(intent);
+            });
+        }
+
         spinnerProductLineFilter = findViewById(R.id.spinnerProductLineFilter);
-        listenToProductLinesForFilter();
+        spinnerSort = findViewById(R.id.spinnerSort);
+        setupSortSpinner();
 
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
@@ -75,6 +95,9 @@ public class Inventory extends BaseActivity {
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
         tvTotalCount = findViewById(R.id.TotalCountTV);
         tvLowStockWarning = findViewById(R.id.tvLowStockWarning);
+        btnArchive = findViewById(R.id.btn_archive);
+        layoutArchiveContainer = findViewById(R.id.layout_archive_container);
+        tvArchiveBadge = findViewById(R.id.tvArchiveBadge);
 
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
@@ -84,17 +107,20 @@ public class Inventory extends BaseActivity {
         productAdapter = new ProductAdapter(filteredProducts, this);
         productAdapter.setReadOnly(isReadOnly);
 
-        productsRecyclerView.setLayoutManager(new GridLayoutManager(this, 3));
+        productsRecyclerView.setLayoutManager(new GridLayoutManager(this, getResponsiveSpanCount()));
         productsRecyclerView.setAdapter(productAdapter);
 
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isRealAdmin = authManager.isCurrentUserAdmin();
-            if (!isRealAdmin || isReadOnly) {
+            isReadOnly = !isRealAdmin;
+            if (isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+                if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
             } else {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
+                listenToArchivedProductsCount();
             }
         }));
 
@@ -103,14 +129,14 @@ public class Inventory extends BaseActivity {
         categoryRef = FirebaseDatabase.getInstance().getReference("Categories");
 
         setupSearchView();
-        listenToCategoriesForFilter();
 
-        // REPLACE lines 108-115 in onCreate():
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null && !products.isEmpty()) {
                 allProducts.clear();
                 allProducts.addAll(products);
                 updateHeaderStats();
+                updateDynamicMainCategories();
+
                 applyFilters();
             } else {
                 fetchInventoryFromFirestore();
@@ -124,9 +150,88 @@ public class Inventory extends BaseActivity {
         productRepository.registerCriticalStockListener(criticalListener);
     }
 
-    // ADD this new method to Inventory.java:
+    private void listenToArchivedProductsCount() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (ownerId == null) return;
+
+        archiveListener = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId).collection("products")
+                .whereEqualTo("isActive", false) // Retrieves deleted/archived products
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) return;
+                    if (snapshot != null) {
+                        int archiveCount = snapshot.size();
+                        runOnUiThread(() -> {
+                            if (archiveCount > 0 && !isReadOnly) {
+                                // Show button and badge if there are archived items
+                                if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.VISIBLE);
+                                if (tvArchiveBadge != null) tvArchiveBadge.setText(String.valueOf(archiveCount));
+                            } else {
+                                // Hide entire button if empty or if user is staff
+                                if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+                            }
+                        });
+                    }
+                });
+    }
+
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
+    private void setupSortSpinner() {
+        List<String> sortOptions = Arrays.asList(
+                "Alphabetical (A-Z)",
+                "Alphabetical (Z-A)",
+                "Stock: High to Low",
+                "Stock: Low to High",
+                "Earliest Expiry",
+                "Recently Added"
+        );
+
+        // Use adaptive adapter
+        ArrayAdapter<String> adapter = getAdaptiveAdapter(sortOptions);
+        spinnerSort.setAdapter(adapter);
+
+        spinnerSort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                currentSortOption = sortOptions.get(position);
+                applyFilters();
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
     private void fetchInventoryFromFirestore() {
-        String ownerId = AuthManager.getInstance().getCurrentUserId();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
         if (ownerId == null) return;
 
         com.google.firebase.firestore.FirebaseFirestore.getInstance()
@@ -142,9 +247,10 @@ public class Inventory extends BaseActivity {
                             p.setProductId(doc.getId());
                             p.setActive(true);
                             allProducts.add(p);
-                            repo.upsertFromRemote(p); // saves to Room for next time
+                            repo.upsertFromRemote(p);
                         }
                     }
+                    repo.refreshProducts();
                     runOnUiThread(() -> {
                         updateHeaderStats();
                         applyFilters();
@@ -157,40 +263,96 @@ public class Inventory extends BaseActivity {
                 );
     }
 
-    private void listenToProductLinesForFilter() {
-        String currentUserId = AuthManager.getInstance().getCurrentUserId();
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("ProductLines");
+    private String normalizeCategoryName(String name) {
+        if (name == null || name.trim().isEmpty()) return "uncategorized";
+        return name.toLowerCase().replaceAll("\\s+", "");
+    }
 
-        ref.orderByChild("ownerAdminId").equalTo(currentUserId).addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                List<String> lines = new ArrayList<>();
-                lines.add("All Lines");
-                lines.add("Core Products"); lines.add("Specialty / Unique Offerings");
-                lines.add("Complementary Goods"); lines.add("Retail / Merchandise");
-                lines.add("Seasonal Items"); lines.add("Grab-and-Go");
+    private void updateDynamicMainCategories() {
+        java.util.Map<String, String> mainCatMap = new java.util.HashMap<>();
+        mainCatMap.put("alllines", "All Lines");
 
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    String lineName = ds.child("lineName").getValue(String.class);
-                    if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
+        for (Product p : allProducts) {
+            if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
+
+            String mainCat = p.getProductLine() != null && !p.getProductLine().trim().isEmpty() ? p.getProductLine().trim() : "Uncategorized";
+            String normKey = normalizeCategoryName(mainCat);
+
+            // Only add if we haven't seen a variant of this name yet. Uses the first found spelling/casing.
+            if (!mainCatMap.containsKey(normKey)) {
+                mainCatMap.put(normKey, mainCat);
+            }
+        }
+
+        List<String> displayList = new ArrayList<>(mainCatMap.values());
+        Collections.sort(displayList, (a, b) -> {
+            if (a.equals("All Lines")) return -1;
+            if (b.equals("All Lines")) return 1;
+            return a.compareToIgnoreCase(b);
+        });
+
+        ArrayAdapter<String> mainAdapter = getAdaptiveAdapter(displayList);
+        if (spinnerProductLineFilter != null) {
+            spinnerProductLineFilter.setAdapter(mainAdapter);
+            int spinnerPosition = mainAdapter.getPosition(currentProductLineFilter);
+            spinnerProductLineFilter.setSelection(Math.max(spinnerPosition, 0));
+
+            spinnerProductLineFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    currentProductLineFilter = (String) parent.getItemAtPosition(position);
+                    updateDynamicSubCategories();
+                    applyFilters();
                 }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
+    }
 
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(Inventory.this, android.R.layout.simple_spinner_item, lines);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                if (spinnerProductLineFilter != null) {
-                    spinnerProductLineFilter.setAdapter(adapter);
-                    spinnerProductLineFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                        @Override
-                        public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                            currentProductLineFilter = (String) parent.getItemAtPosition(position);
-                            applyFilters();
-                        }
-                        @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-                    });
+    private void updateDynamicSubCategories() {
+        java.util.Map<String, String> subCatMap = new java.util.HashMap<>();
+        subCatMap.put("all", "All");
+
+        String currentMainNorm = normalizeCategoryName(currentProductLineFilter);
+
+        for (Product p : allProducts) {
+            if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
+
+            String mainCat = p.getProductLine() != null && !p.getProductLine().trim().isEmpty() ? p.getProductLine().trim() : "Uncategorized";
+            String pMainNorm = normalizeCategoryName(mainCat);
+
+            if (currentMainNorm.equals("alllines") || currentMainNorm.equals(pMainNorm)) {
+                String subCat = p.getCategoryName() != null && !p.getCategoryName().trim().isEmpty() ? p.getCategoryName().trim() : "Uncategorized";
+                String normKey = normalizeCategoryName(subCat);
+
+                if (!subCatMap.containsKey(normKey)) {
+                    subCatMap.put(normKey, subCat);
                 }
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        }
+
+        List<String> displayList = new ArrayList<>(subCatMap.values());
+        Collections.sort(displayList, (a, b) -> {
+            if (a.equals("All")) return -1;
+            if (b.equals("All")) return 1;
+            return a.compareToIgnoreCase(b);
         });
+
+        ArrayAdapter<String> subAdapter = getAdaptiveAdapter(displayList);
+        if (spinnerCategoryFilter != null) {
+            spinnerCategoryFilter.setAdapter(subAdapter);
+            currentCategoryFilter = "All";
+            spinnerCategoryFilter.setSelection(0);
+
+            spinnerCategoryFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    currentCategoryFilter = (String) parent.getItemAtPosition(position);
+                    applyFilters();
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
     }
 
     private void setupSearchView() {
@@ -198,6 +360,11 @@ public class Inventory extends BaseActivity {
         android.widget.TextView searchEditText = searchView.findViewById(id);
 
         if (searchEditText != null) {
+            // FIX: Force the text to be White in Dark Mode and Black in Light Mode!
+            boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+            searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
+            searchEditText.setHintTextColor(Color.GRAY);
+
             searchEditText.setFilters(new android.text.InputFilter[]{
                     (source, start, end, dest, dstart, dend) -> {
                         if (source.toString().matches("^[a-zA-Z\\s]*$")) {
@@ -236,10 +403,19 @@ public class Inventory extends BaseActivity {
         if (btnAdjustStock != null) {
             btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
         }
+        if (btnArchive != null) {
+            btnArchive.setOnClickListener(v -> startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
+        }
     }
 
     private void listenToCategoriesForFilter() {
-        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        String tempId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (tempId == null || tempId.isEmpty()) {
+            tempId = AuthManager.getInstance().getCurrentUserId();
+        }
+
+        final String finalUnifiedId = tempId;
+
         DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Categories");
 
         if (categoryListener != null) ref.removeEventListener(categoryListener);
@@ -252,16 +428,13 @@ public class Inventory extends BaseActivity {
 
                 for (DataSnapshot child : snapshot.getChildren()) {
                     Category c = child.getValue(Category.class);
-                    if (c != null && c.isActive() &&
-                            currentUserId.equals(c.getOwnerAdminId()) &&
-                            !"Menu".equalsIgnoreCase(c.getType())) {
+                    if (c != null && c.isActive() && finalUnifiedId.equals(c.getOwnerAdminId())) {
                         options.add(c.getCategoryName());
                     }
                 }
 
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(Inventory.this,
-                        android.R.layout.simple_spinner_item, options);
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                // Use adaptive adapter
+                ArrayAdapter<String> adapter = getAdaptiveAdapter(options);
                 spinnerCategoryFilter.setAdapter(adapter);
 
                 spinnerCategoryFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -282,97 +455,107 @@ public class Inventory extends BaseActivity {
         ref.addValueEventListener(categoryListener);
     }
 
-    private void setupCategoryFilterSpinnerFallback() {
-        Set<String> categories = new HashSet<>();
-        for (Product p : allProducts) {
-            if (p == null || !p.isActive()) continue;
-            String type = p.getProductType() == null ? "" : p.getProductType();
-            if ("Menu".equalsIgnoreCase(type)) continue;
-            String c = p.getCategoryName();
-            if (c != null && !c.isEmpty()) categories.add(c);
-        }
-        List<String> options = new ArrayList<>();
-        options.add("All");
-        options.addAll(categories);
-
-        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, options);
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerCategoryFilter.setAdapter(adapter);
-
-        int index = options.indexOf(currentCategoryFilter);
-        if (index < 0) index = 0;
-        spinnerCategoryFilter.setSelection(index);
-
-        spinnerCategoryFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                String selected = (String) parent.getItemAtPosition(position);
-                currentCategoryFilter = selected == null ? "All" : selected;
-                applyFilters();
-            }
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) { }
-        });
-    }
 
     private void applyFilters() {
-        String cat = currentCategoryFilter == null ? "All" : currentCategoryFilter;
-        String line = currentProductLineFilter == null ? "All Lines" : currentProductLineFilter;
+        String cat = currentCategoryFilter == null ? "All" : currentCategoryFilter.trim();
+        String line = currentProductLineFilter == null ? "All Lines" : currentProductLineFilter.trim();
         String q = currentSearchQuery == null ? "" : currentSearchQuery.toLowerCase().trim();
 
         filteredProducts.clear();
+        Set<String> seenNames = new HashSet<>();
+
         for (Product p : allProducts) {
-            if (p == null || !p.isActive()) continue;
+            // Ignore inactive or POS Menu items in the stockroom
+            if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
 
-            String type = p.getProductType() == null ? "" : p.getProductType();
-            if ("Menu".equalsIgnoreCase(type)) continue;
+            String pName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
+            if (!pName.isEmpty() && seenNames.contains(pName)) continue;
 
-            boolean matchesSearch = q.isEmpty()
-                    || p.getProductName().toLowerCase().contains(q)
-                    || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q));
+            // 1. Extract the raw strings from the product object
+            String pCat = p.getCategoryName() != null ? p.getCategoryName().trim() : "Uncategorized";
+            String pLine = p.getProductLine() != null ? p.getProductLine().trim() : "Uncategorized";
 
-            boolean matchesCategory = "All".equalsIgnoreCase(cat)
-                    || (p.getCategoryName() != null && p.getCategoryName().equalsIgnoreCase(cat));
+            // 2. Restore the Search Function logic
+            boolean matchesSearch = q.isEmpty() || pName.contains(q);
 
-            boolean matchesProductLine = "All Lines".equalsIgnoreCase(line)
-                    || p.getProductLine() == null        // ← null = show under all lines
-                    || p.getProductLine().isEmpty()      // ← empty = show under all lines
-                    || p.getProductLine().equalsIgnoreCase(line);
+            // 3. Normalize for case/space-insensitive matching
+            String pCatNorm = normalizeCategoryName(pCat);
+            String pLineNorm = normalizeCategoryName(pLine);
+            String filterCatNorm = normalizeCategoryName(cat);
+            String filterLineNorm = normalizeCategoryName(line);
 
-            if (!matchesSearch || !matchesCategory || !matchesProductLine) continue;
+            boolean matchesCategory = filterCatNorm.equals("all") || pCatNorm.equals(filterCatNorm);
+            boolean matchesProductLine = filterLineNorm.equals("alllines") || filterLineNorm.equals("all") || pLineNorm.equals(filterLineNorm);
 
-            if (showLowStockOnly) {
-                if (!p.isCriticalStock() && !p.isLowStock()) continue;
+            if (matchesSearch && matchesCategory && matchesProductLine) {
+                if (showLowStockOnly && (!p.isCriticalStock() && !p.isLowStock())) continue;
+
+                if (showNearExpiryOnly) {
+                    long expiry = p.getExpiryDate();
+                    if (expiry <= 0) continue;
+                    long days = (expiry - System.currentTimeMillis()) / (24L * 60L * 60L * 1000L);
+                    if (days > 7) continue;
+                }
+
+                seenNames.add(pName);
+                filteredProducts.add(p);
             }
-
-            if (showNearExpiryOnly) {
-                long expiry = p.getExpiryDate();
-                if (expiry <= 0) continue;
-                long now = System.currentTimeMillis();
-                long days = (expiry - now) / (24L * 60L * 60L * 1000L);
-                if (expiry - now > 0 && days > 7) continue;
-            }
-
-            filteredProducts.add(p);
         }
 
         Collections.sort(filteredProducts, (p1, p2) -> {
-            String n1 = p1.getProductName() != null ? p1.getProductName() : "";
-            String n2 = p2.getProductName() != null ? p2.getProductName() : "";
-            return n1.compareToIgnoreCase(n2);
+            switch (currentSortOption) {
+                case "Alphabetical (A-Z)":
+                    return p1.getProductName().compareToIgnoreCase(p2.getProductName());
+                case "Alphabetical (Z-A)":
+                    return p2.getProductName().compareToIgnoreCase(p1.getProductName());
+                case "Stock: High to Low":
+                    return Double.compare(p2.getQuantity(), p1.getQuantity());
+                case "Stock: Low to High":
+                    return Double.compare(p1.getQuantity(), p2.getQuantity());
+                case "Earliest Expiry":
+                    long e1 = p1.getExpiryDate() <= 0 ? Long.MAX_VALUE : p1.getExpiryDate();
+                    long e2 = p2.getExpiryDate() <= 0 ? Long.MAX_VALUE : p2.getExpiryDate();
+                    return Long.compare(e1, e2);
+                case "Recently Added":
+                    return Long.compare(p2.getDateAdded(), p1.getDateAdded());
+                default:
+                    return p1.getProductName().compareToIgnoreCase(p2.getProductName());
+            }
         });
 
         productAdapter.updateProducts(filteredProducts);
         updateEmptyState();
     }
 
+    private int getResponsiveSpanCount() {
+        android.content.res.Configuration config = getResources().getConfiguration();
+        int screenWidthDp = config.screenWidthDp;
+        boolean isLandscape = config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+
+        // A screen width of 600dp or higher is the standard Android measurement for a Tablet
+        boolean isTablet = screenWidthDp >= 600;
+
+        if (isTablet) {
+            // Tablet Landscape: 4 columns for extra-large tablets (900dp+), otherwise 3
+            return isLandscape ? (screenWidthDp >= 900 ? 4 : 3) : 2; // Tablet Portrait: 2
+        } else {
+            // Phone Landscape: 2, Phone Portrait: 1
+            return isLandscape ? 2 : 1;
+        }
+    }
+
     private void updateHeaderStats() {
         int total = 0;
         int lowOrCritical = 0;
+        Set<String> seenNames = new HashSet<>();
+
         for (Product p : allProducts) {
-            if (p == null || !p.isActive()) continue;
-            String type = p.getProductType() == null ? "" : p.getProductType();
-            if ("Menu".equalsIgnoreCase(type)) continue;
+            if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
+
+            String nameKey = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
+            if (!nameKey.isEmpty() && seenNames.contains(nameKey)) continue;
+            seenNames.add(nameKey);
+
             total++;
             if (p.isCriticalStock() || p.isLowStock()) {
                 lowOrCritical++;
@@ -381,12 +564,6 @@ public class Inventory extends BaseActivity {
 
         if (tvTotalCount != null) {
             tvTotalCount.setText(String.valueOf(total));
-            tvTotalCount.setOnLongClickListener(v -> {
-                MockDataInjector.injectHanZaiDefenseData(Inventory.this, () -> {
-                    runOnUiThread(() -> fetchInventoryFromFirestore());
-                });
-                return true;
-            });
         }
 
         if (tvLowStockWarning != null) {
@@ -415,5 +592,6 @@ public class Inventory extends BaseActivity {
         super.onDestroy();
         if (categoryListener != null && categoryRef != null) categoryRef.removeEventListener(categoryListener);
         if (productRepository != null && criticalListener != null) productRepository.unregisterCriticalStockListener(criticalListener);
+        if (archiveListener != null) archiveListener.remove();
     }
 }

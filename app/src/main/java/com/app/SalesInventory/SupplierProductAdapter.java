@@ -42,18 +42,22 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        // Guard: invalid position or null product
         if (position < 0 || position >= products.size()) return;
         Product p = products.get(position);
         if (p == null) return;
 
-        // Product name — safe null fallback
+        // 1. Product Name
         holder.tvName.setText(p.getProductName() != null ? p.getProductName() : "Unknown Product");
 
-        // Price
-        holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", p.getCostPrice()));
+        // 2. Unit Price Calculation (Total Cost / Quantity)
+        double cost = p.getCostPrice();
+        if (p.getQuantity() > 0) {
+            cost = cost / p.getQuantity();
+        }
+        String unit = p.getUnit() != null ? p.getUnit() : "pcs";
+        holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f / %s", cost, unit));
 
-        // Category badge — show if available
+        // 3. Category Badge
         String category = p.getCategoryName();
         if (holder.tvCategory != null) {
             if (category != null && !category.trim().isEmpty()) {
@@ -64,20 +68,17 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
             }
         }
 
-        // Stock info — show unit + quantity
+        // 4. Stock Info
         if (holder.tvStock != null) {
-            String unit = p.getUnit() != null ? p.getUnit() : "pcs";
             double qty = p.getQuantity();
-            holder.tvStock.setText(String.format(Locale.getDefault(),
-                    "Stock: %.0f %s", qty, unit));
+            holder.tvStock.setText(String.format(Locale.getDefault(), "Stock: %.0f %s", qty, unit));
         }
 
-        // Single click → Add to Cart
+        // 5. Click Listeners
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onProductClick(p);
         });
 
-        // Long press → Delete
         holder.itemView.setOnLongClickListener(v -> {
             if (listener != null) listener.onProductLongClick(p);
             return true;
@@ -94,6 +95,7 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
 
         ViewHolder(View itemView) {
             super(itemView);
+            // These IDs perfectly match your item_supplier_product_grid.xml
             tvName     = itemView.findViewById(R.id.tvProductNameGrid);
             tvPrice    = itemView.findViewById(R.id.tvProductPriceGrid);
             tvCategory = itemView.findViewById(R.id.tvProductCategoryGrid);

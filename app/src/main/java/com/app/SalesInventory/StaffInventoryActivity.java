@@ -39,17 +39,23 @@ public class StaffInventoryActivity extends AppCompatActivity {
         emptyStateTV = findViewById(R.id.emptyStateTV);
         searchView = findViewById(R.id.searchView);
         spinnerCategoryFilter = findViewById(R.id.spinnerCategoryFilter);
-        adapter = new ProductAdapter(this);
+
+        adapter = new ProductAdapter(currentProducts, this);
+
         rv.setLayoutManager(new GridLayoutManager(this, 2));
         rv.setAdapter(adapter);
+
         staffDataManager = StaffDataManager.getInstance();
         staffDataManager.startForCurrentUser(productsListener, null, null, ownerAdminId -> {
             if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
                 currentOwnerAdminId = ownerAdminId;
                 productRemoteSyncer = new ProductRemoteSyncer((Application) getApplicationContext());
-                productRemoteSyncer.startRealtimeSync(ownerAdminId);
+
+                // UPDATED: Changed to startListening()
+                productRemoteSyncer.startListening();
             }
         });
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -82,7 +88,7 @@ public class StaffInventoryActivity extends AppCompatActivity {
                 } else {
                     emptyStateTV.setVisibility(android.view.View.GONE);
                 }
-                adapter.setItems(list);
+                adapter.updateProducts(list);
             });
         }
 
@@ -104,7 +110,7 @@ public class StaffInventoryActivity extends AppCompatActivity {
             String name = p.getProductName() != null ? p.getProductName().toLowerCase() : "";
             if (name.contains(q)) out.add(p);
         }
-        adapter.setItems(out);
+        adapter.updateProducts(out);
         if (out.isEmpty()) {
             emptyStateTV.setVisibility(android.view.View.VISIBLE);
         } else {
@@ -116,6 +122,8 @@ public class StaffInventoryActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (staffDataManager != null) staffDataManager.stopAll();
-        if (productRemoteSyncer != null) productRemoteSyncer.stopRealtimeSync();
+
+        // UPDATED: Changed to stopListening()
+        if (productRemoteSyncer != null) productRemoteSyncer.stopListening();
     }
 }

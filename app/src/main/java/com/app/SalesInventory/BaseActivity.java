@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
@@ -11,10 +12,26 @@ import com.google.firebase.firestore.DocumentSnapshot;
 
 public abstract class BaseActivity extends AppCompatActivity {
 
+    // Add this variable to track what theme was active when the screen was built
+    private String appliedThemeName;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // 1. Record the current theme and apply it FIRST
+        appliedThemeName = ThemeManager.getInstance(this).getCurrentTheme().name;
         ThemeManager.getInstance(this).applyTheme(this);
+
+        // 2. Check for Colorblind override and apply it SECOND
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        boolean isColorblind = prefs.getBoolean("ColorblindMode", false);
+        if (isColorblind) {
+            setTheme(R.style.AppTheme_Colorblind);
+        }
+
+        // 3. Call super.onCreate() ONLY AFTER themes are set!
         super.onCreate(savedInstanceState);
+
+        // 4. Apply status bar colors
         ThemeManager.getInstance(this).applySystemColorsToWindow(this);
         enforceAuthentication();
     }
@@ -23,6 +40,13 @@ public abstract class BaseActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         ThemeManager.getInstance(this).applySystemColorsToWindow(this);
+
+        // FIX: Check if the theme was changed in Settings while this screen was sleeping
+        String currentThemeName = ThemeManager.getInstance(this).getCurrentTheme().name;
+        if (appliedThemeName != null && !appliedThemeName.equals(currentThemeName)) {
+            // The theme changed! Force the activity to instantly redraw itself
+            recreate();
+        }
     }
 
     private void enforceAuthentication() {

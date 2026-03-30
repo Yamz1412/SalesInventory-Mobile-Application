@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.app.DatePickerDialog;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -70,7 +71,7 @@ public class ReceivingReportActivity extends BaseActivity {
 
     private void initializeViews() {
         tvTotalOrders = findViewById(R.id.tvTotalOrders);
-        tvTotalSpent = findViewById(R.id.tvTotalSpent);
+        tvTotalSpent = findViewById(R.id.tvTotalValue);
         tvNoData = findViewById(R.id.tvNoData);
         progressBar = findViewById(R.id.progressBar);
         recyclerViewReceiving = findViewById(R.id.recyclerViewReceiving);
@@ -80,6 +81,33 @@ public class ReceivingReportActivity extends BaseActivity {
         recyclerViewReceiving.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ReceivingAdapter();
         recyclerViewReceiving.setAdapter(adapter);
+    }
+
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     private void setupFilters() {
@@ -151,8 +179,8 @@ public class ReceivingReportActivity extends BaseActivity {
     }
 
     private void setupSupplierSpinner() {
-        ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, supplierList);
-        spinAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Apply the adaptive adapter!
+        ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(supplierList);
         spinnerSupplier.setAdapter(spinAdapter);
 
         spinnerSupplier.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -231,11 +259,10 @@ public class ReceivingReportActivity extends BaseActivity {
 
             if (PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
                 holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-                holder.tvStatus.setBackgroundResource(R.drawable.badge_warning_light); // optional if you have a drawable, else color is fine
             } else if (PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(po.getStatus())) {
                 holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
             } else {
-                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.darker_gray));
+                holder.tvStatus.setTextColor(Color.GRAY);
             }
         }
 

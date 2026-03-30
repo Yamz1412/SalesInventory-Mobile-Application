@@ -1,17 +1,20 @@
 package com.app.SalesInventory;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,6 +29,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,14 +43,12 @@ public class ReturnProductActivity extends BaseActivity {
 
     private List<Product> inventoryList = new ArrayList<>();
 
-    // Dynamic Data Lists
     private List<String> supplierNames = new ArrayList<>();
     private List<String> filteredProductNames = new ArrayList<>();
 
-    // Adapters
     private ArrayAdapter<String> supplierAdapter;
     private ArrayAdapter<String> reasonAdapter;
-    private ArrayAdapter<String> productAdapter; // dynamically filtered
+    private ArrayAdapter<String> productAdapter;
     private ArrayAdapter<String> unitAdapter;
 
     private ProductRepository productRepository;
@@ -72,7 +74,6 @@ public class ReturnProductActivity extends BaseActivity {
         setupAdapters();
         loadData();
 
-        // Listen for changes in the Supplier Dropdown and filter the products
         actvReturnSupplier.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -87,34 +88,69 @@ public class ReturnProductActivity extends BaseActivity {
         btnCancelReturn.setOnClickListener(v -> finish());
     }
 
-    private void setupAdapters() {
-        supplierAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, supplierNames);
-        actvReturnSupplier.setAdapter(supplierAdapter);
+    // ================================================================
+    // FIX: Adaptive Adapters for Dropdowns and Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
 
-        String[] reasons = {"Damaged / Defective", "Expired", "Wrong Item Delivered", "Excess Quantity"};
-        reasonAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, reasons);
-        actvReturnReason.setAdapter(reasonAdapter);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
 
-        // Product adapter relies on the dynamically filtered list
-        productAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, filteredProductNames);
-
-        String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
-        unitAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, units);
-        unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
-    // ========================================================================
-    // DATA FETCHING & FILTERING
-    // ========================================================================
+    private ArrayAdapter<String> getAdaptiveDropdownAdapter(List<String> items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        return new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+    }
+
+    private void setupAdapters() {
+        supplierAdapter = getAdaptiveDropdownAdapter(supplierNames);
+        actvReturnSupplier.setAdapter(supplierAdapter);
+
+        List<String> reasons = Arrays.asList("Damaged / Defective", "Expired", "Wrong Item Delivered", "Excess Quantity");
+        reasonAdapter = getAdaptiveDropdownAdapter(reasons);
+        actvReturnReason.setAdapter(reasonAdapter);
+
+        productAdapter = getAdaptiveDropdownAdapter(filteredProductNames);
+
+        List<String> units = Arrays.asList("pcs", "ml", "L", "oz", "g", "kg", "box", "pack");
+        unitAdapter = getAdaptiveAdapter(units);
+    }
+
     private void loadData() {
-        // FIX: Load suppliers using the Business Owner's ID
         String adminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (adminId == null || adminId.isEmpty()) {
             adminId = AuthManager.getInstance().getCurrentUserId();
         }
         if (adminId == null) return;
 
-        // 1. Load real Suppliers list exactly like the Purchase Order screen
         DatabaseReference supRef = FirebaseDatabase.getInstance().getReference("Suppliers");
         supRef.orderByChild("ownerAdminId").equalTo(adminId).addValueEventListener(new ValueEventListener() {
             @Override
@@ -131,7 +167,6 @@ public class ReturnProductActivity extends BaseActivity {
             @Override public void onCancelled(@NonNull DatabaseError error) {}
         });
 
-        // 2. Load all raw inventory products
         productRepository.getAllProducts().observe(this, products -> {
             inventoryList.clear();
             if (products != null) {
@@ -140,7 +175,6 @@ public class ReturnProductActivity extends BaseActivity {
                         inventoryList.add(p);
                     }
                 }
-                // Pre-filter just in case the supplier was already typed
                 filterProductsBySupplier(actvReturnSupplier.getText().toString().trim());
             }
         });
@@ -149,15 +183,13 @@ public class ReturnProductActivity extends BaseActivity {
     private void filterProductsBySupplier(String supplierName) {
         filteredProductNames.clear();
 
-        // Find products that match this specific supplier
         for (Product p : inventoryList) {
             if (p.getSupplier() != null && p.getSupplier().equalsIgnoreCase(supplierName)) {
                 filteredProductNames.add(p.getProductName());
             }
         }
-        productAdapter.notifyDataSetChanged(); // Automatically updates the dropdowns in all rows
+        productAdapter.notifyDataSetChanged();
 
-        // Safety feature: If they change the supplier, clear out any products they selected that don't belong to the new supplier
         for (int i = 0; i < containerReturnItems.getChildCount(); i++) {
             View row = containerReturnItems.getChildAt(i);
             AutoCompleteTextView actvProduct = row.findViewById(R.id.actvReturnProductItem);
@@ -169,8 +201,6 @@ public class ReturnProductActivity extends BaseActivity {
             }
         }
     }
-    // ========================================================================
-
 
     private void addReturnItemRow() {
         View row = LayoutInflater.from(this).inflate(R.layout.item_return_product, null);
@@ -179,19 +209,14 @@ public class ReturnProductActivity extends BaseActivity {
         Spinner spinnerUnit = row.findViewById(R.id.spinnerReturnUnitItem);
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteReturnItem);
 
-        // Sets the filtered adapter
         actvProduct.setAdapter(productAdapter);
-
-        // Auto-show dropdown when clicked
         actvProduct.setOnClickListener(v -> actvProduct.showDropDown());
         actvProduct.setOnFocusChangeListener((v, hasFocus) -> {
             if (hasFocus) actvProduct.showDropDown();
         });
 
         spinnerUnit.setAdapter(unitAdapter);
-
         btnDelete.setOnClickListener(v -> containerReturnItems.removeView(row));
-
         containerReturnItems.addView(row);
     }
 
@@ -223,10 +248,9 @@ public class ReturnProductActivity extends BaseActivity {
 
             if (pName.isEmpty() || pQtyStr.isEmpty()) continue;
 
-            int returnQty = 0;
+            double returnQty = 0.0;
             try {
-                // Ensure it reads correctly even if they typed a decimal accidentally
-                returnQty = (int) Double.parseDouble(pQtyStr);
+                returnQty = Double.parseDouble(pQtyStr);
             } catch (Exception e) {
                 continue;
             }
@@ -246,18 +270,31 @@ public class ReturnProductActivity extends BaseActivity {
                 return;
             }
 
-            if (existing.getQuantity() < returnQty) {
+            int ppu = existing.getPiecesPerUnit() > 0 ? existing.getPiecesPerUnit() : 1;
+            String invUnit = existing.getUnit() != null ? existing.getUnit() : "pcs";
+
+            Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(existing.getQuantity(), invUnit, pUnit, ppu);
+            String newInvUnit = (String) conversion[1];
+
+            double exactDeductQty = UnitConverterUtil.calculateDeductionAmount(returnQty, newInvUnit, pUnit, ppu);
+
+            if (existing.getQuantity() < exactDeductQty) {
                 Toast.makeText(this, "Cannot return more than available stock for " + pName + ". Current Stock: " + existing.getQuantity(), Toast.LENGTH_LONG).show();
                 return;
             }
+
+            double unitCost = existing.getQuantity() > 0 ? (existing.getCostPrice() / existing.getQuantity()) : 0.0;
+            double costToDeduct = exactDeductQty * unitCost;
 
             Map<String, Object> itemData = new HashMap<>();
             itemData.put("productId", existing.getProductId());
             itemData.put("productName", existing.getProductName());
             itemData.put("returnQty", returnQty);
             itemData.put("unit", pUnit);
-            itemData.put("costPrice", existing.getCostPrice());
+            itemData.put("exactDeductQty", exactDeductQty);
+            itemData.put("costToDeduct", costToDeduct);
             itemData.put("currentStock", existing.getQuantity());
+            itemData.put("currentTotalCost", existing.getCostPrice());
 
             returnItems.add(itemData);
         }
@@ -267,32 +304,52 @@ public class ReturnProductActivity extends BaseActivity {
             return;
         }
 
-        // Show confirmation before deducting
         new AlertDialog.Builder(this)
                 .setTitle("Confirm Return")
-                .setMessage("This will deduct the items from your inventory. Proceed?")
+                .setMessage("This will automatically deduct the items and their cost value from your inventory. Proceed?")
                 .setPositiveButton("Yes", (dialog, which) -> processDeductionsAndLog(supplier, reason, returnItems))
                 .setNegativeButton("No", null)
                 .show();
     }
 
     private void processDeductionsAndLog(String supplier, String reason, List<Map<String, Object>> returnItems) {
+
         for (Map<String, Object> item : returnItems) {
             String productId = (String) item.get("productId");
-            int returnQty = (int) item.get("returnQty");
-            int currentStock = (int) item.get("currentStock");
+            double exactDeductQty = (double) item.get("exactDeductQty");
+            double costToDeduct = (double) item.get("costToDeduct");
+            double currentStock = (double) item.get("currentStock");
+            double currentTotalCost = (double) item.get("currentTotalCost");
 
-            int newStock = currentStock - returnQty;
-            productRepository.updateProductQuantity(productId, newStock, null);
+            double newStock = Math.max(0.0, currentStock - exactDeductQty);
+            double newTotalCost = Math.max(0.0, currentTotalCost - costToDeduct);
+
+            productRepository.updateProductQuantityAndCost(productId, newStock, newTotalCost, null);
+
+            new Thread(() -> {
+                AppDatabase db = AppDatabase.getInstance(ReturnProductActivity.this);
+                List<BatchEntity> batches = db.batchDao().getAvailableBatchesFIFO(productId);
+                double remainingToDeduct = exactDeductQty;
+
+                for (BatchEntity batch : batches) {
+                    if (remainingToDeduct <= 0) break;
+                    if (batch.remainingQuantity <= remainingToDeduct) {
+                        remainingToDeduct -= batch.remainingQuantity;
+                        batch.remainingQuantity = 0;
+                    } else {
+                        batch.remainingQuantity -= remainingToDeduct;
+                        remainingToDeduct = 0;
+                    }
+                    db.batchDao().updateBatch(batch);
+                }
+            }).start();
         }
 
-        // FIX: Ensure the log saves under the Business Owner's ID
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (ownerId == null || ownerId.isEmpty()) {
             ownerId = AuthManager.getInstance().getCurrentUserId();
         }
 
-        // Log to Returns node
         DatabaseReference returnsRef = FirebaseDatabase.getInstance().getReference("Returns");
         String returnId = returnsRef.push().getKey();
         if (returnId != null) {
@@ -302,12 +359,12 @@ public class ReturnProductActivity extends BaseActivity {
             returnData.put("reason", reason);
             returnData.put("items", returnItems);
             returnData.put("date", System.currentTimeMillis());
-            returnData.put("ownerAdminId", ownerId); // Logged to the correct unified business ID
+            returnData.put("ownerAdminId", ownerId);
 
             returnsRef.child(returnId).setValue(returnData);
         }
 
-        Toast.makeText(this, "Products Returned & Inventory Deducted", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Products Returned & Inventory Value Deducted", Toast.LENGTH_LONG).show();
         finish();
     }
 

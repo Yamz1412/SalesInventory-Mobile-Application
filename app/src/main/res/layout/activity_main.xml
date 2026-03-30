@@ -12,7 +12,7 @@
         android:id="@+id/layout_impersonation_banner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/errorRed"
+        android:background="?attr/colorError"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="12dp"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="👀 Viewing layout as Staff"
-            android:textColor="@android:color/white"
+            android:textColor="?attr/colorOnError"
             android:textStyle="bold"
             android:textSize="14sp"/>
 
@@ -35,8 +35,8 @@
             android:layout_height="wrap_content"
             android:minHeight="40dp"
             android:text="Exit View"
-            android:backgroundTint="@android:color/white"
-            android:textColor="@color/errorRed" />
+            android:backgroundTint="?attr/colorOnError"
+            android:textColor="?attr/colorError" />
     </LinearLayout>
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -72,6 +72,7 @@
                         android:layout_width="46dp"
                         android:layout_height="46dp"
                         android:scaleType="centerCrop"
+                        android:backgroundTint="?attr/colorOnSurface"
                         android:background="@drawable/bg_circle_light"
                         android:layout_marginEnd="12dp"
                         android:visibility="gone" />
@@ -99,7 +100,8 @@
                             android:layout_height="wrap_content"
                             android:text="Updated just now"
                             android:textSize="12sp"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="?attr/colorOnBackground"
+                            android:alpha="0.7"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
 
@@ -131,7 +133,7 @@
                             android:gravity="center"
                             android:textSize="9sp"
                             android:textStyle="bold"
-                            android:textColor="@android:color/white"
+                            android:textColor="?attr/colorOnError"
                             android:background="@drawable/bg_notification_badge"
                             android:elevation="2dp" />
                     </FrameLayout>
@@ -181,9 +183,9 @@
                             android:text="Daily"
                             android:textSize="12sp"
                             android:minHeight="40dp"
-                            app:backgroundTint="@color/white"
-                            android:textColor="?attr/colorOnBackground"
-                            app:strokeColor="?attr/colorOnBackground"
+                            app:backgroundTint="?attr/colorSurface"
+                            android:textColor="?attr/colorOnSurface"
+                            app:strokeColor="?attr/colorOnSurface"
                             app:cornerRadius="20dp" />
 
                         <com.google.android.material.button.MaterialButton
@@ -194,9 +196,9 @@
                             android:text="Weekly"
                             android:textSize="12sp"
                             android:minHeight="40dp"
-                            app:backgroundTint="@color/white"
-                            android:textColor="?attr/colorOnBackground"
-                            app:strokeColor="?attr/colorOnBackground"
+                            app:backgroundTint="?attr/colorSurface"
+                            android:textColor="?attr/colorOnSurface"
+                            app:strokeColor="?attr/colorOnSurface"
                             app:cornerRadius="20dp" />
 
                         <com.google.android.material.button.MaterialButton
@@ -207,9 +209,9 @@
                             android:text="Monthly"
                             android:textSize="12sp"
                             android:minHeight="40dp"
-                            app:backgroundTint="@color/white"
-                            android:textColor="?attr/colorOnBackground"
-                            app:strokeColor="?attr/colorOnBackground"
+                            app:backgroundTint="?attr/colorSurface"
+                            android:textColor="?attr/colorOnSurface"
+                            app:strokeColor="?attr/colorOnSurface"
                             app:cornerRadius="20dp" />
 
                         <com.google.android.material.button.MaterialButton
@@ -220,9 +222,9 @@
                             android:text="All Time"
                             android:textSize="12sp"
                             android:minHeight="40dp"
-                            app:backgroundTint="@color/white"
-                            android:textColor="?attr/colorOnBackground"
-                            app:strokeColor="?attr/colorOnBackground"
+                            app:backgroundTint="?attr/colorSurface"
+                            android:textColor="?attr/colorOnSurface"
+                            app:strokeColor="?attr/colorOnSurface"
                             app:cornerRadius="20dp" />
                     </com.google.android.material.button.MaterialButtonToggleGroup>
                 </HorizontalScrollView>
@@ -235,124 +237,259 @@
                     android:visibility="gone"
                     android:indeterminate="true" />
 
-                <TextView
-                    android:id="@+id/tv_overview_label"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Overview (Today)"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorOnBackground"
-                    android:layout_marginBottom="12dp" />
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Café Overview"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnBackground" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Today's live brewing metrics"
+                        android:textSize="13sp"
+                        android:alpha="0.7"
+                        android:textColor="?attr/colorOnBackground" />
+                </LinearLayout>
 
                 <GridLayout
-                    android:id="@+id/stats_grid"
+                    android:id="@+id/dashboard_grid"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:columnCount="2"
                     android:alignmentMode="alignMargins"
                     android:columnOrderPreserved="false"
-                    android:useDefaultMargins="true">
+                    android:paddingHorizontal="10dp">
 
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/card_sales_amount"
+                    <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_columnWeight="1"
-                        android:layout_margin="8dp"
+                        android:layout_margin="6dp"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/ic_sales" app:tint="?attr/colorPrimary" android:background="@drawable/bg_circle_light" android:padding="6dp" />
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Sales" android:textSize="13sp" android:textColor="@color/text_secondary" android:layout_marginTop="12dp" />
-                            <TextView android:id="@+id/tv_sales_amount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/text_primary" android:layout_marginTop="4dp" />
-                        </LinearLayout>
-                    </androidx.cardview.widget.CardView>
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="?attr/colorSurface">
 
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/card_gross_profit"
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:background="@drawable/edite_round"
+                                android:backgroundTint="#FFF8E1"
+                                android:padding="6dp"
+                                android:src="@drawable/ic_sales"
+                                app:tint="#F57F17"
+                                android:layout_marginBottom="12dp"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Today's Sales"
+                                android:textSize="12sp"
+                                android:textColor="?attr/colorOnSurface"
+                                android:alpha="0.8" />
+
+                            <TextView
+                                android:id="@+id/tvTotalSales"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="₱0.00"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorOnSurface"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_columnWeight="1"
-                        android:layout_margin="8dp"
+                        android:layout_margin="6dp"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <ImageView android:layout_width="32dp" android:layout_height="32dp" app:srcCompat="@drawable/ic_receipt" app:tint="@color/successGreen" android:background="@drawable/bg_circle_light" android:padding="6dp"/>
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gross Profit" android:textColor="@color/text_secondary" android:textSize="13sp" android:layout_marginTop="12dp"/>
-                            <TextView android:id="@+id/tv_gross_profit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textColor="@color/successGreen" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="4dp" />
-                        </LinearLayout>
-                    </androidx.cardview.widget.CardView>
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="?attr/colorSurface">
 
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/card_opex"
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:background="@drawable/edite_round"
+                                android:backgroundTint="#E8F5E9"
+                                android:padding="6dp"
+                                android:src="@drawable/ic_purchase"
+                                app:tint="#2E7D32"
+                                android:layout_marginBottom="12dp"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Today's Profit"
+                                android:textSize="12sp"
+                                android:textColor="?attr/colorOnSurface"
+                                android:alpha="0.8" />
+
+                            <TextView
+                                android:id="@+id/tvTotalProfit"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="₱0.00"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorOnSurface"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_columnWeight="1"
-                        android:layout_margin="8dp"
+                        android:layout_margin="6dp"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="2dp">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/ic_inventory" app:tint="@color/errorRed" android:background="@drawable/bg_circle_light" android:padding="6dp" />
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Expenses (Opex)" android:textSize="13sp" android:textColor="@color/text_secondary" android:layout_marginTop="12dp" />
-                            <TextView android:id="@+id/tv_opex" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textSize="18sp" android:textStyle="bold" android:textColor="@color/errorRed" android:layout_marginTop="4dp" />
-                        </LinearLayout>
-                    </androidx.cardview.widget.CardView>
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="?attr/colorSurface">
 
-                    <androidx.cardview.widget.CardView
-                        android:id="@+id/card_net_income"
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:background="@drawable/edite_round"
+                                android:backgroundTint="#FFE082"
+                                android:padding="6dp"
+                                android:src="@drawable/ic_warning"
+                                app:tint="#E65100"
+                                android:layout_marginBottom="12dp"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Running Low"
+                                android:textSize="12sp"
+                                android:textColor="#E65100" />
+
+                            <TextView
+                                android:id="@+id/tvLowStock"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 Items"
+                                android:textSize="18sp"
+                                android:textStyle="bold"
+                                android:textColor="#E65100"
+                                android:layout_marginTop="2dp"/>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_columnWeight="1"
-                        android:layout_margin="8dp"
+                        android:layout_margin="6dp"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="?attr/colorPrimary">
-                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                            <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/ic_reports" app:tint="@color/white" android:padding="6dp" />
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NET INCOME" android:textSize="13sp" android:textColor="#E0E0E0" android:textStyle="bold" android:layout_marginTop="12dp" />
-                            <TextView android:id="@+id/tv_net_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textSize="20sp" android:textStyle="bold" android:textColor="@color/white" android:layout_marginTop="4dp" />
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="?attr/colorSurface">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <ImageView
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:background="@drawable/edite_round"
+                                android:backgroundTint="#C5CAE9"
+                                android:padding="6dp"
+                                android:src="@drawable/ic_purchase_order"
+                                app:tint="#283593"
+                                android:layout_marginBottom="12dp"/>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Incoming POs"
+                                android:textSize="12sp"
+                                android:textColor="#283593" />
+
+                            <TextView
+                                android:id="@+id/tvPendingOrders"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 Orders"
+                                android:textSize="18sp"
+                                android:textStyle="bold"
+                                android:textColor="#283593"
+                                android:layout_marginTop="2dp"/>
                         </LinearLayout>
-                    </androidx.cardview.widget.CardView>
+                    </com.google.android.material.card.MaterialCardView>
                 </GridLayout>
 
                 <androidx.cardview.widget.CardView
-                    android:id="@+id/card_low_stock"
+                    android:id="@+id/card_near_expiry"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="8dp"
+                    android:layout_marginHorizontal="6dp"
                     android:layout_marginBottom="16dp"
                     android:visibility="gone"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="3dp"
-                    app:cardBackgroundColor="#FFF3E0">
+                    app:cardBackgroundColor="?attr/colorSurface">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
                         android:padding="16dp"
                         android:gravity="center_vertical">
-                        <ImageView android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/ic_inventory" app:tint="#E65100" android:layout_marginEnd="12dp"/>
+                        <ImageView android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/ic_inventory" app:tint="#F57F17" android:layout_marginEnd="12dp"/>
                         <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⚠️ ACTION REQUIRED" android:textSize="12sp" android:textStyle="bold" android:textColor="#E65100" />
-                            <TextView android:id="@+id/tv_low_stock_list" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Loading items..." android:textSize="14sp" android:textColor="#BF360C" android:layout_marginTop="4dp" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⏳ ACTION REQUIRED: EXPIRING SOON" android:textSize="12sp" android:textStyle="bold" android:textColor="#F57F17" />
+                            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp">
+                                <TextView android:id="@+id/tv_near_expiry_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textSize="14sp" android:textStyle="bold" android:textColor="#E65100" />
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" items expiring within 7 days" android:textSize="14sp" android:textColor="#E65100" />
+                            </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <androidx.cardview.widget.CardView android:id="@+id/card_low_stock" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"><TextView android:id="@+id/tv_low_stock_count" android:layout_width="wrap_content" android:layout_height="wrap_content"/></androidx.cardview.widget.CardView>
-                <androidx.cardview.widget.CardView android:id="@+id/card_near_expiry" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"><TextView android:id="@+id/tv_near_expiry_count" android:layout_width="wrap_content" android:layout_height="wrap_content"/></androidx.cardview.widget.CardView>
-                <androidx.cardview.widget.CardView android:id="@+id/card_pending_orders" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"><TextView android:id="@+id/tv_pending_orders_count" android:layout_width="wrap_content" android:layout_height="wrap_content"/></androidx.cardview.widget.CardView>
-                <com.google.android.material.button.MaterialButton android:id="@+id/btn_customers" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+                <TextView android:id="@+id/tv_sales_amount" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+                <TextView android:id="@+id/tv_gross_profit" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+                <TextView android:id="@+id/tv_opex" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
+                <TextView android:id="@+id/tv_net_income" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_manage_users"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    style="@style/CustomButtonOutlined"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Manage Users &amp; Staff"
                     android:layout_marginTop="4dp"
-                    android:backgroundTint="@color/white"
+                    android:textColor="?attr/colorOnSurface"
+                    app:backgroundTint="?attr/colorSurface"
                     android:layout_marginBottom="16dp" />
 
                 <TextView
@@ -370,7 +507,7 @@
                     android:layout_marginBottom="16dp"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
-                    app:cardBackgroundColor="@android:color/white">
+                    app:cardBackgroundColor="?attr/colorSurface">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -384,7 +521,7 @@
                             android:text="Sales Trend (7 Days)"
                             android:textSize="14sp"
                             android:textStyle="bold"
-                            android:textColor="@color/text_primary" />
+                            android:textColor="?attr/colorOnSurface" />
 
                         <com.github.mikephil.charting.charts.LineChart
                             android:id="@+id/chart_sales_trend"
@@ -408,7 +545,7 @@
                         android:layout_marginBottom="16dp"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="2dp"
-                        app:cardBackgroundColor="@android:color/white">
+                        app:cardBackgroundColor="?attr/colorSurface">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -422,7 +559,7 @@
                                 android:text="Top Products"
                                 android:textSize="14sp"
                                 android:textStyle="bold"
-                                android:textColor="@color/text_primary" />
+                                android:textColor="?attr/colorOnSurface" />
 
                             <com.github.mikephil.charting.charts.BarChart
                                 android:id="@+id/chart_top_products"
@@ -440,7 +577,7 @@
                         android:layout_marginBottom="16dp"
                         app:cardCornerRadius="16dp"
                         app:cardElevation="2dp"
-                        app:cardBackgroundColor="@android:color/white">
+                        app:cardBackgroundColor="?attr/colorSurface">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -454,7 +591,7 @@
                                 android:text="Inventory"
                                 android:textSize="14sp"
                                 android:textStyle="bold"
-                                android:textColor="@color/text_primary" />
+                                android:textColor="?attr/colorOnSurface" />
 
                             <com.github.mikephil.charting.charts.PieChart
                                 android:id="@+id/chart_inventory_status"
@@ -480,7 +617,7 @@
                     android:layout_marginBottom="12dp"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="2dp"
-                    app:cardBackgroundColor="@android:color/white">
+                    app:cardBackgroundColor="?attr/colorSurface">
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rv_recent_activity"
@@ -503,7 +640,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        app:backgroundTint="@android:color/white"
+        app:backgroundTint="?attr/colorSurface"
         app:fabAlignmentMode="center"
         app:fabCradleMargin="10dp"
         app:fabCradleRoundedCornerRadius="24dp"
@@ -530,8 +667,8 @@
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingVertical="4dp">
-                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_inventory" app:tint="@color/text_secondary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Inventory" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_inventory" app:tint="?attr/colorOnSurface"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Inventory" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:layout_marginTop="4dp"/>
             </LinearLayout>
 
             <LinearLayout
@@ -545,8 +682,8 @@
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingVertical="4dp">
-                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_add_sale" app:tint="@color/text_secondary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Create Sales" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_add_sale" app:tint="?attr/colorOnSurface"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Create Sales" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:layout_marginTop="4dp"/>
             </LinearLayout>
 
             <View android:layout_width="60dp" android:layout_height="0dp" />
@@ -562,8 +699,8 @@
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingVertical="4dp">
-                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_purchase_order" app:tint="@color/text_secondary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Purchase Order" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_purchase_order" app:tint="?attr/colorOnSurface"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Purchase Order" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:layout_marginTop="4dp"/>
             </LinearLayout>
 
             <LinearLayout
@@ -577,8 +714,8 @@
                 android:focusable="true"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:paddingVertical="4dp">
-                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_reports" app:tint="@color/text_secondary"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reports" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="4dp"/>
+                <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/ic_reports" app:tint="?attr/colorOnSurface"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reports" android:textSize="11sp" android:textColor="?attr/colorOnSurface" android:layout_marginTop="4dp"/>
             </LinearLayout>
 
         </LinearLayout>
@@ -592,15 +729,85 @@
         android:visibility="gone"
         android:elevation="6dp" />
 
+    <LinearLayout
+        android:id="@+id/layout_fab_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="90dp"
+        android:gravity="end"
+        android:visibility="gone"
+        android:elevation="7dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Suggested Catalog"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorSurface"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:layout_marginEnd="12dp"/>
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_suggested_product"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:fabSize="mini"
+                app:srcCompat="@android:drawable/ic_menu_search"
+                app:tint="?attr/colorPrimary"
+                app:backgroundTint="?attr/colorSurface" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add Manually"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorSurface"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="6dp"
+                android:layout_marginEnd="12dp"/>
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_add_manual"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:fabSize="mini"
+                app:srcCompat="@android:drawable/ic_input_add"
+                app:tint="?attr/colorPrimary"
+                app:backgroundTint="?attr/colorSurface"/>
+        </LinearLayout>
+    </LinearLayout>
+
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btn_add_product"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_anchor="@id/bottom_app_bar"
-        app:srcCompat="@drawable/ic_add_box_black_24dp"
-        app:tint="@android:color/white"
-        app:backgroundTint="@color/colorPrimary"
-        app:fabSize="normal"
-        app:elevation="8dp" />
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="?attr/colorAccent"
+        app:backgroundTint="?attr/colorOnSurface"
+        style="@style/CustomButtonOutlined"
+        android:contentDescription="Expand Menu" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

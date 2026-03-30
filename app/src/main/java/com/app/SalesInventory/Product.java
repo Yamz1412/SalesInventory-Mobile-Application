@@ -1,7 +1,7 @@
+// Product.java
 package com.app.SalesInventory;
 
 import com.google.firebase.firestore.Exclude;
-
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -11,11 +11,7 @@ import java.util.Objects;
 
 public class Product {
 
-    // -------------------------------------------------------------------------
-    // FIELDS
-    // -------------------------------------------------------------------------
-
-    @Exclude // Room-only — never send to Firestore
+    @Exclude
     private long localId;
 
     private String productId;
@@ -44,6 +40,7 @@ public class Product {
 
     private String addedBy;
     private boolean isActive;
+    private boolean isSellable;
     private String productType;
     private String ownerAdminId;
 
@@ -55,15 +52,11 @@ public class Product {
     private int piecesPerUnit = 1;
     private Map<String, Integer> linkedMaterials;
 
-    private List<Map<String, Object>> variantsList = new ArrayList<>();
-    private List<Map<String, Object>> addonsList   = new ArrayList<>();
-    private List<Map<String, String>> notesList    = new ArrayList<>();
-    private List<Map<String, Object>> bomList      = new ArrayList<>();
-    private List<Map<String, Object>> sizesList    = new ArrayList<>();
-
-    // -------------------------------------------------------------------------
-    // CONSTRUCTORS
-    // -------------------------------------------------------------------------
+    private List<Map<String, Object>> unifiedVariations = new ArrayList<>();
+    private List<Map<String, Object>> bomList = new ArrayList<>();
+    private List<Map<String, Object>> sizesList;
+    private List<Map<String, Object>> addonsList;
+    private List<Map<String, String>> notesList;
 
     public Product() {
         this.productType = "Raw";
@@ -104,10 +97,6 @@ public class Product {
         this.productType   = "Raw";
         this.expiryDate    = null;
     }
-
-    // -------------------------------------------------------------------------
-    // GETTERS & SETTERS
-    // -------------------------------------------------------------------------
 
     @Exclude public long getLocalId()             { return localId; }
     @Exclude public void setLocalId(long localId) { this.localId = localId; }
@@ -193,17 +182,8 @@ public class Product {
     public double getDeductionAmount()                       { return deductionAmount <= 0 ? 1.0 : deductionAmount; }
     public void   setDeductionAmount(double d)               { this.deductionAmount = d; }
 
-    public List<Map<String, Object>> getVariantsList()               { return variantsList; }
-    public void setVariantsList(List<Map<String, Object>> variantsList) { this.variantsList = variantsList; }
-
-    public List<Map<String, Object>> getSizesList()                  { return sizesList; }
-    public void setSizesList(List<Map<String, Object>> sizesList)    { this.sizesList = sizesList; }
-
-    public List<Map<String, Object>> getAddonsList()                 { return addonsList; }
-    public void setAddonsList(List<Map<String, Object>> addonsList)  { this.addonsList = addonsList; }
-
-    public List<Map<String, String>> getNotesList()                  { return notesList; }
-    public void setNotesList(List<Map<String, String>> notesList)    { this.notesList = notesList; }
+    public List<Map<String, Object>> getUnifiedVariations()          { return unifiedVariations; }
+    public void setUnifiedVariations(List<Map<String, Object>> list) { this.unifiedVariations = list; }
 
     public List<Map<String, Object>> getBomList()                    { return bomList; }
     public void setBomList(List<Map<String, Object>> bomList)        { this.bomList = bomList; }
@@ -213,6 +193,8 @@ public class Product {
 
     public boolean isActive()                                { return isActive; }
     public void    setActive(boolean active)                 { isActive = active; }
+    public boolean isSellable()                              { return isSellable; }
+    public void    setSellable(boolean sellable)             { isSellable = sellable; }
 
     public String getProductType()                           { return productType == null || productType.isEmpty() ? "Raw" : productType; }
     public void   setProductType(String productType)         { this.productType = productType; }
@@ -223,17 +205,42 @@ public class Product {
     public String getImageUrl()                              { return imageUrl; }
     public void   setImageUrl(String imageUrl)               { this.imageUrl = imageUrl; }
 
-    // -------------------------------------------------------------------------
-    // COMPUTED STOCK STATUS
-    // -------------------------------------------------------------------------
     @Exclude public boolean isCriticalStock() { return criticalLevel > 0 && quantity <= criticalLevel; }
     @Exclude public boolean isLowStock()      { return quantity > criticalLevel && reorderLevel > 0 && quantity <= reorderLevel; }
     @Exclude public boolean isOverstock()     { return ceilingLevel > 0 && quantity > ceilingLevel; }
     @Exclude public boolean isBelowFloor()    { return floorLevel > 0 && quantity <= floorLevel; }
 
-    // -------------------------------------------------------------------------
-    // toMap()
-    // -------------------------------------------------------------------------
+    public boolean isAvailableForSale(List<Product> masterInventory) {
+        if ((unifiedVariations == null || unifiedVariations.isEmpty()) && (bomList == null || bomList.isEmpty())) return true;
+
+        if (bomList != null && !bomList.isEmpty()) {
+            for (Map<String, Object> bomItem : bomList) {
+                String materialName = (String) bomItem.get("materialName");
+                double reqQty = bomItem.get("quantity") instanceof Number ? ((Number) bomItem.get("quantity")).doubleValue() : 0.0;
+
+                boolean isEssential = true;
+                if (bomItem.containsKey("isEssential")) {
+                    Object essObj = bomItem.get("isEssential");
+                    if (essObj instanceof Boolean) isEssential = (Boolean) essObj;
+                    else if (essObj instanceof String) isEssential = Boolean.parseBoolean((String) essObj);
+                }
+
+                double currentStock = 0.0;
+                for (Product invItem : masterInventory) {
+                    if (materialName != null && materialName.equalsIgnoreCase(invItem.getProductName())) {
+                        currentStock = invItem.getQuantity();
+                        break;
+                    }
+                }
+
+                if (isEssential && currentStock < reqQty) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     public Map<String, Object> toMap() {
         Map<String, Object> m = new HashMap<>();
         m.put("productId",       productId);
@@ -258,25 +265,23 @@ public class Product {
         m.put("dateAdded",       dateAdded);
         m.put("addedBy",         addedBy);
         m.put("isActive",        isActive);
+        m.put("isSellable",      isSellable);
         m.put("productType",     productType);
         m.put("ownerAdminId",    ownerAdminId);
         m.put("expiryDate",      expiryDate);
-        m.put("imagePath",       imagePath);
-        m.put("imageUrl",        imageUrl);
+        m.put("imagePath", imagePath);
+        m.put("imageUrl", imageUrl);
         m.put("salesUnit",       salesUnit);
         m.put("piecesPerUnit",   piecesPerUnit);
         m.put("linkedMaterials", linkedMaterials);
-        m.put("variantsList",    variantsList);
-        m.put("sizesList",       sizesList);
-        m.put("addonsList",      addonsList);
-        m.put("notesList",       notesList);
-        m.put("bomList",         bomList);
+        m.put("unifiedVariations", unifiedVariations);
+        m.put("sizesList", sizesList);
+        m.put("addonsList", addonsList);
+        m.put("notesList", notesList);
+        m.put("bomList", bomList);
         return m;
     }
 
-    // -------------------------------------------------------------------------
-    // fromMap()
-    // -------------------------------------------------------------------------
     @SuppressWarnings("unchecked")
     public static Product fromMap(Map<String, Object> m) {
         Product p = new Product();
@@ -305,11 +310,13 @@ public class Product {
         o = m.get("addedBy");       if (o != null) p.addedBy       = String.valueOf(o);
         o = m.get("ownerAdminId");  if (o != null) p.ownerAdminId  = String.valueOf(o);
         o = m.get("productType");   if (o != null) p.productType   = String.valueOf(o);
-        o = m.get("imagePath");     if (o != null) p.imagePath     = String.valueOf(o);
-        o = m.get("imageUrl");      if (o != null) p.imageUrl      = String.valueOf(o);
         o = m.get("salesUnit");     if (o != null) p.salesUnit     = String.valueOf(o);
         o = m.get("piecesPerUnit"); if (o instanceof Number) p.piecesPerUnit = ((Number)o).intValue();
         o = m.get("isActive");      if (o instanceof Boolean) p.isActive    = (Boolean)o;
+        o = m.get("isSellable");    if (o instanceof Boolean) p.isSellable  = (Boolean)o;
+
+        if (m.get("imagePath") != null) p.imagePath = (String) m.get("imagePath");
+        if (m.get("imageUrl") != null) p.imageUrl = (String) m.get("imageUrl");
 
         o = m.get("dateAdded");
         if      (o instanceof com.google.firebase.Timestamp) p.dateAdded = ((com.google.firebase.Timestamp)o).toDate();
@@ -324,12 +331,10 @@ public class Product {
         Object lm = m.get("linkedMaterials");
         if (lm instanceof Map) p.linkedMaterials = (Map<String,Integer>) lm;
 
-        if (m.get("variantsList") instanceof List) p.variantsList = (List<Map<String,Object>>) m.get("variantsList");
-        if (m.get("sizesList")    instanceof List) p.sizesList    = (List<Map<String,Object>>) m.get("sizesList");
-        if (m.get("addonsList")   instanceof List) p.addonsList   = (List<Map<String,Object>>) m.get("addonsList");
-        if (m.get("notesList")    instanceof List) p.notesList    = (List<Map<String,String>>) m.get("notesList");
-        if (m.get("bomList")      instanceof List) p.bomList      = (List<Map<String,Object>>) m.get("bomList");
-
+        if (m.get("sizesList") instanceof List) p.sizesList = (List<Map<String,Object>>) m.get("sizesList");
+        if (m.get("addonsList") instanceof List) p.addonsList = (List<Map<String,Object>>) m.get("addonsList");
+        if (m.get("notesList") instanceof List) p.notesList = (List<Map<String,String>>) m.get("notesList");
+        if (m.get("bomList") instanceof List) p.bomList = (List<Map<String,Object>>) m.get("bomList");
         return p;
     }
 
@@ -345,4 +350,12 @@ public class Product {
     public int hashCode() {
         return Objects.hash(getProductId());
     }
+    public List<Map<String, Object>> getSizesList() { return sizesList; }
+    public void setSizesList(List<Map<String, Object>> sizesList) { this.sizesList = sizesList; }
+
+    public List<Map<String, Object>> getAddonsList() { return addonsList; }
+    public void setAddonsList(List<Map<String, Object>> addonsList) { this.addonsList = addonsList; }
+
+    public List<Map<String, String>> getNotesList() { return notesList; }
+    public void setNotesList(List<Map<String, String>> notesList) { this.notesList = notesList; }
 }

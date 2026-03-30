@@ -46,8 +46,12 @@ public class StockValueReport {
     public int getFloorLevel() { return floorLevel; }
     public void setFloorLevel(int floorLevel) { this.floorLevel = floorLevel; }
 
-    public double getTotalCostValue() { return costPrice * quantity; }
+    // FIX: CostPrice is already the total cash value of the inventory!
+    public double getTotalCostValue() { return costPrice; }
+
+    // Selling price is still "per unit", so we multiply it by quantity to find potential revenue
     public double getTotalSellingValue() { return sellingPrice * quantity; }
+
     public double getProfit() { return getTotalSellingValue() - getTotalCostValue(); }
 
     public String getProfitMargin() {

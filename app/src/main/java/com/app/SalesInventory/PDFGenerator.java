@@ -146,21 +146,24 @@ public class PDFGenerator {
         document.close();
     }
 
-    public void generateStockMovementReportPDF(File outputFile, List<StockMovementReport> reports, int totalReceived, int totalSold, int totalAdjustments) throws Exception {
+    public void generateStockMovementReportPDF(File outputFile, List<StockMovementReport> reports, double totalReceived, double totalSold, double totalAdjustments) throws Exception {
         OutputStream os = new FileOutputStream(outputFile);
         try { generateStockMovementReportPDF(os, reports, totalReceived, totalSold, totalAdjustments); } finally { try { os.close(); } catch (Exception ignored) {} }
     }
 
-    public void generateStockMovementReportPDF(OutputStream outputStream, List<StockMovementReport> reports, int totalReceived, int totalSold, int totalAdjustments) throws Exception {
+    public void generateStockMovementReportPDF(OutputStream outputStream, List<StockMovementReport> reports, double totalReceived, double totalSold, double totalAdjustments) throws Exception {
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
         document.add(new Paragraph("STOCK MOVEMENT REPORT").setFont(boldFont).setFontSize(20).setTextAlignment(TextAlignment.CENTER));
         document.add(new Paragraph("Generated on: " + dateFormat.format(new Date())).setFontSize(10).setTextAlignment(TextAlignment.CENTER));
         document.add(new Paragraph("SUMMARY").setFont(boldFont).setFontSize(14));
-        document.add(new Paragraph("Total Received: " + totalReceived + " units"));
-        document.add(new Paragraph("Total Sold: " + totalSold + " units"));
-        document.add(new Paragraph("Total Adjustments: " + totalAdjustments + " units"));
+
+        // Updated to use Double formats
+        document.add(new Paragraph(String.format(Locale.US, "Total Received: %.2f units", totalReceived)));
+        document.add(new Paragraph(String.format(Locale.US, "Total Sold: %.2f units", totalSold)));
+        document.add(new Paragraph(String.format(Locale.US, "Total Adjustments: %.2f units", totalAdjustments)));
+
         document.add(new Paragraph("DETAILED REPORT").setFont(boldFont).setFontSize(14).setMarginTop(10));
         Table table = new Table(UnitValue.createPercentArray(new float[]{1.5f, 1.2f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f, 0.8f})).setWidth(UnitValue.createPercentValue(100));
         table.addHeaderCell(createHeaderCell("Product"));
@@ -171,6 +174,7 @@ public class PDFGenerator {
         table.addHeaderCell(createHeaderCell("Adjusted"));
         table.addHeaderCell(createHeaderCell("Closing"));
         table.addHeaderCell(createHeaderCell("Movement %"));
+
         if (reports != null) {
             for (StockMovementReport report : reports) {
                 table.addCell(report.getProductName());
@@ -180,7 +184,7 @@ public class PDFGenerator {
                 table.addCell(String.valueOf(report.getSold()));
                 table.addCell(String.valueOf(report.getAdjusted()));
                 table.addCell(String.valueOf(report.getClosingStock()));
-                table.addCell(String.format("%.2f%%", report.getMovementPercentage()));
+                table.addCell(String.format(Locale.US, "%.2f%%", report.getMovementPercentage()));
             }
         }
         document.add(table);

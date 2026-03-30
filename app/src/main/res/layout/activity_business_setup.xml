@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/backgroundColor"
+    android:background="?android:colorBackground"
     android:fillViewport="true"
     tools:context=".BusinessSetupActivity">
 
@@ -21,7 +21,7 @@
             android:layout_marginBottom="8dp"
             android:layout_marginTop="32dp"
             android:text="Setup Your Coffee Shop"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorPrimary"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -30,7 +30,8 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="32dp"
             android:text="Tell us a bit about your business"
-            android:textColor="@color/textColorSecondary"
+            android:textColor="?attr/colorOnBackground"
+            android:alpha="0.7"
             android:textSize="16sp" />
 
         <FrameLayout
@@ -78,13 +79,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Coffee Shop Name"
-            app:startIconDrawable="@drawable/ic_store">
+            android:hint="Business Name"
+            app:startIconDrawable="@android:drawable/ic_menu_edit">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etBusinessName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnBackground"
                 android:inputType="textCapWords" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -94,14 +96,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Complete Address"
-            app:startIconDrawable="@android:drawable/ic_dialog_map">
+            android:hint="Full Business Address"
+            app:startIconDrawable="@android:drawable/ic_menu_mapmode">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etAddress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textPostalAddress" />
+                android:inputType="textMultiLine"
+                android:textColor="?attr/colorOnBackground"
+                android:minLines="2" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -117,6 +121,7 @@
                 android:id="@+id/etLandmark"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnBackground"
                 android:inputType="textCapWords" />
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -124,7 +129,9 @@
             android:id="@+id/btnSaveBusiness"
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:backgroundTint="@color/colorPrimary"
+            style="@style/CustomButtonOutlined"
+            android:textColor="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
             android:text="Save and Continue"
             android:textAllCaps="false"
             android:textSize="18sp"

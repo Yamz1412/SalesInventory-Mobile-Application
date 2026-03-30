@@ -5,6 +5,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.app.DatePickerDialog;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -40,7 +41,6 @@ public class DeliveryReportActivity extends BaseActivity {
     private List<DeliveryOrder> masterList = new ArrayList<>();
     private List<DeliveryOrder> filteredList = new ArrayList<>();
 
-    // Filters
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
     private String selectedStatus = "All Statuses";
@@ -66,8 +66,8 @@ public class DeliveryReportActivity extends BaseActivity {
     }
 
     private void initializeViews() {
-        tvTotalDeliveries = findViewById(R.id.tvTotalDeliveries);
-        tvTotalPending = findViewById(R.id.tvTotalPending);
+        tvTotalDeliveries = findViewById(R.id.tvTotalDeliveriesCount);
+        tvTotalPending = findViewById(R.id.tvPendingDeliveriesCount);
         tvTotalDelivered = findViewById(R.id.tvTotalDelivered);
         tvNoData = findViewById(R.id.tvNoDataDelivery);
         btnDateFilter = findViewById(R.id.btnDateFilter);
@@ -80,8 +80,34 @@ public class DeliveryReportActivity extends BaseActivity {
         recyclerView.setAdapter(adapter);
     }
 
+    // ================================================================
+    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
+    // ================================================================
+    private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
+    }
+
     private void setupFilters() {
-        // Date Filter
         btnDateFilter.setOnClickListener(v -> {
             Calendar calendar = Calendar.getInstance();
             new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
@@ -104,10 +130,9 @@ public class DeliveryReportActivity extends BaseActivity {
             return true;
         });
 
-        // Status Spinner
         String[] statuses = {"All Statuses", "Pending", "Delivered", "Cancelled"};
-        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, statuses);
-        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        // Use the adaptive adapter here!
+        ArrayAdapter<String> statusAdapter = getAdaptiveAdapter(statuses);
         spinnerStatus.setAdapter(statusAdapter);
 
         spinnerStatus.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -155,7 +180,6 @@ public class DeliveryReportActivity extends BaseActivity {
             masterList.clear();
             masterList.addAll(map.values());
 
-            // Sort by newest first
             masterList.sort((a, b) -> Long.compare(b.orderDate, a.orderDate));
 
             applyFilters();
@@ -213,8 +237,6 @@ public class DeliveryReportActivity extends BaseActivity {
 
             if (updated) {
                 Toast.makeText(this, "Order marked as delivered", Toast.LENGTH_SHORT).show();
-                // Notice we do NOT manually reload data here, because the `updateSaleDeliveryStatus`
-                // triggers Firestore, which will automatically trigger the `getAllSales().observe` again!
             }
         });
     }
@@ -276,10 +298,9 @@ public class DeliveryReportActivity extends BaseActivity {
             String status = o.deliveryStatus != null ? o.deliveryStatus.toUpperCase() : "PENDING";
             holder.tvStatus.setText(status);
 
-            // Dynamic badge styling
             if ("DELIVERED".equals(status)) {
                 holder.tvStatus.setTextColor(getResources().getColor(R.color.successGreen));
-                holder.tvStatus.setBackgroundResource(0); // Optional: add a light green badge drawable if you have one
+                holder.tvStatus.setBackgroundResource(0);
                 holder.btnMarkDelivered.setVisibility(View.GONE);
             } else if ("CANCELLED".equals(status)) {
                 holder.tvStatus.setTextColor(getResources().getColor(R.color.errorRed));

@@ -35,6 +35,15 @@
         android:gravity="center" />
 
     <TextView
+        android:id="@+id/tvReceiptInvoiceNo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Invoice No: INV-0000"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:gravity="center" />
+
+    <TextView
         android:id="@+id/tvReceiptDateTime"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

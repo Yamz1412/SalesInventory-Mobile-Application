@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="?android:colorBackground">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="End of Day (Z-Reading)"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="?attr/colorPrimary"
+        android:layout_marginBottom="16dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Starting Cash:" />
+        <TextView android:id="@+id/tvZStartCash" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Total Cash Sales:" />
+        <TextView android:id="@+id/tvZCashSales" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/successGreen" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Refunds (Cash):" />
+        <TextView android:id="@+id/tvZRefunds" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/errorRed" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#E3F2FD"
+        android:padding="8dp"
+        android:layout_marginBottom="16dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="EXPECTED IN DRAWER:" android:textStyle="bold" android:textColor="?attr/colorPrimary"/>
+        <TextView android:id="@+id/tvZExpected" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textStyle="bold" android:textSize="18sp" android:textColor="?attr/colorPrimary" />
+    </LinearLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Actual Counted Cash (₱)">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etActualCash"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/tvZDifference"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Difference: ₱0.00"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnCancelZ"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Cancel"/>
+        <Button
+            android:id="@+id/btnCloseShift"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/errorRed"
+            android:text="CLOSE SHIFT"/>
+    </LinearLayout>
+</LinearLayout>

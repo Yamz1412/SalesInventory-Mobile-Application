@@ -48,7 +48,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_admin_create_staffs);
 
-        etStaffName = findViewById(R.id.etStaffName);
+        etStaffName = findViewById(R.id.etStaffFullName);
         etStaffEmail = findViewById(R.id.etStaffEmail);
         etStaffPhone = findViewById(R.id.etStaffPhone);
         etStaffPassword = findViewById(R.id.etStaffPassword);

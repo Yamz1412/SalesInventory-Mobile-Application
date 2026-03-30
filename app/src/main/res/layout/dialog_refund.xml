@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="?android:colorBackground">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Process Refund"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/errorRed"
+        android:layout_marginBottom="16dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2"
+        android:layout_marginBottom="8dp">
+
+        <Spinner
+            android:id="@+id/spinnerTimeFilter"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:background="@drawable/edite_round"
+            android:layout_marginEnd="4dp"/>
+
+        <EditText
+            android:id="@+id/etRefundOrderId"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="48dp"
+            android:hint="Search Order/Inv ID"
+            android:textSize="14sp"
+            android:background="@drawable/edite_round"
+            android:paddingHorizontal="12dp"
+            android:layout_marginStart="4dp"
+            android:inputType="text"/>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:background="#F5F5F5"
+        android:padding="8dp"
+        android:layout_marginBottom="12dp">
+        <TextView
+            android:id="@+id/tvRefundOrderDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a time filter or search to view transactions..."
+            android:textColor="#555555"/>
+    </ScrollView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Reason for Refund"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <Spinner
+        android:id="@+id/spinnerRefundReason"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/edite_round"
+        android:layout_marginBottom="8dp"/>
+
+    <EditText
+        android:id="@+id/etRefundSpecificReason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Specific reason or notes (Optional)"
+        android:textSize="14sp"
+        android:background="@drawable/edite_round"
+        android:padding="12dp"
+        android:minLines="2"
+        android:inputType="textMultiLine"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/btnCancelRefund"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Cancel"/>
+
+        <Button
+            android:id="@+id/btnConfirmRefund"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="CONFIRM REFUND"
+            android:backgroundTint="@color/errorRed"
+            android:enabled="false"/>
+    </LinearLayout>
+</LinearLayout>

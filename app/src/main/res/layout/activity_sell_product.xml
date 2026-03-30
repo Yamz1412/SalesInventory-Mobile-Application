@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/backgroundColor"
+    android:background="?android:colorBackground"
     tools:context=".sellProduct">
 
     <LinearLayout
@@ -19,9 +19,9 @@
             android:text="POS Transaction"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="@color/colorPrimary"
+            android:textColor="?attr/colorPrimary"
             android:gravity="center"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
         <TextView
             android:id="@+id/tvCartTitle"
@@ -30,16 +30,16 @@
             android:text="Selected Item"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorPrimary"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginBottom="6dp" />
 
         <ListView
             android:id="@+id/cartListView"
             android:layout_width="match_parent"
             android:layout_height="190dp"
-            android:divider="@color/lightGray"
+            android:divider="#40888888"
             android:dividerHeight="1dp"
-            android:background="@color/white"
+            android:background="?attr/colorSurface"
             android:padding="4dp"
             android:clipToPadding="false"
             tools:listitem="@layout/item_cart_product" />
@@ -60,6 +60,8 @@
                 android:layout_marginEnd="4dp"
                 android:text="Senior Citizen"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnBackground"
+                app:strokeColor="?attr/colorOnBackground"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <com.google.android.material.button.MaterialButton
@@ -70,6 +72,8 @@
                 android:layout_marginEnd="4dp"
                 android:text="PWD"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnBackground"
+                app:strokeColor="?attr/colorOnBackground"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
 
             <com.google.android.material.button.MaterialButton
@@ -79,6 +83,8 @@
                 android:layout_weight="1"
                 android:text="Special"
                 android:textSize="10sp"
+                android:textColor="?attr/colorOnBackground"
+                app:strokeColor="?attr/colorOnBackground"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
         </LinearLayout>
 
@@ -111,7 +117,7 @@
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:text="TOTAL TO PAY:"
-                android:textColor="@color/black"
+                android:textColor="?attr/colorOnBackground"
                 android:textStyle="bold"
                 android:textSize="18sp" />
 
@@ -122,7 +128,7 @@
                 android:text="₱0.00"
                 android:textSize="28sp"
                 android:textStyle="bold"
-                android:textColor="@color/colorPrimary" />
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
 
         <TextView
@@ -131,14 +137,16 @@
             android:text="Payment Method"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorSecondary"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginTop="4dp"
             android:layout_marginBottom="4dp" />
 
         <Spinner
             android:id="@+id/spinnerPaymentMethod"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:backgroundTint="?attr/colorControlHighlight"
+            android:background="@drawable/edite_round"/>
 
         <TextView
             android:layout_width="match_parent"
@@ -146,7 +154,7 @@
             android:text="Order Type"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorSecondary"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="4dp" />
 
@@ -160,6 +168,7 @@
                 android:id="@+id/rbWalkIn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnBackground"
                 android:text="Walk-in"
                 android:checked="true" />
 
@@ -167,6 +176,7 @@
                 android:id="@+id/rbDelivery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="?attr/colorOnBackground"
                 android:text="Delivery"
                 android:layout_marginStart="16dp" />
         </RadioGroup>
@@ -223,6 +233,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             app:cardCornerRadius="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardElevation="3dp">
 
             <LinearLayout
@@ -243,7 +254,7 @@
                         android:text="Cash"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/textColorPrimary"
+                        android:textColor="?attr/colorOnSurface"
                         android:layout_marginBottom="4dp" />
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -265,7 +276,7 @@
                         android:layout_height="wrap_content"
                         android:text="Change: ₱0.00"
                         android:textSize="20sp"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:layout_marginTop="4dp" />
                 </LinearLayout>
 
@@ -283,7 +294,7 @@
                         android:text="GCash"
                         android:textSize="14sp"
                         android:textStyle="bold"
-                        android:textColor="@color/textColorPrimary"
+                        android:textColor="?attr/colorOnSurface"
                         android:layout_marginBottom="4dp" />
 
                     <com.google.android.material.textfield.TextInputLayout
@@ -304,8 +315,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Capture or Upload Receipt"
-                        android:backgroundTint="@color/colorPrimary"
-                        android:textColor="@color/white" />
+                        android:backgroundTint="?attr/colorPrimary"
+                        android:textColor="?attr/colorOnPrimary" />
 
                     <FrameLayout
                         android:layout_width="match_parent"
@@ -330,7 +341,8 @@
                         android:text="No receipt captured"
                         android:gravity="center"
                         android:textSize="12sp"
-                        android:textColor="@color/textColorSecondary"
+                        android:textColor="?attr/colorOnSurface"
+                        android:alpha="0.7"
                         android:layout_marginTop="8dp" />
                 </LinearLayout>
             </LinearLayout>
@@ -341,8 +353,8 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:text="Edit Cart"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@color/white"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
             android:layout_marginTop="16dp" />
 
         <Button
@@ -350,8 +362,8 @@
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:text="Confirm Sale"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@color/white"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnPrimary"
             android:layout_marginTop="8dp" />
     </LinearLayout>
 </ScrollView>
