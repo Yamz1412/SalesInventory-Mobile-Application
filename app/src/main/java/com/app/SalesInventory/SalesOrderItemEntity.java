@@ -26,4 +26,5 @@ public class SalesOrderItemEntity {
     public double lineTotal;
     public String size;
     public String addons;
+    public String excludedIngredients;
 }

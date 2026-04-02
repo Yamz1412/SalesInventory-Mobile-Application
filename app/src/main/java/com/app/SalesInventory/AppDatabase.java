@@ -8,8 +8,7 @@ import androidx.room.RoomDatabase;
 import androidx.room.migration.Migration;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 
-// CHANGED: version bumped to 14 for the automated reorder point variables
-@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class, BatchEntity.class}, version = 17, exportSchema = false)
+@Database(entities = {ProductEntity.class, SalesOrderEntity.class, SalesOrderItemEntity.class, BatchEntity.class}, version = 19, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase INSTANCE;
 

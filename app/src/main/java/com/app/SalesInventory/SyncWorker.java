@@ -222,8 +222,15 @@ public class SyncWorker extends Worker {
                     .set(doc);
             try {
                 Tasks.await(t);
+
+                // SAFEGUARD: Delete duplicate if the real-time listener pulled it too fast
+                ProductEntity duplicate = productDao.getByProductIdSync(pe.productId);
+                if (duplicate != null && duplicate.localId != pe.localId) {
+                    productDao.deleteByLocalId(duplicate.localId);
+                }
+
                 productDao.setSyncInfo(pe.localId, pe.productId, "SYNCED");
-            } catch (ExecutionException | InterruptedException e) {
+            } catch (Exception e) { // Broadened to catch all exceptions including SQLite crashes
                 productDao.setSyncInfo(pe.localId, pe.productId, "ERROR");
             }
         } else {
@@ -233,8 +240,14 @@ public class SyncWorker extends Worker {
             try {
                 com.google.firebase.firestore.DocumentReference dr = Tasks.await(t);
                 String newId = dr.getId();
+
+                ProductEntity duplicate = productDao.getByProductIdSync(newId);
+                if (duplicate != null && duplicate.localId != pe.localId) {
+                    productDao.deleteByLocalId(duplicate.localId);
+                }
+
                 productDao.setSyncInfo(pe.localId, newId, "SYNCED");
-            } catch (ExecutionException | InterruptedException e) {
+            } catch (Exception e) { // Broadened to catch all exceptions
                 productDao.setSyncInfo(pe.localId, null, "ERROR");
             }
         }

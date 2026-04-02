@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,8 +22,10 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     private final List<Product> items = new ArrayList<>();
@@ -31,6 +34,16 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     private final AuthManager authManager;
 
     private boolean isReadOnly = false;
+
+    // --- NEW: MULTI-SELECTION VARIABLES ---
+    private Set<String> selectedIds = new HashSet<>();
+    private boolean isSelectionMode = false;
+
+    public interface OnSelectionChangeListener {
+        void onSelectionChanged(Set<String> selectedIds);
+    }
+    private OnSelectionChangeListener selectionListener;
+    // ----------------------------------------
 
     public ProductAdapter(Context ctx) {
         this.ctx = ctx;
@@ -61,6 +74,28 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         }
         notifyDataSetChanged();
     }
+
+    // --- NEW: MULTI-SELECTION METHODS ---
+    public void setSelectionListener(OnSelectionChangeListener listener) {
+        this.selectionListener = listener;
+    }
+
+    public void clearSelection() {
+        selectedIds.clear();
+        isSelectionMode = false;
+        notifyDataSetChanged();
+        if (selectionListener != null) selectionListener.onSelectionChanged(selectedIds);
+    }
+
+    private void toggleSelection(String id) {
+        if (selectedIds.contains(id)) selectedIds.remove(id);
+        else selectedIds.add(id);
+
+        if (selectedIds.isEmpty()) isSelectionMode = false;
+        notifyDataSetChanged();
+        if (selectionListener != null) selectionListener.onSelectionChanged(selectedIds);
+    }
+    // --------------------------------------
 
     @NonNull
     @Override
@@ -94,14 +129,34 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
         loadImage(p.getImagePath(), p.getImageUrl(), holder.productImage);
 
+        // --- NEW: VISUAL HIGHLIGHT FOR SELECTION ---
+        if (selectedIds.contains(p.getProductId())) {
+            holder.itemView.setBackgroundColor(Color.parseColor("#40007BFF")); // Translucent Blue overlay
+        } else {
+            holder.itemView.setBackgroundColor(Color.TRANSPARENT);
+        }
+
+        // --- NEW: HANDLE LONG PRESS FOR MULTI-SELECTION ---
+        holder.itemView.setOnLongClickListener(v -> {
+            if (isReadOnly) return false;
+            isSelectionMode = true;
+            toggleSelection(p.getProductId());
+            return true;
+        });
+
+        // --- NEW: HANDLE NORMAL CLICKS (Selection vs Opening Details) ---
         holder.itemView.setOnClickListener(v -> {
-            int currentPos = holder.getAdapterPosition();
-            if (currentPos != RecyclerView.NO_POSITION) {
-                Product currentProduct = items.get(currentPos);
-                Intent intent = new Intent(ctx, ProductDetailActivity.class);
-                intent.putExtra("productId", currentProduct.getProductId());
-                intent.putExtra("PRODUCT_ID", currentProduct.getProductId()); // Safety fallback
-                ctx.startActivity(intent);
+            if (isSelectionMode) {
+                toggleSelection(p.getProductId());
+            } else {
+                int currentPos = holder.getAdapterPosition();
+                if (currentPos != RecyclerView.NO_POSITION) {
+                    Product currentProduct = items.get(currentPos);
+                    Intent intent = new Intent(ctx, ProductDetailActivity.class);
+                    intent.putExtra("productId", currentProduct.getProductId());
+                    intent.putExtra("PRODUCT_ID", currentProduct.getProductId()); // Safety fallback
+                    ctx.startActivity(intent);
+                }
             }
         });
 
@@ -110,7 +165,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             if (currentPos != RecyclerView.NO_POSITION) {
                 Product currentProduct = items.get(currentPos);
 
-                // FIX: Point to AddProductActivity instead of EditProduct, as this handles the Edit UI
+                // Point to AddProductActivity instead of EditProduct
                 Intent intent = new Intent(ctx, AddProductActivity.class);
                 intent.putExtra("EDIT_PRODUCT_ID", currentProduct.getProductId());
                 intent.putExtra("productId", currentProduct.getProductId()); // Safety fallback
@@ -118,6 +173,7 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             }
         });
 
+        // --- FIX: PROPERLY HIDE/SHOW BUTTONS FOR ADMINS ---
         if (isReadOnly) {
             holder.btnEdit.setVisibility(View.GONE);
             holder.btnIncrease.setVisibility(View.GONE);
@@ -194,61 +250,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                         });
                     }
                 }
-            });
-
-            holder.itemView.setOnLongClickListener(v -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    Product currentProduct = items.get(currentPos);
-
-                    new AlertDialog.Builder(ctx)
-                            .setTitle("Archive Product")
-                            .setMessage("Are you sure you want to archive " + currentProduct.getProductName() + "?")
-                            .setPositiveButton("Archive", (dialog, which) -> {
-
-                                final Product archivedProduct = currentProduct;
-                                final int archivedPos = currentPos;
-
-                                repository.deleteProduct(currentProduct.getProductId(), new ProductRepository.OnProductDeletedListener() {
-                                    @Override
-                                    public void onProductDeleted(String filename) {
-                                        if (ctx instanceof Activity) {
-                                            ((Activity) ctx).runOnUiThread(() -> {
-                                                View rootView = ((Activity) ctx).findViewById(android.R.id.content);
-                                                com.google.android.material.snackbar.Snackbar.make(rootView,
-                                                                archivedProduct.getProductName() + " archived",
-                                                                com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
-                                                        .setAction("UNDO", view -> {
-                                                            repository.restoreArchived(filename, new ProductRepository.OnProductRestoreListener() {
-                                                                @Override
-                                                                public void onProductRestored() {
-                                                                    ((Activity) ctx).runOnUiThread(() ->
-                                                                            Toast.makeText(ctx, "Restored!", Toast.LENGTH_SHORT).show());
-                                                                }
-                                                                @Override
-                                                                public void onError(String error) {
-                                                                    ((Activity) ctx).runOnUiThread(() ->
-                                                                            Toast.makeText(ctx, "Failed to undo", Toast.LENGTH_SHORT).show());
-                                                                }
-                                                            });
-                                                        }).show();
-                                            });
-                                        }
-                                    }
-
-                                    @Override
-                                    public void onError(String error) {
-                                        if (ctx instanceof Activity) {
-                                            ((Activity) ctx).runOnUiThread(() ->
-                                                    Toast.makeText(ctx, "Error: " + error, Toast.LENGTH_SHORT).show());
-                                        }
-                                    }
-                                });
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                }
-                return true;
             });
         }
     }

@@ -40,16 +40,28 @@ public class ReceivingReportActivity extends BaseActivity {
 
     private DatabaseReference poRef;
     private String currentOwnerId;
+    private ValueEventListener realTimeListener;
 
-    private List<PurchaseOrder> masterPOList = new ArrayList<>();
-    private List<PurchaseOrder> filteredPOList = new ArrayList<>();
+    private List<ReceivedItemRecord> masterItemList = new ArrayList<>();
+    private List<ReceivedItemRecord> filteredItemList = new ArrayList<>();
     private ReceivingAdapter adapter;
 
-    // Filters
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
     private String selectedSupplier = "All Suppliers";
     private List<String> supplierList = new ArrayList<>();
+
+    private static class ReceivedItemRecord {
+        String productName;
+        String poNumber;
+        String supplierName;
+        long date;
+        double qtyReceived;
+        double unitPrice;
+        double subtotal;
+        String status;
+        String unit;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,6 +74,10 @@ public class ReceivingReportActivity extends BaseActivity {
         }
 
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentOwnerId == null || currentOwnerId.isEmpty()) {
+            currentOwnerId = AuthManager.getInstance().getCurrentUserId();
+        }
+
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
 
         initializeViews();
@@ -70,7 +86,7 @@ public class ReceivingReportActivity extends BaseActivity {
     }
 
     private void initializeViews() {
-        tvTotalOrders = findViewById(R.id.tvTotalOrders);
+        tvTotalOrders = findViewById(R.id.tvTotalOrders); // Will now show "Total Items"
         tvTotalSpent = findViewById(R.id.tvTotalValue);
         tvNoData = findViewById(R.id.tvNoData);
         progressBar = findViewById(R.id.progressBar);
@@ -83,9 +99,6 @@ public class ReceivingReportActivity extends BaseActivity {
         recyclerViewReceiving.setAdapter(adapter);
     }
 
-    // ================================================================
-    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
-    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -138,10 +151,15 @@ public class ReceivingReportActivity extends BaseActivity {
 
     private void loadReceivingData() {
         progressBar.setVisibility(View.VISIBLE);
-        poRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+        if (realTimeListener != null) {
+            poRef.removeEventListener(realTimeListener);
+        }
+
+        realTimeListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                masterPOList.clear();
+                masterItemList.clear();
                 supplierList.clear();
                 supplierList.add("All Suppliers");
 
@@ -152,21 +170,34 @@ public class ReceivingReportActivity extends BaseActivity {
                         if (PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(po.getStatus()) ||
                                 PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
 
-                            masterPOList.add(po);
-
                             String supName = po.getSupplierName();
                             if (supName != null && !supName.isEmpty() && !supplierList.contains(supName)) {
                                 supplierList.add(supName);
+                            }
+
+                            // EXTRACT INDIVIDUAL ITEMS
+                            if (po.getItems() != null) {
+                                for (POItem item : po.getItems()) {
+                                    if (item.getReceivedQuantity() > 0) {
+                                        ReceivedItemRecord record = new ReceivedItemRecord();
+                                        record.productName = item.getProductName();
+                                        record.poNumber = po.getPoNumber();
+                                        record.supplierName = po.getSupplierName();
+                                        record.date = po.getOrderDate();
+                                        record.qtyReceived = item.getReceivedQuantity();
+                                        record.unitPrice = item.getUnitPrice();
+                                        record.subtotal = item.getReceivedQuantity() * item.getUnitPrice();
+                                        record.status = po.getStatus();
+                                        record.unit = item.getUnit();
+                                        masterItemList.add(record);
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                Collections.sort(masterPOList, (a, b) -> Long.compare(
-                        b.getOrderDate() != null ? b.getOrderDate().getTime() : 0L,
-                        a.getOrderDate() != null ? a.getOrderDate().getTime() : 0L
-                ));
-
+                Collections.sort(masterItemList, (a, b) -> Long.compare(b.date, a.date));
                 setupSupplierSpinner();
                 applyFilters();
             }
@@ -175,11 +206,11 @@ public class ReceivingReportActivity extends BaseActivity {
             public void onCancelled(@NonNull DatabaseError error) {
                 progressBar.setVisibility(View.GONE);
             }
-        });
+        };
+        poRef.addValueEventListener(realTimeListener);
     }
 
     private void setupSupplierSpinner() {
-        // Apply the adaptive adapter!
         ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(supplierList);
         spinnerSupplier.setAdapter(spinAdapter);
 
@@ -194,34 +225,40 @@ public class ReceivingReportActivity extends BaseActivity {
     }
 
     private void applyFilters() {
-        filteredPOList.clear();
+        filteredItemList.clear();
         double totalSpent = 0.0;
-        int totalOrders = 0;
+        int totalItemsReceived = 0;
 
-        for (PurchaseOrder po : masterPOList) {
-            long poTime = po.getOrderDate() != null ? po.getOrderDate().getTime() : 0L;
-
-            boolean matchesDate = (filterStartDate == 0 || (poTime >= filterStartDate && poTime <= filterEndDate));
-            boolean matchesSupplier = selectedSupplier.equals("All Suppliers") || selectedSupplier.equals(po.getSupplierName());
+        for (ReceivedItemRecord item : masterItemList) {
+            boolean matchesDate = (filterStartDate == 0 || (item.date >= filterStartDate && item.date <= filterEndDate));
+            boolean matchesSupplier = selectedSupplier.equals("All Suppliers") || selectedSupplier.equals(item.supplierName);
 
             if (matchesDate && matchesSupplier) {
-                filteredPOList.add(po);
-                totalSpent += po.getTotalAmount();
-                totalOrders++;
+                filteredItemList.add(item);
+                totalSpent += item.subtotal;
+                totalItemsReceived++;
             }
         }
 
-        tvTotalOrders.setText(String.valueOf(totalOrders));
+        tvTotalOrders.setText(String.valueOf(totalItemsReceived)); // Hijacked to show Item Count
         tvTotalSpent.setText(String.format(Locale.US, "₱%,.2f", totalSpent));
         progressBar.setVisibility(View.GONE);
 
-        if (filteredPOList.isEmpty()) {
+        if (filteredItemList.isEmpty()) {
             tvNoData.setVisibility(View.VISIBLE);
             recyclerViewReceiving.setVisibility(View.GONE);
         } else {
             tvNoData.setVisibility(View.GONE);
             recyclerViewReceiving.setVisibility(View.VISIBLE);
             adapter.notifyDataSetChanged();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (poRef != null && realTimeListener != null) {
+            poRef.removeEventListener(realTimeListener);
         }
     }
 
@@ -243,44 +280,42 @@ public class ReceivingReportActivity extends BaseActivity {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            PurchaseOrder po = filteredPOList.get(position);
+            ReceivedItemRecord item = filteredItemList.get(position);
 
-            holder.tvPoNumber.setText(po.getPoNumber());
-            holder.tvSupplier.setText(po.getSupplierName());
+            holder.tvItemName.setText(item.productName);
+            holder.tvOrderRef.setText(item.supplierName + " | " + item.poNumber);
 
-            if (po.getOrderDate() != null) {
-                holder.tvDate.setText(sdf.format(po.getOrderDate()));
+            if (item.date > 0) {
+                holder.tvDate.setText(sdf.format(new java.util.Date(item.date)));
             } else {
                 holder.tvDate.setText("Unknown Date");
             }
 
-            holder.tvTotalAmount.setText(String.format(Locale.US, "₱%,.2f", po.getTotalAmount()));
-            holder.tvStatus.setText(po.getStatus() != null ? po.getStatus().toUpperCase() : "UNKNOWN");
+            holder.tvSubtotal.setText(String.format(Locale.US, "₱%,.2f", item.subtotal));
 
-            if (PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
-                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_orange_dark));
-            } else if (PurchaseOrder.STATUS_RECEIVED.equalsIgnoreCase(po.getStatus())) {
-                holder.tvStatus.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
-            } else {
-                holder.tvStatus.setTextColor(Color.GRAY);
-            }
+            // Format qty dynamically
+            String qtyStr = (item.qtyReceived % 1 == 0) ? String.valueOf((long)item.qtyReceived) : String.format(Locale.US, "%.2f", item.qtyReceived);
+            String unit = item.unit != null ? item.unit : "pcs";
+
+            holder.tvQtyReceived.setText(qtyStr + " " + unit + " Rcvd");
+            holder.tvQtyReceived.setTextColor(getResources().getColor(android.R.color.holo_green_dark));
         }
 
         @Override
         public int getItemCount() {
-            return filteredPOList.size();
+            return filteredItemList.size();
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvPoNumber, tvSupplier, tvDate, tvTotalAmount, tvStatus;
+            TextView tvItemName, tvOrderRef, tvDate, tvSubtotal, tvQtyReceived;
 
             ViewHolder(View itemView) {
                 super(itemView);
-                tvPoNumber = itemView.findViewById(R.id.tvPoNumber);
-                tvSupplier = itemView.findViewById(R.id.tvSupplier);
+                tvItemName = itemView.findViewById(R.id.tvItemName);
+                tvOrderRef = itemView.findViewById(R.id.tvOrderRef);
                 tvDate = itemView.findViewById(R.id.tvDate);
-                tvTotalAmount = itemView.findViewById(R.id.tvTotalAmount);
-                tvStatus = itemView.findViewById(R.id.tvStatus);
+                tvSubtotal = itemView.findViewById(R.id.tvSubtotal);
+                tvQtyReceived = itemView.findViewById(R.id.tvQtyReceived);
             }
         }
     }

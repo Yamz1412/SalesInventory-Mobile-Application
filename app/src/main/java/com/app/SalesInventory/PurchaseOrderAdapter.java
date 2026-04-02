@@ -58,9 +58,9 @@ public class PurchaseOrderAdapter extends RecyclerView.Adapter<PurchaseOrderAdap
         holder.tvSupplier.setText(po.getSupplierName());
         holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%.2f", po.getTotalAmount()));
 
-        if (po.getOrderDate() != null) {
+        if (po.getOrderDate() > 0) {
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-            holder.tvOrderDate.setText(sdf.format(po.getOrderDate()));
+            holder.tvOrderDate.setText(sdf.format(new java.util.Date(po.getOrderDate())));
         } else {
             holder.tvOrderDate.setText("Unknown Date");
         }

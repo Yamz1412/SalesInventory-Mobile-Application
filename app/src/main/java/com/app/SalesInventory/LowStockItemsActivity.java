@@ -17,7 +17,7 @@ public class LowStockItemsActivity extends BaseActivity {
 
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
-    private TextView tvNoData;
+    private TextView tvNoData, tvTotalLowStock;
     private LowStockItemsAdapter adapter;
     private List<Product> lowStockList = new ArrayList<>();
     private ProductRepository productRepository;
@@ -35,6 +35,7 @@ public class LowStockItemsActivity extends BaseActivity {
         recyclerView = findViewById(R.id.recyclerViewLowStock);
         progressBar = findViewById(R.id.progressBar);
         tvNoData = findViewById(R.id.tvNoData);
+        tvTotalLowStock = findViewById(R.id.tvTotalLowStock);
 
         productRepository = ProductRepository.getInstance((Application) getApplicationContext());
         adapter = new LowStockItemsAdapter(this, lowStockList, productRepository);
@@ -49,11 +50,13 @@ public class LowStockItemsActivity extends BaseActivity {
         tvNoData.setVisibility(View.GONE);
         recyclerView.setVisibility(View.GONE);
 
+        // This observe method automatically listens for real-time updates!
         productRepository.getAllProducts().observe(this, products -> {
             lowStockList.clear();
             if (products != null) {
                 for (Product p : products) {
                     if (p == null || !p.isActive()) continue;
+
                     String type = p.getProductType() == null ? "" : p.getProductType();
                     if ("Menu".equalsIgnoreCase(type)) continue;
 
@@ -64,6 +67,11 @@ public class LowStockItemsActivity extends BaseActivity {
                         lowStockList.add(p);
                     }
                 }
+            }
+
+            // Update the new Summary Card
+            if (tvTotalLowStock != null) {
+                tvTotalLowStock.setText(lowStockList.size() + (lowStockList.size() == 1 ? " item at risk" : " items at risk"));
             }
 
             progressBar.setVisibility(View.GONE);

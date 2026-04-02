@@ -23,30 +23,30 @@
             android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/tvPoNumber"
+                android:id="@+id/tvItemName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="PO-12345678"
+                android:text="Product Name"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
                 />
 
             <TextView
-                android:id="@+id/tvStatus"
+                android:id="@+id/tvQtyReceived"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="RECEIVED"
+                android:text="0 pcs Rcvd"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
         <TextView
-            android:id="@+id/tvSupplier"
+            android:id="@+id/tvOrderRef"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Supplier Name"
+            android:text="Supplier Name | PO-123456"
             android:textSize="14sp"
             android:textColor="?attr/colorOnSurface"
             android:alpha="0.8"
@@ -70,7 +70,7 @@
                 android:alpha="0.6"/>
 
             <TextView
-                android:id="@+id/tvTotalAmount"
+                android:id="@+id/tvSubtotal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="₱0.00"

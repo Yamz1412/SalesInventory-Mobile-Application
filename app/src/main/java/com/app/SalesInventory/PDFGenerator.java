@@ -29,11 +29,13 @@ public class PDFGenerator {
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     private PdfFont boldFont;
     private PdfFont regularFont;
+    private PdfFont italicFont; // Added to fix the setItalic() error
 
     public PDFGenerator(Context context) throws Exception {
         this.context = context;
         this.boldFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA_BOLD);
         this.regularFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA);
+        this.italicFont = PdfFontFactory.createFont(com.itextpdf.io.font.constants.StandardFonts.HELVETICA_OBLIQUE); // Initialized
     }
 
     public void generateOverallSummaryReportPDF(File outputFile, int totalProducts, int lowOrCriticalProducts,
@@ -159,7 +161,6 @@ public class PDFGenerator {
         document.add(new Paragraph("Generated on: " + dateFormat.format(new Date())).setFontSize(10).setTextAlignment(TextAlignment.CENTER));
         document.add(new Paragraph("SUMMARY").setFont(boldFont).setFontSize(14));
 
-        // Updated to use Double formats
         document.add(new Paragraph(String.format(Locale.US, "Total Received: %.2f units", totalReceived)));
         document.add(new Paragraph(String.format(Locale.US, "Total Sold: %.2f units", totalSold)));
         document.add(new Paragraph(String.format(Locale.US, "Total Adjustments: %.2f units", totalAdjustments)));
@@ -242,6 +243,7 @@ public class PDFGenerator {
         return new Cell().add(new Paragraph(text).setFont(boldFont)).setTextAlignment(TextAlignment.CENTER).setBackgroundColor(ColorConstants.LIGHT_GRAY);
     }
 
+    // 1. COMBINED INVENTORY MASTER PDF
     public void generateCombinedInventoryReportPDF(OutputStream outputStream, List<StockValueReport> stockValueReports, List<StockMovementReport> stockMovementReports, List<AdjustmentSummaryData> adjustmentSummaries, int totalReceived, int totalSold, int totalAdjustments) throws Exception {
         PdfWriter writer = new PdfWriter(outputStream);
         PdfDocument pdfDoc = new PdfDocument(writer);
@@ -318,10 +320,6 @@ public class PDFGenerator {
         document.close();
     }
 
-
-    // ==========================================================
-    // UPDATED: GAAP ACCOUNTING FORMAT FOR FINANCIAL REPORT
-    // ==========================================================
     public void generateAccountingReportPDF(File file, String dateRange, String businessName,
                                             double grossSales, double discounts, double netSales,
                                             double cogs, double grossProfit, double opex, double netIncome,
@@ -488,33 +486,77 @@ public class PDFGenerator {
         document.close();
     }
 
-    // ==========================================================
-    // NEW: OPERATIONS, RECEIVING & ADJUSTMENTS REPORT
-    // ==========================================================
-    public void generateOperationsAndReceivingReportPDF(File file, String dateRange, String businessName,
-                                                        String poDetails, String returnsDetails,
-                                                        String damageDetails) throws Exception {
-        PdfWriter writer = new PdfWriter(new FileOutputStream(file));
-        PdfDocument pdf = new PdfDocument(writer);
-        Document document = new Document(pdf);
+    public void generateOperationsAndReceivingReportPDF(File dest, String dateRange, String bizName, String pos, String returns, String damages) throws Exception {
+        PdfWriter writer = new PdfWriter(new FileOutputStream(dest));
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc);
 
-        document.add(new Paragraph(businessName.toUpperCase()).setFont(boldFont).setFontSize(18).setTextAlignment(TextAlignment.CENTER));
-        document.add(new Paragraph("Operations, Receiving & Adjustments Report").setFont(boldFont).setFontSize(14).setTextAlignment(TextAlignment.CENTER));
-        document.add(new Paragraph("For the Period: " + dateRange).setFontSize(10).setFontColor(ColorConstants.DARK_GRAY).setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
+        document.add(new Paragraph(bizName.toUpperCase()).setFont(boldFont).setFontSize(18).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("OPERATIONS & LOGISTICS REPORT").setFont(boldFont).setFontSize(14).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("Period: " + dateRange + "\n\n").setFontSize(10).setTextAlignment(TextAlignment.CENTER));
 
-        // Damages & Adjustments
-        document.add(new Paragraph("Stock Adjustments & Damages").setFont(boldFont).setFontSize(12));
-        document.add(new Paragraph(damageDetails.isEmpty() ? "No damages recorded." : damageDetails).setFont(regularFont).setFontSize(10).setMarginBottom(15));
+        document.add(new Paragraph("PURCHASE ORDERS").setFont(boldFont).setFontSize(12).setBackgroundColor(ColorConstants.LIGHT_GRAY));
+        document.add(new Paragraph(pos).setFontSize(10));
 
-        // Purchase Orders & Receiving
-        document.add(new Paragraph("Purchase Orders & Receiving").setFont(boldFont).setFontSize(12));
-        document.add(new Paragraph(poDetails.isEmpty() ? "No Purchase Orders found." : poDetails).setFont(regularFont).setFontSize(10).setMarginBottom(15));
+        document.add(new Paragraph("\nSUPPLIER RETURNS").setFont(boldFont).setFontSize(12).setBackgroundColor(ColorConstants.LIGHT_GRAY));
+        document.add(new Paragraph(returns).setFontSize(10));
 
-        // Supplier Returns
-        document.add(new Paragraph("Supplier Returns").setFont(boldFont).setFontSize(12));
-        document.add(new Paragraph(returnsDetails.isEmpty() ? "No Supplier Returns found." : returnsDetails).setFont(regularFont).setFontSize(10).setMarginBottom(15));
+        document.add(new Paragraph("\nRECORDED DAMAGES / LOSSES").setFont(boldFont).setFontSize(12).setBackgroundColor(ColorConstants.LIGHT_GRAY));
+        document.add(new Paragraph(damages).setFontSize(10));
 
-        document.add(new Paragraph("\nReport generated by: Sales Inventory System").setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
+        document.close();
+    }
+
+    public void generatePurchaseOrderPDF(File dest, String bizName, PurchaseOrder po) throws Exception {
+        PdfWriter writer = new PdfWriter(new FileOutputStream(dest));
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc);
+
+        document.add(new Paragraph(bizName.toUpperCase()).setFont(boldFont).setFontSize(22).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("OFFICIAL PURCHASE ORDER").setFont(boldFont).setFontSize(16).setTextAlignment(TextAlignment.CENTER));
+
+        document.add(new Paragraph("\nPO Number: " + po.getPoNumber() +
+                "\nOrder Date: " + dateFormat.format(new Date(po.getOrderDate())) +
+                "\nSupplier: " + po.getSupplierName() + "\n\n").setFontSize(12));
+
+        Table table = new Table(UnitValue.createPercentArray(new float[]{4, 2, 2, 2})).useAllAvailableWidth();
+        table.addHeaderCell(createHeaderCell("Item Description"));
+        table.addHeaderCell(createHeaderCell("Qty"));
+        table.addHeaderCell(createHeaderCell("Unit Cost"));
+        table.addHeaderCell(createHeaderCell("Total"));
+
+        if (po.getItems() != null) {
+            for (POItem item : po.getItems()) {
+                table.addCell(new Cell().add(new Paragraph(item.getProductName()).setFontSize(10)));
+                table.addCell(new Cell().add(new Paragraph(String.valueOf(item.getQuantity())).setFontSize(10).setTextAlignment(TextAlignment.CENTER)));
+                table.addCell(new Cell().add(new Paragraph(String.format(Locale.US, "₱%,.2f", item.getUnitPrice())).setFontSize(10).setTextAlignment(TextAlignment.RIGHT)));
+                table.addCell(new Cell().add(new Paragraph(String.format(Locale.US, "₱%,.2f", item.getSubtotal())).setFontSize(10).setTextAlignment(TextAlignment.RIGHT)));
+            }
+        }
+        document.add(table);
+        document.add(new Paragraph("\nTotal Order Amount: ₱" + String.format(Locale.US, "%,.2f", po.getTotalAmount())).setFont(boldFont).setFontSize(14).setTextAlignment(TextAlignment.RIGHT));
+
+        document.close();
+    }
+
+    // 6. NEW: SALES RECEIPT PDF (For Automated Cloud/Local Save)
+    public void generateReceiptPDF(File dest, String bizName, String orderId, String receiptContent) throws Exception {
+        PdfWriter writer = new PdfWriter(new FileOutputStream(dest));
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        Document document = new Document(pdfDoc);
+
+        document.add(new Paragraph(bizName.toUpperCase()).setFont(boldFont).setFontSize(18).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("OFFICIAL RECEIPT").setFont(boldFont).setFontSize(14).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("Order #: " + orderId + "\nDate: " + dateFormat.format(new Date()) + "\n\n").setFontSize(10).setTextAlignment(TextAlignment.CENTER));
+
+        Paragraph content = new Paragraph(receiptContent)
+                .setFontSize(10)
+                .setFontFamily("Courier")
+                .setTextAlignment(TextAlignment.LEFT);
+        document.add(content);
+
+        document.add(new Paragraph("\nThank you for your business!").setFontSize(10).setTextAlignment(TextAlignment.CENTER).setFont(italicFont));
+
         document.close();
     }
 

@@ -1,114 +1,243 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground">
+    android:background="?android:colorBackground"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp"
+        android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/imgDetailProduct"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
-            android:layout_gravity="center"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_image_placeholder"
-            android:background="@drawable/edite_round"
-            android:padding="4dp" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="6dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#33888888">
+
+            <ImageView
+                android:id="@+id/imgDetailProduct"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_image_placeholder" />
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:id="@+id/tvDetailName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Product Name"
-            android:textSize="20sp"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="26sp"
             android:textStyle="bold"
-            android:layout_marginTop="12dp" />
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="32dp" />
 
         <TextView
-            android:id="@+id/tvDetailSupplier"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Organization"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:layout_marginStart="4dp"/>
+
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Supplier"
-            android:layout_marginTop="4dp" />
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvDetailCategory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Category"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="12dp"/>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A888888" android:layout_marginBottom="12dp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailProductLine"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Product Line"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="12dp"/>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A888888" android:layout_marginBottom="12dp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Type"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/tvDetailCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pricing"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:layout_marginStart="4dp"/>
+
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Category"
-            android:layout_marginTop="4dp" />
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvDetailPrice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Selling Price: ₱0.00"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp"/>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A888888" android:layout_marginBottom="12dp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailCost"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Buying Price: ₱0.00"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-            android:id="@+id/tvDetailProductLine"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Product Line"
-            android:layout_marginTop="4dp" />
+            android:text="Inventory Details"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:layout_marginStart="4dp"/>
 
-        <TextView
-            android:id="@+id/tvDetailType"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Type"
-            android:layout_marginTop="4dp" />
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="32dp">
 
-        <TextView
-            android:id="@+id/tvDetailPrice"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Selling Price"
-            android:layout_marginTop="8dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        <TextView
-            android:id="@+id/tvDetailCost"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Buying Price"
-            android:layout_marginTop="4dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
 
-        <TextView
-            android:id="@+id/tvDetailQty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Quantity"
-            android:layout_marginTop="4dp" />
+                    <TextView
+                        android:id="@+id/tvDetailQty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Quantity: 0"
+                        android:textColor="?attr/colorOnBackground"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
 
-        <TextView
-            android:id="@+id/tvDetailUnit"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Unit"
-            android:layout_marginTop="4dp" />
+                    <TextView
+                        android:id="@+id/tvDetailUnit"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Unit: pcs"
+                        android:textColor="?attr/colorOnBackground"
+                        android:textSize="16sp"
+                        android:gravity="end" />
+                </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvDetailExpiry"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Expiry"
-            android:layout_marginTop="4dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A888888" android:layout_marginBottom="12dp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailExpiry"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Expiry: N/A"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="12dp" />
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A888888" android:layout_marginBottom="12dp"/>
+
+                <TextView
+                    android:id="@+id/tvDetailSupplier"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Supplier: None"
+                    android:textColor="?attr/colorOnBackground"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
             android:id="@+id/layoutAdminButtons"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="16dp"
-            android:weightSum="1">
+            android:orientation="vertical">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDeleteProduct"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="Delete"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="Delete Product"
+                android:textSize="16sp"
                 android:textColor="@android:color/white"
-                android:backgroundTint="@android:color/holo_red_dark"
-                android:layout_marginStart="8dp" />
+                app:backgroundTint="?attr/colorError"
+                app:cornerRadius="14dp"
+                app:icon="@android:drawable/ic_menu_delete"
+                app:iconGravity="textStart"
+                app:iconTint="@android:color/white" />
         </LinearLayout>
 
     </LinearLayout>

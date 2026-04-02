@@ -20,7 +20,8 @@
             android:text="Product Name"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="@color/textColorPrimary" />
+            android:textColor="?attr/colorOnBackground"
+            />
 
         <TextView
             android:id="@+id/tvCartDetails"
@@ -28,7 +29,8 @@
             android:layout_height="wrap_content"
             android:text="Medium / Extra Shot, Syrup"
             android:textSize="12sp"
-            android:textColor="@color/textColorSecondary" />
+            android:textColor="?attr/colorOnBackground"
+            />
     </LinearLayout>
 
     <TextView
@@ -46,7 +48,8 @@
         android:layout_height="wrap_content"
         android:text="₱0.00"
         android:textSize="14sp"
-        android:textColor="@color/textColorPrimary" />
+        android:textColor="?attr/colorOnBackground"
+        />
 
     <ImageButton
         android:id="@+id/btnRemoveItem"

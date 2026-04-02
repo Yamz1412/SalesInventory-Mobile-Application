@@ -28,7 +28,6 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
 
     public void filterList(List<Product> filteredList) {
         this.products = filteredList != null ? filteredList : new ArrayList<>();
-        // Post to avoid notifyDataSetChanged during RecyclerView layout/measure pass
         new android.os.Handler(android.os.Looper.getMainLooper()).post(this::notifyDataSetChanged);
     }
 
@@ -46,10 +45,8 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
         Product p = products.get(position);
         if (p == null) return;
 
-        // 1. Product Name
         holder.tvName.setText(p.getProductName() != null ? p.getProductName() : "Unknown Product");
 
-        // 2. Unit Price Calculation (Total Cost / Quantity)
         double cost = p.getCostPrice();
         if (p.getQuantity() > 0) {
             cost = cost / p.getQuantity();
@@ -57,7 +54,6 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
         String unit = p.getUnit() != null ? p.getUnit() : "pcs";
         holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f / %s", cost, unit));
 
-        // 3. Category Badge
         String category = p.getCategoryName();
         if (holder.tvCategory != null) {
             if (category != null && !category.trim().isEmpty()) {
@@ -68,13 +64,6 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
             }
         }
 
-        // 4. Stock Info
-        if (holder.tvStock != null) {
-            double qty = p.getQuantity();
-            holder.tvStock.setText(String.format(Locale.getDefault(), "Stock: %.0f %s", qty, unit));
-        }
-
-        // 5. Click Listeners
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onProductClick(p);
         });
@@ -91,15 +80,13 @@ public class SupplierProductAdapter extends RecyclerView.Adapter<SupplierProduct
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName, tvPrice, tvCategory, tvStock;
+        TextView tvName, tvPrice, tvCategory;
 
         ViewHolder(View itemView) {
             super(itemView);
-            // These IDs perfectly match your item_supplier_product_grid.xml
             tvName     = itemView.findViewById(R.id.tvProductNameGrid);
             tvPrice    = itemView.findViewById(R.id.tvProductPriceGrid);
             tvCategory = itemView.findViewById(R.id.tvProductCategoryGrid);
-            tvStock    = itemView.findViewById(R.id.tvProductStockGrid);
         }
     }
 }

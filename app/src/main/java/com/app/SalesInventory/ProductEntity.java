@@ -15,6 +15,11 @@ import androidx.room.PrimaryKey;
     public String notesListJson;
     public String variantsListJson;
     public String bomListJson;
+    public boolean isPromo;
+    public boolean isTemporaryPromo;
+    public String promoName;
+    public long promoStartDate;
+    public long promoEndDate;
 
     @PrimaryKey(autoGenerate = true)
     public long localId;

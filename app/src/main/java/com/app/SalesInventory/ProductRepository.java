@@ -55,7 +55,6 @@ public class ProductRepository {
                     Product p = mapEntityToProduct(e);
                     String nameKey = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
 
-                    // FIX: Extremely Strict Deduplication Logic prevents ghost duplicates
                     boolean isIdUnique = p.getProductId() == null || !seenIds.contains(p.getProductId());
                     boolean isNameUnique = nameKey.isEmpty() || !seenNames.contains(nameKey);
 
@@ -337,6 +336,12 @@ public class ProductRepository {
                 existing.addonsListJson = serializeListObj(product.getAddonsList());
                 existing.notesListJson = serializeListStr(product.getNotesList());
 
+                existing.isPromo = product.isPromo();
+                existing.isTemporaryPromo = product.isTemporaryPromo();
+                existing.promoName = product.getPromoName();
+                existing.promoStartDate = product.getPromoStartDate();
+                existing.promoEndDate = product.getPromoEndDate();
+
                 if (existing.floorLevel < 1) existing.floorLevel = 1;
                 if (existing.criticalLevel < 1) existing.criticalLevel = 1;
                 if (existing.ceilingLevel <= 0) existing.ceilingLevel = computeDefaultCeiling(existing.quantity, existing.reorderLevel);
@@ -486,6 +491,13 @@ public class ProductRepository {
             o.put("addonsListJson", e.addonsListJson);
             o.put("notesListJson", e.notesListJson);
             o.put("bomListJson", e.bomListJson);
+
+            o.put("isPromo", e.isPromo);
+            o.put("isTemporaryPromo", e.isTemporaryPromo);
+            o.put("promoName", e.promoName);
+            o.put("promoStartDate", e.promoStartDate);
+            o.put("promoEndDate", e.promoEndDate);
+
             FileWriter fw = new FileWriter(out);
             fw.write(o.toString());
             fw.flush();
@@ -596,7 +608,6 @@ public class ProductRepository {
     private void createLowStockAlert(ProductEntity e) {
         if (alertRepository == null) return;
         String name = e.productName == null ? "" : e.productName;
-        // Clean, precise text without "Qty" or "Floor" jargon
         String message = "Reorder level reached: " + name + " (" + e.quantity + " left)";
         alertRepository.addAlertIfNotExists(e.productId, "LOW_STOCK", message, System.currentTimeMillis(), new AlertRepository.OnAlertAddedListener() {
             @Override
@@ -788,6 +799,12 @@ public class ProductRepository {
         p.setAddonsList(deserializeListObj(e.addonsListJson));
         p.setNotesList(deserializeListStr(e.notesListJson));
 
+        p.setPromo(e.isPromo);
+        p.setTemporaryPromo(e.isTemporaryPromo);
+        p.setPromoName(e.promoName);
+        p.setPromoStartDate(e.promoStartDate);
+        p.setPromoEndDate(e.promoEndDate);
+
         return p;
     }
 
@@ -825,6 +842,12 @@ public class ProductRepository {
         e.sizesListJson = serializeListObj(p.getSizesList());
         e.addonsListJson = serializeListObj(p.getAddonsList());
         e.notesListJson = serializeListStr(p.getNotesList());
+
+        e.isPromo = p.isPromo();
+        e.isTemporaryPromo = p.isTemporaryPromo();
+        e.promoName = p.getPromoName();
+        e.promoStartDate = p.getPromoStartDate();
+        e.promoEndDate = p.getPromoEndDate();
 
         return e;
     }
@@ -961,6 +984,12 @@ public class ProductRepository {
                 e.notesListJson = o.optString("notesListJson", null);
                 e.bomListJson = o.optString("bomListJson", null);
 
+                e.isPromo = o.optBoolean("isPromo", false);
+                e.isTemporaryPromo = o.optBoolean("isTemporaryPromo", false);
+                e.promoName = o.optString("promoName", null);
+                e.promoStartDate = o.optLong("promoStartDate", 0);
+                e.promoEndDate = o.optLong("promoEndDate", 0);
+
                 if (e.floorLevel < 1) e.floorLevel = 1;
                 if (e.criticalLevel < 1) e.criticalLevel = 1;
                 if (e.ceilingLevel <= 0) e.ceilingLevel = computeDefaultCeiling(e.quantity, e.reorderLevel);
@@ -997,6 +1026,13 @@ public class ProductRepository {
                     existing.addonsListJson = e.addonsListJson;
                     existing.notesListJson = e.notesListJson;
                     existing.bomListJson = e.bomListJson;
+
+                    existing.isPromo = e.isPromo;
+                    existing.isTemporaryPromo = e.isTemporaryPromo;
+                    existing.promoName = e.promoName;
+                    existing.promoStartDate = e.promoStartDate;
+                    existing.promoEndDate = e.promoEndDate;
+
                     productDao.update(existing);
                 } else {
                     productDao.insert(e);

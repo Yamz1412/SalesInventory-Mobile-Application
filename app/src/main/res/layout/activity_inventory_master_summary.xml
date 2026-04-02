@@ -31,9 +31,21 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDateFilter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:text="All Time"
+                android:textColor="?attr/colorOnSurface"
+                app:icon="@android:drawable/ic_menu_today"
+                app:iconTint="?attr/colorOnSurface"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                app:strokeColor="?attr/colorOnSurface"/>
+
             <androidx.cardview.widget.CardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="12dp" app:cardCornerRadius="8dp" app:cardElevation="2dp" app:cardBackgroundColor="?attr/colorSurface">
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Warehouse Value (Cost)" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Current Warehouse Value (Cost)" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp" />
                     <TextView android:id="@+id/tvTotalValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textSize="28sp" android:textStyle="bold" android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -67,7 +79,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Valuation by Category"
+                android:text="Current Valuation by Category"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnBackground"
@@ -92,7 +104,7 @@
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:text="EXPORT FULL MASTER PDF"
-            android:textColor="?attr/colorOnPrimary"
+            android:textColor="@color/white"
             android:backgroundTint="#FF9800"
             android:textSize="16sp"
             android:textStyle="bold"

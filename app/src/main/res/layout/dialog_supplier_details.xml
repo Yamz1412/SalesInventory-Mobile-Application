@@ -6,14 +6,14 @@
     android:layout_height="wrap_content"
     android:layout_margin="16dp"
     app:cardCornerRadius="16dp"
-    app:cardElevation="8dp">
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:background="@android:color/white">
+        android:padding="24dp">
 
         <TextView
             android:id="@+id/tvDialogSupplierName"
@@ -28,38 +28,42 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#E0E0E0"
+            android:background="?android:attr/listDivider"
             android:layout_marginBottom="16dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Categories Handled"
+            android:text="Categories"
             android:textStyle="bold"
-            android:textColor="#424242"
+            android:textColor="?attr/colorOnSurface"
+            android:alpha="0.7"
             android:textSize="12sp" />
+
         <TextView
             android:id="@+id/tvDialogSupplierCategories"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Coffee Beans, Syrups, Milk"
-            android:textColor="#212121"
+            android:text="Coffee, Milk, Syrups"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:layout_marginBottom="12dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Contact Number"
+            android:text="Phone Number"
             android:textStyle="bold"
-            android:textColor="#424242"
+            android:textColor="?attr/colorOnSurface"
+            android:alpha="0.7"
             android:textSize="12sp" />
+
         <TextView
             android:id="@+id/tvDialogSupplierPhone"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="0917-123-4567"
-            android:textColor="#212121"
+            android:text="09123456789"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:layout_marginBottom="12dp" />
 
@@ -68,14 +72,16 @@
             android:layout_height="wrap_content"
             android:text="Email Address"
             android:textStyle="bold"
-            android:textColor="#424242"
+            android:textColor="?attr/colorOnSurface"
+            android:alpha="0.7"
             android:textSize="12sp" />
+
         <TextView
             android:id="@+id/tvDialogSupplierEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="contact@supplier.com"
-            android:textColor="#212121"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:layout_marginBottom="12dp" />
 
@@ -84,14 +90,16 @@
             android:layout_height="wrap_content"
             android:text="Store Address"
             android:textStyle="bold"
-            android:textColor="#424242"
+            android:textColor="?attr/colorOnSurface"
+            android:alpha="0.7"
             android:textSize="12sp" />
+
         <TextView
             android:id="@+id/tvDialogSupplierAddress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="123 Coffee Ave, Marikina City"
-            android:textColor="#212121"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:layout_marginBottom="24dp" />
 
@@ -101,8 +109,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:text="Close"
-            android:textColor="?attr/colorPrimary" />
+            android:textColor="?attr/colorPrimary"
+            android:text="Close" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

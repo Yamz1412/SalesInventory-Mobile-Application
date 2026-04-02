@@ -363,6 +363,7 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
                         b.putString("productName", item.getProductName());
                         b.putDouble("quantity", item.getReceivedQuantity());
                         b.putDouble("costPrice", item.getUnitPrice());
+                        b.putString("unit", item.getUnit());
                         registrationQueue.add(b);
                     }
 
@@ -390,15 +391,15 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         inUnit = inUnit.toLowerCase(Locale.ROOT).trim();
         invUnit = invUnit.toLowerCase(Locale.ROOT).trim();
 
-        if ((inUnit.contains("box") || inUnit.contains("pack")) && invUnit.equals("pcs")) {
-            int ppu = piecesPerUnit > 0 ? piecesPerUnit : 1;
-            return receivedQty * ppu;
-        } else if (inUnit.equals("l") && invUnit.equals("ml")) {
+        if (inUnit.equals("l") && invUnit.equals("ml")) {
             return receivedQty * 1000.0;
         } else if (inUnit.equals("kg") && invUnit.equals("g")) {
             return receivedQty * 1000.0;
         } else if (inUnit.equals("l") && invUnit.equals("oz")) {
             return receivedQty * 33.814;
+        }
+        if (!inUnit.equals(invUnit) && piecesPerUnit > 1) {
+            return receivedQty * piecesPerUnit;
         }
 
         return receivedQty;

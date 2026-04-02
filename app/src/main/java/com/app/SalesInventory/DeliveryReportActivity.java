@@ -22,10 +22,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class DeliveryReportActivity extends BaseActivity {
 
@@ -38,8 +36,8 @@ public class DeliveryReportActivity extends BaseActivity {
     private DeliveryReportAdapter adapter;
     private SalesRepository salesRepository;
 
-    private List<DeliveryOrder> masterList = new ArrayList<>();
-    private List<DeliveryOrder> filteredList = new ArrayList<>();
+    private List<DeliveryItemRecord> masterList = new ArrayList<>();
+    private List<DeliveryItemRecord> filteredList = new ArrayList<>();
 
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
@@ -66,7 +64,7 @@ public class DeliveryReportActivity extends BaseActivity {
     }
 
     private void initializeViews() {
-        tvTotalDeliveries = findViewById(R.id.tvTotalDeliveriesCount);
+        tvTotalDeliveries = findViewById(R.id.tvTotalDeliveriesCount); // Now acts as Total Items
         tvTotalPending = findViewById(R.id.tvPendingDeliveriesCount);
         tvTotalDelivered = findViewById(R.id.tvTotalDelivered);
         tvNoData = findViewById(R.id.tvNoDataDelivery);
@@ -76,13 +74,10 @@ public class DeliveryReportActivity extends BaseActivity {
         recyclerView = findViewById(R.id.recyclerViewDelivery);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new DeliveryReportAdapter(filteredList, this::markOrderDelivered);
+        adapter = new DeliveryReportAdapter(filteredList, this::markItemDelivered);
         recyclerView.setAdapter(adapter);
     }
 
-    // ================================================================
-    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
-    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -131,7 +126,6 @@ public class DeliveryReportActivity extends BaseActivity {
         });
 
         String[] statuses = {"All Statuses", "Pending", "Delivered", "Cancelled"};
-        // Use the adaptive adapter here!
         ArrayAdapter<String> statusAdapter = getAdaptiveAdapter(statuses);
         spinnerStatus.setAdapter(statusAdapter);
 
@@ -147,6 +141,7 @@ public class DeliveryReportActivity extends BaseActivity {
 
     private void loadData() {
         progressBar.setVisibility(View.VISIBLE);
+
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales == null || sales.isEmpty()) {
                 masterList.clear();
@@ -154,34 +149,36 @@ public class DeliveryReportActivity extends BaseActivity {
                 return;
             }
 
-            Map<String, DeliveryOrder> map = new HashMap<>();
+            masterList.clear();
             for (Sales s : sales) {
                 if (s.getDeliveryType() == null || !"DELIVERY".equalsIgnoreCase(s.getDeliveryType())) {
                     continue;
                 }
-                String orderId = s.getOrderId();
-                if (orderId == null || orderId.isEmpty()) continue;
 
-                DeliveryOrder o = map.get(orderId);
-                if (o == null) {
-                    o = new DeliveryOrder();
-                    o.orderId = orderId;
-                    o.deliveryStatus = s.getDeliveryStatus() != null && !s.getDeliveryStatus().isEmpty() ? s.getDeliveryStatus() : "PENDING";
-                    o.deliveryDate = s.getDeliveryDate();
-                    o.orderDate = s.getDate();
-                    o.totalAmount = 0;
-                    o.customerName = s.getDeliveryName() != null && !s.getDeliveryName().isEmpty() ? s.getDeliveryName() : "Unknown Customer";
-                    o.paymentType = s.getDeliveryPaymentMethod() != null && !s.getDeliveryPaymentMethod().isEmpty() ? s.getDeliveryPaymentMethod() : s.getPaymentMethod();
-                    map.put(orderId, o);
+                // Create a record for every individual item
+                DeliveryItemRecord r = new DeliveryItemRecord();
+                r.saleId = s.getId();
+                r.productName = s.getProductName();
+                r.orderId = s.getOrderId() != null ? s.getOrderId() : "N/A";
+                r.customerName = s.getDeliveryName() != null && !s.getDeliveryName().isEmpty() ? s.getDeliveryName() : "Unknown Customer";
+                r.paymentType = s.getDeliveryPaymentMethod() != null && !s.getDeliveryPaymentMethod().isEmpty() ? s.getDeliveryPaymentMethod() : s.getPaymentMethod();
+                r.qty = s.getQuantity();
+                r.subtotal = s.getTotalPrice();
+                r.deliveryStatus = s.getDeliveryStatus() != null && !s.getDeliveryStatus().isEmpty() ? s.getDeliveryStatus() : "PENDING";
+
+                // Show delivery date if completed, otherwise show order creation date
+                if ("DELIVERED".equalsIgnoreCase(r.deliveryStatus) && s.getDeliveryDate() > 0) {
+                    r.date = s.getDeliveryDate();
+                } else {
+                    r.date = s.getDate();
                 }
-                o.totalAmount += s.getTotalPrice();
+
+                r.originalSaleObj = s;
+                masterList.add(r);
             }
 
-            masterList.clear();
-            masterList.addAll(map.values());
-
-            masterList.sort((a, b) -> Long.compare(b.orderDate, a.orderDate));
-
+            // Sort newest first
+            masterList.sort((a, b) -> Long.compare(b.date, a.date));
             applyFilters();
         });
     }
@@ -191,8 +188,8 @@ public class DeliveryReportActivity extends BaseActivity {
         int pendingCount = 0;
         int deliveredCount = 0;
 
-        for (DeliveryOrder o : masterList) {
-            boolean matchesDate = (filterStartDate == 0 || (o.orderDate >= filterStartDate && o.orderDate <= filterEndDate));
+        for (DeliveryItemRecord o : masterList) {
+            boolean matchesDate = (filterStartDate == 0 || (o.date >= filterStartDate && o.date <= filterEndDate));
             boolean matchesStatus = "All Statuses".equalsIgnoreCase(selectedStatus) || selectedStatus.equalsIgnoreCase(o.deliveryStatus);
 
             if (matchesDate && matchesStatus) {
@@ -219,26 +216,21 @@ public class DeliveryReportActivity extends BaseActivity {
         }
     }
 
-    private void markOrderDelivered(String orderId) {
-        if (orderId == null || orderId.isEmpty()) return;
-        salesRepository.getAllSales().observe(this, sales -> {
-            if (sales == null) return;
-            long now = System.currentTimeMillis();
-            boolean updated = false;
+    private void markItemDelivered(String saleId) {
+        if (saleId == null || saleId.isEmpty()) return;
 
-            for (Sales s : sales) {
-                if (orderId.equals(s.getOrderId()) && "DELIVERY".equalsIgnoreCase(s.getDeliveryType())) {
-                    s.setDeliveryStatus("DELIVERED");
-                    s.setDeliveryDate(now);
-                    salesRepository.updateSaleDeliveryStatus(s);
-                    updated = true;
-                }
-            }
+        long now = System.currentTimeMillis();
 
-            if (updated) {
-                Toast.makeText(this, "Order marked as delivered", Toast.LENGTH_SHORT).show();
+        for (DeliveryItemRecord record : masterList) {
+            if (saleId.equals(record.saleId)) {
+                Sales s = record.originalSaleObj;
+                s.setDeliveryStatus("DELIVERED");
+                s.setDeliveryDate(now);
+                salesRepository.updateSaleDeliveryStatus(s); // LiveData auto-refreshes the list!
+                Toast.makeText(this, "Item marked as delivered", Toast.LENGTH_SHORT).show();
+                break;
             }
-        });
+        }
     }
 
     @Override
@@ -247,31 +239,34 @@ public class DeliveryReportActivity extends BaseActivity {
         return true;
     }
 
-    private static class DeliveryOrder {
+    private static class DeliveryItemRecord {
+        String saleId;
+        String productName;
         String orderId;
-        double totalAmount;
-        String deliveryStatus;
-        long orderDate;
-        long deliveryDate;
         String customerName;
         String paymentType;
+        int qty;
+        double subtotal;
+        String deliveryStatus;
+        long date;
+        Sales originalSaleObj;
     }
 
     private interface OnMarkDeliveredListener {
-        void onMarkDelivered(String orderId);
+        void onMarkDelivered(String saleId);
     }
 
     private class DeliveryReportAdapter extends RecyclerView.Adapter<DeliveryReportAdapter.ViewHolder> {
 
-        private List<DeliveryOrder> items;
+        private List<DeliveryItemRecord> items;
         private OnMarkDeliveredListener listener;
 
-        DeliveryReportAdapter(List<DeliveryOrder> items, OnMarkDeliveredListener listener) {
+        DeliveryReportAdapter(List<DeliveryItemRecord> items, OnMarkDeliveredListener listener) {
             this.items = items;
             this.listener = listener;
         }
 
-        void setItems(List<DeliveryOrder> newItems) {
+        void setItems(List<DeliveryItemRecord> newItems) {
             this.items = newItems;
             notifyDataSetChanged();
         }
@@ -285,32 +280,37 @@ public class DeliveryReportActivity extends BaseActivity {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            DeliveryOrder o = items.get(position);
-            holder.tvOrderId.setText("Order #" + (o.orderId.length() > 6 ? o.orderId.substring(0, 6).toUpperCase() : o.orderId.toUpperCase()));
+            DeliveryItemRecord r = items.get(position);
 
-            String dateStr = o.orderDate > 0 ? dateFormat.format(new Date(o.orderDate)) : "Unknown Date";
-            holder.tvOrderDate.setText(dateStr);
-            holder.tvAmount.setText(String.format(Locale.US, "₱%,.2f", o.totalAmount));
+            holder.tvItemName.setText(r.productName);
 
-            holder.tvCustomer.setText(o.customerName);
-            holder.tvPayment.setText(o.paymentType != null && !o.paymentType.isEmpty() ? o.paymentType.toUpperCase() : "CASH");
+            String shortOrderId = r.orderId.length() > 6 ? r.orderId.substring(0, 6).toUpperCase() : r.orderId.toUpperCase();
+            holder.tvCustomerOrderRef.setText(r.customerName + " | Order #" + shortOrderId);
 
-            String status = o.deliveryStatus != null ? o.deliveryStatus.toUpperCase() : "PENDING";
-            holder.tvStatus.setText(status);
+            String dateStr = r.date > 0 ? dateFormat.format(new Date(r.date)) : "Unknown Date";
+            holder.tvDate.setText(dateStr);
+
+            holder.tvSubtotal.setText(String.format(Locale.US, "₱%,.2f", r.subtotal));
+
+            String paymentStr = r.paymentType != null && !r.paymentType.isEmpty() ? r.paymentType.toUpperCase() : "CASH";
+            holder.tvQtyAndPayment.setText(r.qty + "x | " + paymentStr);
+
+            String status = r.deliveryStatus != null ? r.deliveryStatus.toUpperCase() : "PENDING";
+            holder.tvDeliveryStatus.setText(status);
 
             if ("DELIVERED".equals(status)) {
-                holder.tvStatus.setTextColor(getResources().getColor(R.color.successGreen));
-                holder.tvStatus.setBackgroundResource(0);
+                holder.tvDeliveryStatus.setTextColor(getResources().getColor(R.color.successGreen));
+                holder.tvDeliveryStatus.setBackgroundResource(0);
                 holder.btnMarkDelivered.setVisibility(View.GONE);
             } else if ("CANCELLED".equals(status)) {
-                holder.tvStatus.setTextColor(getResources().getColor(R.color.errorRed));
-                holder.tvStatus.setBackgroundResource(0);
+                holder.tvDeliveryStatus.setTextColor(getResources().getColor(R.color.errorRed));
+                holder.tvDeliveryStatus.setBackgroundResource(0);
                 holder.btnMarkDelivered.setVisibility(View.GONE);
             } else {
-                holder.tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
+                holder.tvDeliveryStatus.setTextColor(getResources().getColor(R.color.warningYellow));
                 holder.btnMarkDelivered.setVisibility(View.VISIBLE);
                 holder.btnMarkDelivered.setOnClickListener(v -> {
-                    if (listener != null) listener.onMarkDelivered(o.orderId);
+                    if (listener != null) listener.onMarkDelivered(r.saleId);
                 });
             }
         }
@@ -321,17 +321,17 @@ public class DeliveryReportActivity extends BaseActivity {
         }
 
         class ViewHolder extends RecyclerView.ViewHolder {
-            TextView tvOrderId, tvOrderDate, tvAmount, tvStatus, tvCustomer, tvPayment;
+            TextView tvItemName, tvDate, tvSubtotal, tvDeliveryStatus, tvCustomerOrderRef, tvQtyAndPayment;
             Button btnMarkDelivered;
 
             ViewHolder(@NonNull View itemView) {
                 super(itemView);
-                tvOrderId = itemView.findViewById(R.id.tvOrderId);
-                tvOrderDate = itemView.findViewById(R.id.tvOrderDate);
-                tvAmount = itemView.findViewById(R.id.tvAmount);
-                tvStatus = itemView.findViewById(R.id.tvStatus);
-                tvCustomer = itemView.findViewById(R.id.tvCustomer);
-                tvPayment = itemView.findViewById(R.id.tvPayment);
+                tvItemName = itemView.findViewById(R.id.tvItemName);
+                tvDate = itemView.findViewById(R.id.tvDate);
+                tvSubtotal = itemView.findViewById(R.id.tvSubtotal);
+                tvDeliveryStatus = itemView.findViewById(R.id.tvDeliveryStatus);
+                tvCustomerOrderRef = itemView.findViewById(R.id.tvCustomerOrderRef);
+                tvQtyAndPayment = itemView.findViewById(R.id.tvQtyAndPayment);
                 btnMarkDelivered = itemView.findViewById(R.id.btnMarkDelivered);
             }
         }

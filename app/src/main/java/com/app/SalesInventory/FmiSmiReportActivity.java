@@ -65,6 +65,7 @@ public class FmiSmiReportActivity extends BaseActivity {
                 calculateAndDisplayData(checkedId == R.id.btnFmi);
             }
         });
+
         spinnerProductLine.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
@@ -80,9 +81,6 @@ public class FmiSmiReportActivity extends BaseActivity {
         loadData();
     }
 
-    // ================================================================
-    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
-    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -126,7 +124,6 @@ public class FmiSmiReportActivity extends BaseActivity {
                     if (lineName != null && !lines.contains(lineName)) lines.add(lineName);
                 }
 
-                // Apply Adaptive Adapter
                 ArrayAdapter<String> lineAdapter = getAdaptiveAdapter(lines);
                 spinnerProductLine.setAdapter(lineAdapter);
             }
@@ -175,7 +172,7 @@ public class FmiSmiReportActivity extends BaseActivity {
         String selectedLine = spinnerProductLine.getSelectedItem() != null ? spinnerProductLine.getSelectedItem().toString() : "All Product Lines";
 
         for (Product p : allProducts) {
-            if (!p.isActive()) continue;
+            if (!p.isActive() || "Menu".equalsIgnoreCase(p.getProductType())) continue;
 
             if (!selectedLine.equals("All Product Lines")) {
                 String pLine = p.getProductLine() != null ? p.getProductLine() : "";
@@ -189,9 +186,11 @@ public class FmiSmiReportActivity extends BaseActivity {
         }
 
         if (isFmi) {
+            // Fast moving: Highest sales at the top, ignore zero sales
             Collections.sort(reportItems, (a, b) -> Integer.compare(b.qtySold, a.qtySold));
             reportItems.removeIf(item -> item.qtySold == 0);
         } else {
+            // Slow moving: Lowest (or zero) sales at the top
             Collections.sort(reportItems, (a, b) -> Integer.compare(a.qtySold, b.qtySold));
         }
 
@@ -239,15 +238,29 @@ public class FmiSmiReportActivity extends BaseActivity {
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
             ReportItem item = currentDisplayList.get(position);
-            holder.tvProductName.setText(item.product.getProductName());
-            holder.tvCategory.setText(item.product.getCategoryName() != null ? item.product.getCategoryName() : "Uncategorized");
-            holder.tvQtySold.setText(item.qtySold + " Sold");
-            holder.tvCurrentStock.setText("Stock Left: " + item.product.getQuantity());
 
+            holder.tvProductName.setText(item.product.getProductName());
+
+            String categoryStr = item.product.getCategoryName() != null && !item.product.getCategoryName().isEmpty()
+                    ? item.product.getCategoryName()
+                    : "Uncategorized";
+            holder.tvCategory.setText(categoryStr);
+
+            holder.tvQtySold.setText(item.qtySold + " Sold");
+
+            // Format stock to handle decimals cleanly
+            String stockStr = (item.product.getQuantity() % 1 == 0)
+                    ? String.valueOf((long)item.product.getQuantity())
+                    : String.format(java.util.Locale.US, "%.2f", item.product.getQuantity());
+
+            String unitStr = item.product.getUnit() != null ? item.product.getUnit() : "pcs";
+            holder.tvCurrentStock.setText("Stock Left: " + stockStr + " " + unitStr);
+
+            // Dynamic color selection for Light/Dark mode safety
             if (item.qtySold == 0) {
-                holder.tvQtySold.setTextColor(android.graphics.Color.parseColor("#D32F2F")); // Red
+                holder.tvQtySold.setTextColor(Color.parseColor("#E53935")); // Slightly brighter Red for dark mode safety
             } else {
-                holder.tvQtySold.setTextColor(android.graphics.Color.parseColor("#388E3C")); // Green
+                holder.tvQtySold.setTextColor(Color.parseColor("#43A047")); // Slightly brighter Green for dark mode safety
             }
         }
 

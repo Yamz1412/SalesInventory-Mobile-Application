@@ -15,23 +15,31 @@
         android:layout_height="wrap_content"
         android:padding="12dp">
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ivProductImage"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardProductImage"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
-            android:src="@drawable/ic_image_placeholder"
-            android:scaleType="centerCrop"
-            android:background="@drawable/edite_round"
-            android:backgroundTint="?android:colorBackground"
-            android:padding="2dp" />
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="@android:color/transparent">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivProductImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_image_placeholder"
+                android:scaleType="centerCrop" />
+
+        </com.google.android.material.card.MaterialCardView>
 
         <LinearLayout
             android:id="@+id/layoutDetails"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_toEndOf="@id/ivProductImage"
+            android:layout_toEndOf="@id/cardProductImage"
             android:layout_toStartOf="@+id/btnEdit"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="8dp"

@@ -39,7 +39,7 @@ public interface ProductDao {
     @Query("DELETE FROM products WHERE localId = :localId")
     void deleteByLocalId(long localId);
 
-    @Query("UPDATE products SET productId = :productId, syncState = :syncState WHERE localId = :localId")
+    @Query("UPDATE OR REPLACE products SET productId = :productId, syncState = :syncState WHERE localId = :localId")
     void setSyncInfo(long localId, String productId, String syncState);
 
     @Query("SELECT * FROM products ORDER BY lastUpdated DESC")

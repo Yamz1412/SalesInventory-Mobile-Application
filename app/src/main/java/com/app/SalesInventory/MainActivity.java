@@ -567,17 +567,17 @@ public class MainActivity extends BaseActivity {
         if (btnSettings != null) btnSettings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
         if (btnProfile != null) btnProfile.setOnClickListener(v -> startActivity(new Intent(this, Profile.class)));
         if (btnCreateSale != null) btnCreateSale.setOnClickListener(v -> startActivity(new Intent(this, SellList.class)));
-
-        if (btnAddProduct != null) {
-            btnAddProduct.setOnClickListener(v -> {
-                if (!isAdminFlag) {
-                    Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!isFabOpen) showFabMenu();
-                else closeFabMenu();
-            });
-        }
+        if (btnAddProduct != null) btnAddProduct.setOnClickListener(v -> startActivity(new Intent(this, AddProductActivity.class)));
+//        if (btnAddProduct != null) {
+//            btnAddProduct.setOnClickListener(v -> {
+//                if (!isAdminFlag) {
+//                    Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
+//                    return;
+//                }
+//                if (!isFabOpen) showFabMenu();
+//                else closeFabMenu();
+//            });
+//        }
 
         if (dimOverlay != null) {
             dimOverlay.setOnClickListener(v -> closeFabMenu());
@@ -590,12 +590,12 @@ public class MainActivity extends BaseActivity {
             });
         }
 
-        if (fabSuggestedProduct != null) {
-            fabSuggestedProduct.setOnClickListener(v -> {
-                closeFabMenu();
-                startActivity(new Intent(this, SuggestedSuppliesActivity.class));
-            });
-        }
+//        if (fabSuggestedProduct != null) {
+//            fabSuggestedProduct.setOnClickListener(v -> {
+//                closeFabMenu();
+//                startActivity(new Intent(this, SuggestedSuppliesActivity.class));
+//            });
+//        }
 
         if (btnCreatePO != null) btnCreatePO.setOnClickListener(v -> {
             if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));

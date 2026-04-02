@@ -3,6 +3,7 @@ package com.app.SalesInventory;
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,8 +14,10 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 
 import java.util.List;
+import java.util.Locale;
 
 public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdapter.VH> {
 
@@ -40,28 +43,51 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         Product p = items.get(position);
-        if (p == null) return;
 
-        holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
-        holder.category.setText(p.getCategoryName() != null ? p.getCategoryName() : "");
+        holder.name.setText(p.getProductName());
 
-        double qty = p.getQuantity();
-        int reorder = p.getReorderLevel();
-        int critical = p.getCriticalLevel();
-        holder.stockInfo.setText("Stock: " + qty + " | Reorder: " + reorder + " | Critical: " + critical);
-        holder.currentStock.setText(String.valueOf(qty));
+        String categoryStr = p.getCategoryName() != null && !p.getCategoryName().isEmpty() ? p.getCategoryName() : "Uncategorized";
+        holder.category.setText(categoryStr);
 
-        String imageUrl = p.getImageUrl();
-        String imagePath = p.getImagePath();
-        String toLoad = null;
-        if (imageUrl != null && !imageUrl.isEmpty()) {
-            toLoad = imageUrl;
-        } else if (imagePath != null && !imagePath.isEmpty()) {
-            toLoad = imagePath;
+        // Clean decimal formatting for stock and limits
+        String currentQtyStr = (p.getQuantity() % 1 == 0) ? String.valueOf((long) p.getQuantity()) : String.format(Locale.US, "%.2f", p.getQuantity());
+
+        holder.stockInfo.setText(String.format(Locale.US, "Reorder: %d | Critical: %d", p.getReorderLevel(), p.getCriticalLevel()));
+
+        String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";
+        holder.currentStock.setText(currentQtyStr + " " + unitStr);
+
+        // Dynamic color coding for severity
+        if (p.getQuantity() <= p.getCriticalLevel()) {
+            // Critical Stock -> Red
+            holder.currentStock.setTextColor(Color.parseColor("#E53935"));
+        } else {
+            // Low Stock (Below reorder, above critical) -> Orange
+            holder.currentStock.setTextColor(Color.parseColor("#FB8C00"));
         }
-        if (toLoad != null && !toLoad.isEmpty()) {
+
+        // ROBUST OFFLINE IMAGE FALLBACK (Same as ProductAdapter)
+        String imageUrl = p.getImageUrl();
+        String localPath = p.getImagePath();
+
+        if (imageUrl != null && !imageUrl.isEmpty()) {
             Glide.with(ctx)
-                    .load(toLoad)
+                    .load(imageUrl)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .placeholder(R.drawable.ic_image_placeholder)
+                    .error(
+                            // Fallback to local gallery path if URL fails
+                            Glide.with(ctx)
+                                    .load(localPath)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .error(R.drawable.ic_image_placeholder)
+                    )
+                    .centerCrop()
+                    .into(holder.productImage);
+        } else if (localPath != null && !localPath.isEmpty()) {
+            Glide.with(ctx)
+                    .load(localPath)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .placeholder(R.drawable.ic_image_placeholder)
                     .error(R.drawable.ic_image_placeholder)
                     .centerCrop()
@@ -73,6 +99,8 @@ public class LowStockItemsAdapter extends RecyclerView.Adapter<LowStockItemsAdap
         holder.itemView.setOnClickListener(v -> {
             Intent i = new Intent(ctx, ProductDetailActivity.class);
             i.putExtra("productId", p.getProductId());
+            // Added safety fallback extra matching Inventory logic
+            i.putExtra("PRODUCT_ID", p.getProductId());
             ctx.startActivity(i);
         });
     }

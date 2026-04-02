@@ -510,8 +510,7 @@ public class EditSalesProductActivity extends BaseActivity {
             String cat = p.getCategoryName() != null ? p.getCategoryName() : "Uncategorized";
             if (!categories.contains(cat)) categories.add(cat);
         }
-        ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
-        spinnerFilter.setAdapter(catAdapter);
+        spinnerFilter.setAdapter(getAdaptiveDropdownAdapter(categories));
 
         List<Product> filteredList = new ArrayList<>(inventoryProducts);
         ArrayAdapter<Product> listAdapter = new ArrayAdapter<Product>(this, android.R.layout.simple_list_item_1, filteredList) {
@@ -643,6 +642,27 @@ public class EditSalesProductActivity extends BaseActivity {
                 runOnUiThread(() -> Toast.makeText(EditSalesProductActivity.this, "Failed to load product data: " + error, Toast.LENGTH_SHORT).show());
             }
         });
+    }
+
+    private ArrayAdapter<String> getAdaptiveDropdownAdapter(List<String> items) {
+        boolean isDark = false;
+        try {
+            isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        } catch (Exception e) {
+            int currentNightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            isDark = currentNightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+        int textColor = isDark ? android.graphics.Color.WHITE : android.graphics.Color.BLACK;
+
+        return new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
     }
 
     private void attemptEdit() {

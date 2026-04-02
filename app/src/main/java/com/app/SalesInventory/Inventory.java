@@ -67,6 +67,9 @@ public class Inventory extends BaseActivity {
     private TextView tvArchiveBadge;
     private com.google.firebase.firestore.ListenerRegistration archiveListener;
 
+    private com.google.android.material.switchmaterial.SwitchMaterial switchShowOutOfStock;
+    private boolean showOutOfStock = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -74,14 +77,6 @@ public class Inventory extends BaseActivity {
 
         authManager = AuthManager.getInstance();
         productRepository = SalesInventoryApplication.getProductRepository();
-
-        com.google.android.material.button.MaterialButton btnSuggestedSupplies = findViewById(R.id.btnSuggestedSupplies);
-        if (btnSuggestedSupplies != null) {
-            btnSuggestedSupplies.setOnClickListener(v -> {
-                Intent intent = new Intent(Inventory.this, SuggestedSuppliesActivity.class);
-                startActivity(intent);
-            });
-        }
 
         spinnerProductLineFilter = findViewById(R.id.spinnerProductLineFilter);
         spinnerSort = findViewById(R.id.spinnerSort);
@@ -99,6 +94,13 @@ public class Inventory extends BaseActivity {
         layoutArchiveContainer = findViewById(R.id.layout_archive_container);
         tvArchiveBadge = findViewById(R.id.tvArchiveBadge);
 
+        if (switchShowOutOfStock != null) {
+            switchShowOutOfStock.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                showOutOfStock = isChecked;
+                applyFilters();
+            });
+        }
+
         showLowStockOnly = getIntent().getBooleanExtra(EXTRA_SHOW_LOW_STOCK_ONLY, false);
         showNearExpiryOnly = getIntent().getBooleanExtra(EXTRA_SHOW_NEAR_EXPIRY_ONLY, false);
 
@@ -107,12 +109,47 @@ public class Inventory extends BaseActivity {
         productAdapter = new ProductAdapter(filteredProducts, this);
         productAdapter.setReadOnly(isReadOnly);
 
+        // --- NEW: LISTEN FOR MULTI-SELECTION TO TRIGGER BULK ARCHIVE ---
+        productAdapter.setSelectionListener(selectedIds -> {
+            if (selectedIds.isEmpty()) {
+                // Return to normal "Archive" button state
+                btnArchive.setText("Archive");
+                btnArchive.setOnClickListener(v -> startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
+            } else {
+                // Switch to Bulk Archive Mode
+                btnArchive.setText("Archive (" + selectedIds.size() + ")");
+                btnArchive.setOnClickListener(v -> {
+                    new android.app.AlertDialog.Builder(Inventory.this)
+                            .setTitle("Archive Multiple")
+                            .setMessage("Are you sure you want to archive " + selectedIds.size() + " selected items?")
+                            .setPositiveButton("Archive", (dialog, which) -> {
+                                for (String id : selectedIds) {
+                                    // Submit deletion logic without expecting UI update strings
+                                    productRepository.deleteProduct(id, new ProductRepository.OnProductDeletedListener() {
+                                        @Override public void onProductDeleted(String message) {}
+                                        @Override public void onError(String error) {}
+                                    });
+                                }
+                                productAdapter.clearSelection();
+                                Toast.makeText(Inventory.this, "Items Archived", Toast.LENGTH_SHORT).show();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                });
+            }
+        });
+
         productsRecyclerView.setLayoutManager(new GridLayoutManager(this, getResponsiveSpanCount()));
         productsRecyclerView.setAdapter(productAdapter);
 
+        // --- NEW: FIX INVISIBLE BUTTONS BY FORCING ADAPTER REFRESH ---
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isRealAdmin = authManager.isCurrentUserAdmin();
             isReadOnly = !isRealAdmin;
+
+            // This line fixes the hidden button bug!
+            if (productAdapter != null) productAdapter.setReadOnly(isReadOnly);
+
             if (isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
@@ -136,7 +173,6 @@ public class Inventory extends BaseActivity {
                 allProducts.addAll(products);
                 updateHeaderStats();
                 updateDynamicMainCategories();
-
                 applyFilters();
             } else {
                 fetchInventoryFromFirestore();
@@ -159,18 +195,16 @@ public class Inventory extends BaseActivity {
 
         archiveListener = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 .collection("users").document(ownerId).collection("products")
-                .whereEqualTo("isActive", false) // Retrieves deleted/archived products
+                .whereEqualTo("isActive", false)
                 .addSnapshotListener((snapshot, e) -> {
                     if (e != null) return;
                     if (snapshot != null) {
                         int archiveCount = snapshot.size();
                         runOnUiThread(() -> {
                             if (archiveCount > 0 && !isReadOnly) {
-                                // Show button and badge if there are archived items
                                 if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.VISIBLE);
                                 if (tvArchiveBadge != null) tvArchiveBadge.setText(String.valueOf(archiveCount));
                             } else {
-                                // Hide entire button if empty or if user is staff
                                 if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
                             }
                         });
@@ -212,7 +246,6 @@ public class Inventory extends BaseActivity {
                 "Recently Added"
         );
 
-        // Use adaptive adapter
         ArrayAdapter<String> adapter = getAdaptiveAdapter(sortOptions);
         spinnerSort.setAdapter(adapter);
 
@@ -278,7 +311,6 @@ public class Inventory extends BaseActivity {
             String mainCat = p.getProductLine() != null && !p.getProductLine().trim().isEmpty() ? p.getProductLine().trim() : "Uncategorized";
             String normKey = normalizeCategoryName(mainCat);
 
-            // Only add if we haven't seen a variant of this name yet. Uses the first found spelling/casing.
             if (!mainCatMap.containsKey(normKey)) {
                 mainCatMap.put(normKey, mainCat);
             }
@@ -360,7 +392,6 @@ public class Inventory extends BaseActivity {
         android.widget.TextView searchEditText = searchView.findViewById(id);
 
         if (searchEditText != null) {
-            // FIX: Force the text to be White in Dark Mode and Black in Light Mode!
             boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
             searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
             searchEditText.setHintTextColor(Color.GRAY);
@@ -404,6 +435,7 @@ public class Inventory extends BaseActivity {
             btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
         }
         if (btnArchive != null) {
+            // Default action if nothing is selected
             btnArchive.setOnClickListener(v -> startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
         }
     }
@@ -433,7 +465,6 @@ public class Inventory extends BaseActivity {
                     }
                 }
 
-                // Use adaptive adapter
                 ArrayAdapter<String> adapter = getAdaptiveAdapter(options);
                 spinnerCategoryFilter.setAdapter(adapter);
 
@@ -465,20 +496,16 @@ public class Inventory extends BaseActivity {
         Set<String> seenNames = new HashSet<>();
 
         for (Product p : allProducts) {
-            // Ignore inactive or POS Menu items in the stockroom
             if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
 
             String pName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
             if (!pName.isEmpty() && seenNames.contains(pName)) continue;
 
-            // 1. Extract the raw strings from the product object
             String pCat = p.getCategoryName() != null ? p.getCategoryName().trim() : "Uncategorized";
             String pLine = p.getProductLine() != null ? p.getProductLine().trim() : "Uncategorized";
 
-            // 2. Restore the Search Function logic
             boolean matchesSearch = q.isEmpty() || pName.contains(q);
 
-            // 3. Normalize for case/space-insensitive matching
             String pCatNorm = normalizeCategoryName(pCat);
             String pLineNorm = normalizeCategoryName(pLine);
             String filterCatNorm = normalizeCategoryName(cat);
@@ -488,6 +515,11 @@ public class Inventory extends BaseActivity {
             boolean matchesProductLine = filterLineNorm.equals("alllines") || filterLineNorm.equals("all") || pLineNorm.equals(filterLineNorm);
 
             if (matchesSearch && matchesCategory && matchesProductLine) {
+
+                if (!showOutOfStock && p.getQuantity() <= 0) {
+                    continue;
+                }
+
                 if (showLowStockOnly && (!p.isCriticalStock() && !p.isLowStock())) continue;
 
                 if (showNearExpiryOnly) {
@@ -532,14 +564,11 @@ public class Inventory extends BaseActivity {
         int screenWidthDp = config.screenWidthDp;
         boolean isLandscape = config.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 
-        // A screen width of 600dp or higher is the standard Android measurement for a Tablet
         boolean isTablet = screenWidthDp >= 600;
 
         if (isTablet) {
-            // Tablet Landscape: 4 columns for extra-large tablets (900dp+), otherwise 3
-            return isLandscape ? (screenWidthDp >= 900 ? 4 : 3) : 2; // Tablet Portrait: 2
+            return isLandscape ? (screenWidthDp >= 900 ? 4 : 3) : 2;
         } else {
-            // Phone Landscape: 2, Phone Portrait: 1
             return isLandscape ? 2 : 1;
         }
     }

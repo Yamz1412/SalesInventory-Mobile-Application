@@ -113,6 +113,14 @@ public class Reports extends BaseActivity {
     private List<Product> currentInventory = new ArrayList<>();
     private List<Sales> allSalesList = new ArrayList<>();
 
+    // --- NEW: Real-Time Cache Variables ---
+    private List<DataSnapshot> cachedOpex = new ArrayList<>();
+    private List<StockAdjustment> cachedAdjustments = new ArrayList<>();
+    private List<DataSnapshot> cachedPOs = new ArrayList<>();
+    private List<DataSnapshot> cachedReturns = new ArrayList<>();
+
+    private ValueEventListener opexListener, adjListener, poListener, returnsListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -164,7 +172,6 @@ public class Reports extends BaseActivity {
         loadLocalData();
         fetchBusinessProfile();
 
-        // Refresh Feature
         swipeRefreshLayout.setOnRefreshListener(() -> {
             salesRepository.reloadAllSales();
             fetchBusinessProfile();
@@ -201,9 +208,6 @@ public class Reports extends BaseActivity {
         });
     }
 
-    // ================================================================
-    // FIX: Adaptive Dropdown Adapter for Light/Dark Theme Spinners
-    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -234,11 +238,8 @@ public class Reports extends BaseActivity {
                 "This Month", "Last Month", "This Year", "Last Year to Now", "Custom Range"
         };
 
-        // Use the adaptive adapter here!
         ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(options);
         spinnerDateFilter.setAdapter(spinAdapter);
-
-        // Set default to "Last Year to Now"
         spinnerDateFilter.setSelection(7);
 
         spinnerDateFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -248,7 +249,7 @@ public class Reports extends BaseActivity {
 
                 if (selection.equals("Custom Range")) {
                     layoutCustomDate.setVisibility(View.VISIBLE);
-                    return; // Wait for the user to pick dates using the buttons
+                    return;
                 } else {
                     layoutCustomDate.setVisibility(View.GONE);
                 }
@@ -261,8 +262,7 @@ public class Reports extends BaseActivity {
                 startCalendar.set(Calendar.HOUR_OF_DAY, 0); startCalendar.set(Calendar.MINUTE, 0); startCalendar.set(Calendar.SECOND, 0);
 
                 switch (selection) {
-                    case "Today":
-                        break;
+                    case "Today": break;
                     case "Yesterday":
                         startCalendar.add(Calendar.DAY_OF_MONTH, -1);
                         endCalendar.add(Calendar.DAY_OF_MONTH, -1);
@@ -295,13 +295,14 @@ public class Reports extends BaseActivity {
                         break;
                 }
                 updateDateButtons();
-                if (!allSalesList.isEmpty()) calculateMetricsAndList();
+                calculateMetricsAndList();
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
     }
 
     private void loadLocalData() {
+        // 1. Listen to Products
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 currentInventory = products;
@@ -315,12 +316,79 @@ public class Reports extends BaseActivity {
             }
         });
 
+        // 2. Listen to Sales
         salesRepository.getAllSales().observe(this, sales -> {
             if (sales != null) {
                 allSalesList = new ArrayList<>(sales);
                 injectAdviserMockData();
                 calculateMetricsAndList();
             }
+        });
+
+        // 3. NEW: Listen to Operating Expenses in Real-Time
+        if (currentOwnerId != null && !currentOwnerId.isEmpty()) {
+            DatabaseReference opexRef = FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId);
+            opexListener = opexRef.addValueEventListener(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    cachedOpex.clear();
+                    for (DataSnapshot ds : snapshot.getChildren()) cachedOpex.add(ds);
+                    calculateMetricsAndList();
+                }
+                @Override public void onCancelled(@NonNull DatabaseError error) {}
+            });
+        }
+
+        // 4. NEW: Listen to Stock Adjustments in Real-Time
+        DatabaseReference adjRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
+        adjListener = adjRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                cachedAdjustments.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    StockAdjustment adj = ds.getValue(StockAdjustment.class);
+                    String owner = ds.child("ownerAdminId").getValue(String.class);
+                    if (adj != null && (currentOwnerId.equals(owner) || currentOwnerId.equals(adj.getOwnerAdminId()))) {
+                        cachedAdjustments.add(adj);
+                    }
+                }
+                calculateMetricsAndList();
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+
+        // 5. NEW: Listen to Purchase Orders in Real-Time
+        DatabaseReference poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
+        poListener = poRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                cachedPOs.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    PurchaseOrder po = ds.getValue(PurchaseOrder.class);
+                    if (po != null && currentOwnerId.equals(po.getOwnerAdminId())) {
+                        cachedPOs.add(ds); // Store snapshot to ensure we can pull all fields
+                    }
+                }
+                calculateMetricsAndList();
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        });
+
+        // 6. NEW: Listen to Returns in Real-Time
+        DatabaseReference returnsRef = FirebaseDatabase.getInstance().getReference("Returns");
+        returnsListener = returnsRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                cachedReturns.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String owner = ds.child("ownerAdminId").getValue(String.class);
+                    if (currentOwnerId.equals(owner)) {
+                        cachedReturns.add(ds);
+                    }
+                }
+                calculateMetricsAndList();
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
         });
     }
 
@@ -352,10 +420,10 @@ public class Reports extends BaseActivity {
         refund.setOrderId("MOCK-REF-99991");
         refund.setProductName("Caramel Macchiato (REFUND)");
         refund.setQuantity(-1);
-        refund.setTotalPrice(-4850.0); // Returning the excess money
+        refund.setTotalPrice(-4850.0);
         refund.setTotalCost(-45.0);
         refund.setPaymentMethod("Refund (Manager Override)");
-        refund.setTimestamp(twoMonthsAgo + 300000); // 5 mins later
+        refund.setTimestamp(twoMonthsAgo + 300000);
 
         allSalesList.add(mistake);
         allSalesList.add(refund);
@@ -534,7 +602,7 @@ public class Reports extends BaseActivity {
         Collections.sort(bestSellersList, (a, b) -> Integer.compare(b.quantitySold, a.quantitySold));
         Collections.sort(allReportItems, (a, b) -> b.date.compareTo(a.date));
 
-        generateDetailedStrings(startMillis, endMillis);
+        generateDetailedStrings();
 
         if (!bestSellersList.isEmpty()) tvOverviewBestSeller.setText(bestSellersList.get(0).productName + "\n(" + bestSellersList.get(0).quantitySold + " sold)");
         else tvOverviewBestSeller.setText("-");
@@ -553,47 +621,124 @@ public class Reports extends BaseActivity {
 
         adapter.notifyDataSetChanged();
 
-        fetchOperationsData(startMillis, endMillis);
-        fetchPODetailsData(startMillis, endMillis);
-        fetchOperatingExpensesAndRenderIS(startMillis, endMillis);
+        // Process the live-cached data natively
+        processOpex(startMillis, endMillis);
+        processOperations(startMillis, endMillis);
+        processPODetails(startMillis, endMillis);
+
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
     }
 
-    private void fetchOperatingExpensesAndRenderIS(long startMillis, long endMillis) {
-        if (currentOwnerId == null || currentOwnerId.isEmpty()) {
-            if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-            return;
-        }
-
-        DatabaseReference opexRef = FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId);
-        opexRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                databaseExpenses.clear();
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    Long dateLogged = ds.child("dateLogged").getValue(Long.class);
-                    if (dateLogged != null && dateLogged >= startMillis && dateLogged <= endMillis) {
-                        DataSnapshot itemsSnapshot = ds.child("items");
-                        for (DataSnapshot itemDs : itemsSnapshot.getChildren()) {
-                            String expName = itemDs.getKey();
-                            Object val = itemDs.getValue();
-                            if (val != null && expName != null) {
-                                try {
-                                    double amt = Double.parseDouble(val.toString());
-                                    databaseExpenses.put(expName, databaseExpenses.getOrDefault(expName, 0.0) + amt);
-                                } catch (NumberFormatException ignored) {}
-                            }
-                        }
+    private void processOpex(long startMillis, long endMillis) {
+        databaseExpenses.clear();
+        for (DataSnapshot ds : cachedOpex) {
+            Long dateLogged = ds.child("dateLogged").getValue(Long.class);
+            if (dateLogged != null && dateLogged >= startMillis && dateLogged <= endMillis) {
+                DataSnapshot itemsSnapshot = ds.child("items");
+                for (DataSnapshot itemDs : itemsSnapshot.getChildren()) {
+                    String expName = itemDs.getKey();
+                    Object val = itemDs.getValue();
+                    if (val != null && expName != null) {
+                        try {
+                            double amt = Double.parseDouble(val.toString());
+                            databaseExpenses.put(expName, databaseExpenses.getOrDefault(expName, 0.0) + amt);
+                        } catch (NumberFormatException ignored) {}
                     }
                 }
-                mergeAndRenderOperatingExpenses();
-                if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
             }
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                mergeAndRenderOperatingExpenses();
-                if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        }
+        mergeAndRenderOperatingExpenses();
+    }
+
+    private void processOperations(long startMillis, long endMillis) {
+        detailedDamagesStr.setLength(0);
+        int countDamages = 0;
+        for (StockAdjustment adj : cachedAdjustments) {
+            long ts = adj.getTimestamp();
+            if (ts >= startMillis && ts <= endMillis) {
+                if ("Damage".equalsIgnoreCase(adj.getReason()) || "Loss".equalsIgnoreCase(adj.getReason())) {
+                    countDamages++;
+                    detailedDamagesStr.append("• ").append(adj.getProductName())
+                            .append(" (").append(adj.getAdjustmentType()).append(" ")
+                            .append(Math.abs(adj.getQuantityAdjusted())).append(")\n  Reason: ")
+                            .append(adj.getReason()).append("\n\n");
+                }
             }
-        });
+        }
+        if (countDamages == 0) detailedDamagesStr.append("No damages recorded.\n");
+
+        detailedPOsStr.setLength(0);
+        int countPOs = 0;
+        for (DataSnapshot ds : cachedPOs) {
+            PurchaseOrder po = ds.getValue(PurchaseOrder.class);
+            if (po == null) continue;
+            long ts = po.getOrderDate();
+            if (ts >= startMillis && ts <= endMillis) {
+                if (PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
+                    countPOs++;
+                    detailedPOsStr.append("• PO: ").append(po.getPoNumber())
+                            .append("\n  Supplier: ").append(po.getSupplierName())
+                            .append("\n  Status: Incomplete/Partial\n\n");
+                }
+            }
+        }
+        if (countPOs == 0) detailedPOsStr.append("No partial deliveries found.\n");
+    }
+
+    private void processPODetails(long startMillis, long endMillis) {
+        detailedPOFullStr.setLength(0);
+        totalPOSpent = 0.0;
+        totalPOCount = 0;
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+
+        for (DataSnapshot ds : cachedPOs) {
+            PurchaseOrder po = ds.getValue(PurchaseOrder.class);
+            if (po == null) continue;
+            long ts = po.getOrderDate();
+            if (ts >= startMillis && ts <= endMillis) {
+                totalPOCount++;
+                totalPOSpent += po.getTotalAmount();
+                String payment = ds.child("paymentMethod").getValue(String.class);
+                if (payment == null || payment.isEmpty()) payment = "Not Specified";
+
+                detailedPOFullStr.append("• ").append(po.getPoNumber())
+                        .append(" | ").append(sdf.format(new Date(ts)))
+                        .append("\n  Supplier: ").append(po.getSupplierName())
+                        .append("\n  Status: ").append(po.getStatus().toUpperCase())
+                        .append("\n  Payment: ").append(payment)
+                        .append("\n  Total Amount: ₱").append(String.format(Locale.US, "%.2f", po.getTotalAmount()))
+                        .append("\n\n");
+            }
+        }
+        if (totalPOCount == 0) detailedPOFullStr.append("No Purchase Orders found in this period.\n");
+
+        detailedReturnsFullStr.setLength(0);
+        totalReturnsCount = 0;
+        SimpleDateFormat sdfReturns = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
+
+        for (DataSnapshot ds : cachedReturns) {
+            Long date = ds.child("date").getValue(Long.class);
+            if (date != null && date >= startMillis && date <= endMillis) {
+                totalReturnsCount++;
+                String supplier = ds.child("supplierName").getValue(String.class);
+                String reason = ds.child("reason").getValue(String.class);
+
+                detailedReturnsFullStr.append("• Return on ").append(sdfReturns.format(new Date(date)))
+                        .append("\n  Supplier: ").append(supplier)
+                        .append("\n  Reason: ").append(reason)
+                        .append("\n  Items Returned: \n");
+
+                Iterable<DataSnapshot> items = ds.child("items").getChildren();
+                for (DataSnapshot item : items) {
+                    String pName = item.child("productName").getValue(String.class);
+                    Long qty = item.child("returnQty").getValue(Long.class);
+                    String unit = item.child("unit").getValue(String.class);
+                    detailedReturnsFullStr.append("    - ").append(pName).append(" (").append(qty).append(" ").append(unit).append(")\n");
+                }
+                detailedReturnsFullStr.append("\n");
+            }
+        }
+        if (totalReturnsCount == 0) detailedReturnsFullStr.append("No Supplier Returns found in this period.\n");
     }
 
     private void mergeAndRenderOperatingExpenses() {
@@ -619,7 +764,7 @@ public class Reports extends BaseActivity {
         tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
     }
 
-    private void generateDetailedStrings(long startMillis, long endMillis) {
+    private void generateDetailedStrings() {
         detailedProductsStr.setLength(0);
         Map<String, List<DetailedProductReport>> catGrouped = new HashMap<>();
         List<String> sortedCategories = new ArrayList<>();
@@ -830,136 +975,6 @@ public class Reports extends BaseActivity {
         }
     }
 
-    private void fetchOperationsData(long startMillis, long endMillis) {
-        DatabaseReference adjRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
-        adjRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                detailedDamagesStr.setLength(0);
-                int count = 0;
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    StockAdjustment adj = ds.getValue(StockAdjustment.class);
-                    if (adj != null) {
-                        String owner = ds.child("ownerAdminId").getValue(String.class);
-                        if (currentOwnerId.equals(owner) || currentOwnerId.equals(adj.getOwnerAdminId())) {
-                            long ts = adj.getTimestamp();
-                            if (ts >= startMillis && ts <= endMillis) {
-                                if ("Damage".equalsIgnoreCase(adj.getReason()) || "Loss".equalsIgnoreCase(adj.getReason())) {
-                                    count++;
-                                    detailedDamagesStr.append("• ").append(adj.getProductName())
-                                            .append(" (").append(adj.getAdjustmentType()).append(" ")
-                                            .append(Math.abs(adj.getQuantityAdjusted())).append(")\n  Reason: ")
-                                            .append(adj.getReason()).append("\n\n");
-                                }
-                            }
-                        }
-                    }
-                }
-                if (count == 0) detailedDamagesStr.append("No damages recorded.\n");
-            }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
-
-        DatabaseReference poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
-        poRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                detailedPOsStr.setLength(0);
-                int count = 0;
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    PurchaseOrder po = ds.getValue(PurchaseOrder.class);
-                    if (po != null && currentOwnerId.equals(po.getOwnerAdminId())) {
-                        long ts = po.getOrderDate() != null ? po.getOrderDate().getTime() : 0L;
-                        if (ts >= startMillis && ts <= endMillis) {
-                            if (PurchaseOrder.STATUS_PARTIAL.equalsIgnoreCase(po.getStatus())) {
-                                count++;
-                                detailedPOsStr.append("• PO: ").append(po.getPoNumber())
-                                        .append("\n  Supplier: ").append(po.getSupplierName())
-                                        .append("\n  Status: Incomplete/Partial\n\n");
-                            }
-                        }
-                    }
-                }
-                if (count == 0) detailedPOsStr.append("No partial deliveries found.\n");
-            }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
-    }
-
-    private void fetchPODetailsData(long startMillis, long endMillis) {
-        DatabaseReference poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
-        poRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                detailedPOFullStr.setLength(0);
-                totalPOSpent = 0.0;
-                totalPOCount = 0;
-                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    PurchaseOrder po = ds.getValue(PurchaseOrder.class);
-                    if (po != null && currentOwnerId.equals(po.getOwnerAdminId())) {
-                        long ts = po.getOrderDate() != null ? po.getOrderDate().getTime() : 0L;
-                        if (ts >= startMillis && ts <= endMillis) {
-                            totalPOCount++;
-                            totalPOSpent += po.getTotalAmount();
-                            String payment = ds.child("paymentMethod").getValue(String.class);
-                            if (payment == null || payment.isEmpty()) payment = "Not Specified";
-
-                            detailedPOFullStr.append("• ").append(po.getPoNumber())
-                                    .append(" | ").append(sdf.format(new Date(ts)))
-                                    .append("\n  Supplier: ").append(po.getSupplierName())
-                                    .append("\n  Status: ").append(po.getStatus().toUpperCase())
-                                    .append("\n  Payment: ").append(payment)
-                                    .append("\n  Total Amount: ₱").append(String.format(Locale.US, "%.2f", po.getTotalAmount()))
-                                    .append("\n\n");
-                        }
-                    }
-                }
-                if (totalPOCount == 0) detailedPOFullStr.append("No Purchase Orders found in this period.\n");
-            }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
-
-        DatabaseReference returnsRef = FirebaseDatabase.getInstance().getReference("Returns");
-        returnsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                detailedReturnsFullStr.setLength(0);
-                totalReturnsCount = 0;
-                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault());
-
-                for (DataSnapshot ds : snapshot.getChildren()) {
-                    String owner = ds.child("ownerAdminId").getValue(String.class);
-                    if (currentOwnerId.equals(owner)) {
-                        Long date = ds.child("date").getValue(Long.class);
-                        if (date != null && date >= startMillis && date <= endMillis) {
-                            totalReturnsCount++;
-                            String supplier = ds.child("supplierName").getValue(String.class);
-                            String reason = ds.child("reason").getValue(String.class);
-
-                            detailedReturnsFullStr.append("• Return on ").append(sdf.format(new Date(date)))
-                                    .append("\n  Supplier: ").append(supplier)
-                                    .append("\n  Reason: ").append(reason)
-                                    .append("\n  Items Returned: \n");
-
-                            Iterable<DataSnapshot> items = ds.child("items").getChildren();
-                            for(DataSnapshot item : items) {
-                                String pName = item.child("productName").getValue(String.class);
-                                Long qty = item.child("returnQty").getValue(Long.class);
-                                String unit = item.child("unit").getValue(String.class);
-                                detailedReturnsFullStr.append("    - ").append(pName).append(" (").append(qty).append(" ").append(unit).append(")\n");
-                            }
-                            detailedReturnsFullStr.append("\n");
-                        }
-                    }
-                }
-                if (totalReturnsCount == 0) detailedReturnsFullStr.append("No Supplier Returns found in this period.\n");
-            }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
-    }
-
     private void showPOReportDialog() {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_po_report, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(dialogView).setCancelable(true).create();
@@ -1068,6 +1083,15 @@ public class Reports extends BaseActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) return true;
         ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_WRITE_STORAGE);
         return false;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (opexListener != null) FirebaseDatabase.getInstance().getReference("OperatingExpenses").child(currentOwnerId).removeEventListener(opexListener);
+        if (adjListener != null) FirebaseDatabase.getInstance().getReference("StockAdjustments").removeEventListener(adjListener);
+        if (poListener != null) FirebaseDatabase.getInstance().getReference("PurchaseOrders").removeEventListener(poListener);
+        if (returnsListener != null) FirebaseDatabase.getInstance().getReference("Returns").removeEventListener(returnsListener);
     }
 
     @Override

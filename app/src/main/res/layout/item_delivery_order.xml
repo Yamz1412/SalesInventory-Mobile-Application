@@ -23,17 +23,17 @@
             android:layout_marginBottom="12dp">
 
             <TextView
-                android:id="@+id/tvOrderId"
+                android:id="@+id/tvItemName"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="Order #12345"
+                android:text="Product Name"
                 android:textStyle="bold"
                 android:textColor="#212121"
                 android:textSize="16sp" />
 
             <TextView
-                android:id="@+id/tvStatus"
+                android:id="@+id/tvDeliveryStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="PENDING"
@@ -56,8 +56,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Customer" android:textSize="11sp" android:textColor="#9E9E9E" />
-                <TextView android:id="@+id/tvCustomer" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Walk-in" android:textSize="14sp" android:textColor="#424242" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Customer Info" android:textSize="11sp" android:textColor="#9E9E9E" />
+                <TextView android:id="@+id/tvCustomerOrderRef" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Walk-in | Order #123" android:textSize="14sp" android:textColor="#424242" android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
@@ -66,8 +66,8 @@
                 android:layout_weight="1"
                 android:orientation="vertical"
                 android:gravity="end">
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Payment" android:textSize="11sp" android:textColor="#9E9E9E" />
-                <TextView android:id="@+id/tvPayment" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cash" android:textSize="14sp" android:textColor="#424242" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Qty &amp; Payment" android:textSize="11sp" android:textColor="#9E9E9E" />
+                <TextView android:id="@+id/tvQtyAndPayment" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2x | Cash" android:textSize="14sp" android:textColor="#424242" android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
@@ -84,8 +84,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
-                <TextView android:id="@+id/tvOrderDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Jan 01, 2025" android:textColor="#9E9E9E" android:textSize="12sp" />
-                <TextView android:id="@+id/tvAmount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:textSize="16sp" android:layout_marginTop="2dp"/>
+                <TextView android:id="@+id/tvDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Jan 01, 2025" android:textColor="#9E9E9E" android:textSize="12sp" />
+                <TextView android:id="@+id/tvSubtotal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="₱0.00" android:textStyle="bold" android:textColor="?attr/colorPrimary" android:textSize="16sp" android:layout_marginTop="2dp"/>
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

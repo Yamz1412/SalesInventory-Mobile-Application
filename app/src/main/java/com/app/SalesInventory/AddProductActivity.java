@@ -67,6 +67,14 @@ public class AddProductActivity extends BaseActivity {
     private SwitchMaterial switchSellOnPOS;
     private SwitchMaterial switchSizes, switchAddons, switchNotes, switchBOM;
 
+    // --- NEW: Promo & Limited Series Variables ---
+    private SwitchMaterial switchIsPromo, switchTemporaryPromo;
+    private LinearLayout layoutPromoSettings, layoutPromoDates;
+    private TextInputEditText etPromoSeriesName, etPromoStartDate, etPromoEndDate;
+    private Calendar promoStartCalendar = Calendar.getInstance();
+    private Calendar promoEndCalendar = Calendar.getInstance();
+    // ---------------------------------------------
+
     private LinearLayout layoutConfigurations;
     private TextInputLayout layoutSellingPrice;
 
@@ -88,16 +96,18 @@ public class AddProductActivity extends BaseActivity {
     private String editProductId = null;
     private Product existingProductToEdit = null;
 
-    private TextInputLayout layoutPiecesPerUnit;
+    private LinearLayout layoutPiecesPerUnit;
     private TextInputEditText etPiecesPerUnit;
     private List<String> unitList = new ArrayList<>();
     private ArrayAdapter<String> unitAdapter;
     private List<String> dialogUnits = new ArrayList<>();
 
-    // UPGRADED: Added Custom Measurements natively
     private List<String> baseUnitList = new ArrayList<>(java.util.Arrays.asList(
-            "pcs", "ml", "L", "oz", "g", "kg", "box", "pack", "bottle", "scoop"
+            "pcs", "ml", "L", "oz", "g", "kg", "box", "pack", "scoop"
     ));
+    private Spinner subUnitSpinner;
+    private List<String> subUnitList = new ArrayList<>();
+    private ArrayAdapter<String> subUnitAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,11 +147,38 @@ public class AddProductActivity extends BaseActivity {
         addBtn = findViewById(R.id.addBtn);
         cancelBtn = findViewById(R.id.cancelBtn);
 
+        // --- NEW: Promo Bindings & Listeners ---
+        switchIsPromo = findViewById(R.id.switchIsPromo);
+        switchTemporaryPromo = findViewById(R.id.switchTemporaryPromo);
+        layoutPromoSettings = findViewById(R.id.layoutPromoSettings);
+        layoutPromoDates = findViewById(R.id.layoutPromoDates);
+        etPromoSeriesName = findViewById(R.id.etPromoSeriesName);
+        etPromoStartDate = findViewById(R.id.etPromoStartDate);
+        etPromoEndDate = findViewById(R.id.etPromoEndDate);
+
+        if (switchIsPromo != null) {
+            switchIsPromo.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (layoutPromoSettings != null) layoutPromoSettings.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+                if (!isChecked && switchTemporaryPromo != null) switchTemporaryPromo.setChecked(false);
+            });
+        }
+        if (switchTemporaryPromo != null) {
+            switchTemporaryPromo.setOnCheckedChangeListener((btn, isChecked) -> {
+                if (layoutPromoDates != null) layoutPromoDates.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+            });
+        }
+        if (etPromoStartDate != null) etPromoStartDate.setOnClickListener(v -> showPromoDatePicker(etPromoStartDate, promoStartCalendar));
+        if (etPromoEndDate != null) etPromoEndDate.setOnClickListener(v -> showPromoDatePicker(etPromoEndDate, promoEndCalendar));
+        // ----------------------------------------
+
         setupImagePickers();
         loadInventoryForCalculations();
 
         layoutPiecesPerUnit = findViewById(R.id.layoutPiecesPerUnit);
         etPiecesPerUnit = findViewById(R.id.etPiecesPerUnit);
+        subUnitSpinner = findViewById(R.id.subUnitSpinner);
+        subUnitAdapter = getAdaptiveAdapter(subUnitList);
+        subUnitSpinner.setAdapter(subUnitAdapter);
 
         unitList.addAll(baseUnitList);
         unitList.add("+ Add Custom Unit...");
@@ -157,16 +194,23 @@ public class AddProductActivity extends BaseActivity {
                 } else {
                     boolean isBulkContainer = selected.equalsIgnoreCase("box") ||
                             selected.equalsIgnoreCase("pack") ||
-                            selected.equalsIgnoreCase("bottle") ||
                             selected.equalsIgnoreCase("L") ||
                             selected.equalsIgnoreCase("kg");
 
                     layoutPiecesPerUnit.setVisibility(isBulkContainer ? View.VISIBLE : View.GONE);
 
                     if (isBulkContainer) {
-                        layoutPiecesPerUnit.setHint("Total sub-units in 1 " + selected);
+                        subUnitList.clear();
+                        for (String u : unitList) {
+                            if (!u.equals("+ Add Custom Unit...") && !u.equalsIgnoreCase(selected)) {
+                                subUnitList.add(u);
+                            }
+                        }
+                        if (!subUnitList.contains("pcs")) subUnitList.add(0, "pcs");
+
+                        subUnitAdapter.notifyDataSetChanged();
                     } else {
-                        etPiecesPerUnit.setText("1"); // Reset to 1 for simple units like pcs/scoop
+                        etPiecesPerUnit.setText("1");
                     }
                 }
             }
@@ -204,38 +248,23 @@ public class AddProductActivity extends BaseActivity {
             loadProductDataForEdit();
         }
 
-        // CATCH UNREGISTERED PRODUCTS FROM PURCHASE ORDERS
-        if (getIntent().hasExtra("REGISTRATION_QUEUE")) {
-            ArrayList<Bundle> queue = getIntent().getParcelableArrayListExtra("REGISTRATION_QUEUE");
-            if (queue != null && !queue.isEmpty()) {
-                Bundle pendingItem = queue.get(0);
-                productNameET.setText(pendingItem.getString("productName", ""));
-
-                double cost = pendingItem.getDouble("costPrice", 0.0);
-                double qty = pendingItem.getDouble("quantity", 0.0);
-
-                costPriceET.setText(String.format(java.util.Locale.US, "%.2f", cost));
-                quantityET.setText(String.format(java.util.Locale.US, "%.2f", qty));
-
-                if (queue.size() > 1) {
-                    queue.remove(0);
-                    final ArrayList<Bundle> remainingQueue = new ArrayList<>(queue);
-
-                    addBtn.setOnClickListener(v -> {
-                        attemptAdd();
-                        Intent nextIntent = new Intent(AddProductActivity.this, AddProductActivity.class);
-                        nextIntent.putParcelableArrayListExtra("REGISTRATION_QUEUE", remainingQueue);
-                        startActivity(nextIntent);
-                    });
-                }
-            }
-        }
         if (getIntent().getBooleanExtra("MODE_MENU_ONLY", false)) {
             if (switchSellOnPOS != null) {
                 switchSellOnPOS.setChecked(true);
                 updateLayoutForSelectedType();
             }
         }
+    }
+
+    private void showPromoDatePicker(TextInputEditText targetEditText, Calendar targetCalendar) {
+        Calendar now = Calendar.getInstance();
+        DatePickerDialog dialog = new DatePickerDialog(this, (view, y, m, d) -> {
+            targetCalendar.set(Calendar.YEAR, y);
+            targetCalendar.set(Calendar.MONTH, m);
+            targetCalendar.set(Calendar.DAY_OF_MONTH, d);
+            targetEditText.setText(expiryFormat.format(targetCalendar.getTime()));
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
     }
 
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
@@ -262,12 +291,6 @@ public class AddProductActivity extends BaseActivity {
         return adapter;
     }
 
-    private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
-        List<String> list = new ArrayList<>();
-        Collections.addAll(list, items);
-        return getAdaptiveAdapter(list);
-    }
-
     private ArrayAdapter<String> getAdaptiveDropdownAdapter(List<String> items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -286,58 +309,42 @@ public class AddProductActivity extends BaseActivity {
     private void showCustomUnitDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Add Custom Unit");
-
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(60, 40, 60, 20);
-
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
-
-        // 1. Input for the Main Unit (e.g., "Tub")
         final EditText etNewUnit = new EditText(this);
-        etNewUnit.setHint("Main Unit (e.g., Tub, Gallon)");
+        etNewUnit.setHint("Main Unit (e.g., Tub)");
         etNewUnit.setTextColor(textColor);
         layout.addView(etNewUnit);
-
-        // 2. Question Text
         TextView tvInfo = new TextView(this);
-        tvInfo.setText("\nDoes this unit contain sub-amounts?\n(e.g., 1 Tub = 50 Scoops)");
+        tvInfo.setText("\nDoes this unit contain sub-amounts?");
         tvInfo.setTextSize(12);
         tvInfo.setTextColor(textColor);
         layout.addView(tvInfo);
-
-        // 3. Input for the Amount (e.g., "50")
         final EditText etSubAmount = new EditText(this);
         etSubAmount.setHint("Amount (e.g., 50)");
         etSubAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         etSubAmount.setTextColor(textColor);
         layout.addView(etSubAmount);
-
-        // 4. Input for the Sub-Unit Name (e.g., "scoops")
         final EditText etSubUnitName = new EditText(this);
-        etSubUnitName.setHint("Sub-unit name (e.g., scoops, ml)");
+        etSubUnitName.setHint("Sub-unit name (e.g., scoops)");
         etSubUnitName.setTextColor(textColor);
         layout.addView(etSubUnitName);
-
         builder.setView(layout);
         builder.setPositiveButton("Add", (dialog, which) -> {
             String mainUnit = etNewUnit.getText().toString().trim();
             String subAmount = etSubAmount.getText().toString().trim();
             String subName = etSubUnitName.getText().toString().trim();
-
             if (!mainUnit.isEmpty()) {
-                // Add to list and select it
                 unitList.add(unitList.size() - 1, mainUnit);
                 unitAdapter.notifyDataSetChanged();
                 unitSpinner.setSelection(unitList.size() - 2);
-
-                // Automatically populate the "Pieces Per Unit" logic
                 if (!subAmount.isEmpty()) {
                     layoutPiecesPerUnit.setVisibility(View.VISIBLE);
                     etPiecesPerUnit.setText(subAmount);
-                    // Tip: You can even update the label to say "Pieces per [Main Unit]"
-                    layoutPiecesPerUnit.setHint(subName + " per " + mainUnit);
+                    etPiecesPerUnit.setHint(subName + " per " + mainUnit);
                 }
             } else {
                 unitSpinner.setSelection(0);
@@ -349,15 +356,12 @@ public class AddProductActivity extends BaseActivity {
 
     private void updateLayoutForSelectedType() {
         boolean isMenu = switchSellOnPOS.isChecked();
-
         if (isMenu) {
             layoutConfigurations.setVisibility(View.VISIBLE);
             if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
-
             quantityET.setVisibility(View.GONE);
             unitSpinner.setVisibility(View.GONE);
             ((View) tvStockLevel.getParent()).setVisibility(View.GONE);
-
             costPriceET.setEnabled(false);
             costPriceET.setHint("Auto-calculated");
             costPriceET.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.dirtyWhite));
@@ -365,11 +369,9 @@ public class AddProductActivity extends BaseActivity {
         } else {
             layoutConfigurations.setVisibility(View.GONE);
             if (layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.INVISIBLE);
-
             quantityET.setVisibility(View.VISIBLE);
             unitSpinner.setVisibility(View.VISIBLE);
             ((View) tvStockLevel.getParent()).setVisibility(View.VISIBLE);
-
             costPriceET.setEnabled(true);
             costPriceET.setHint("Total Cost (₱)");
             costPriceET.setBackgroundTintList(null);
@@ -379,7 +381,7 @@ public class AddProductActivity extends BaseActivity {
     private void loadInventoryForCalculations() {
         productRepository.getAllProducts().observe(this, products -> {
             inventoryProducts.clear();
-            java.util.Set<String> dynamicUnits = new java.util.HashSet<>(baseUnitList); // UPGRADED
+            java.util.Set<String> dynamicUnits = new java.util.HashSet<>(baseUnitList);
             if (products != null) {
                 for (Product p : products) {
                     if (p.getUnit() != null && !p.getUnit().isEmpty()) dynamicUnits.add(p.getUnit());
@@ -417,13 +419,10 @@ public class AddProductActivity extends BaseActivity {
             if (mat != null && mat.getQuantity() > 0) {
                 int ppu = mat.getPiecesPerUnit() > 0 ? mat.getPiecesPerUnit() : 1;
                 String invUnit = mat.getUnit() != null ? mat.getUnit() : "pcs";
-
                 Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(mat.getQuantity(), invUnit, bUnit, ppu);
                 double convertedInvQty = (double) conversion[0];
                 String newInvUnit = (String) conversion[1];
-
                 double deductionAmount = UnitConverterUtil.calculateDeductionAmount(bQty, newInvUnit, bUnit, ppu);
-
                 double unitCost = mat.getCostPrice() / convertedInvQty;
                 totalCost += (deductionAmount * unitCost);
             }
@@ -435,12 +434,10 @@ public class AddProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_bom, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         LinearLayout containerRows = view.findViewById(R.id.containerRows);
         ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
         Button btnCancel = view.findViewById(R.id.btnCancel);
         Button btnSave = view.findViewById(R.id.btnSave);
-
         dialogUnits.remove("+ Add Custom Unit...");
         ArrayAdapter<String> rowUnitAdapter = getAdaptiveAdapter(dialogUnits);
 
@@ -448,10 +445,7 @@ public class AddProductActivity extends BaseActivity {
             View row = LayoutInflater.from(this).inflate(R.layout.item_config_bom, null);
             TextView tvMaterial = row.findViewById(R.id.tvRawMaterial);
             Spinner spinnerUnit = row.findViewById(R.id.spinnerUnit);
-
-            // FIX: Create a unique, final list for this specific row's logic
             final List<String> rowUnits = new ArrayList<>(unitList);
-            // FIX: Create a unique adapter specifically for this row
             ArrayAdapter<String> adapterForThisRow = getAdaptiveAdapter(rowUnits);
 
             if (spinnerUnit != null) {
@@ -459,18 +453,14 @@ public class AddProductActivity extends BaseActivity {
                 spinnerUnit.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
                     @Override
                     public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                        if (rowUnits.get(pos).equals("+ Add Custom Unit...")) {
-                            showCustomUnitDialog();
-                        }
+                        if (rowUnits.get(pos).equals("+ Add Custom Unit...")) showCustomUnitDialog();
                     }
                     @Override public void onNothingSelected(AdapterView<?> p) {}
                 });
             }
-
             if (tvMaterial != null) {
                 tvMaterial.setOnClickListener(v -> showInventorySelectionDialog(tvMaterial, () -> {}));
             }
-
             View btnDelete = row.findViewById(R.id.btnDelete);
             if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
             containerRows.addView(row);
@@ -498,14 +488,12 @@ public class AddProductActivity extends BaseActivity {
                         }
                     }
                 }
-
                 android.widget.CheckBox cbIsEssential = row.findViewById(R.id.cbIsEssential);
                 if (cbIsEssential != null && bom.containsKey("isEssential")) {
                     Object isEssObj = bom.get("isEssential");
                     if (isEssObj instanceof Boolean) cbIsEssential.setChecked((Boolean) isEssObj);
                     else if (isEssObj instanceof String) cbIsEssential.setChecked(Boolean.parseBoolean((String) isEssObj));
                 }
-
                 View btnDelete = row.findViewById(R.id.btnDelete);
                 if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
                 containerRows.addView(row);
@@ -514,7 +502,6 @@ public class AddProductActivity extends BaseActivity {
 
         btnAddRow.setOnClickListener(v -> addRow.run());
         btnCancel.setOnClickListener(v -> { if (savedBOM.isEmpty() && switchBOM != null) switchBOM.setChecked(false); dialog.dismiss(); });
-
         btnSave.setOnClickListener(v -> {
             savedBOM.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
@@ -552,16 +539,13 @@ public class AddProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_addons, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         LinearLayout containerRows = view.findViewById(R.id.containerRows);
         ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
         Button btnCancel = view.findViewById(R.id.btnCancel);
         Button btnSave = view.findViewById(R.id.btnSave);
-
         List<String> inventoryNames = new ArrayList<>();
         for (Product p : inventoryProducts) inventoryNames.add(p.getProductName());
         ArrayAdapter<String> autoCompleteAdapter = getAdaptiveDropdownAdapter(inventoryNames);
-
         List<String> currentDialogUnits = new ArrayList<>(dialogUnits);
         currentDialogUnits.remove("+ Add Custom Unit...");
         ArrayAdapter<String> rowUnitAdapter = getAdaptiveAdapter(currentDialogUnits);
@@ -570,10 +554,7 @@ public class AddProductActivity extends BaseActivity {
             View row = LayoutInflater.from(this).inflate(R.layout.item_config_addon, null);
             AutoCompleteTextView actvItem = row.findViewById(R.id.actvAddonItem);
             Spinner spinnerUnit = row.findViewById(R.id.spinnerAddonUnit);
-
-            // FIX: Create a unique, final list for this specific row's logic
             final List<String> rowUnits = new ArrayList<>(unitList);
-            // FIX: Create a unique adapter specifically for this row
             ArrayAdapter<String> adapterForThisRow = getAdaptiveAdapter(rowUnits);
 
             if (actvItem != null) actvItem.setAdapter(autoCompleteAdapter);
@@ -582,14 +563,11 @@ public class AddProductActivity extends BaseActivity {
                 spinnerUnit.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
                     @Override
                     public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                        if (rowUnits.get(pos).equals("+ Add Custom Unit...")) {
-                            showCustomUnitDialog();
-                        }
+                        if (rowUnits.get(pos).equals("+ Add Custom Unit...")) showCustomUnitDialog();
                     }
                     @Override public void onNothingSelected(AdapterView<?> p) {}
                 });
             }
-
             View btnDelete = row.findViewById(R.id.btnDelete);
             if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
             containerRows.addView(row);
@@ -611,14 +589,12 @@ public class AddProductActivity extends BaseActivity {
                 if (spinnerUnit != null) spinnerUnit.setAdapter(rowUnitAdapter);
                 if (etPrice != null) etPrice.setText(String.valueOf(addon.get("price")));
                 if (etQty != null && addon.containsKey("deductQty")) etQty.setText(String.valueOf(addon.get("deductQty")));
-
                 if (addon.containsKey("unit") && spinnerUnit != null) {
                     String savedUnit = (String) addon.get("unit");
                     for (int i = 0; i < currentDialogUnits.size(); i++) {
                         if (currentDialogUnits.get(i).equalsIgnoreCase(savedUnit)) { spinnerUnit.setSelection(i); break; }
                     }
                 }
-
                 View btnDelete = row.findViewById(R.id.btnDelete);
                 if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
                 containerRows.addView(row);
@@ -627,7 +603,6 @@ public class AddProductActivity extends BaseActivity {
 
         btnAddRow.setOnClickListener(v -> addRow.run());
         btnCancel.setOnClickListener(v -> { if (savedAddons.isEmpty() && switchAddons != null) switchAddons.setChecked(false); dialog.dismiss(); });
-
         btnSave.setOnClickListener(v -> {
             savedAddons.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
@@ -663,7 +638,6 @@ public class AddProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_notes, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         LinearLayout containerRows = view.findViewById(R.id.containerRows);
         ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
         Button btnCancel = view.findViewById(R.id.btnCancel);
@@ -694,7 +668,6 @@ public class AddProductActivity extends BaseActivity {
 
         btnAddRow.setOnClickListener(v -> addRow.run());
         btnCancel.setOnClickListener(v -> { if (savedNotes.isEmpty() && switchNotes != null) switchNotes.setChecked(false); dialog.dismiss(); });
-
         btnSave.setOnClickListener(v -> {
             savedNotes.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
@@ -724,12 +697,10 @@ public class AddProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_sizes, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         LinearLayout containerRows = view.findViewById(R.id.containerRows);
         ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
         Button btnCancel = view.findViewById(R.id.btnCancel);
         Button btnSave = view.findViewById(R.id.btnSave);
-
         List<String> inventoryNames = new ArrayList<>();
         for (Product p : inventoryProducts) inventoryNames.add(p.getProductName());
         ArrayAdapter<String> autoCompleteAdapter = getAdaptiveDropdownAdapter(inventoryNames);
@@ -738,7 +709,6 @@ public class AddProductActivity extends BaseActivity {
             View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
             AutoCompleteTextView actvLinked = row.findViewById(R.id.actvLinkedInventory);
             if (actvLinked != null) actvLinked.setAdapter(autoCompleteAdapter);
-
             View btnDelete = row.findViewById(R.id.btnDelete);
             if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
             containerRows.addView(row);
@@ -801,7 +771,6 @@ public class AddProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_inventory_selection, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         EditText etSearch = view.findViewById(R.id.etSearchInventory);
         Spinner spinnerFilter = view.findViewById(R.id.spinnerFilterCategory);
         ListView lvItems = view.findViewById(R.id.lvInventoryItems);
@@ -996,6 +965,25 @@ public class AddProductActivity extends BaseActivity {
                         costPriceET.setText(String.valueOf(p.getCostPrice()));
                         quantityET.setText(String.valueOf(p.getQuantity()));
 
+                        // --- NEW: Load Promo Data ---
+                        if (p.isPromo()) {
+                            if (switchIsPromo != null) switchIsPromo.setChecked(true);
+                            if (etPromoSeriesName != null) etPromoSeriesName.setText(p.getPromoName());
+
+                            if (p.isTemporaryPromo()) {
+                                if (switchTemporaryPromo != null) switchTemporaryPromo.setChecked(true);
+                                if (p.getPromoStartDate() > 0) {
+                                    promoStartCalendar.setTimeInMillis(p.getPromoStartDate());
+                                    if (etPromoStartDate != null) etPromoStartDate.setText(expiryFormat.format(promoStartCalendar.getTime()));
+                                }
+                                if (p.getPromoEndDate() > 0) {
+                                    promoEndCalendar.setTimeInMillis(p.getPromoEndDate());
+                                    if (etPromoEndDate != null) etPromoEndDate.setText(expiryFormat.format(promoEndCalendar.getTime()));
+                                }
+                            }
+                        }
+                        // ----------------------------
+
                         if (p.getExpiryDate() > 0) {
                             expiryCalendar.setTimeInMillis(p.getExpiryDate());
                             expiryDateET.setText(expiryFormat.format(expiryCalendar.getTime()));
@@ -1010,13 +998,29 @@ public class AddProductActivity extends BaseActivity {
                         String loadedUnit = p.getUnit() != null ? p.getUnit() : "";
                         boolean isBulk = loadedUnit.equalsIgnoreCase("box") ||
                                 loadedUnit.equalsIgnoreCase("pack") ||
-                                loadedUnit.equalsIgnoreCase("bottle") ||
                                 loadedUnit.equalsIgnoreCase("tub") ||
                                 loadedUnit.equalsIgnoreCase("can");
 
                         if (p.getPiecesPerUnit() > 1 || isBulk) {
                             layoutPiecesPerUnit.setVisibility(View.VISIBLE);
                             etPiecesPerUnit.setText(String.valueOf(p.getPiecesPerUnit()));
+
+                            subUnitList.clear();
+                            for (String u : unitList) {
+                                if (!u.equals("+ Add Custom Unit...") && !u.equalsIgnoreCase(loadedUnit)) {
+                                    subUnitList.add(u);
+                                }
+                            }
+                            if (!subUnitList.contains("pcs")) subUnitList.add(0, "pcs");
+                            subUnitAdapter.notifyDataSetChanged();
+
+                            String savedSalesUnit = p.getSalesUnit() != null ? p.getSalesUnit() : "pcs";
+                            for (int i = 0; i < subUnitSpinner.getAdapter().getCount(); i++) {
+                                if (subUnitSpinner.getAdapter().getItem(i).toString().equalsIgnoreCase(savedSalesUnit)) {
+                                    subUnitSpinner.setSelection(i);
+                                    break;
+                                }
+                            }
                         } else {
                             layoutPiecesPerUnit.setVisibility(View.GONE);
                         }
@@ -1101,6 +1105,27 @@ public class AddProductActivity extends BaseActivity {
             if (reorderLevel < 0) reorderLevel = 0;
         }
 
+        // --- NEW: Fetching Promo Logic Inputs ---
+        boolean isPromo = switchIsPromo != null && switchIsPromo.isChecked();
+        boolean isTemporaryPromo = switchTemporaryPromo != null && switchTemporaryPromo.isChecked();
+        String promoName = etPromoSeriesName != null && etPromoSeriesName.getText() != null ? etPromoSeriesName.getText().toString().trim() : "";
+
+        long promoStart = 0L;
+        long promoEnd = 0L;
+
+        if (isPromo && isTemporaryPromo) {
+            String startStr = etPromoStartDate.getText() != null ? etPromoStartDate.getText().toString().trim() : "";
+            String endStr = etPromoEndDate.getText() != null ? etPromoEndDate.getText().toString().trim() : "";
+
+            if (!startStr.isEmpty()) {
+                try { Date d = expiryFormat.parse(startStr); if (d != null) promoStart = d.getTime(); } catch (ParseException ignored) {}
+            }
+            if (!endStr.isEmpty()) {
+                try { Date d = expiryFormat.parse(endStr); if (d != null) promoEnd = d.getTime(); } catch (ParseException ignored) {}
+            }
+        }
+        // ----------------------------------------
+
         Product p = existingProductToEdit != null ? existingProductToEdit : new Product();
         p.setProductName(name);
         p.setCategoryName(type);
@@ -1113,8 +1138,23 @@ public class AddProductActivity extends BaseActivity {
         p.setQuantity(qty);
         p.setCriticalLevel(criticalLevel);
         p.setReorderLevel(reorderLevel);
-        p.setUnit(unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "pcs");
-        p.setSalesUnit(unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "pcs");
+        String mainUnit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "pcs";
+        p.setUnit(mainUnit);
+
+        // --- NEW: Appending Data to Product Object ---
+        p.setPromo(isPromo);
+        p.setPromoName(promoName);
+        p.setTemporaryPromo(isTemporaryPromo);
+        p.setPromoStartDate(promoStart);
+        p.setPromoEndDate(promoEnd);
+        // ---------------------------------------------
+
+        if (layoutPiecesPerUnit.getVisibility() == View.VISIBLE && subUnitSpinner != null && subUnitSpinner.getSelectedItem() != null) {
+            p.setSalesUnit(subUnitSpinner.getSelectedItem().toString());
+        } else {
+            p.setSalesUnit(mainUnit);
+        }
+
         p.setExpiryDate(expiryDate);
 
         int piecesPerUnit = 1;

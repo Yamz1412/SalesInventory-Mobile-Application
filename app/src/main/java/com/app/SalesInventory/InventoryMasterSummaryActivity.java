@@ -1,6 +1,7 @@
 package com.app.SalesInventory;
 
 import android.Manifest;
+import android.app.DatePickerDialog;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,7 +24,9 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,15 +38,21 @@ import java.util.concurrent.Executors;
 public class InventoryMasterSummaryActivity extends BaseActivity {
 
     private TextView tvTotalValue, tvTotalSold, tvTotalReceived, tvTotalAdjustments, tvTotalDeliveries;
-    private Button btnExportMasterPDF;
+    private Button btnExportMasterPDF, btnDateFilter;
     private RecyclerView rvCategorySummary;
 
     private DatabaseReference adjustmentRef;
     private ProductRepository productRepository;
     private SalesRepository salesRepository;
 
+    // Raw Real-Time Data
     private List<Product> cachedProducts = new ArrayList<>();
     private List<Sales> cachedSales = new ArrayList<>();
+    private List<DataSnapshot> cachedAdjustments = new ArrayList<>(); // Store snapshots to handle missing model classes
+
+    // Filtered Data (Updates based on date picker)
+    private List<Sales> filteredSales = new ArrayList<>();
+    private List<DataSnapshot> filteredAdjustments = new ArrayList<>();
 
     private CategoryValuationAdapter categoryAdapter;
     private List<CategoryValuation> categoryList = new ArrayList<>();
@@ -53,6 +62,11 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
     private final ExecutorService exportExecutor = Executors.newSingleThreadExecutor();
 
     private String currentOwnerId;
+    private ValueEventListener adjustmentsListener;
+
+    // Filters
+    private long filterStartDate = 0;
+    private long filterEndDate = System.currentTimeMillis();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +82,7 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
 
         initializeViews();
+        setupDateFilter();
         loadLocalData();
 
         btnExportMasterPDF.setOnClickListener(v -> {
@@ -88,6 +103,7 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         tvTotalAdjustments = findViewById(R.id.tvTotalAdjustments);
         tvTotalDeliveries = findViewById(R.id.tvTotalDeliveries);
         btnExportMasterPDF = findViewById(R.id.btnExportMasterPDF);
+        btnDateFilter = findViewById(R.id.btnDateFilter);
         rvCategorySummary = findViewById(R.id.rvCategorySummary);
 
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
@@ -100,32 +116,79 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         rvCategorySummary.setAdapter(categoryAdapter);
     }
 
+    private void setupDateFilter() {
+        btnDateFilter.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                calendar.set(year, month, dayOfMonth, 0, 0, 0);
+                filterStartDate = calendar.getTimeInMillis();
+
+                calendar.set(year, month, dayOfMonth, 23, 59, 59);
+                filterEndDate = calendar.getTimeInMillis();
+
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                btnDateFilter.setText(sdf.format(calendar.getTime()));
+
+                calculateDashboardMetrics(); // Recalculate with new filters
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+        });
+
+        btnDateFilter.setOnLongClickListener(v -> {
+            filterStartDate = 0;
+            filterEndDate = System.currentTimeMillis();
+            btnDateFilter.setText("All Time");
+            calculateDashboardMetrics();
+            return true;
+        });
+    }
+
     private void loadLocalData() {
+        // 1. Products (Real-time)
         productRepository.getAllProducts().observe(this, products -> {
             cachedProducts.clear();
             if (products != null) cachedProducts.addAll(products);
             calculateDashboardMetrics();
         });
 
+        // 2. Sales (Real-time)
         salesRepository.getAllSales().observe(this, sales -> {
             cachedSales.clear();
             if (sales != null) cachedSales.addAll(sales);
             calculateDashboardMetrics();
         });
+
+        // 3. Adjustments (Upgraded to Real-time listener)
+        if (adjustmentsListener != null) adjustmentRef.removeEventListener(adjustmentsListener);
+        adjustmentsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                cachedAdjustments.clear();
+                for (DataSnapshot ads : snapshot.getChildren()) {
+                    String owner = ads.child("ownerAdminId").getValue(String.class);
+                    if (owner != null && owner.equals(currentOwnerId)) {
+                        cachedAdjustments.add(ads);
+                    }
+                }
+                calculateDashboardMetrics();
+            }
+            @Override public void onCancelled(@NonNull DatabaseError error) {}
+        };
+        adjustmentRef.addValueEventListener(adjustmentsListener);
     }
 
-    // =========================================================================
-    // FIX: Accurate Master Category Valuation
-    // =========================================================================
     private void calculateDashboardMetrics() {
-        // 1. Calculate Total Warehouse Value & Group By Category
+        filteredSales.clear();
+        filteredAdjustments.clear();
+
+        // -------------------------------------------------------------
+        // 1. CURRENT WAREHOUSE VALUATION (Ignores Date Filter)
+        // -------------------------------------------------------------
         double totalCostValue = 0.0;
         Map<String, CategoryValuation> catMap = new HashMap<>();
 
         for (Product p : cachedProducts) {
-            if ("Menu".equalsIgnoreCase(p.getProductType())) continue; // Skip BOM double-counting
+            if ("Menu".equalsIgnoreCase(p.getProductType())) continue; // Skip BOM
 
-            // FIX: Cost Price IS the total value. No multiplication needed!
             double pValue = p.getCostPrice();
             totalCostValue += pValue;
 
@@ -138,59 +201,69 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
 
         tvTotalValue.setText(String.format(Locale.US, "₱%,.2f", totalCostValue));
 
-        // Update the Real-time Category List
         categoryList.clear();
         categoryList.addAll(catMap.values());
-        Collections.sort(categoryList, (a, b) -> Double.compare(b.totalValue, a.totalValue)); // Highest value first
+        Collections.sort(categoryList, (a, b) -> Double.compare(b.totalValue, a.totalValue));
         categoryAdapter.notifyDataSetChanged();
 
-        // 2. Calculate Total Sold & Deliveries
+        // -------------------------------------------------------------
+        // 2. FILTERED SALES & DELIVERIES
+        // -------------------------------------------------------------
         int totalSold = 0;
         int deliveryCount = 0;
         for (Sales s : cachedSales) {
-            totalSold += s.getQuantity();
-            if (s.getDeliveryType() != null && !s.getDeliveryType().isEmpty() && !"Dine-In".equalsIgnoreCase(s.getDeliveryType()) && !"Takeout".equalsIgnoreCase(s.getDeliveryType())) {
-                deliveryCount++;
+            long saleDate = s.getDate();
+            if (filterStartDate == 0 || (saleDate >= filterStartDate && saleDate <= filterEndDate)) {
+                filteredSales.add(s); // Save for PDF
+                totalSold += s.getQuantity();
+
+                if (s.getDeliveryType() != null && !s.getDeliveryType().isEmpty() &&
+                        !"Dine-In".equalsIgnoreCase(s.getDeliveryType()) && !"Takeout".equalsIgnoreCase(s.getDeliveryType())) {
+                    deliveryCount++;
+                }
             }
         }
         tvTotalSold.setText(String.valueOf(totalSold));
         tvTotalDeliveries.setText(String.valueOf(deliveryCount));
 
-        // 3. Fetch Adjustments and Receiving
-        adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot adjSnapshot) {
-                int totalReceived = 0;
-                int totalAdjusted = 0;
+        // -------------------------------------------------------------
+        // 3. FILTERED ADJUSTMENTS & RECEIVING
+        // -------------------------------------------------------------
+        int totalReceived = 0;
+        int totalAdjusted = 0;
 
-                for (DataSnapshot ads : adjSnapshot.getChildren()) {
-                    String owner = ads.child("ownerAdminId").getValue(String.class);
-                    if (owner != null && !owner.equals(currentOwnerId)) continue;
+        for (DataSnapshot ads : cachedAdjustments) {
+            // Safely extract date from the snapshot
+            Long adjDate = ads.child("date").getValue(Long.class);
+            if (adjDate == null) adjDate = ads.child("timestamp").getValue(Long.class);
+            if (adjDate == null) adjDate = 0L;
 
-                    Double qtyObj = ads.child("quantityAdjusted").getValue(Double.class);
-                    if (qtyObj == null) continue;
+            if (filterStartDate == 0 || (adjDate >= filterStartDate && adjDate <= filterEndDate)) {
+                filteredAdjustments.add(ads); // Save for PDF
 
-                    String type = ads.child("adjustmentType").getValue(String.class);
-                    if ("Add Stock".equals(type)) {
-                        totalReceived += qtyObj.intValue();
-                    } else {
-                        totalAdjusted += qtyObj.intValue();
-                    }
+                Double qtyObj = ads.child("quantityAdjusted").getValue(Double.class);
+                if (qtyObj == null) continue;
+
+                String type = ads.child("adjustmentType").getValue(String.class);
+                if ("Add Stock".equals(type)) {
+                    totalReceived += qtyObj.intValue();
+                } else {
+                    totalAdjusted += qtyObj.intValue();
                 }
-                tvTotalReceived.setText(String.valueOf(totalReceived));
-                tvTotalAdjustments.setText(String.valueOf(totalAdjusted));
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
-        });
+        }
+        tvTotalReceived.setText(String.valueOf(totalReceived));
+        tvTotalAdjustments.setText(String.valueOf(totalAdjusted));
     }
 
     private void exportMasterReportPdf() {
-        Toast.makeText(this, "Generating Full Master PDF...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Generating Filtered Master PDF...", Toast.LENGTH_SHORT).show();
 
+        // Use the filtered sets instead of raw data
         Map<String, Integer> soldMap = new HashMap<>();
         final int[] totalSoldHolder = new int[1];
 
-        for (Sales s : cachedSales) {
+        for (Sales s : filteredSales) {
             String pid = s.getProductId();
             double q = s.getQuantity();
             if (pid != null) {
@@ -199,91 +272,89 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
             }
         }
 
-        adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot adjSnapshot) {
-                Map<String, Integer> receivedMap = new HashMap<>();
-                Map<String, Integer> adjustedMap = new HashMap<>();
-                final int[] totalReceivedHolder = new int[1];
-                final int[] totalAdjustedHolder = new int[1];
+        Map<String, Integer> receivedMap = new HashMap<>();
+        Map<String, Integer> adjustedMap = new HashMap<>();
+        final int[] totalReceivedHolder = new int[1];
+        final int[] totalAdjustedHolder = new int[1];
 
-                for (DataSnapshot ads : adjSnapshot.getChildren()) {
-                    StockAdjustment a = ads.getValue(StockAdjustment.class);
-                    if (a == null || a.getProductId() == null) continue;
+        for (DataSnapshot ads : filteredAdjustments) {
+            String pid = ads.child("productId").getValue(String.class);
+            Double qty = ads.child("quantityAdjusted").getValue(Double.class);
+            String type = ads.child("adjustmentType").getValue(String.class);
 
-                    String owner = ads.child("ownerAdminId").getValue(String.class);
-                    if (owner != null && !owner.equals(currentOwnerId)) continue;
+            if (pid == null || qty == null) continue;
 
-                    String pid = a.getProductId();
-                    double qty = a.getQuantityAdjusted();
+            if ("Add Stock".equals(type)) {
+                receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + qty.intValue());
+                totalReceivedHolder[0] += qty;
+            } else {
+                adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + qty.intValue());
+                totalAdjustedHolder[0] += qty;
+            }
+        }
 
-                    if ("Add Stock".equals(a.getAdjustmentType())) {
-                        receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + (int)qty);
-                        totalReceivedHolder[0] += qty;
-                    } else {
-                        adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + (int)qty);
-                        totalAdjustedHolder[0] += qty;
-                    }
-                }
+        try {
+            List<StockValueReport> valueReports = new ArrayList<>();
+            List<StockMovementReport> movementReports = new ArrayList<>();
+            List<AdjustmentSummaryData> adjustmentSummaries = new ArrayList<>();
 
+            for (Product p : cachedProducts) {
+                if ("Menu".equalsIgnoreCase(p.getProductType())) continue;
+
+                // Current Valuation
+                StockValueReport vr = new StockValueReport(
+                        p.getProductId(), p.getProductName(), p.getCategoryName(),
+                        p.getQuantity(), p.getCostPrice(), p.getSellingPrice(),
+                        p.getReorderLevel(), p.getCriticalLevel(), p.getCeilingLevel(), p.getFloorLevel()
+                );
+                valueReports.add(vr);
+
+                // Filtered Movements
+                int rec = receivedMap.getOrDefault(p.getProductId(), 0);
+                int sold = soldMap.getOrDefault(p.getProductId(), 0);
+                int adj = adjustedMap.getOrDefault(p.getProductId(), 0);
+
+                StockMovementReport mr = new StockMovementReport(
+                        p.getProductId(), p.getProductName(), p.getCategoryName(),
+                        p.getQuantity(), rec, sold, adj, p.getQuantity(), System.currentTimeMillis()
+                );
+                mr.calculateOpening();
+                movementReports.add(mr);
+
+                AdjustmentSummaryData asd = new AdjustmentSummaryData(p.getProductId(), p.getProductName());
+                asd.setTotalAdditions(rec);
+                asd.setTotalRemovals(adj);
+                asd.setTotalAdjustments(rec + adj);
+                adjustmentSummaries.add(asd);
+            }
+
+            String fileName = exportUtil.generateFileName("Inventory_Master_Report", ReportExportUtil.EXPORT_PDF);
+            ReportExportUtil.ExportResult res = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
+
+            if (res == null || res.outputStream == null) throw new Exception("Unable to create export stream");
+
+            exportExecutor.execute(() -> {
                 try {
-                    List<StockValueReport> valueReports = new ArrayList<>();
-                    List<StockMovementReport> movementReports = new ArrayList<>();
-                    List<AdjustmentSummaryData> adjustmentSummaries = new ArrayList<>();
-
-                    for (Product p : cachedProducts) {
-                        if ("Menu".equalsIgnoreCase(p.getProductType())) continue;
-
-                        StockValueReport vr = new StockValueReport(
-                                p.getProductId(), p.getProductName(), p.getCategoryName(),
-                                p.getQuantity(), p.getCostPrice(), p.getSellingPrice(),
-                                p.getReorderLevel(), p.getCriticalLevel(), p.getCeilingLevel(), p.getFloorLevel()
-                        );
-                        valueReports.add(vr);
-
-                        int rec = receivedMap.getOrDefault(p.getProductId(), 0);
-                        int sold = soldMap.getOrDefault(p.getProductId(), 0);
-                        int adj = adjustedMap.getOrDefault(p.getProductId(), 0);
-
-                        StockMovementReport mr = new StockMovementReport(
-                                p.getProductId(), p.getProductName(), p.getCategoryName(),
-                                p.getQuantity(), rec, sold, adj, p.getQuantity(), System.currentTimeMillis()
-                        );
-                        mr.calculateOpening();
-                        movementReports.add(mr);
-
-                        AdjustmentSummaryData asd = new AdjustmentSummaryData(p.getProductId(), p.getProductName());
-                        asd.setTotalAdditions(rec);
-                        asd.setTotalRemovals(adj);
-                        asd.setTotalAdjustments(rec + adj);
-                        adjustmentSummaries.add(asd);
-                    }
-
-                    String fileName = exportUtil.generateFileName("Inventory_Master_Report", ReportExportUtil.EXPORT_PDF);
-                    ReportExportUtil.ExportResult res = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
-
-                    if (res == null || res.outputStream == null) throw new Exception("Unable to create export stream");
-
-                    exportExecutor.execute(() -> {
-                        try {
-                            PDFGenerator generator = new PDFGenerator(InventoryMasterSummaryActivity.this);
-                            generator.generateCombinedInventoryReportPDF(res.outputStream, valueReports, movementReports, adjustmentSummaries, totalReceivedHolder[0], totalSoldHolder[0], totalAdjustedHolder[0]);
-                            try { res.outputStream.close(); } catch (Exception ignored) {}
-                            runOnUiThread(() -> exportUtil.showExportSuccess(res.displayPath));
-                        } catch (Exception e) {
-                            try { res.outputStream.close(); } catch (Exception ignored) {}
-                            runOnUiThread(() -> exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage()));
-                        }
-                    });
+                    PDFGenerator generator = new PDFGenerator(InventoryMasterSummaryActivity.this);
+                    generator.generateCombinedInventoryReportPDF(res.outputStream, valueReports, movementReports, adjustmentSummaries, totalReceivedHolder[0], totalSoldHolder[0], totalAdjustedHolder[0]);
+                    try { res.outputStream.close(); } catch (Exception ignored) {}
+                    runOnUiThread(() -> exportUtil.showExportSuccess(res.displayPath));
                 } catch (Exception e) {
-                    exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage());
+                    try { res.outputStream.close(); } catch (Exception ignored) {}
+                    runOnUiThread(() -> exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage()));
                 }
-            }
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                exportUtil.showExportError("Failed to load adjustments: " + error.getMessage());
-            }
-        });
+            });
+        } catch (Exception e) {
+            exportUtil.showExportError(e.getMessage() == null ? "Export failed" : e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (adjustmentRef != null && adjustmentsListener != null) {
+            adjustmentRef.removeEventListener(adjustmentsListener);
+        }
     }
 
     @Override

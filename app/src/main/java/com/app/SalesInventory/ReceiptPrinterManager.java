@@ -13,11 +13,11 @@ public class ReceiptPrinterManager {
         PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
         if (printManager == null) return;
 
-        // 1. Format the text into a clean, thermal-printer style HTML layout
+        // FIX: Added explicit background: white and color: black to prevent thermal printer issues in Dark Mode
         String htmlDocument =
                 "<html>" +
                         "<head><style>" +
-                        "body { font-family: monospace; font-size: 14px; text-align: center; margin: 0; padding: 20px; }" +
+                        "body { font-family: monospace; font-size: 14px; text-align: center; margin: 0; padding: 20px; background-color: #FFFFFF; color: #000000; }" +
                         "hr { border-top: 1px dashed black; }" +
                         ".left { text-align: left; }" +
                         ".right { text-align: right; float: right; }" +
@@ -32,12 +32,10 @@ public class ReceiptPrinterManager {
                         "</body>" +
                         "</html>";
 
-        // 2. Use a hidden WebView to render the HTML into a printable document
         WebView webView = new WebView(context);
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                // 3. Send to Android's Native Print Spooler once rendering is done
                 PrintDocumentAdapter printAdapter;
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                     printAdapter = webView.createPrintDocumentAdapter("Receipt_" + orderId);
@@ -46,7 +44,7 @@ public class ReceiptPrinterManager {
                 }
 
                 PrintAttributes attributes = new PrintAttributes.Builder()
-                        .setMediaSize(PrintAttributes.MediaSize.ISO_A6) // A6 is close to thermal receipt size
+                        .setMediaSize(PrintAttributes.MediaSize.ISO_A6)
                         .setResolution(new PrintAttributes.Resolution("res1", "Receipt", 300, 300))
                         .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
                         .build();

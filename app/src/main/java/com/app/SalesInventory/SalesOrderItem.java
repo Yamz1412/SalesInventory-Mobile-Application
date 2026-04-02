@@ -10,6 +10,7 @@ public class SalesOrderItem {
     private double lineTotal;
     private String size;
     private String addons;
+    private String excludedIngredients;
 
     public long getLocalId() {
         return localId;
@@ -81,5 +82,13 @@ public class SalesOrderItem {
 
     public void setAddons(String addons) {
         this.addons = addons;
+    }
+
+    public String getExcludedIngredients() {
+        return excludedIngredients;
+    }
+
+    public void setExcludedIngredients(String excludedIngredients) {
+        this.excludedIngredients = excludedIngredients;
     }
 }

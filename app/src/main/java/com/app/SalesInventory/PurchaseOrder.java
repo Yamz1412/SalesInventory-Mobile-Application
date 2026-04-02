@@ -1,7 +1,5 @@
 package com.app.SalesInventory;
 
-import com.google.firebase.firestore.ServerTimestamp;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,12 +21,11 @@ public class PurchaseOrder {
     private String ownerAdminId;
     private String deliveryNote;
 
-    // NEW: Needed for Firebase to map the schedule correctly
     private long expectedDeliveryDate;
     private String purchaseOrderId;
 
-    @ServerTimestamp
-    public Date orderDate;
+    // FIXED: Use a 'long' instead of 'Date' for Realtime Database compatibility
+    private long orderDate;
 
     private double totalAmount;
     private List<POItem> items;
@@ -42,11 +39,9 @@ public class PurchaseOrder {
         this.supplierName = supplierName;
         this.supplierPhone = supplierPhone;
         this.status = status;
-        this.orderDate = new Date(orderDate);
+        this.orderDate = orderDate; // FIXED
         this.totalAmount = totalAmount;
         this.items = items;
-        this.deliveryNote = "";
-        this.expectedDeliveryDate = 0L;
     }
 
     public String getPoId() { return poId; }
@@ -70,8 +65,9 @@ public class PurchaseOrder {
     public long getExpectedDeliveryDate() { return expectedDeliveryDate; }
     public void setExpectedDeliveryDate(long expectedDeliveryDate) { this.expectedDeliveryDate = expectedDeliveryDate; }
 
-    public Date getOrderDate() { return orderDate; }
-    public void setOrderDate(long orderDate) { this.orderDate = new Date(orderDate); }
+    // FIXED Getters and Setters for orderDate
+    public long getOrderDate() { return orderDate; }
+    public void setOrderDate(long orderDate) { this.orderDate = orderDate; }
 
     public double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
@@ -81,6 +77,7 @@ public class PurchaseOrder {
 
     public String getOwnerAdminId() { return ownerAdminId; }
     public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
+
     public String getPurchaseOrderId() { return purchaseOrderId; }
     public void setPurchaseOrderId(String purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }
 
@@ -94,13 +91,9 @@ public class PurchaseOrder {
         m.put("ownerAdminId", this.ownerAdminId);
         m.put("deliveryNote", this.deliveryNote);
         m.put("expectedDeliveryDate", this.expectedDeliveryDate);
-        m.put("orderDate", this.orderDate != null ? this.orderDate.getTime() : 0L);
+        m.put("orderDate", this.orderDate); // FIXED
         m.put("totalAmount", this.totalAmount);
         m.put("items", this.items);
         return m;
-    }
-
-    public boolean isReceived() {
-        return STATUS_RECEIVED.equals(this.status);
     }
 }

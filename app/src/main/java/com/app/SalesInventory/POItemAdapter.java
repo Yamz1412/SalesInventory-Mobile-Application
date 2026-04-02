@@ -1,6 +1,5 @@
 package com.app.SalesInventory;
 
-import android.app.DatePickerDialog;
 import android.content.Context;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -10,12 +9,8 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -66,10 +61,12 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
         POItem item = items.get(position);
         holder.tvName.setText(item.getProductName());
 
-        // Clear previous listeners to avoid RecyclerView recycling glitches
+        // 1. ALWAYS remove the old text watcher before doing anything else
         if (holder.textWatcher != null) {
             holder.etQty.removeTextChangedListener(holder.textWatcher);
         }
+
+        // Reset listener
         holder.btnDelete.setOnClickListener(null);
 
         if (receiveMode) {
@@ -80,7 +77,8 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
 
             if (remaining > 0) {
                 holder.etQty.setVisibility(View.VISIBLE);
-                holder.etQty.setText(newlyReceivedMap.containsKey(position) ? String.valueOf(newlyReceivedMap.get(position)) : "");
+                holder.etQty.setText(newlyReceivedMap.containsKey(holder.getAdapterPosition()) ?
+                        String.valueOf(newlyReceivedMap.get(holder.getAdapterPosition())) : "");
 
                 holder.textWatcher = new TextWatcher() {
                     @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -92,6 +90,7 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
                             double qty = Double.parseDouble(input);
                             if (qty > remaining) {
                                 holder.etQty.setText(String.valueOf(remaining));
+                                holder.etQty.setSelection(holder.etQty.getText().length());
                                 newlyReceivedMap.put(holder.getAdapterPosition(), remaining);
                             } else {
                                 newlyReceivedMap.put(holder.getAdapterPosition(), qty);
@@ -102,16 +101,13 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
                 holder.etQty.addTextChangedListener(holder.textWatcher);
             } else {
                 holder.etQty.setVisibility(View.GONE);
-                if (holder.tvStatus != null) {
-                    holder.tvStatus.setText("Fully Received");
-                }
             }
         } else {
-            // Cart Mode logic
+            // --- CART MODE LOGIC ---
             holder.btnDelete.setVisibility(View.VISIBLE);
             holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", item.getSubtotal()));
 
-            // Display as integer if there are no decimals to make it look cleaner
+            // Set text WITHOUT triggering listeners
             if (item.getQuantity() == (long) item.getQuantity()) {
                 holder.etQty.setText(String.format(Locale.getDefault(), "%d", (long) item.getQuantity()));
             } else {
@@ -124,11 +120,11 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
                 if (currentPos != RecyclerView.NO_POSITION && removeListener != null) {
                     removeListener.onItemRemoved(currentPos);
                     notifyItemRemoved(currentPos);
-                    notifyItemRangeChanged(currentPos, items.size()); // Update positions
+                    notifyItemRangeChanged(currentPos, items.size());
                 }
             });
 
-            // Handle Quantity Updates in Cart
+            // Handle Quantity Updates
             holder.textWatcher = new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -140,10 +136,13 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
                     if (!input.isEmpty()) {
                         try {
                             double newQty = Double.parseDouble(input);
-                            if (newQty > 0) {
+                            if (newQty >= 0) {
                                 items.get(currentPos).setQuantity(newQty);
                                 holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", items.get(currentPos).getSubtotal()));
-                                if (onQtyChangedTask != null) onQtyChangedTask.run(); // Updates total in Activity
+                                if (onQtyChangedTask != null) {
+                                    // Trigger the activity calculation without refreshing the whole list
+                                    holder.itemView.post(() -> onQtyChangedTask.run());
+                                }
                             }
                         } catch (NumberFormatException ignored) {}
                     }
@@ -156,7 +155,7 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
     @Override public int getItemCount() { return items.size(); }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvName, tvPrice, tvStatus, tvExpiryDate;
+        TextView tvName, tvPrice, tvExpiryDate;
         EditText etQty;
         ImageButton btnDelete;
         TextWatcher textWatcher;
@@ -165,7 +164,6 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
             super(itemView);
             tvName = itemView.findViewById(R.id.tvItemName);
             tvPrice = itemView.findViewById(R.id.tvItemPrice);
-            tvStatus = itemView.findViewById(R.id.tvItemStatus);
             etQty = itemView.findViewById(R.id.etReceiveQty);
             btnDelete = itemView.findViewById(R.id.btnDeleteItem);
             tvExpiryDate = itemView.findViewById(R.id.tvExpiryDate);

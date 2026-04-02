@@ -58,6 +58,12 @@ public class Product {
     private List<Map<String, Object>> addonsList;
     private List<Map<String, String>> notesList;
 
+    private boolean isPromo;
+    private boolean isTemporaryPromo;
+    private String promoName;
+    private long promoStartDate;
+    private long promoEndDate;
+
     public Product() {
         this.productType = "Raw";
         this.expiryDate  = null;
@@ -185,9 +191,13 @@ public class Product {
     public List<Map<String, Object>> getUnifiedVariations()          { return unifiedVariations; }
     public void setUnifiedVariations(List<Map<String, Object>> list) { this.unifiedVariations = list; }
 
-    public List<Map<String, Object>> getBomList()                    { return bomList; }
-    public void setBomList(List<Map<String, Object>> bomList)        { this.bomList = bomList; }
+    public java.util.List<java.util.Map<String, Object>> getBomList() {
+        return bomList;
+    }
 
+    public void setBomList(java.util.List<java.util.Map<String, Object>> bomList) {
+        this.bomList = bomList;
+    }
     public String getAddedBy()                               { return addedBy == null ? "" : addedBy; }
     public void   setAddedBy(String addedBy)                 { this.addedBy = addedBy; }
 
@@ -204,6 +214,21 @@ public class Product {
 
     public String getImageUrl()                              { return imageUrl; }
     public void   setImageUrl(String imageUrl)               { this.imageUrl = imageUrl; }
+
+    public boolean isPromo() { return isPromo; }
+    public void setPromo(boolean promo) { isPromo = promo; }
+
+    public boolean isTemporaryPromo() { return isTemporaryPromo; }
+    public void setTemporaryPromo(boolean temporaryPromo) { isTemporaryPromo = temporaryPromo; }
+
+    public String getPromoName() { return promoName; }
+    public void setPromoName(String promoName) { this.promoName = promoName; }
+
+    public long getPromoStartDate() { return promoStartDate; }
+    public void setPromoStartDate(long promoStartDate) { this.promoStartDate = promoStartDate; }
+
+    public long getPromoEndDate() { return promoEndDate; }
+    public void setPromoEndDate(long promoEndDate) { this.promoEndDate = promoEndDate; }
 
     @Exclude public boolean isCriticalStock() { return criticalLevel > 0 && quantity <= criticalLevel; }
     @Exclude public boolean isLowStock()      { return quantity > criticalLevel && reorderLevel > 0 && quantity <= reorderLevel; }
@@ -358,4 +383,6 @@ public class Product {
 
     public List<Map<String, String>> getNotesList() { return notesList; }
     public void setNotesList(List<Map<String, String>> notesList) { this.notesList = notesList; }
+
+
 }

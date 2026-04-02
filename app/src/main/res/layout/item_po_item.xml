@@ -38,15 +38,6 @@
                 android:text="₱0.00 / Unit"
                 android:textSize="13sp"
                 android:textColor="#757575"/>
-            <TextView
-                android:id="@+id/tvItemStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Ordered: 0 (Rcvd: 0)"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorOnBackground"
-                android:layout_marginTop="4dp"/>
 
             <TextView
                 android:id="@+id/tvExpiryDate"

@@ -6,4 +6,6 @@
     <external-cache-path name="external_cache" path="." />
     <external-path name="external" path="." />
     <cache-path name="shared_pdfs" path="pdfs/" />
+    <external-files-path name="reports_docs" path="Documents/SalesInventory_Reports" />
+    <external-files-path name="receipts_docs" path="Documents/Receipts" />
 </paths>

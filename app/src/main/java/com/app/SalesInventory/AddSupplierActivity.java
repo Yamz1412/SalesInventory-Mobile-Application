@@ -47,6 +47,7 @@ public class AddSupplierActivity extends BaseActivity {
 
     private ProductRepository productRepository;
     private ArrayAdapter<String> measurementAdapter;
+    private List<String> measurementList; // Made dynamic to support custom units
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,25 +84,26 @@ public class AddSupplierActivity extends BaseActivity {
     }
 
     // ================================================================
-    // FIX: Adaptive Adapters for Dropdowns and Spinners
+    // FIX: Specialized Adapter for Spinner (White Background, Black Text)
     // ================================================================
-    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
-        int textColor = isDark ? Color.WHITE : Color.BLACK;
-
+    private ArrayAdapter<String> getMeasurementAdapter(List<String> items) {
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                ((TextView) view).setTextColor(textColor);
+                // Force white background and black text for visibility
+                view.setBackgroundColor(Color.WHITE);
+                ((TextView) view).setTextColor(Color.BLACK);
                 return view;
             }
 
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                ((TextView) view).setTextColor(textColor);
+                // Force white background and black text in the dropdown list
+                view.setBackgroundColor(Color.WHITE);
+                ((TextView) view).setTextColor(Color.BLACK);
                 return view;
             }
         };
@@ -110,8 +112,9 @@ public class AddSupplierActivity extends BaseActivity {
     }
 
     private void setupAdapters() {
-        List<String> measurements = Arrays.asList("pcs", "ml", "L", "g", "kg", "box", "pack");
-        measurementAdapter = getAdaptiveAdapter(measurements);
+        // Made the list mutable and added "Custom..."
+        measurementList = new ArrayList<>(Arrays.asList("pcs", "ml", "L", "g", "kg", "box", "pack", "Custom..."));
+        measurementAdapter = getMeasurementAdapter(measurementList);
     }
 
     private void showCustomCategoryDialog() {
@@ -121,7 +124,6 @@ public class AddSupplierActivity extends BaseActivity {
         final EditText input = new EditText(this);
         input.setHint("e.g. Cleaning Supplies");
 
-        // FIX: Force text color so it's perfectly visible in Dark Mode
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
         input.setTextColor(textColor);
@@ -142,12 +144,61 @@ public class AddSupplierActivity extends BaseActivity {
         builder.show();
     }
 
-    private void addCustomChip(String categoryName) {
+    // ================================================================
+    // MISSING METHOD: Creates and adds a custom category chip to the UI
+    // ================================================================
+    private void addCustomChip(String category) {
         Chip chip = new Chip(this);
-        chip.setText(categoryName);
+        chip.setText(category);
         chip.setCheckable(true);
-        chip.setChecked(true);
+        chip.setChecked(true); // Auto-check it since they just added it
+        chip.setClickable(true);
+        chip.setFocusable(true);
+
+        // Add a close icon so they can delete it if they made a typo
+        chip.setCloseIconVisible(true);
+        chip.setOnCloseIconClickListener(v -> chipGroupCategories.removeView(chip));
+
         chipGroupCategories.addView(chip);
+    }
+
+    // ================================================================
+    // NEW: Dialog to Add Custom Measurement Unit
+    // ================================================================
+    private void showCustomUnitDialog(Spinner spinner) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Add Custom Unit");
+
+        final EditText input = new EditText(this);
+        input.setHint("e.g. sack, crate, bundle");
+
+        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        input.setTextColor(isDark ? Color.WHITE : Color.BLACK);
+        input.setHintTextColor(Color.GRAY);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setPadding(50, 20, 50, 20);
+        layout.addView(input, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        builder.setView(layout);
+
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String newUnit = input.getText().toString().trim();
+            if (!newUnit.isEmpty()) {
+                // Add the new unit right before "Custom..."
+                int customIndex = measurementList.indexOf("Custom...");
+                if (customIndex == -1) customIndex = measurementList.size();
+                measurementList.add(customIndex, newUnit);
+                measurementAdapter.notifyDataSetChanged();
+                spinner.setSelection(customIndex);
+            } else {
+                spinner.setSelection(0); // Fallback to 'pcs'
+            }
+        });
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            spinner.setSelection(0); // Fallback to 'pcs'
+            dialog.cancel();
+        });
+        builder.show();
     }
 
     private void addProductRow() {
@@ -162,10 +213,23 @@ public class AddSupplierActivity extends BaseActivity {
         spinnerMeasurement.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selectedUnit = parent.getItemAtPosition(position).toString().toLowerCase();
+                String selectedUnit = parent.getItemAtPosition(position).toString();
 
-                if (selectedUnit.contains("pack") || selectedUnit.contains("box")) {
+                if (selectedUnit.equalsIgnoreCase("Custom...")) {
+                    showCustomUnitDialog(spinnerMeasurement);
+                    return;
+                }
+
+                // If it's a bulk unit (not a standard single unit), show the sub-unit field
+                boolean isBulkUnit = !selectedUnit.equalsIgnoreCase("pcs") &&
+                        !selectedUnit.equalsIgnoreCase("ml") &&
+                        !selectedUnit.equalsIgnoreCase("L") &&
+                        !selectedUnit.equalsIgnoreCase("g") &&
+                        !selectedUnit.equalsIgnoreCase("kg");
+
+                if (isBulkUnit) {
                     etPcsPerPack.setVisibility(View.VISIBLE);
+                    etPcsPerPack.setHint("Qty per " + selectedUnit);
                 } else {
                     etPcsPerPack.setVisibility(View.GONE);
                     etPcsPerPack.setText("");
@@ -177,6 +241,7 @@ public class AddSupplierActivity extends BaseActivity {
                 etPcsPerPack.setVisibility(View.GONE);
             }
         });
+
         btnDelete.setOnClickListener(v -> containerSupplierProducts.removeView(row));
         containerSupplierProducts.addView(row);
     }
@@ -333,8 +398,16 @@ public class AddSupplierActivity extends BaseActivity {
             double cost = costStr.isEmpty() ? 0.0 : Double.parseDouble(costStr);
 
             String finalProductName = baseName;
-            boolean isPackOrBox = measurement.equals("pack") || measurement.equals("box");
-            if (isPackOrBox && etPcsPerPack != null) {
+
+            // Check if it's a bulk unit that requires a sub-unit multiplier appended to the name
+            boolean isBulkUnit = !measurement.equalsIgnoreCase("pcs") &&
+                    !measurement.equalsIgnoreCase("ml") &&
+                    !measurement.equalsIgnoreCase("L") &&
+                    !measurement.equalsIgnoreCase("g") &&
+                    !measurement.equalsIgnoreCase("kg") &&
+                    !measurement.equalsIgnoreCase("Custom...");
+
+            if (isBulkUnit && etPcsPerPack != null && etPcsPerPack.getVisibility() == View.VISIBLE) {
                 String pcsStr = etPcsPerPack.getText().toString().trim();
                 if (!pcsStr.isEmpty()) {
                     finalProductName = baseName + " (" + pcsStr + "pcs/" + measurement + ")";

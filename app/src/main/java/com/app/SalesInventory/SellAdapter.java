@@ -41,13 +41,16 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
     private Set<String> selectedIds = new HashSet<>();
     private boolean isSelectionMode = false;
     private boolean isAdmin = false;
+    private boolean isFlexibleHandlingEnabled;
 
-    public SellAdapter(Context ctx, List<Product> initial, List<Product> inventory, OnProductClickListener clickListener, OnSelectionChangeListener selectionChangeListener) {
+    // UPDATED: Added isFlexibleHandlingEnabled to Constructor
+    public SellAdapter(Context ctx, List<Product> initial, List<Product> inventory, OnProductClickListener clickListener, OnSelectionChangeListener selectionChangeListener, boolean isFlexibleHandlingEnabled) {
         this.ctx = ctx;
         if (initial != null) this.items.addAll(initial);
         if (inventory != null) this.masterInventory.addAll(inventory);
         this.clickListener = clickListener;
         this.selectionChangeListener = selectionChangeListener;
+        this.isFlexibleHandlingEnabled = isFlexibleHandlingEnabled;
     }
 
     public void setAdminStatus(boolean isAdmin) {
@@ -164,7 +167,13 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
                 (p.getAddonsList() != null && !p.getAddonsList().isEmpty()) ||
                 (p.getNotesList() != null && !p.getNotesList().isEmpty());
 
-        if (hasOptions) {
+        if (p.isPromo()) { // NEW PROMO BADGE LOGIC
+            holder.badgeSell.setVisibility(View.VISIBLE);
+            holder.badgeSell.setText(p.getPromoName() != null && !p.getPromoName().isEmpty() ? p.getPromoName() : "Promo");
+            holder.badgeSell.setTextColor(Color.WHITE);
+            holder.badgeSell.setBackgroundColor(Color.parseColor("#E91E63")); // A nice Pink/Red color for promos
+            holder.badgeSell.setPadding(12, 4, 12, 4);
+        } else if (hasOptions) {
             holder.badgeSell.setVisibility(View.VISIBLE);
             holder.badgeSell.setText("Customizable");
             holder.badgeSell.setTextColor(Color.WHITE);
@@ -179,7 +188,6 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
             imageToLoad = p.getImagePath();
         }
 
-        // FIX: The Crash Fix! Prevent Glide from loading if the activity is changing themes!
         if (ctx instanceof Activity) {
             if (((Activity) ctx).isDestroyed() || ((Activity) ctx).isFinishing()) return;
         }
@@ -199,25 +207,30 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
         int maxServings = calculateMaxServings(p);
         boolean isAvailable = maxServings > 0;
 
+        // NEW: Check if the product can be clicked based on the flexible handling setting
+        boolean canClick = isAvailable || isFlexibleHandlingEnabled;
+
         if (!isAvailable) {
             holder.productImage.setAlpha(0.3f);
-            holder.cardView.setCardBackgroundColor(Color.parseColor("#EEEEEE"));
             if (holder.unavailableBadge != null) holder.unavailableBadge.setVisibility(View.VISIBLE);
         } else {
             holder.productImage.setAlpha(1.0f);
-            holder.cardView.setCardBackgroundColor(Color.WHITE);
             if (holder.unavailableBadge != null) holder.unavailableBadge.setVisibility(View.GONE);
         }
 
         String currentId = p.getProductId() != null ? p.getProductId() : "local:" + p.getLocalId();
+
+        // UPDATED: Use a translucent overlay for selection so it doesn't break the dynamic XML theme,
+        // and set it to transparent when not selected to let the app:cardBackgroundColor show.
         if (selectedIds.contains(currentId)) {
-            holder.cardView.setCardBackgroundColor(Color.parseColor("#E3F2FD"));
+            holder.cardView.setCardBackgroundColor(Color.parseColor("#40007BFF")); // Translucent selection overlay
         } else {
-            if (isAvailable) holder.cardView.setCardBackgroundColor(Color.WHITE);
+            holder.cardView.setCardBackgroundColor(Color.TRANSPARENT);
         }
 
+        // UPDATED: Use 'canClick' instead of 'isAvailable' to allow selections when flexible handling is true
         holder.itemView.setOnClickListener(v -> {
-            if (!isAvailable) return;
+            if (!canClick) return;
             if (isSelectionMode) {
                 toggleSelection(currentId);
             } else {
@@ -225,8 +238,9 @@ public class SellAdapter extends RecyclerView.Adapter<SellAdapter.VH> {
             }
         });
 
+        // UPDATED: Use 'canClick' instead of 'isAvailable'
         holder.itemView.setOnLongClickListener(v -> {
-            if (!isAvailable) return false;
+            if (!canClick) return false;
             if (!isSelectionMode) {
                 isSelectionMode = true;
                 toggleSelection(currentId);

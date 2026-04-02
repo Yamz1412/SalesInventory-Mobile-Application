@@ -31,6 +31,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,9 +52,12 @@ public class SellList extends BaseActivity {
     private Button btnCheckout;
     private ImageButton btnRefundList;
     private EditText etSearchProduct;
+    private ImageButton btnFilterSort; // NEW: Filter button
     private LinearLayout layoutCategoryChips;
     private FloatingActionButton fabAddSalesProduct;
+
     private String currentCategoryFilter = "All";
+    private String currentSortOption = "A-Z"; // NEW: Default sorting
     private List<Product> cachedInventoryList = new ArrayList<>();
 
     // Bulk action bar
@@ -67,6 +71,8 @@ public class SellList extends BaseActivity {
     private String currentMainCategory = "All";
     private String currentSubCategory = "All";
 
+    // NEW: Flexible Handling toggle (Set to true to allow clicking out-of-stock items)
+    private boolean isFlexibleHandlingEnabled = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +86,8 @@ public class SellList extends BaseActivity {
         if (btnRefundList != null) btnRefundList.setOnClickListener(v -> showRefundDialog());
 
         etSearchProduct = findViewById(R.id.etSearchProduct);
+        btnFilterSort = findViewById(R.id.btnFilterSort); // NEW
+
         layoutCategoryChips = findViewById(R.id.layoutCategoryChips);
 
         sellListView = findViewById(R.id.SellListD);
@@ -96,6 +104,12 @@ public class SellList extends BaseActivity {
             }
         });
 
+        // --- NEW: Filter/Sort Button Listener ---
+        if (btnFilterSort != null) {
+            btnFilterSort.setOnClickListener(v -> showSortFilterDialog());
+        }
+        // ----------------------------------------
+
         sellAdapter = new SellAdapter(this, filteredProducts, masterInventory, new SellAdapter.OnProductClickListener() {
             @Override
             public void onProductClick(Product product, int maxServings) {
@@ -104,7 +118,7 @@ public class SellList extends BaseActivity {
         }, selectedIds -> {
             currentSelectedIds = selectedIds;
             updateBulkActionBar(selectedIds);
-        });
+        }, isFlexibleHandlingEnabled);
 
         sellListView.setAdapter(sellAdapter);
 
@@ -117,7 +131,6 @@ public class SellList extends BaseActivity {
             });
         }
 
-        // Inside onCreate in SellList.java
         AuthManager.getInstance().isUserAdmin(isAdmin -> {
             runOnUiThread(() -> {
                 if (fabAddSalesProduct != null) {
@@ -227,9 +240,38 @@ public class SellList extends BaseActivity {
         loadProducts();
     }
 
+    // --- NEW: Sort & Filter Dialog ---
+    private void showSortFilterDialog() {
+        String[] options = {
+                "A-Z",
+                "Z-A",
+                "Price: Low to High",
+                "Price: High to Low",
+                "Recently Added"
+        };
+
+        int checkedItem = 0;
+        for (int i = 0; i < options.length; i++) {
+            if (options[i].equals(currentSortOption)) {
+                checkedItem = i;
+                break;
+            }
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Sort Products")
+                .setSingleChoiceItems(options, checkedItem, (dialog, which) -> {
+                    currentSortOption = options[which];
+                    applyCategoryFilter();
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+    // ---------------------------------
+
     private void observeShiftStatus() {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        // Real-time listener ensures Admin and Staff are synced
         shiftListener = FirebaseFirestore.getInstance()
                 .collection("users").document(ownerId)
                 .collection("system").document("current_shift")
@@ -252,7 +294,7 @@ public class SellList extends BaseActivity {
                 btnShiftAction.setTextColor(getResources().getColor(R.color.errorRed));
             } else {
                 btnShiftAction.setText("Start Shift");
-                btnShiftAction.setIconTintResource(R.color.colorPrimary);
+                btnShiftAction.setIconTintResource(R.color.colorAccent);
                 btnShiftAction.setTextColor(getResources().getColor(R.color.textColorSecondary));
             }
         });
@@ -303,7 +345,7 @@ public class SellList extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (shiftListener != null) shiftListener.remove(); // Clean up listener
+        if (shiftListener != null) shiftListener.remove();
     }
 
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
@@ -347,7 +389,7 @@ public class SellList extends BaseActivity {
 
     private void adjustButtonsForMobile() {
         android.content.res.Configuration config = getResources().getConfiguration();
-        if (config.screenWidthDp < 450) { // If it's a small mobile device
+        if (config.screenWidthDp < 450) {
             btnShiftAction.setText(isShiftActive ? "End" : "Start");
             if (btnCheckout != null) btnCheckout.setText("Cart");
         }
@@ -359,15 +401,34 @@ public class SellList extends BaseActivity {
                 allMenuProducts.clear();
                 masterInventory.clear();
 
+                // Get today's exact date and time
+                long currentTime = System.currentTimeMillis();
+
                 for (Product product : products) {
                     if (product.isActive()) {
                         masterInventory.add(product);
-                        if (product.isSellable() || "finished".equalsIgnoreCase(product.getProductType()) || "Menu".equalsIgnoreCase(product.getProductType())) {
+
+                        boolean isVisibleOnMenu = product.isSellable() ||
+                                "finished".equalsIgnoreCase(product.getProductType()) ||
+                                "Menu".equalsIgnoreCase(product.getProductType());
+
+                        // --- NEW: AUTO-ERASE PROMO LOGIC ---
+                        if (isVisibleOnMenu && product.isPromo() && product.isTemporaryPromo()) {
+                            boolean hasStarted = product.getPromoStartDate() == 0 || currentTime >= product.getPromoStartDate();
+                            // Adding 86400000 ms (24 hours) to End Date to ensure it lasts the whole final day
+                            boolean hasExpired = product.getPromoEndDate() > 0 && currentTime > (product.getPromoEndDate() + 86400000);
+
+                            if (!hasStarted || hasExpired) {
+                                isVisibleOnMenu = false; // Hide from POS!
+                            }
+                        }
+
+                        if (isVisibleOnMenu) {
                             allMenuProducts.add(product);
                         }
                     }
                 }
-                extractAndSetupCategories(); // Triggers the new dual-row hierarchy
+                extractAndSetupCategories();
                 applyCategoryFilter();
             }
         });
@@ -536,7 +597,6 @@ public class SellList extends BaseActivity {
         LinearLayout mainRow = new LinearLayout(this);
         mainRow.setOrientation(LinearLayout.HORIZONTAL);
         for (String main : mainCategories) {
-            // Compare normalized names so the UI knows which one is selected
             boolean isSelected = normalizeCategoryName(main).equals(normalizeCategoryName(currentMainCategory));
             MaterialButton chip = createChip(main, isSelected, false);
             chip.setOnClickListener(v -> {
@@ -589,7 +649,7 @@ public class SellList extends BaseActivity {
         chip.setCornerRadius(50);
 
         if (isSubCategory) {
-            chip.setTextSize(12f); // Make subcategories slightly smaller
+            chip.setTextSize(12f);
             chip.setMinimumHeight(0);
             chip.setPadding(24, 0, 24, 0);
         }
@@ -602,10 +662,10 @@ public class SellList extends BaseActivity {
         if (isSelected) {
             chip.setChecked(true);
             chip.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
-            chip.setTextColor(getResources().getColor(android.R.color.white));
+            chip.setTextColor(getResources().getColor(R.color.backgroundColor));
         } else {
             chip.setChecked(false);
-            chip.setTextColor(getResources().getColor(R.color.colorPrimary));
+            chip.setTextColor(getResources().getColor(R.color.textColorSecondary));
         }
         return chip;
     }
@@ -615,15 +675,12 @@ public class SellList extends BaseActivity {
         String query = etSearchProduct != null ? etSearchProduct.getText().toString().toLowerCase().trim() : "";
 
         for (Product p : allMenuProducts) {
-            // 1. Extract the raw strings from the product object
             String pMain = p.getProductLine() != null ? p.getProductLine().trim() : "Uncategorized";
             String pSub = p.getCategoryName() != null ? p.getCategoryName().trim() : "Uncategorized";
             String pName = p.getProductName() != null ? p.getProductName().toLowerCase() : "";
 
-            // 2. Restore the Search Function logic
             boolean matchesSearch = query.isEmpty() || pName.contains(query);
 
-            // 3. Normalize for case/space-insensitive matching
             String pMainNorm = normalizeCategoryName(pMain);
             String pSubNorm = normalizeCategoryName(pSub);
             String currentMainNorm = normalizeCategoryName(currentMainCategory);
@@ -636,6 +693,30 @@ public class SellList extends BaseActivity {
                 filteredProducts.add(p);
             }
         }
+
+        // --- NEW: Apply Sorting Logic Before Populating Adapter ---
+        Collections.sort(filteredProducts, (p1, p2) -> {
+            String name1 = p1.getProductName() != null ? p1.getProductName() : "";
+            String name2 = p2.getProductName() != null ? p2.getProductName() : "";
+
+            switch (currentSortOption) {
+                case "A-Z":
+                    return name1.compareToIgnoreCase(name2);
+                case "Z-A":
+                    return name2.compareToIgnoreCase(name1);
+                case "Price: Low to High":
+                    return Double.compare(p1.getSellingPrice(), p2.getSellingPrice());
+                case "Price: High to Low":
+                    return Double.compare(p2.getSellingPrice(), p1.getSellingPrice());
+                case "Recently Added":
+                    // Sort descending by DateAdded
+                    return Long.compare(p2.getDateAdded(), p1.getDateAdded());
+                default:
+                    return 0;
+            }
+        });
+        // -----------------------------------------------------------
+
         sellAdapter.filterList(filteredProducts, masterInventory);
     }
 
@@ -655,6 +736,15 @@ public class SellList extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+        boolean isDark = false;
+        try {
+            isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        } catch (Exception e) {
+            int currentNightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            isDark = currentNightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+        int dynamicTextColor = isDark ? Color.WHITE : Color.BLACK;
 
         TextView tvName = view.findViewById(R.id.tvOptionProductName);
         TextView tvPrice = view.findViewById(R.id.tvOptionProductPrice);
@@ -679,6 +769,7 @@ public class SellList extends BaseActivity {
         final double[] selectedAddonsPrice = {0.0};
         final String[] selectedSizeName = {""};
 
+        // SIZES
         List<Map<String, Object>> sizes = product.getSizesList();
         if (sizes != null && !sizes.isEmpty()) {
             layoutSizesContainer.setVisibility(View.VISIBLE);
@@ -686,6 +777,8 @@ public class SellList extends BaseActivity {
             for (int i = 0; i < sizes.size(); i++) {
                 Map<String, Object> size = sizes.get(i);
                 RadioButton rb = new RadioButton(this);
+                rb.setTextColor(dynamicTextColor);
+
                 String sName = (String) size.get("name");
                 String linkedMat = (String) size.get("linkedMaterial");
 
@@ -728,12 +821,15 @@ public class SellList extends BaseActivity {
             }
         }
 
+        // ADDONS
         List<CheckBox> addonBoxes = new ArrayList<>();
         List<Map<String, Object>> addons = product.getAddonsList();
         if (addons != null && !addons.isEmpty()) {
             layoutAddonsContainer.setVisibility(View.VISIBLE);
             for (Map<String, Object> addon : addons) {
                 CheckBox cb = new CheckBox(this);
+                cb.setTextColor(dynamicTextColor);
+
                 String aName = (String) addon.get("name");
                 String linkedMat = (String) addon.get("linkedMaterial");
 
@@ -767,6 +863,7 @@ public class SellList extends BaseActivity {
             }
         }
 
+        // NOTES
         List<Map<String, String>> notes = product.getNotesList();
         final String[] selectedNoteText = {""};
         if (notes != null && !notes.isEmpty()) {
@@ -780,8 +877,8 @@ public class SellList extends BaseActivity {
                 if (!noteGroups.containsKey(type)) {
                     TextView tvTitle = new TextView(this);
                     tvTitle.setText(type);
+                    tvTitle.setTextColor(dynamicTextColor);
                     tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-
                     tvTitle.setPadding(0, 16, 0, 8);
                     containerNotesList.addView(tvTitle);
 
@@ -793,6 +890,7 @@ public class SellList extends BaseActivity {
 
                 RadioButton rb = new RadioButton(this);
                 rb.setText(value);
+                rb.setTextColor(dynamicTextColor);
                 rb.setId(View.generateViewId());
                 noteGroups.get(type).addView(rb);
             }
@@ -812,14 +910,63 @@ public class SellList extends BaseActivity {
             }
         }
 
+        // INGREDIENTS
+        List<CheckBox> ingredientBoxes = new ArrayList<>();
+        List<Map<String, Object>> bomList = product.getBomList();
+        if (bomList != null && !bomList.isEmpty()) {
+            TextView tvIngredientsTitle = new TextView(this);
+            tvIngredientsTitle.setText("Recipe Ingredients (Uncheck to remove)");
+            tvIngredientsTitle.setTextColor(dynamicTextColor);
+            tvIngredientsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvIngredientsTitle.setPadding(0, 24, 0, 8);
+            containerNotesList.addView(tvIngredientsTitle);
+
+            for (Map<String, Object> bomItem : bomList) {
+                CheckBox cb = new CheckBox(this);
+                cb.setTextColor(dynamicTextColor);
+
+                String rawName = (String) bomItem.get("rawMaterialName");
+                String rawId = (String) bomItem.get("rawMaterialId");
+
+                cb.setChecked(true);
+                cb.setText(rawName != null ? rawName : "Unknown Ingredient");
+                cb.setTag(rawId);
+
+                Product inventoryItem = findInventoryProduct(rawName);
+                if (inventoryItem != null) {
+                    double requiredQty = 0;
+                    try { requiredQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception e){}
+                    if (inventoryItem.getQuantity() < requiredQty) {
+                        cb.setText(rawName + " (OUT OF STOCK - Uncheck to proceed)");
+                        cb.setTextColor(Color.RED);
+                        cb.setChecked(false);
+                    }
+                }
+
+                ingredientBoxes.add(cb);
+                containerNotesList.addView(cb);
+            }
+        }
+
         btnCancel.setOnClickListener(v -> dialog.dismiss());
         btnAddToCart.setOnClickListener(v -> {
             String qtyStr = etQty.getText().toString().trim();
             int qty = qtyStr.isEmpty() ? 1 : Integer.parseInt(qtyStr);
             if (qty <= 0) return;
+            StringBuilder excludedBuilder = new StringBuilder();
+            StringBuilder excludedNamesBuilder = new StringBuilder();
 
-            if (qty > maxBaseServings) {
-                Toast.makeText(this, "Only " + maxBaseServings + " servings available based on raw ingredients!", Toast.LENGTH_LONG).show();
+            for (CheckBox cb : ingredientBoxes) {
+                if (!cb.isChecked()) {
+                    excludedBuilder.append(cb.getTag().toString()).append(",");
+                    String ingName = cb.getText().toString().replaceAll(" \\(OUT OF STOCK.*\\)", "");
+                    excludedNamesBuilder.append("No ").append(ingName).append(", ");
+                }
+            }
+            String excludedIngredients = excludedBuilder.toString();
+
+            if (qty > maxBaseServings && excludedIngredients.isEmpty() && !isFlexibleHandlingEnabled) {
+                Toast.makeText(this, "Not enough raw ingredients! Uncheck missing ingredients to override.", Toast.LENGTH_LONG).show();
                 return;
             }
 
@@ -831,18 +978,26 @@ public class SellList extends BaseActivity {
             }
             if (!selectedNoteText[0].isEmpty()) extrasBuilder.append(selectedNoteText[0]);
 
+            if (excludedNamesBuilder.length() > 0) {
+                extrasBuilder.append("(").append(excludedNamesBuilder.toString().trim());
+                if (extrasBuilder.toString().endsWith(",")) {
+                    extrasBuilder.setLength(extrasBuilder.length() - 1);
+                }
+                extrasBuilder.append(") ");
+            }
+
             String extraDetails = extrasBuilder.toString().trim();
             if (extraDetails.endsWith(",")) extraDetails = extraDetails.substring(0, extraDetails.length() - 1).trim();
 
             String safeId = product.getProductId() != null ? product.getProductId() : "local:" + product.getLocalId();
-
-            boolean added = cartManager.addItem(safeId, product.getProductName(), finalPrice, qty, maxBaseServings, selectedSizeName[0], extraDetails);
+            boolean added = cartManager.addItem(safeId, product.getProductName(), finalPrice, qty, maxBaseServings, selectedSizeName[0], extraDetails, excludedIngredients);
 
             if (added) {
                 Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
+                updateCheckoutButton();
                 dialog.dismiss();
             } else {
-                Toast.makeText(this, "Not enough ingredients to fulfill order!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Error adding to cart", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -886,37 +1041,182 @@ public class SellList extends BaseActivity {
     }
 
     private void showCopyOptionsDialog(Product source) {
-        String[] options = {"Copy Pricing to All Products", "Copy Recipe (BOM) to All Products", "Copy Add-ons to All Products"};
+        // 1. Grouped Options: Sizes, Add-ons, and Notes are now combined into ONE checkbox.
+        String[] options = {
+                "Copy Pricing",
+                "Copy Recipe (BOM)",
+                "Copy Sizes, Add-ons & Notes"
+        };
         boolean[] checked = {false, false, false};
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Copy from \"" + source.getProductName() + "\" to all products")
+                .setTitle("Copy from \"" + source.getProductName() + "\"")
                 .setMultiChoiceItems(options, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
-                .setPositiveButton("Apply", (dialog, w) -> {
+                .setPositiveButton("Next", (dialog, w) -> {
                     boolean anyChecked = false;
                     for (boolean b : checked) if (b) { anyChecked = true; break; }
+
                     if (!anyChecked) {
-                        Toast.makeText(this, "Select at least one option to copy", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Select at least one property to copy", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    int count = 0;
-                    for (Product target : allMenuProducts) {
-                        if (target.getProductId().equals(source.getProductId())) continue;
-                        boolean changed = false;
-                        if (checked[0]) { target.setSellingPrice(source.getSellingPrice()); target.setCostPrice(source.getCostPrice()); changed = true; }
-                        if (checked[1]) { target.setBomList(source.getBomList()); changed = true; }
-                        if (checked[2]) { target.setAddonsList(source.getAddonsList()); changed = true; }
-                        if (changed) {
-                            productRepository.updateProduct(target, null, null);
-                            count++;
-                        }
-                    }
-                    sellAdapter.clearSelection();
-                    hideBulkActionBar();
-                    Toast.makeText(this, "Copied to " + count + " product(s)", Toast.LENGTH_SHORT).show();
+
+                    // Proceed to Target Selection Dialog
+                    showTargetScopeDialog(source, checked[0], checked[1], checked[2]);
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void showTargetScopeDialog(Product source, boolean copyPricing, boolean copyBom, boolean copyVariants) {
+        String[] scopes = {"Entire Menu (All Products)", "Specific Category", "Specific Products"};
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Apply changes to...")
+                .setSingleChoiceItems(scopes, -1, (dialog, which) -> {
+                    dialog.dismiss();
+
+                    if (which == 0) {
+                        // Apply to ALL products
+                        List<Product> targets = new ArrayList<>();
+                        for (Product p : allMenuProducts) {
+                            if (!p.getProductId().equals(source.getProductId())) targets.add(p);
+                        }
+                        executeAdvancedCopy(source, targets, copyPricing, copyBom, copyVariants);
+
+                    } else if (which == 1) {
+                        // Select a specific Category
+                        showCategorySelectionDialog(source, copyPricing, copyBom, copyVariants);
+
+                    } else if (which == 2) {
+                        // Select specific individual products
+                        showProductMultiSelectDialog(source, copyPricing, copyBom, copyVariants);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showCategorySelectionDialog(Product source, boolean copyPricing, boolean copyBom, boolean copyVariants) {
+        // Extract unique categories from the menu
+        Set<String> categorySet = new HashSet<>();
+        for (Product p : allMenuProducts) {
+            if (p.getCategoryName() != null && !p.getCategoryName().isEmpty()) {
+                categorySet.add(p.getCategoryName());
+            }
+        }
+        String[] categories = categorySet.toArray(new String[0]);
+
+        if (categories.length == 0) {
+            Toast.makeText(this, "No categories found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Select Target Category")
+                .setSingleChoiceItems(categories, -1, (dialog, which) -> {
+                    dialog.dismiss();
+                    String selectedCat = categories[which];
+
+                    // Find all products matching this category
+                    List<Product> targets = new ArrayList<>();
+                    for (Product p : allMenuProducts) {
+                        if (!p.getProductId().equals(source.getProductId()) && selectedCat.equals(p.getCategoryName())) {
+                            targets.add(p);
+                        }
+                    }
+                    executeAdvancedCopy(source, targets, copyPricing, copyBom, copyVariants);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showProductMultiSelectDialog(Product source, boolean copyPricing, boolean copyBom, boolean copyVariants) {
+        List<Product> availableProducts = new ArrayList<>();
+        for (Product p : allMenuProducts) {
+            if (!p.getProductId().equals(source.getProductId())) {
+                availableProducts.add(p);
+            }
+        }
+
+        String[] productNames = new String[availableProducts.size()];
+        boolean[] checkedItems = new boolean[availableProducts.size()];
+        for (int i = 0; i < availableProducts.size(); i++) {
+            productNames[i] = availableProducts.get(i).getProductName();
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Select Target Products")
+                .setMultiChoiceItems(productNames, checkedItems, (dialog, which, isChecked) -> {
+                    checkedItems[which] = isChecked;
+                })
+                .setPositiveButton("Apply", (dialog, which) -> {
+                    List<Product> targets = new ArrayList<>();
+                    for (int i = 0; i < checkedItems.length; i++) {
+                        if (checkedItems[i]) {
+                            targets.add(availableProducts.get(i));
+                        }
+                    }
+                    if (targets.isEmpty()) {
+                        Toast.makeText(this, "No products selected", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    executeAdvancedCopy(source, targets, copyPricing, copyBom, copyVariants);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void executeAdvancedCopy(Product source, List<Product> targets, boolean copyPricing, boolean copyBom, boolean copyVariants) {
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "No target products found.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int count = 0;
+        for (Product target : targets) {
+            boolean changed = false;
+
+            if (copyPricing) {
+                target.setSellingPrice(source.getSellingPrice());
+                target.setCostPrice(source.getCostPrice());
+                changed = true;
+            }
+
+            if (copyBom) {
+                // Create a new list instance to avoid reference sharing bugs
+                target.setBomList(source.getBomList() != null ? new ArrayList<>(source.getBomList()) : new ArrayList<>());
+                changed = true;
+            }
+
+            if (copyVariants) {
+                // Copies Sizes, Add-ons, and Notes all at once
+                target.setSizesList(source.getSizesList() != null ? new ArrayList<>(source.getSizesList()) : new ArrayList<>());
+                target.setAddonsList(source.getAddonsList() != null ? new ArrayList<>(source.getAddonsList()) : new ArrayList<>());
+                target.setNotesList(source.getNotesList() != null ? new ArrayList<>(source.getNotesList()) : new ArrayList<>());
+                changed = true;
+            }
+
+            if (changed) {
+                // FIX: We must pass a valid listener instead of 'null' to prevent background thread crashes
+                productRepository.updateProduct(target, null, new ProductRepository.OnProductUpdatedListener() {
+                    @Override
+                    public void onProductUpdated() {
+                        // Update successful, do nothing (to avoid spamming the UI)
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        // Background error handler
+                    }
+                });
+                count++;
+            }
+        }
+
+        sellAdapter.clearSelection();
+        hideBulkActionBar();
+        Toast.makeText(this, "Successfully copied to " + count + " product(s)!", Toast.LENGTH_LONG).show();
     }
 
     @Override

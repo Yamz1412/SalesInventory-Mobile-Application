@@ -159,6 +159,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Display on Sales (Menu Item)"
+                android:textColor="?attr/colorOnBackground"
                 android:checked="false" />
         </LinearLayout>
 
@@ -230,6 +231,7 @@
                 android:background="@drawable/edite_round"
                 android:backgroundTint="?android:colorBackground"
                 android:padding="12dp"
+                android:visibility="gone"
                 android:gravity="center_vertical"
                 android:layout_marginBottom="12dp">
 

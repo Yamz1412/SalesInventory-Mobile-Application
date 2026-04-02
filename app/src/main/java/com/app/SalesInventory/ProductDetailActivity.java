@@ -55,6 +55,7 @@ public class ProductDetailActivity extends BaseActivity {
             runOnUiThread(() -> {
                 if (btnDelete != null) {
                     btnDelete.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+                    btnDelete.setOnClickListener(v -> showDeleteConfirmation());
                 }
             });
         });
