@@ -5,9 +5,11 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -29,7 +31,10 @@ public class SettingsActivity extends BaseActivity {
     private RadioButton rbLight, rbDark, rbDefault;
     private MaterialSwitch switchColorblind;
 
-    private Button btnBackup, btnRestore, btnUserManual, btnClearCache;
+    private Button btnBackup, btnRestore, btnUserManual, btnClearCache, btnSystemControls;
+    private TextView tvAdminTitle;
+    private View cardAdmin;
+
     private ActivityResultLauncher<String> backupLauncher;
     private ActivityResultLauncher<String[]> restoreLauncher;
 
@@ -37,17 +42,22 @@ public class SettingsActivity extends BaseActivity {
     private AlertDialog restoreConfirmDialog;
     private SharedPreferences prefs;
 
+    private AuthManager authManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
 
         prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        authManager = AuthManager.getInstance();
 
         initializeUI();
         setupLaunchers();
         loadSavedPreferences();
         setupListeners();
+
+        checkUserRoleForPermissions();
     }
 
     private void initializeUI() {
@@ -61,6 +71,26 @@ public class SettingsActivity extends BaseActivity {
         btnRestore = findViewById(R.id.btnRestore);
         btnUserManual = findViewById(R.id.btnUserManual);
         btnClearCache = findViewById(R.id.btnClearCache);
+
+        tvAdminTitle = findViewById(R.id.tvAdminTitle);
+        cardAdmin = findViewById(R.id.cardAdmin);
+        btnSystemControls = findViewById(R.id.btnSystemControls);
+    }
+
+    private void checkUserRoleForPermissions() {
+        // Refresh the current user's role from AuthManager
+        authManager.refreshCurrentUserStatus(success -> {
+            runOnUiThread(() -> {
+                // Only show the Administration card if the user is an Admin
+                if (authManager.isCurrentUserAdmin()) {
+                    tvAdminTitle.setVisibility(View.VISIBLE);
+                    cardAdmin.setVisibility(View.VISIBLE);
+                } else {
+                    tvAdminTitle.setVisibility(View.GONE);
+                    cardAdmin.setVisibility(View.GONE);
+                }
+            });
+        });
     }
 
     private void loadSavedPreferences() {
@@ -78,6 +108,11 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void setupListeners() {
+        btnSystemControls.setOnClickListener(v -> {
+            Intent intent = new Intent(this, ControlSettingsActivity.class);
+            startActivity(intent);
+        });
+
         rgTheme.setOnCheckedChangeListener((group, checkedId) -> {
             String selectedTheme = "default";
             if (checkedId == R.id.rbDark) {
@@ -195,22 +230,28 @@ public class SettingsActivity extends BaseActivity {
 
     private void openUserManual() {
         try {
-            File file = new File(getCacheDir(), "USER-MANUAL.pdf");
+            File file = new File(getCacheDir(), "USER-MANUAL_UPDATED.pdf");
+
             if (!file.exists()) {
-                InputStream is = getAssets().open("USER-MANUAL.pdf");
+                InputStream is = getAssets().open("USER-MANUAL_UPDATED.pdf");
                 OutputStream os = new FileOutputStream(file);
                 byte[] buffer = new byte[1024];
                 int length;
                 while ((length = is.read(buffer)) > 0) os.write(buffer, 0, length);
-                os.flush(); os.close(); is.close();
+                os.flush();
+                os.close();
+                is.close();
             }
+
             Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(uri, "application/pdf");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NO_HISTORY);
             startActivity(Intent.createChooser(intent, "Open User Manual"));
+
         } catch (Exception e) {
-            Toast.makeText(this, "Unable to open manual", Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+            Toast.makeText(this, "Unable to open manual: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 }

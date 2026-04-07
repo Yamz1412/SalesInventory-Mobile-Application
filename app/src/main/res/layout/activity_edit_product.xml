@@ -14,7 +14,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Edit Product"
+            android:text="Edit Product Inventory"
             android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="?attr/colorOnBackground"
@@ -51,7 +51,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Basic Details"
+                android:text="General Details"
                 android:textStyle="bold"
                 android:textColor="?attr/colorPrimary"
                 android:layout_marginBottom="12dp"/>
@@ -59,8 +59,8 @@
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/CustomTextInputLayout"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/productNameET"
                     android:layout_width="match_parent"
@@ -68,25 +68,6 @@
                     android:textColor="?attr/colorOnBackground"
                     android:hint="Product Name" />
             </com.google.android.material.textfield.TextInputLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/edite_round"
-            android:backgroundTint="?attr/colorSurface"
-            android:padding="16dp"
-            android:elevation="1dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Organization"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="12dp"/>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -100,13 +81,12 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp">
-
                     <AutoCompleteTextView
                         android:id="@+id/productLineET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Product Line" />
+                        android:hint="Category" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -115,52 +95,15 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="6dp">
-
                     <AutoCompleteTextView
                         android:id="@+id/productTypeET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Product Type"
+                        android:hint="Type"
                         android:inputType="text" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/edite_round"
-            android:backgroundTint="?attr/colorSurface"
-            android:padding="16dp"
-            android:elevation="1dp"
-            android:layout_marginBottom="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sales Visibility"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="4dp"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Turn ON to sell this item directly to customers. Keep OFF if this is a raw ingredient."
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"
-                android:layout_marginBottom="8dp"/>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchSellOnPOS"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Display on Sales (Menu Item)"
-                android:textColor="?attr/colorOnBackground"
-                android:checked="false" />
         </LinearLayout>
 
         <LinearLayout
@@ -172,7 +115,7 @@
             android:backgroundTint="?attr/colorSurface"
             android:padding="16dp"
             android:elevation="1dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="24dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -195,63 +138,29 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginEnd="6dp">
-
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/costPriceET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="numberDecimal"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Total Cost (₱)" />
+                        android:hint="Cost" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/layoutSellingPrice"
                     style="@style/CustomTextInputLayout"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:layout_marginStart="6dp">
-
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/sellingPriceET"
+                        android:id="@+id/lowStockET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
+                        android:inputType="number"
                         android:textColor="?attr/colorOnBackground"
-                        android:hint="Selling Price (₱)" />
+                        android:hint="Low Alert" />
                 </com.google.android.material.textfield.TextInputLayout>
-
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:background="@drawable/edite_round"
-                android:backgroundTint="?android:colorBackground"
-                android:padding="12dp"
-                android:visibility="gone"
-                android:gravity="center_vertical"
-                android:layout_marginBottom="12dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Auto Low-Stock Alert at:"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorSecondary" />
-
-                <TextView
-                    android:id="@+id/tvStockLevel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorSecondary" />
             </LinearLayout>
 
             <LinearLayout
@@ -260,30 +169,26 @@
                 android:orientation="horizontal"
                 android:weightSum="2"
                 android:layout_marginBottom="12dp">
-
                 <com.google.android.material.textfield.TextInputLayout
-                    style="@style/CustomTextInputLayout"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="6dp">
-
-                    <com.google.android.material.textfield.TextInputEditText
+                    android:layout_marginEnd="6dp"
+                    android:hint="Stock Qty">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
                         android:id="@+id/quantityET"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="numberDecimal"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Inventory Stock" />
+                        android:textColor="?attr/colorOnBackground" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
-                    android:padding="4dp">
-
+                    android:layout_height="56dp"
+                    android:layout_marginStart="6dp">
                     <Spinner
                         android:id="@+id/unitSpinner"
                         android:layout_width="match_parent"
@@ -294,28 +199,48 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
                 android:id="@+id/layoutPiecesPerUnit"
-                style="@style/CustomTextInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2"
                 android:layout_marginBottom="12dp"
-                android:visibility="gone">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etPiecesPerUnit"
-                    android:layout_width="match_parent"
+                android:visibility="visible">
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:textColor="?attr/colorOnBackground"
-                    android:hint="Sub-units per item (e.g., 50 scoops per Pack)" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPiecesPerUnit"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Sub-unit Qty" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp">
+                    <Spinner
+                        android:id="@+id/subUnitSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:backgroundTint="?attr/colorControlHighlight"
+                        android:background="@drawable/edite_round"
+                        android:spinnerMode="dropdown" />
+                </LinearLayout>
+            </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/CustomTextInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
-
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/expiryDateET"
                     android:layout_width="match_parent"
@@ -324,58 +249,8 @@
                     android:clickable="true"
                     android:inputType="none"
                     android:textColor="?attr/colorOnBackground"
-                    android:hint="Expiry Date (optional, DD/MM/YYYY)" />
+                    android:hint="Expiry Date (Optional)" />
             </com.google.android.material.textfield.TextInputLayout>
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/layoutConfigurations"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/edite_round"
-            android:backgroundTint="?attr/colorSurface"
-            android:padding="16dp"
-            android:elevation="1dp"
-            android:layout_marginBottom="24dp"
-            android:visibility="visible">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Menu Configurations"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:layout_marginBottom="12dp"/>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchBOM"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Standard Recipe (Auto-Deduct)"
-                android:checked="false" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchSizes"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Multiple Sizes"
-                android:checked="false" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchAddons"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Has Add-ons / Sinkers"
-                android:checked="false" />
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchNotes"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Custom Notes (e.g. Sugar Level)"
-                android:checked="false" />
         </LinearLayout>
 
         <LinearLayout
@@ -384,16 +259,14 @@
             android:orientation="horizontal"
             android:weightSum="2"
             android:layout_gravity="center">
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/updateBtn"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="60dp"
-                android:text="Update Product"
+                android:text="Update Stock"
                 android:layout_marginEnd="8dp"
                 style="@style/CustomButton" />
-
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/cancelBtn"
                 android:layout_width="0dp"

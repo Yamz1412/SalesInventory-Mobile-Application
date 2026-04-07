@@ -29,11 +29,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="₱0.00"
-            android:textSize="16sp"
+            android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="?attr/colorOnSurface"
-            android:alpha="0.7"
-            android:layout_marginBottom="16dp" />
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginBottom="16dp"/>
 
         <ScrollView
             android:layout_width="match_parent"
@@ -46,28 +45,50 @@
                 android:orientation="vertical">
 
                 <LinearLayout
-                    android:id="@+id/layoutSizesContainer"
+                    android:id="@+id/layoutSizes"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:visibility="gone"
-                    android:layout_marginBottom="16dp">
+                    android:layout_marginBottom="12dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Select Size"
+                        android:text="Select Size:"
                         android:textStyle="bold"
-                        android:textColor="?attr/colorOnSurface"
-                        android:layout_marginBottom="8dp" />
+                        android:textColor="?attr/colorOnSurface"/>
                     <RadioGroup
                         android:id="@+id/rgSizes"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"
+                        android:layout_marginTop="4dp"/>
                 </LinearLayout>
 
                 <LinearLayout
-                    android:id="@+id/layoutAddonsContainer"
+                    android:id="@+id/layoutSugar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="12dp">
+                    <TextView
+                        android:id="@+id/tvSugarLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sugar Level:"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface"/>
+                    <Spinner
+                        android:id="@+id/spinnerSugar"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/edite_round"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutAddons"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
@@ -76,59 +97,58 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Add-ons"
+                        android:text="Add-ons:"
                         android:textStyle="bold"
-                        android:textColor="?attr/colorOnSurface"
-                        android:layout_marginBottom="8dp" />
+                        android:textColor="?attr/colorOnSurface"/>
                     <LinearLayout
-                        android:id="@+id/containerAddonsList"
+                        android:id="@+id/containerAddons"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/layoutNotesContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:visibility="gone"
-                    android:layout_marginBottom="16dp">
-                    <LinearLayout
-                        android:id="@+id/containerNotesList"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"
+                        android:layout_marginTop="4dp"/>
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:layout_marginTop="8dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Quantity"
+                        android:text="Quantity: "
+                        android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="?attr/colorOnSurface"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginEnd="16dp" />
+                        android:textColor="?attr/colorOnSurface" />
 
-                    <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
-                        android:layout_width="100dp"
+                    <ImageButton
+                        android:id="@+id/btnOptionMinus"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_minus"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:tint="?attr/colorOnSurface"
+                        android:layout_marginStart="16dp"/>
+
+                    <TextView
+                        android:id="@+id/tvOptionQty"
+                        android:layout_width="40dp"
                         android:layout_height="wrap_content"
-                        android:hint="Qty">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etOptionQty"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:textColor="?attr/colorOnSurface"
-                            android:text="1" />
-                    </com.google.android.material.textfield.TextInputLayout>
+                        android:text="1"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <ImageButton
+                        android:id="@+id/btnOptionPlus"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_add"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        app:tint="?attr/colorOnSurface"/>
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>

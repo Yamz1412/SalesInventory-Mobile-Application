@@ -26,6 +26,16 @@
             android:textColor="?attr/colorOnBackground" />
 
         <Button
+            android:id="@+id/btnViewLogs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Logs"
+            android:layout_marginEnd="8dp"
+            style="@style/CustomButtonOutlined"
+            app:strokeColor="?attr/colorPrimary"
+            android:textColor="?attr/colorPrimary" />
+
+        <Button
             android:id="@+id/btnCreateStaff"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

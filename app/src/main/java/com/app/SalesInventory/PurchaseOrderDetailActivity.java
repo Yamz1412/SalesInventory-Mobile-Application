@@ -115,19 +115,31 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         });
 
     }
+
     private void updateUI() {
-        tvPONumber.setText(currentPo.getPoNumber());
-        tvSupplier.setText(currentPo.getSupplierName());
+        // FIX: Added Null-Safety in case lists are empty
+        if (currentPo.getItems() == null) {
+            currentPo.setItems(new ArrayList<>());
+        }
 
+        tvPONumber.setText(currentPo.getPoNumber() != null ? currentPo.getPoNumber() : "Unknown");
+        tvSupplier.setText(currentPo.getSupplierName() != null ? currentPo.getSupplierName() : "Unknown");
+
+        // FIX: Wrapped long in java.util.Date to prevent IllegalArgumentException Crash!
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-        tvDate.setText("Expected: " + sdf.format(currentPo.getOrderDate()));
+        long orderDate = currentPo.getOrderDate() > 0 ? currentPo.getOrderDate() : System.currentTimeMillis();
+        tvDate.setText("Expected: " + sdf.format(new java.util.Date(orderDate)));
 
-        String status = currentPo.getStatus();
+        // FIX: Prevent NullPointerException if status is null
+        String status = currentPo.getStatus() != null ? currentPo.getStatus() : PurchaseOrder.STATUS_PENDING;
         tvStatus.setText(status.toUpperCase());
 
         if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) || status.equalsIgnoreCase("SENT") || status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
-            layoutActionButtons.setVisibility(View.VISIBLE);
-            tilDeliveryNote.setVisibility(View.VISIBLE);
+            if (layoutActionButtons != null) layoutActionButtons.setVisibility(View.VISIBLE);
+
+            // FIX: Prevents the app from crashing if the XML doesn't have the delivery note box
+            if (tilDeliveryNote != null) tilDeliveryNote.setVisibility(View.VISIBLE);
+
             tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
 
             if (btnDispatchPO != null) {
@@ -149,8 +161,11 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position), null);
             itemsAdapter.setReceiveMode(true);
         } else {
-            layoutActionButtons.setVisibility(View.GONE);
-            tilDeliveryNote.setVisibility(View.GONE);
+            if (layoutActionButtons != null) layoutActionButtons.setVisibility(View.GONE);
+
+            // FIX: Null safety check
+            if (tilDeliveryNote != null) tilDeliveryNote.setVisibility(View.GONE);
+
             if (btnDispatchPO != null) btnDispatchPO.setVisibility(View.GONE);
 
             if (status.equalsIgnoreCase(PurchaseOrder.STATUS_RECEIVED) || status.equalsIgnoreCase("COMPLETED")) {
@@ -276,7 +291,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         Button btnInspectConfirm = view.findViewById(R.id.btnInspectConfirm);
 
         // FIX: Ensure Dialog text is perfectly visible in Dark/Light Mode
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
         int textColor = isDark ? Color.WHITE : Color.BLACK;
 
         if (tvInspectionWarning != null) {
@@ -337,51 +353,25 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     }
 
     private void checkProductsAndFinalize(List<POItem> itemsReceivedNow, boolean isPartial) {
-        ArrayList<Bundle> registrationQueue = new ArrayList<>();
-        int[] processedCount = {0};
-
         if (itemsReceivedNow.isEmpty()) {
-            finalizeDeliveryStatus(isPartial, registrationQueue);
+            finalizeDeliveryStatus(isPartial, new ArrayList<>());
             return;
         }
 
+        DatabaseReference stagingRef = FirebaseDatabase.getInstance().getReference("DeliveryChecklist").child(currentPo.getOwnerAdminId());
+
         for (POItem item : itemsReceivedNow) {
-            productRepository.getProductById(item.getProductId(), new ProductRepository.OnProductFetchedListener() {
-                @Override
-                public void onProductFetched(Product p) {
-                    if (p != null) {
-                        double convertedQty = calculateConvertedQuantity(item.getReceivedQuantity(), item.getUnit(), p.getUnit(), p.getPiecesPerUnit());
-                        double newQty = p.getQuantity() + convertedQty;
-
-                        double conversionRatio = convertedQty / item.getReceivedQuantity();
-                        double newCostPerUnit = item.getUnitPrice() / conversionRatio;
-
-                        productRepository.updateProductQuantityAndCost(p.getProductId(), newQty, newCostPerUnit, null);
-
-                    } else {
-                        Bundle b = new Bundle();
-                        b.putString("productName", item.getProductName());
-                        b.putDouble("quantity", item.getReceivedQuantity());
-                        b.putDouble("costPrice", item.getUnitPrice());
-                        b.putString("unit", item.getUnit());
-                        registrationQueue.add(b);
-                    }
-
-                    processedCount[0]++;
-                    if (processedCount[0] == itemsReceivedNow.size()) {
-                        finalizeDeliveryStatus(isPartial, registrationQueue);
-                    }
-                }
-
-                @Override
-                public void onError(String error) {
-                    processedCount[0]++;
-                    if (processedCount[0] == itemsReceivedNow.size()) {
-                        finalizeDeliveryStatus(isPartial, registrationQueue);
-                    }
-                }
-            });
+            String key = stagingRef.push().getKey();
+            Map<String, Object> map = new HashMap<>();
+            map.put("productId", item.getProductId());
+            map.put("productName", item.getProductName());
+            map.put("receivedQuantity", item.getReceivedQuantity());
+            map.put("unitPrice", item.getUnitPrice());
+            map.put("unit", item.getUnit());
+            stagingRef.child(key).setValue(map);
         }
+
+        finalizeDeliveryStatus(isPartial, new ArrayList<>());
     }
 
 
@@ -408,8 +398,21 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     private void finalizeDeliveryStatus(boolean isPartial, ArrayList<Bundle> registrationQueue) {
         String newStatus = isPartial ? PurchaseOrder.STATUS_PARTIAL : PurchaseOrder.STATUS_RECEIVED;
 
+        // NEW: Grab the note the user typed
+        String deliveryNote = "";
+        if (etDeliveryNote != null && etDeliveryNote.getText() != null) {
+            deliveryNote = etDeliveryNote.getText().toString().trim();
+        }
+
+        final String finalNote = deliveryNote;
+
         poRef.child("status").setValue(newStatus).addOnSuccessListener(aVoid -> {
             poRef.child("items").setValue(currentPo.getItems());
+
+            // NEW: Save the delivery note/receipt number to the database!
+            if (!finalNote.isEmpty()) {
+                poRef.child("deliveryNote").setValue(finalNote);
+            }
 
             Toast.makeText(this, "Delivery updated and inventory synchronized!", Toast.LENGTH_SHORT).show();
 

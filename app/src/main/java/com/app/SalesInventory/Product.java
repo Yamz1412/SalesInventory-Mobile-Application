@@ -64,6 +64,9 @@ public class Product {
     private long promoStartDate;
     private long promoEndDate;
 
+    @com.google.firebase.firestore.Exclude
+    private String cartNote = "";
+
     public Product() {
         this.productType = "Raw";
         this.expiryDate  = null;
@@ -173,18 +176,26 @@ public class Product {
     public String getSupplier()                              { return supplier == null ? "" : supplier; }
     public void   setSupplier(String supplier)               { this.supplier = supplier; }
 
+    @com.google.firebase.firestore.PropertyName("dateAdded")
     public Date getDateAddedAsDate()                         { return dateAdded; }
+    @com.google.firebase.firestore.PropertyName("dateAdded")
     public void setDateAddedAsDate(Date date)                { this.dateAdded = date; }
 
     @Exclude public long getDateAdded()                      { return dateAdded != null ? dateAdded.getTime() : 0L; }
     @Exclude public void setDateAdded(long millis)           { this.dateAdded = (millis > 0) ? new Date(millis) : null; }
 
+    @com.google.firebase.firestore.PropertyName("expiryDate")
     public Date getExpiryDateAsDate()                        { return expiryDate; }
+    @com.google.firebase.firestore.PropertyName("expiryDate")
     public void setExpiryDateAsDate(Date expiryDate)         { this.expiryDate = expiryDate; }
 
     @Exclude public long getExpiryDate()                     { return expiryDate != null ? expiryDate.getTime() : 0L; }
     @Exclude public void setExpiryDate(long millis)          { this.expiryDate = (millis > 0) ? new Date(millis) : null; }
 
+    @com.google.firebase.firestore.PropertyName("isActive")
+    public boolean getIsActive()                             { return isActive; }
+    @com.google.firebase.firestore.PropertyName("isActive")
+    public void setIsActive(boolean active)                  { this.isActive = active; }
     public double getDeductionAmount()                       { return deductionAmount <= 0 ? 1.0 : deductionAmount; }
     public void   setDeductionAmount(double d)               { this.deductionAmount = d; }
 
@@ -229,11 +240,16 @@ public class Product {
 
     public long getPromoEndDate() { return promoEndDate; }
     public void setPromoEndDate(long promoEndDate) { this.promoEndDate = promoEndDate; }
-
     @Exclude public boolean isCriticalStock() { return criticalLevel > 0 && quantity <= criticalLevel; }
     @Exclude public boolean isLowStock()      { return quantity > criticalLevel && reorderLevel > 0 && quantity <= reorderLevel; }
     @Exclude public boolean isOverstock()     { return ceilingLevel > 0 && quantity > ceilingLevel; }
     @Exclude public boolean isBelowFloor()    { return floorLevel > 0 && quantity <= floorLevel; }
+
+    @com.google.firebase.firestore.Exclude
+    public String getCartNote() { return cartNote == null ? "" : cartNote; }
+
+    @com.google.firebase.firestore.Exclude
+    public void setCartNote(String cartNote) { this.cartNote = cartNote; }
 
     public boolean isAvailableForSale(List<Product> masterInventory) {
         if ((unifiedVariations == null || unifiedVariations.isEmpty()) && (bomList == null || bomList.isEmpty())) return true;
@@ -345,21 +361,65 @@ public class Product {
 
         o = m.get("dateAdded");
         if      (o instanceof com.google.firebase.Timestamp) p.dateAdded = ((com.google.firebase.Timestamp)o).toDate();
-        else if (o instanceof Date)   p.dateAdded = (Date)o;
-        else if (o instanceof Number) { long v = ((Number)o).longValue(); p.dateAdded = v > 0 ? new Date(v) : null; }
+        else if (o instanceof java.util.Date)   p.dateAdded = (java.util.Date)o;
+        else if (o instanceof Number) { long v = ((Number)o).longValue(); p.dateAdded = v > 0 ? new java.util.Date(v) : null; }
 
         o = m.get("expiryDate");
         if      (o instanceof com.google.firebase.Timestamp) p.expiryDate = ((com.google.firebase.Timestamp)o).toDate();
-        else if (o instanceof Date)   p.expiryDate = (Date)o;
-        else if (o instanceof Number) { long v = ((Number)o).longValue(); p.expiryDate = v > 0 ? new Date(v) : null; }
+        else if (o instanceof java.util.Date)   p.expiryDate = (java.util.Date)o;
+        else if (o instanceof Number) { long v = ((Number)o).longValue(); p.expiryDate = v > 0 ? new java.util.Date(v) : null; }
 
         Object lm = m.get("linkedMaterials");
         if (lm instanceof Map) p.linkedMaterials = (Map<String,Integer>) lm;
 
-        if (m.get("sizesList") instanceof List) p.sizesList = (List<Map<String,Object>>) m.get("sizesList");
-        if (m.get("addonsList") instanceof List) p.addonsList = (List<Map<String,Object>>) m.get("addonsList");
-        if (m.get("notesList") instanceof List) p.notesList = (List<Map<String,String>>) m.get("notesList");
-        if (m.get("bomList") instanceof List) p.bomList = (List<Map<String,Object>>) m.get("bomList");
+        // =======================================================
+        // CRITICAL FIX: Safe Cloud Sync Parsing for Nested Lists
+        // =======================================================
+        try {
+            if (m.get("sizesList") instanceof List) {
+                List<?> raw = (List<?>) m.get("sizesList");
+                List<Map<String, Object>> parsed = new ArrayList<>();
+                for (Object item : raw) { if (item instanceof Map) parsed.add((Map<String, Object>) item); }
+                p.setSizesList(parsed);
+            }
+        } catch (Exception e) {}
+
+        try {
+            if (m.get("addonsList") instanceof List) {
+                List<?> raw = (List<?>) m.get("addonsList");
+                List<Map<String, Object>> parsed = new ArrayList<>();
+                for (Object item : raw) { if (item instanceof Map) parsed.add((Map<String, Object>) item); }
+                p.setAddonsList(parsed);
+            }
+        } catch (Exception e) {}
+
+        try {
+            if (m.get("bomList") instanceof List) {
+                List<?> raw = (List<?>) m.get("bomList");
+                List<Map<String, Object>> parsed = new ArrayList<>();
+                for (Object item : raw) { if (item instanceof Map) parsed.add((Map<String, Object>) item); }
+                p.setBomList(parsed);
+            }
+        } catch (Exception e) {}
+
+        try {
+            if (m.get("notesList") instanceof List) {
+                List<?> raw = (List<?>) m.get("notesList");
+                List<Map<String, String>> parsed = new ArrayList<>();
+                for (Object item : raw) {
+                    if (item instanceof Map) {
+                        Map<?, ?> rawMap = (Map<?, ?>) item;
+                        Map<String, String> stringMap = new HashMap<>();
+                        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                            stringMap.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+                        }
+                        parsed.add(stringMap);
+                    }
+                }
+                p.setNotesList(parsed);
+            }
+        } catch (Exception e) {}
+
         return p;
     }
 

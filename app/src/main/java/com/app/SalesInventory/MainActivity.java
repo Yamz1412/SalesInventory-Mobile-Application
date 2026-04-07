@@ -51,6 +51,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import com.google.android.material.textfield.TextInputEditText;
+
 public class MainActivity extends BaseActivity {
 
     // CAFE OVERVIEW UI COMPONENTS
@@ -95,6 +97,8 @@ public class MainActivity extends BaseActivity {
     private NotificationBadgeManager badgeManager;
     private boolean isAdminFlag = false;
 
+    private boolean isManagerFlag = false;
+
     // Data Cache for Filtering
     private List<Sales> cachedSalesList = new ArrayList<>();
     private List<Product> cachedProductList = new ArrayList<>();
@@ -103,6 +107,11 @@ public class MainActivity extends BaseActivity {
     private TextView tvImpersonationText;
     private Button btnExitImpersonation;
     private boolean isImpersonating = false;
+
+    private View btnLockScreen;
+    private LinearLayout layoutLockScreen;
+    private TextInputEditText etUnlockPassword;
+    private Button btnUnlock;
 
     // REAL-TIME RESET LISTENER
     private com.google.firebase.firestore.ListenerRegistration resetSignalListener;
@@ -255,6 +264,11 @@ public class MainActivity extends BaseActivity {
         quickActionsGrid = findViewById(R.id.quick_actions_grid);
         progressBar = findViewById(R.id.progress_bar);
 
+        btnLockScreen = findViewById(R.id.btn_lock_screen);
+        layoutLockScreen = findViewById(R.id.layout_lock_screen);
+        etUnlockPassword = findViewById(R.id.et_unlock_password);
+        btnUnlock = findViewById(R.id.btn_unlock);
+
         rvRecentActivity = findViewById(R.id.rv_recent_activity);
         activityAdapter = new RecentActivityAdapter(this);
         rvRecentActivity.setAdapter(activityAdapter);
@@ -335,24 +349,28 @@ public class MainActivity extends BaseActivity {
     private void resolveUserRoleAndConfigureUI() {
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isRealAdmin = authManager.isCurrentUserAdmin();
+            boolean isManager = authManager.hasManagerAccess(); // Gets Admin OR Sub-Admin
             if (isImpersonating) {
                 isAdminFlag = false;
+                isManagerFlag = false;
             } else {
                 isAdminFlag = isRealAdmin;
+                isManagerFlag = isManager;
             }
             applyRoleVisibility();
         }));
     }
 
     private void applyRoleVisibility() {
-        if (isAdminFlag) {
+        if (isManagerFlag) {
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.VISIBLE);
             if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
             if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnManageUsers != null) btnManageUsers.setVisibility(View.VISIBLE);
-        } else {
+            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
+        }
+        else {
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
@@ -364,8 +382,10 @@ public class MainActivity extends BaseActivity {
             if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
             isFabOpen = false;
         }
-        arrangeQuickActions();
-    }
+            if (btnManageUsers != null) btnManageUsers.setVisibility(isAdminFlag ? View.VISIBLE : View.GONE);
+
+            arrangeQuickActions();
+        }
 
     private void exitImpersonation() {
         isImpersonating = false;
@@ -445,7 +465,14 @@ public class MainActivity extends BaseActivity {
         double profit = totalSales - totalCost;
 
         if (tvTotalSales != null) tvTotalSales.setText(String.format(Locale.US, "₱%,.2f", totalSales));
-        if (tvTotalProfit != null) tvTotalProfit.setText(String.format(Locale.US, "₱%,.2f", profit));
+
+        if (tvTotalProfit != null) {
+            if (isAdminFlag && isManagerFlag) {
+                tvTotalProfit.setText(String.format(Locale.US, "₱%,.2f", profit));
+            } else {
+                tvTotalProfit.setText("₱ ***.**"); // Hidden from staff
+            }
+        }
     }
 
     private void setupNearExpiryCard() {
@@ -568,16 +595,6 @@ public class MainActivity extends BaseActivity {
         if (btnProfile != null) btnProfile.setOnClickListener(v -> startActivity(new Intent(this, Profile.class)));
         if (btnCreateSale != null) btnCreateSale.setOnClickListener(v -> startActivity(new Intent(this, SellList.class)));
         if (btnAddProduct != null) btnAddProduct.setOnClickListener(v -> startActivity(new Intent(this, AddProductActivity.class)));
-//        if (btnAddProduct != null) {
-//            btnAddProduct.setOnClickListener(v -> {
-//                if (!isAdminFlag) {
-//                    Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
-//                    return;
-//                }
-//                if (!isFabOpen) showFabMenu();
-//                else closeFabMenu();
-//            });
-//        }
 
         if (dimOverlay != null) {
             dimOverlay.setOnClickListener(v -> closeFabMenu());
@@ -590,39 +607,83 @@ public class MainActivity extends BaseActivity {
             });
         }
 
-//        if (fabSuggestedProduct != null) {
-//            fabSuggestedProduct.setOnClickListener(v -> {
-//                closeFabMenu();
-//                startActivity(new Intent(this, SuggestedSuppliesActivity.class));
-//            });
-//        }
-
         if (btnCreatePO != null) btnCreatePO.setOnClickListener(v -> {
-            if (isAdminFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
-            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
+            if (isManagerFlag) startActivity(new Intent(this, PurchaseOrderListActivity.class));
+            else Toast.makeText(this, "Manager access required", Toast.LENGTH_SHORT).show();
         });
         if (btnViewReports != null) btnViewReports.setOnClickListener(v -> startActivity(new Intent(this, Reports.class)));
 
         if (btnInventory != null) btnInventory.setOnClickListener(v -> {
             Intent i = new Intent(this, Inventory.class);
-            i.putExtra("readonly", !isAdminFlag);
+            // Gives Managers full edit access, but keeps staff on read-only!
+            i.putExtra("readonly", !isManagerFlag);
             startActivity(i);
         });
 
         if (tvTotalSales != null && tvTotalSales.getParent() != null) {
-            ((View) tvTotalSales.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
+            ((View) tvTotalSales.getParent().getParent()).setOnClickListener(v -> {
+                if (isManagerFlag) startActivity(new Intent(MainActivity.this, Reports.class));
+                else Toast.makeText(MainActivity.this, "Manager access required", Toast.LENGTH_SHORT).show();
+            });
         }
         if (tvTotalProfit != null && tvTotalProfit.getParent() != null) {
-            ((View) tvTotalProfit.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, Reports.class)));
+            ((View) tvTotalProfit.getParent().getParent()).setOnClickListener(v -> {
+                if (isManagerFlag) startActivity(new Intent(MainActivity.this, Reports.class));
+                else Toast.makeText(MainActivity.this, "Manager access required", Toast.LENGTH_SHORT).show();
+            });
         }
         if (tvLowStock != null && tvLowStock.getParent() != null) {
-            ((View) tvLowStock.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class)));
+            ((View) tvLowStock.getParent().getParent()).setOnClickListener(v -> {
+                if (isManagerFlag) startActivity(new Intent(MainActivity.this, LowStockItemsActivity.class));
+                else Toast.makeText(MainActivity.this, "Manager access required", Toast.LENGTH_SHORT).show();
+            });
         }
         if (tvPendingOrders != null && tvPendingOrders.getParent() != null) {
-            ((View) tvPendingOrders.getParent().getParent()).setOnClickListener(v -> startActivity(new Intent(MainActivity.this, PurchaseOrderListActivity.class)));
+            ((View) tvPendingOrders.getParent().getParent()).setOnClickListener(v -> {
+                if (isManagerFlag) startActivity(new Intent(MainActivity.this, PurchaseOrderListActivity.class));
+                else Toast.makeText(MainActivity.this, "Manager access required", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnLockScreen != null) {
+            btnLockScreen.setOnClickListener(v -> {
+                // Show lock screen and log to Firebase
+                layoutLockScreen.setVisibility(View.VISIBLE);
+                authManager.logShiftLock(true);
+                Toast.makeText(this, "Register Locked", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnUnlock != null) {
+            btnUnlock.setOnClickListener(v -> {
+                String pass = etUnlockPassword.getText().toString();
+                if (pass.isEmpty()) {
+                    etUnlockPassword.setError("Password required");
+                    return;
+                }
+
+                progressBar.setVisibility(View.VISIBLE);
+                String email = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getEmail();
+
+                // Re-authenticate to ensure it's the right person
+                com.google.firebase.auth.FirebaseAuth.getInstance()
+                        .signInWithEmailAndPassword(email, pass)
+                        .addOnCompleteListener(task -> {
+                            progressBar.setVisibility(View.GONE);
+                            if (task.isSuccessful()) {
+                                layoutLockScreen.setVisibility(View.GONE);
+                                etUnlockPassword.setText("");
+                                authManager.logShiftLock(false); // Log unlock to Firebase
+                                Toast.makeText(MainActivity.this, "Unlocked Successfully", Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(MainActivity.this, "Incorrect Password", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+            });
         }
 
         if (btnManageUsers != null) btnManageUsers.setOnClickListener(v -> {
+            // Keep this strictly as isAdminFlag so Sub-Admins cannot fire people!
             if (isAdminFlag) authManager.isCurrentUserAdminAsync(success -> runOnUiThread(() -> {
                 if (success) startActivity(new Intent(MainActivity.this, AdminStaffList.class));
                 else Toast.makeText(MainActivity.this, "Admin access required", Toast.LENGTH_LONG).show();

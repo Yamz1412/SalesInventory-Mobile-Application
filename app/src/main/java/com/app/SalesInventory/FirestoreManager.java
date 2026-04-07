@@ -36,6 +36,13 @@ public class FirestoreManager {
         return auth.getCurrentUser() != null;
     }
 
+    // --- NEW METHOD TO PREVENT "UNKNOWN" PERMISSION DENIED CRASHES ---
+    public boolean hasValidUser() {
+        String id = getBusinessOwnerId();
+        return id != null && !id.trim().isEmpty() && !id.equals("unknown");
+    }
+    // -----------------------------------------------------------------
+
     public void updateCurrentUserId(String uid) {
         this.currentUserId = uid;
     }
@@ -70,11 +77,9 @@ public class FirestoreManager {
         this.businessOwnerId = null;
     }
 
-    // --- ADDED RESET SIGNAL PATH ---
     public com.google.firebase.firestore.DocumentReference getResetSignalRef() {
         return getDb().collection("users").document(getBusinessOwnerId()).collection("system").document("reset_signal");
     }
-    // -------------------------------
 
     public String getUserProductsPath() {
         String ownerId = getBusinessOwnerId();

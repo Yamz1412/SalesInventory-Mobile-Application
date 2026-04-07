@@ -3,10 +3,13 @@ package com.app.SalesInventory;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -18,9 +21,11 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class StockAdjustmentActivity extends BaseActivity {
 
@@ -41,6 +46,7 @@ public class StockAdjustmentActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_stock_adjustment);
 
+        // RESTORED ORIGINAL IDs
         spinnerProduct = findViewById(R.id.spinnerProduct);
         spinnerAdjustmentType = findViewById(R.id.spinnerAdjustmentType);
         spinnerReason = findViewById(R.id.spinnerReason);
@@ -53,157 +59,147 @@ public class StockAdjustmentActivity extends BaseActivity {
         btnViewHistory = findViewById(R.id.btnViewHistory);
 
         productRepository = SalesInventoryApplication.getProductRepository();
+        productList = new ArrayList<>();
 
         setupSpinners();
         loadProducts();
 
-        spinnerProduct.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                if (position > 0 && productList != null && productList.size() > position - 1) {
-                    selectedProduct = productList.get(position - 1);
-                    String unit = selectedProduct.getUnit() == null || selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
-                    tvCurrentStock.setText(String.format(Locale.getDefault(), "%.2f %s", selectedProduct.getQuantity(), unit));
-                    calculateNewStock();
-                } else {
-                    selectedProduct = null;
-                    tvCurrentStock.setText("0.0");
-                    tvFinancialImpact.setText("₱0.00");
-                    calculateNewStock();
-                }
-            }
-            @Override
-            public void onNothingSelected(android.widget.AdapterView<?> parent) {
-            }
-        });
-
         etQuantity.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { calculateNewStock(); }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        spinnerAdjustmentType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) { calculateNewStock(); }
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) { calculateImpact(); }
         });
 
         btnAdjust.setOnClickListener(v -> performAdjustment());
 
-        // FIXED: Changed the History button to function as a Cancel button
-        btnViewHistory.setOnClickListener(v -> finish());
+        if (btnViewHistory != null) {
+            btnViewHistory.setOnClickListener(v -> {
+                // Assuming you have an AdjustmentHistoryActivity
+                // startActivity(new Intent(this, AdjustmentHistoryActivity.class));
+            });
+        }
+    }
+
+    // Adaptive Spinner to prevent invisible text in Dark Mode
+    private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+            @Override
+            public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return adapter;
     }
 
     private void setupSpinners() {
-        String[] adjustmentTypes = {"Add Stock", "Remove Stock"};
-        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, adjustmentTypes);
-        typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerAdjustmentType.setAdapter(typeAdapter);
+        List<String> types = Arrays.asList("Add Stock (+)", "Remove Stock (-)");
+        spinnerAdjustmentType.setAdapter(getAdaptiveAdapter(types));
 
-        String[] reasons = {
-                "Manual Restock / Found Stock",
-                "Spoilage / Expired",
-                "Damaged in Store",
-                "Staff Consumption",
-                "Inventory Recount Correction",
-                "Promotional Giveaway",
-                "Return to Supplier",
-                "Other"
-        };
-        ArrayAdapter<String> reasonAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, reasons);
-        reasonAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerReason.setAdapter(reasonAdapter);
+        spinnerAdjustmentType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                updateReasonSpinner(position == 0);
+                calculateImpact();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        spinnerProduct.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedProduct = productList.get(position);
+                tvCurrentStock.setText(String.valueOf(selectedProduct.getQuantity()));
+                calculateImpact();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+
+    private void updateReasonSpinner(boolean isAddition) {
+        List<String> reasons;
+        if (isAddition) {
+            reasons = Arrays.asList("New Stock Discovered", "Return from Customer", "Inventory Recount", "Other (Specify in Remarks)");
+        } else {
+            reasons = Arrays.asList("Damaged", "Expired", "Lost/Stolen", "Inventory Recount", "Other (Specify in Remarks)");
+        }
+        spinnerReason.setAdapter(getAdaptiveAdapter(reasons));
     }
 
     private void loadProducts() {
         productRepository.getAllProducts().observe(this, products -> {
-            productList = new ArrayList<>();
-            List<String> productNames = new ArrayList<>();
-            productNames.add("Select Product");
-
             if (products != null) {
-                List<Product> activeProducts = new ArrayList<>();
+                productList.clear();
+                List<String> productNames = new ArrayList<>();
                 for (Product p : products) {
-                    if (p != null && p.isActive() && !"Menu".equalsIgnoreCase(p.getProductType())) {
-                        activeProducts.add(p);
+                    if (p.isActive() && !"Menu".equalsIgnoreCase(p.getProductType())) {
+                        productList.add(p);
+                        productNames.add(p.getProductName());
                     }
                 }
 
-                Collections.sort(activeProducts, (p1, p2) -> {
-                    String name1 = p1.getProductName() != null ? p1.getProductName() : "";
-                    String name2 = p2.getProductName() != null ? p2.getProductName() : "";
-                    return name1.compareToIgnoreCase(name2);
-                });
-
-                for (Product p : activeProducts) {
-                    productList.add(p);
-                    productNames.add(p.getProductName());
+                if (!productNames.isEmpty()) {
+                    spinnerProduct.setAdapter(getAdaptiveAdapter(productNames));
+                    selectedProduct = productList.get(0);
+                    tvCurrentStock.setText(String.valueOf(selectedProduct.getQuantity()));
+                } else {
+                    spinnerProduct.setAdapter(getAdaptiveAdapter(Arrays.asList("No Products Available")));
+                    selectedProduct = null;
                 }
             }
-
-            ArrayAdapter<String> adapter = new ArrayAdapter<>(StockAdjustmentActivity.this,
-                    android.R.layout.simple_spinner_item, productNames);
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-            spinnerProduct.setAdapter(adapter);
-            spinnerProduct.setEnabled(true);
         });
     }
 
-    // =========================================================================
-    // FIX: Accurate Financial Impact Calculation
-    // Calculates EXACT fractional cost instead of treating Total Cost as Unit Cost
-    // =========================================================================
-    private void calculateNewStock() {
-        if (selectedProduct == null) {
-            tvNewStock.setText("0.0");
-            tvNewStock.setTextColor(getResources().getColor(android.R.color.darker_gray));
-            tvFinancialImpact.setText("₱0.00");
-            return;
-        }
+    private void calculateImpact() {
+        if (selectedProduct == null) return;
 
-        String quantityStr = etQuantity.getText().toString().trim();
-        String unit = selectedProduct.getUnit() == null || selectedProduct.getUnit().isEmpty() ? "Units" : selectedProduct.getUnit();
-
-        if (quantityStr.isEmpty()) {
-            tvNewStock.setText(String.format(Locale.getDefault(), "%.2f %s", selectedProduct.getQuantity(), unit));
-            tvNewStock.setTextColor(getResources().getColor(android.R.color.darker_gray));
+        String qtyStr = etQuantity.getText().toString().trim();
+        if (qtyStr.isEmpty()) {
+            tvNewStock.setText(String.valueOf(selectedProduct.getQuantity()));
             tvFinancialImpact.setText("₱0.00");
+            tvFinancialImpact.setTextColor(getResources().getColor(R.color.textColorSecondary));
             return;
         }
 
         try {
             double currentStock = selectedProduct.getQuantity();
-            double currentTotalCost = selectedProduct.getCostPrice();
+            double adjustmentQty = Double.parseDouble(qtyStr);
+            boolean isAddition = spinnerAdjustmentType.getSelectedItemPosition() == 0;
 
-            // Protect against dividing by zero if stock is somehow 0
-            double unitCost = currentStock > 0 ? (currentTotalCost / currentStock) : 0.0;
+            double newStock = isAddition ? (currentStock + adjustmentQty) : (currentStock - adjustmentQty);
+            tvNewStock.setText(String.format(Locale.US, "%.2f", newStock));
 
-            double adjustmentQty = Double.parseDouble(quantityStr);
-            String adjustmentType = spinnerAdjustmentType.getSelectedItem().toString();
+            double impact = adjustmentQty * selectedProduct.getCostPrice();
 
-            double newStock;
-            double valueImpact = adjustmentQty * unitCost; // Exact fractional value!
-
-            if ("Add Stock".equals(adjustmentType)) {
-                newStock = currentStock + adjustmentQty;
-                tvFinancialImpact.setText(String.format(Locale.getDefault(), "+ ₱%.2f (Value Gained)", valueImpact));
+            if (isAddition) {
+                tvFinancialImpact.setText(String.format(Locale.US, "+₱%,.2f", impact));
                 tvFinancialImpact.setTextColor(getResources().getColor(R.color.successGreen));
             } else {
-                newStock = currentStock - adjustmentQty;
-                tvFinancialImpact.setText(String.format(Locale.getDefault(), "- ₱%.2f (Value Lost)", valueImpact));
+                tvFinancialImpact.setText(String.format(Locale.US, "-₱%,.2f", impact));
                 tvFinancialImpact.setTextColor(getResources().getColor(R.color.errorRed));
             }
-
-            tvNewStock.setText(String.format(Locale.getDefault(), "%.2f %s", newStock, unit));
 
             if (newStock < FLOOR_LEVEL) {
                 tvNewStock.setTextColor(getResources().getColor(R.color.errorRed));
             } else {
-                tvNewStock.setTextColor(getResources().getColor(R.color.successGreen));
+                tvNewStock.setTextColor(getResources().getColor(R.color.textColorPrimary));
             }
+
         } catch (NumberFormatException e) {
-            tvNewStock.setText(String.format(Locale.getDefault(), "%.2f %s", selectedProduct.getQuantity(), unit));
-            tvNewStock.setTextColor(getResources().getColor(android.R.color.darker_gray));
+            tvNewStock.setText("Invalid");
             tvFinancialImpact.setText("₱0.00");
         }
     }
@@ -214,142 +210,86 @@ public class StockAdjustmentActivity extends BaseActivity {
             return;
         }
 
-        String quantityStr = etQuantity.getText().toString().trim();
-        if (quantityStr.isEmpty()) {
-            etQuantity.setError("Quantity required");
+        String qtyStr = etQuantity.getText().toString().trim();
+        if (qtyStr.isEmpty()) {
+            etQuantity.setError("Required");
             return;
         }
 
+        double adjustmentQty;
         try {
-            double adjustmentQty = Double.parseDouble(quantityStr);
+            adjustmentQty = Double.parseDouble(qtyStr);
             if (adjustmentQty <= 0) {
-                etQuantity.setError("Quantity must be greater than 0");
+                etQuantity.setError("Must be greater than 0");
                 return;
             }
-
-            String adjustmentType = spinnerAdjustmentType.getSelectedItem().toString();
-            String reason = spinnerReason.getSelectedItem().toString();
-            String remarks = etRemarks.getText().toString().trim();
-
-            double currentStock = selectedProduct.getQuantity();
-            double newStock;
-
-            if ("Add Stock".equals(adjustmentType)) {
-                newStock = currentStock + adjustmentQty;
-            } else {
-                newStock = currentStock - adjustmentQty;
-            }
-
-            newStock = Math.min(newStock, MAX_STOCK);
-
-            if (newStock < FLOOR_LEVEL) {
-                new AlertDialog.Builder(this)
-                        .setTitle("Invalid Adjustment")
-                        .setMessage("You cannot remove " + adjustmentQty + " items. You only have " + currentStock + " in stock.")
-                        .setPositiveButton("OK", null)
-                        .show();
-            } else {
-                saveAdjustment(adjustmentType, adjustmentQty, currentStock, newStock, reason, remarks);
-            }
         } catch (NumberFormatException e) {
-            etQuantity.setError("Please enter a valid number");
+            etQuantity.setError("Invalid number");
+            return;
+        }
+
+        boolean isAddition = spinnerAdjustmentType.getSelectedItemPosition() == 0;
+        String reason = spinnerReason.getSelectedItem().toString();
+        String remarks = etRemarks.getText().toString().trim();
+
+        double currentStock = selectedProduct.getQuantity();
+        double newStock = isAddition ? (currentStock + adjustmentQty) : (currentStock - adjustmentQty);
+
+        if (newStock < FLOOR_LEVEL) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Warning")
+                    .setMessage("This deduction will result in negative stock. Are you sure you want to proceed?")
+                    .setPositiveButton("Proceed", (dialog, which) -> executeDatabaseUpdate(newStock, adjustmentQty, isAddition, reason, remarks))
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        } else if (newStock > MAX_STOCK) {
+            Toast.makeText(this, "Adjustment exceeds maximum allowed stock limit.", Toast.LENGTH_SHORT).show();
+        } else {
+            executeDatabaseUpdate(newStock, adjustmentQty, isAddition, reason, remarks);
         }
     }
 
-    // =========================================================================
-    // UPGRADE: Perfectly Syncs Quantity, Total Value, and History
-    // =========================================================================
-    private void saveAdjustment(String adjustmentType, double adjustmentQty, double currentStock, double newStock, String reason, String remarks) {
-        String userId = AuthManager.getInstance().getCurrentUserId();
-        if (userId == null || userId.isEmpty()) {
-            Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    private void executeDatabaseUpdate(double newStock, double adjustmentQty, boolean isAddition, String reason, String remarks) {
+        String productId = selectedProduct.getProductId();
+        double impact = adjustmentQty * selectedProduct.getCostPrice();
 
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("StockAdjustments");
-        String adjustmentId = ref.push().getKey();
-
-        if (adjustmentId == null) {
-            Toast.makeText(this, "Error generating adjustment ID", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // Calculate the Exact New Total Cost
-        double currentTotalCost = selectedProduct.getCostPrice();
-        double unitCost = currentStock > 0 ? (currentTotalCost / currentStock) : 0.0;
-        double valueImpact = adjustmentQty * unitCost;
-
-        double newTotalCost;
-        if ("Add Stock".equals(adjustmentType)) {
-            newTotalCost = currentTotalCost + valueImpact;
-        } else {
-            newTotalCost = Math.max(0.0, currentTotalCost - valueImpact);
-        }
-
-        StockAdjustment adjustment = new StockAdjustment(
-                adjustmentId,
-                selectedProduct.getProductId(),
-                selectedProduct.getProductName(),
-                adjustmentType,
-                currentStock,
-                adjustmentQty,
-                newStock,
-                reason,
-                remarks,
-                System.currentTimeMillis(),
-                userId
-        );
-
-        // Update Database directly using our super-method!
-        productRepository.updateProductQuantityAndCost(
-                selectedProduct.getProductId(),
-                newStock,
-                newTotalCost,
-                new ProductRepository.OnProductUpdatedListener() {
+        productRepository.updateProductQuantity(productId, newStock, new ProductRepository.OnProductUpdatedListener() {
                     @Override
                     public void onProductUpdated() {
+                        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+                        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
 
-                        // Handle Offline Room Database Batches securely in the background
-                        new Thread(() -> {
-                            AppDatabase db = AppDatabase.getInstance(StockAdjustmentActivity.this);
-                            if ("Add Stock".equals(adjustmentType)) {
-                                BatchEntity newBatch = new BatchEntity();
-                                newBatch.productId = selectedProduct.getProductId();
-                                newBatch.initialQuantity = adjustmentQty;
-                                newBatch.remainingQuantity = adjustmentQty;
-                                newBatch.receiveDate = System.currentTimeMillis();
-                                newBatch.expiryDate = System.currentTimeMillis() + (14L * 24 * 60 * 60 * 1000);
-                                newBatch.costPrice = unitCost;
-                                db.batchDao().insertBatch(newBatch);
-                            } else {
-                                // Manual FIFO deduction for batches
-                                List<BatchEntity> batches = db.batchDao().getAvailableBatchesFIFO(selectedProduct.getProductId());
-                                double remainingToDeduct = adjustmentQty;
-                                for (BatchEntity batch : batches) {
-                                    if (remainingToDeduct <= 0) break;
-                                    if (batch.remainingQuantity <= remainingToDeduct) {
-                                        remainingToDeduct -= batch.remainingQuantity;
-                                        batch.remainingQuantity = 0;
-                                    } else {
-                                        batch.remainingQuantity -= remainingToDeduct;
-                                        remainingToDeduct = 0;
-                                    }
-                                    db.batchDao().updateBatch(batch);
-                                }
-                            }
-                        }).start();
+                        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("stock_adjustments").child(ownerId);
+                        String adjustmentId = ref.push().getKey();
 
-                        // Log History to Firebase
-                        ref.child(adjustmentId).setValue(adjustment)
-                                .addOnSuccessListener(aVoid -> {
-                                    runOnUiThread(() -> {
-                                        Toast.makeText(StockAdjustmentActivity.this, "Stock & Financials Updated Successfully", Toast.LENGTH_SHORT).show();
-                                        clearForm();
-                                    });
-                                })
-                                .addOnFailureListener(e -> runOnUiThread(() ->
-                                        Toast.makeText(StockAdjustmentActivity.this, "Stock updated, but history log failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                                ));
+                        Map<String, Object> adjustment = new HashMap<>();
+                        adjustment.put("id", adjustmentId);
+                        adjustment.put("productId", productId);
+                        adjustment.put("productName", selectedProduct.getProductName());
+                        adjustment.put("productLine", selectedProduct.getProductLine() != null ? selectedProduct.getProductLine() : "Uncategorized");
+                        adjustment.put("type", isAddition ? "ADDITION" : "DEDUCTION");
+                        adjustment.put("quantity", adjustmentQty);
+                        adjustment.put("reason", reason);
+                        adjustment.put("remarks", remarks);
+                        adjustment.put("timestamp", System.currentTimeMillis());
+                        adjustment.put("financialImpact", isAddition ? impact : -impact);
+                        // Added Unit Cost so Damaged Reports can calculate the loss perfectly!
+                        adjustment.put("unitCost", selectedProduct.getCostPrice());
+                        adjustment.put("ownerAdminId", ownerId);
+                        adjustment.put("adjustedBy", AuthManager.getInstance().getCurrentUserId());
+
+                        if (adjustmentId != null) {
+                            ref.child(adjustmentId).setValue(adjustment)
+                                    .addOnSuccessListener(aVoid -> {
+                                        runOnUiThread(() -> {
+                                            Toast.makeText(StockAdjustmentActivity.this, "Stock & Financials Updated Successfully", Toast.LENGTH_SHORT).show();
+                                            clearForm();
+                                        });
+                                    })
+                                    .addOnFailureListener(e -> runOnUiThread(() ->
+                                            Toast.makeText(StockAdjustmentActivity.this, "Stock updated, but history log failed: " + e.getMessage(), Toast.LENGTH_SHORT).show()
+                                    ));
+                        }
                     }
 
                     @Override
@@ -363,12 +303,11 @@ public class StockAdjustmentActivity extends BaseActivity {
     private void clearForm() {
         etQuantity.setText("");
         etRemarks.setText("");
-        spinnerProduct.setSelection(0);
+        if (spinnerProduct.getAdapter() != null && spinnerProduct.getAdapter().getCount() > 0) spinnerProduct.setSelection(0);
         spinnerAdjustmentType.setSelection(0);
         spinnerReason.setSelection(0);
         tvCurrentStock.setText("0.0");
         tvNewStock.setText("0.0");
         tvFinancialImpact.setText("₱0.00");
-        selectedProduct = null;
     }
 }

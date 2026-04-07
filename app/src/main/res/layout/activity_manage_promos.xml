@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        app:elevation="4dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:title="Manage Promos &amp; Series"
+            app:navigationIcon="@drawable/ic_arrow_back_black_24dp"
+            app:navigationIconTint="?attr/colorOnPrimary"
+            app:titleTextColor="?attr/colorOnPrimary"/>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="?attr/colorSurface"
+        android:elevation="2dp">
+
+        <EditText
+            android:id="@+id/etSearchPromos"
+            android:layout_width="0dp"
+            android:layout_height="45dp"
+            android:layout_weight="1"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?android:colorBackground"
+            android:hint="Search promos..."
+            android:paddingHorizontal="16dp"
+            android:drawableStart="@android:drawable/ic_menu_search"
+            android:drawablePadding="8dp"
+            android:textColorHint="#888"
+            android:textColor="?attr/colorOnSurface"
+            android:maxLines="1"
+            android:inputType="text"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageButton
+            android:id="@+id/btnFilterPromos"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?android:colorBackground"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            app:tint="?attr/colorOnSurface"
+            android:contentDescription="Filter Promos" />
+    </LinearLayout>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvManagePromos"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:clipToPadding="false"
+            android:nestedScrollingEnabled="true" />
+
+        <TextView
+            android:id="@+id/tvNoPromos"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="No promos found.\nClick + to create one."
+            android:textAlignment="center"
+            android:textColor="?attr/colorOnSurface"
+            android:alpha="0.5"
+            android:textSize="16sp"
+            android:visibility="gone"/>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabAddPromo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:layout_margin="24dp"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="?attr/colorOnPrimary"
+            app:backgroundTint="?attr/colorPrimary"
+            android:contentDescription="Create New Promo"
+            app:elevation="6dp" />
+    </RelativeLayout>
+</LinearLayout>

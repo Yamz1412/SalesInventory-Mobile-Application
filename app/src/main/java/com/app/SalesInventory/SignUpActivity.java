@@ -138,14 +138,14 @@ public class SignUpActivity extends BaseActivity {
         });
     }
 
-    // FIX: Adaptive text colors for the requirement checklist!
     private void updateRequirementUI(TextView tv, boolean isValid, String text) {
         if (isValid) {
             tv.setText("✓ " + text);
             tv.setTextColor(Color.parseColor("#4CAF50")); // Green for success
         } else {
             tv.setText("✗ " + text);
-            boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+            boolean isDark = false;
+            try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
             // Use Light Gray for Dark Mode, Dark Gray for Light Mode
             tv.setTextColor(isDark ? Color.LTGRAY : Color.parseColor("#757575"));
         }
@@ -203,16 +203,48 @@ public class SignUpActivity extends BaseActivity {
 
         progressBar.setVisibility(android.view.View.VISIBLE);
 
-        firestore.collection("users").whereEqualTo("username", username).get().addOnCompleteListener(task -> {
-            if (task.isSuccessful() && !task.getResult().isEmpty()) {
-                progressBar.setVisibility(View.GONE);
-                Toast.makeText(this, "Username is already taken, please choose another.", Toast.LENGTH_LONG).show();
-                mUserName.setError("Taken");
-            } else {
-                createAccountAndSave(name, username, email, fullPhone, password);
-            }
+        // FIX: Route to the new Case-Insensitive Smart Checker
+        checkUsernameUniqueness(name, username, email, fullPhone, password);
+    }
+
+    // =========================================================================================
+    // FIX: Multi-Layer Username Checker (Prevents Taguro123 and taguro123 duplicates)
+    // =========================================================================================
+    private void checkUsernameUniqueness(String name, String username, String email, String fullPhone, String password) {
+        String lowerUsername = username.toLowerCase();
+
+        // 1. Check exact match
+        firestore.collection("users").whereEqualTo("username", username).get().addOnCompleteListener(t1 -> {
+            if (t1.isSuccessful() && !t1.getResult().isEmpty()) { showUsernameTaken(); return; }
+
+            // 2. Check lowercase match
+            firestore.collection("users").whereEqualTo("username", lowerUsername).get().addOnCompleteListener(t2 -> {
+                if (t2.isSuccessful() && !t2.getResult().isEmpty()) { showUsernameTaken(); return; }
+
+                // 3. Check Capitalized 'Username' field
+                firestore.collection("users").whereEqualTo("Username", username).get().addOnCompleteListener(t3 -> {
+                    if (t3.isSuccessful() && !t3.getResult().isEmpty()) { showUsernameTaken(); return; }
+
+                    // 4. Check strict internal tracking field
+                    firestore.collection("users").whereEqualTo("username_lower", lowerUsername).get().addOnCompleteListener(t4 -> {
+                        if (t4.isSuccessful() && !t4.getResult().isEmpty()) { showUsernameTaken(); return; }
+
+                        // PASSED ALL CHECKS! Create Account.
+                        createAccountAndSave(name, username, email, fullPhone, password);
+                    });
+                });
+            });
         });
     }
+
+    private void showUsernameTaken() {
+        runOnUiThread(() -> {
+            progressBar.setVisibility(View.GONE);
+            Toast.makeText(SignUpActivity.this, "Username is already taken, please choose another.", Toast.LENGTH_LONG).show();
+            mUserName.setError("Taken");
+        });
+    }
+    // =========================================================================================
 
     private void createAccountAndSave(String name, String username, String email, String fullPhone, String password) {
         firebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(createTask -> {
@@ -224,6 +256,10 @@ public class SignUpActivity extends BaseActivity {
                 userMap.put("name", name);
                 userMap.put("Name", name);
                 userMap.put("username", username);
+
+                // FIX: Add a strictly lowercase tracking field for future searches
+                userMap.put("username_lower", username.toLowerCase());
+
                 userMap.put("email", email);
                 userMap.put("Email", email);
                 userMap.put("phone", fullPhone);

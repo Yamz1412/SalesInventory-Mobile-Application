@@ -16,25 +16,19 @@
         android:gravity="center_vertical"
         android:weightSum="4">
 
-        <TextView
-            android:id="@+id/tvRawMaterial"
+        <Spinner
+            android:id="@+id/spinnerRawMaterial"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_weight="2"
-            android:hint="Select Item ▾"
-            android:textColor="?attr/colorOnBackground"
-            android:textSize="14sp"
             android:background="@drawable/edite_round"
             android:backgroundTint="#FFFFFF"
-            android:padding="12dp"
-            android:layout_marginEnd="4dp"
-            android:clickable="true"
-            android:focusable="true"/>
+            android:layout_marginEnd="4dp"/>
 
         <EditText
             android:id="@+id/etDeductQty"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:hint="Qty"
             android:textSize="14sp"

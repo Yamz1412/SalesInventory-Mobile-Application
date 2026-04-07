@@ -9,7 +9,10 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.ActionMode;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -27,10 +30,12 @@ import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -49,29 +54,42 @@ public class SellList extends BaseActivity {
     private ProductRepository productRepository;
     private CartManager cartManager;
 
-    private Button btnCheckout;
-    private ImageButton btnRefundList;
+    // UI Navigation & Shift Elements
+    private MaterialButton btnCart, btnReturn, btnLockScreen, btnUnlock, btnRefund;
+    private LinearLayout layoutLockScreen;
+    private TextInputEditText etUnlockPassword;
+    private TextView tvShiftStatus;
+
     private EditText etSearchProduct;
-    private ImageButton btnFilterSort; // NEW: Filter button
-    private LinearLayout layoutCategoryChips;
+    private ImageButton btnFilterSort;
+    private LinearLayout layoutCategoryChips; // Mapped to categoryContainer in XML
     private FloatingActionButton fabAddSalesProduct;
 
     private String currentCategoryFilter = "All";
-    private String currentSortOption = "A-Z"; // NEW: Default sorting
+    private String currentSortOption = "A-Z";
     private List<Product> cachedInventoryList = new ArrayList<>();
+    private Map<String, Product> fastInventoryLookup = new HashMap<>();
 
     // Bulk action bar
     private LinearLayout layoutBulkActions;
     private TextView tvSelectedCount;
     private ImageButton btnBulkEdit, btnBulkDelete, btnBulkOptions, btnBulkClose;
     private Set<String> currentSelectedIds = new HashSet<>();
-    private com.google.android.material.button.MaterialButton btnShiftAction;
-    private boolean isShiftActive = false;
-    private com.google.firebase.firestore.ListenerRegistration shiftListener;
+
+    // Archive UI Elements
+    private View layoutArchiveContainer;
+    private Button btnArchive;
+    private TextView tvArchiveBadge;
+    private com.google.firebase.firestore.ListenerRegistration archiveListener;
+    private boolean isReadOnly = false;
+
     private String currentMainCategory = "All";
     private String currentSubCategory = "All";
+    private String lastCategoryHash = "";
+    private ActionMode actionMode;
+    private Map<String, View> dynamicNoteViews = new HashMap<>();
 
-    // NEW: Flexible Handling toggle (Set to true to allow clicking out-of-stock items)
+    // Flexible Handling toggle
     private boolean isFlexibleHandlingEnabled = true;
 
     @Override
@@ -82,33 +100,67 @@ public class SellList extends BaseActivity {
         productRepository = SalesInventoryApplication.getProductRepository();
         cartManager = CartManager.getInstance();
 
-        btnRefundList = findViewById(R.id.btnRefundList);
-        if (btnRefundList != null) btnRefundList.setOnClickListener(v -> showRefundDialog());
+        btnRefund = findViewById(R.id.btnRefund);
+        if (btnRefund != null) btnRefund.setOnClickListener(v -> showRefundDialog());
 
         etSearchProduct = findViewById(R.id.etSearchProduct);
-        btnFilterSort = findViewById(R.id.btnFilterSort); // NEW
-
-        layoutCategoryChips = findViewById(R.id.layoutCategoryChips);
+        layoutCategoryChips = findViewById(R.id.categoryContainer);
 
         sellListView = findViewById(R.id.SellListD);
-        sellListView.setLayoutManager(new GridLayoutManager(this, getResponsiveSpanCount()));
-
-        btnShiftAction = findViewById(R.id.btnShiftAction);
-        observeShiftStatus();
-
-        btnShiftAction.setOnClickListener(v -> {
-            if (!isShiftActive) {
-                showStartShiftDialog();
-            } else {
-                showEndShiftDialog();
-            }
-        });
-
-        // --- NEW: Filter/Sort Button Listener ---
-        if (btnFilterSort != null) {
-            btnFilterSort.setOnClickListener(v -> showSortFilterDialog());
+        if (sellListView != null) {
+            sellListView.setLayoutManager(new GridLayoutManager(this, getResponsiveSpanCount()));
         }
-        // ----------------------------------------
+
+        // Lock Screen & Top Button Bindings
+        tvShiftStatus = findViewById(R.id.tvShiftStatus);
+        btnCart = findViewById(R.id.btnCart);
+        btnLockScreen = findViewById(R.id.btn_lock_screen);
+        layoutLockScreen = findViewById(R.id.layout_lock_screen);
+        etUnlockPassword = findViewById(R.id.et_unlock_password);
+        btnUnlock = findViewById(R.id.btn_unlock);
+
+
+        btnFilterSort = findViewById(R.id.btnFilterSort);
+        if (btnFilterSort != null) btnFilterSort.setOnClickListener(v -> showSortFilterDialog());
+
+        if (btnCart != null) {
+            btnCart.setOnClickListener(v -> {
+                if (cartManager.getItems().isEmpty()) {
+                    Toast.makeText(SellList.this, "Cart is empty", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(SellList.this, sellProduct.class));
+            });
+        }
+
+        // Automated Shift Logging
+        logAttendance("Shift Started / Logged In");
+        if (tvShiftStatus != null) {
+            tvShiftStatus.setText("🟢 Shift Active (Automated)");
+        }
+
+        if (btnLockScreen != null) {
+            btnLockScreen.setOnClickListener(v -> {
+                logAttendance("Screen Locked");
+                if (layoutLockScreen != null) layoutLockScreen.setVisibility(View.VISIBLE);
+            });
+        }
+
+        if (btnUnlock != null) {
+            btnUnlock.setOnClickListener(v -> {
+                if (etUnlockPassword != null) {
+                    String pin = etUnlockPassword.getText().toString().trim();
+                    if (pin.isEmpty()) {
+                        etUnlockPassword.setError("PIN Required to Unlock");
+                        return;
+                    }
+                    etUnlockPassword.setText("");
+                }
+                logAttendance("Screen Unlocked");
+                if (layoutLockScreen != null) layoutLockScreen.setVisibility(View.GONE);
+                Toast.makeText(this, "Register Unlocked", Toast.LENGTH_SHORT).show();
+            });
+        }
 
         sellAdapter = new SellAdapter(this, filteredProducts, masterInventory, new SellAdapter.OnProductClickListener() {
             @Override
@@ -116,30 +168,47 @@ public class SellList extends BaseActivity {
                 showProductOptionsDialog(product, maxServings);
             }
         }, selectedIds -> {
+
+            if (isReadOnly) {
+                if (!selectedIds.isEmpty() && sellAdapter != null) {
+                    sellAdapter.clearSelection();
+                    Toast.makeText(SellList.this, "Admin access required to modify items.", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+
             currentSelectedIds = selectedIds;
             updateBulkActionBar(selectedIds);
         }, isFlexibleHandlingEnabled);
 
-        sellListView.setAdapter(sellAdapter);
+        if (sellListView != null) {
+            sellListView.setAdapter(sellAdapter);
+        }
 
         fabAddSalesProduct = findViewById(R.id.fabAddSalesProduct);
         if (fabAddSalesProduct != null) {
+            fabAddSalesProduct.setVisibility(View.GONE);
             fabAddSalesProduct.setOnClickListener(v -> {
+                if (isReadOnly) {
+                    Toast.makeText(SellList.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 Intent intent = new Intent(SellList.this, AddProductActivity.class);
                 intent.putExtra("MODE_MENU_ONLY", true);
                 startActivity(intent);
             });
         }
 
+        // Admin checks
         AuthManager.getInstance().isUserAdmin(isAdmin -> {
             runOnUiThread(() -> {
+                isReadOnly = !isAdmin;
                 if (fabAddSalesProduct != null) {
                     fabAddSalesProduct.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
                 }
 
-                View btnAddProduct = findViewById(R.id.btn_add_product);
-                if (btnAddProduct != null) {
-                    btnAddProduct.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+                if (btnLockScreen != null) {
+                    btnLockScreen.setVisibility(isAdmin ? View.GONE : View.VISIBLE);
                 }
 
                 if (layoutBulkActions != null && !isAdmin) {
@@ -149,19 +218,27 @@ public class SellList extends BaseActivity {
                 if (sellAdapter != null) {
                     sellAdapter.setAdminStatus(isAdmin);
                 }
+
+                if (isAdmin) {
+                    listenToArchivedProductsCount();
+                } else {
+                    if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+                    if (btnArchive != null) btnArchive.setVisibility(View.GONE);
+                }
             });
         });
 
+        // Initialize Bulk Actions safely
         layoutBulkActions = findViewById(R.id.layoutBulkActions);
-        tvSelectedCount   = findViewById(R.id.tvSelectedCount);
-        btnBulkEdit       = findViewById(R.id.btnBulkEdit);
-        btnBulkDelete     = findViewById(R.id.btnBulkDelete);
-        btnBulkOptions    = findViewById(R.id.btnBulkOptions);
-        btnBulkClose      = findViewById(R.id.btnBulkClose);
+        tvSelectedCount = findViewById(R.id.tvSelectedCount);
+        btnBulkEdit = findViewById(R.id.btnBulkEdit);
+        btnBulkDelete = findViewById(R.id.btnBulkDelete);
+        btnBulkOptions = findViewById(R.id.btnBulkOptions);
+        btnBulkClose = findViewById(R.id.btnBulkClose);
 
         if (btnBulkClose != null) {
             btnBulkClose.setOnClickListener(v -> {
-                sellAdapter.clearSelection();
+                if (sellAdapter != null) sellAdapter.clearSelection();
                 hideBulkActionBar();
             });
         }
@@ -172,10 +249,10 @@ public class SellList extends BaseActivity {
                     String selectedId = currentSelectedIds.iterator().next();
                     Product selected = findProductById(selectedId);
                     if (selected != null) {
-                        Intent intent = new Intent(SellList.this, EditProduct.class);
+                        Intent intent = new Intent(SellList.this, EditSalesProductActivity.class);
                         intent.putExtra("PRODUCT_ID", selected.getProductId());
                         startActivity(intent);
-                        sellAdapter.clearSelection();
+                        if (sellAdapter != null) sellAdapter.clearSelection();
                         hideBulkActionBar();
                     }
                 } else {
@@ -193,9 +270,10 @@ public class SellList extends BaseActivity {
                         .setPositiveButton("Delete", (d, w) -> {
                             for (String id : currentSelectedIds) {
                                 Product p = findProductById(id);
-                                if (p != null) productRepository.deleteProduct(p.getProductId(), null);
+                                if (p != null)
+                                    productRepository.deleteProduct(p.getProductId(), null);
                             }
-                            sellAdapter.clearSelection();
+                            if (sellAdapter != null) sellAdapter.clearSelection();
                             hideBulkActionBar();
                             Toast.makeText(this, "Deleted", Toast.LENGTH_SHORT).show();
                         })
@@ -217,22 +295,18 @@ public class SellList extends BaseActivity {
             });
         }
 
-        btnCheckout = findViewById(R.id.btnCheckout);
-        if (btnCheckout != null) {
-            btnCheckout.setOnClickListener(v -> {
-                if (cartManager.getItems().isEmpty()) {
-                    Toast.makeText(SellList.this, "Cart is empty", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                startActivity(new Intent(SellList.this, sellProduct.class));
-            });
-        }
-
         if (etSearchProduct != null) {
             etSearchProduct.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                @Override public void afterTextChanged(Editable s) { applyCategoryFilter(); }
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    applyCategoryFilter();
+                }
             });
         }
 
@@ -240,7 +314,51 @@ public class SellList extends BaseActivity {
         loadProducts();
     }
 
-    // --- NEW: Sort & Filter Dialog ---
+    private void logAttendance(String action) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
+
+        Map<String, Object> log = new HashMap<>();
+        log.put("action", action);
+        log.put("timestamp", System.currentTimeMillis());
+        log.put("userId", AuthManager.getInstance().getCurrentUserId());
+
+        FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                .collection("attendance_logs").add(log);
+    }
+
+    private void listenToArchivedProductsCount() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (ownerId == null) return;
+
+        archiveListener = FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId).collection("products")
+                .whereEqualTo("isActive", false)
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) return;
+                    if (snapshot != null) {
+                        int archiveCount = snapshot.size();
+                        runOnUiThread(() -> {
+                            boolean show = (archiveCount > 0 && !isReadOnly);
+                            if (layoutArchiveContainer != null) {
+                                layoutArchiveContainer.setVisibility(show ? View.VISIBLE : View.GONE);
+                            }
+                            if (btnArchive != null) {
+                                btnArchive.setVisibility(show ? View.VISIBLE : View.GONE);
+                            }
+                            if (tvArchiveBadge != null) {
+                                tvArchiveBadge.setText(String.valueOf(archiveCount));
+                                tvArchiveBadge.setVisibility(archiveCount > 0 ? View.VISIBLE : View.GONE);
+                            }
+                        });
+                    }
+                });
+    }
+
     private void showSortFilterDialog() {
         String[] options = {
                 "A-Z",
@@ -268,88 +386,13 @@ public class SellList extends BaseActivity {
                 .setNegativeButton("Cancel", null)
                 .show();
     }
-    // ---------------------------------
-
-    private void observeShiftStatus() {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        shiftListener = FirebaseFirestore.getInstance()
-                .collection("users").document(ownerId)
-                .collection("system").document("current_shift")
-                .addSnapshotListener((snapshot, e) -> {
-                    if (snapshot != null && snapshot.exists()) {
-                        isShiftActive = Boolean.TRUE.equals(snapshot.getBoolean("active"));
-                        updateShiftUI(isShiftActive);
-                    } else {
-                        isShiftActive = false;
-                        updateShiftUI(false);
-                    }
-                });
-    }
-
-    private void updateShiftUI(boolean active) {
-        runOnUiThread(() -> {
-            if (active) {
-                btnShiftAction.setText("End Shift");
-                btnShiftAction.setIconTintResource(R.color.errorRed);
-                btnShiftAction.setTextColor(getResources().getColor(R.color.errorRed));
-            } else {
-                btnShiftAction.setText("Start Shift");
-                btnShiftAction.setIconTintResource(R.color.colorAccent);
-                btnShiftAction.setTextColor(getResources().getColor(R.color.textColorSecondary));
-            }
-        });
-    }
-
-    private void showStartShiftDialog() {
-        android.widget.EditText etStartingCash = new android.widget.EditText(this);
-        etStartingCash.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        etStartingCash.setHint("0.00");
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Start Shift")
-                .setMessage("Enter starting cash amount in drawer:")
-                .setView(etStartingCash)
-                .setPositiveButton("Start", (d, w) -> {
-                    String amount = etStartingCash.getText().toString();
-                    if (!amount.isEmpty()) {
-                        saveShiftStatus(true, Double.parseDouble(amount));
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void saveShiftStatus(boolean active, double amount) {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        java.util.Map<String, Object> shiftData = new java.util.HashMap<>();
-        shiftData.put("active", active);
-        shiftData.put("amount", amount);
-        shiftData.put("timestamp", System.currentTimeMillis());
-        shiftData.put("updatedBy", AuthManager.getInstance().getCurrentUserId());
-
-        FirebaseFirestore.getInstance()
-                .collection("users").document(ownerId)
-                .collection("system").document("current_shift")
-                .set(shiftData, com.google.firebase.firestore.SetOptions.merge());
-    }
-
-    private void showEndShiftDialog() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("End Shift")
-                .setMessage("Are you sure you want to end the current shift?")
-                .setPositiveButton("End Shift", (d, w) -> saveShiftStatus(false, 0.0))
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (shiftListener != null) shiftListener.remove();
-    }
 
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        boolean isDark = false;
+        try {
+            isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        } catch (Exception e) {
+        }
         int textColor = isDark ? Color.WHITE : Color.BLACK;
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
@@ -390,8 +433,7 @@ public class SellList extends BaseActivity {
     private void adjustButtonsForMobile() {
         android.content.res.Configuration config = getResources().getConfiguration();
         if (config.screenWidthDp < 450) {
-            btnShiftAction.setText(isShiftActive ? "End" : "Start");
-            if (btnCheckout != null) btnCheckout.setText("Cart");
+            if (btnCart != null) btnCart.setText("Cart");
         }
     }
 
@@ -400,32 +442,45 @@ public class SellList extends BaseActivity {
             if (products != null) {
                 allMenuProducts.clear();
                 masterInventory.clear();
+                cachedInventoryList.clear();
 
-                // Get today's exact date and time
                 long currentTime = System.currentTimeMillis();
 
                 for (Product product : products) {
-                    if (product.isActive()) {
-                        masterInventory.add(product);
+                    if (product == null || !product.isActive()) continue;
 
-                        boolean isVisibleOnMenu = product.isSellable() ||
-                                "finished".equalsIgnoreCase(product.getProductType()) ||
-                                "Menu".equalsIgnoreCase(product.getProductType());
+                    masterInventory.add(product);
+                    cachedInventoryList.add(product);
 
-                        // --- NEW: AUTO-ERASE PROMO LOGIC ---
-                        if (isVisibleOnMenu && product.isPromo() && product.isTemporaryPromo()) {
+                    if (product.getProductName() != null) {
+                        fastInventoryLookup.put(product.getProductName().toLowerCase().trim(), product);
+                    }
+
+                    boolean isVisibleOnMenu = product.isSellable() ||
+                            "finished".equalsIgnoreCase(product.getProductType()) ||
+                            "Menu".equalsIgnoreCase(product.getProductType());
+
+                    // PROMO OVERRIDE LOGIC
+                    if (isVisibleOnMenu && product.isPromo()) {
+
+                        if (product.isTemporaryPromo()) {
                             boolean hasStarted = product.getPromoStartDate() == 0 || currentTime >= product.getPromoStartDate();
-                            // Adding 86400000 ms (24 hours) to End Date to ensure it lasts the whole final day
                             boolean hasExpired = product.getPromoEndDate() > 0 && currentTime > (product.getPromoEndDate() + 86400000);
-
                             if (!hasStarted || hasExpired) {
-                                isVisibleOnMenu = false; // Hide from POS!
+                                isVisibleOnMenu = false;
                             }
                         }
 
                         if (isVisibleOnMenu) {
-                            allMenuProducts.add(product);
+                            String seriesName = product.getPromoName() != null && !product.getPromoName().isEmpty()
+                                    ? product.getPromoName() : "Special Promos";
+                            product.setProductLine(seriesName);
+                            product.setCategoryName("");
                         }
+                    }
+
+                    if (isVisibleOnMenu) {
+                        allMenuProducts.add(product);
                     }
                 }
                 extractAndSetupCategories();
@@ -437,7 +492,8 @@ public class SellList extends BaseActivity {
     private void showRefundDialog() {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_refund, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        if (dialog.getWindow() != null)
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         Spinner spinnerTime = view.findViewById(R.id.spinnerTimeFilter);
         EditText etOrderId = view.findViewById(R.id.etRefundOrderId);
@@ -447,7 +503,11 @@ public class SellList extends BaseActivity {
         Button btnCancel = view.findViewById(R.id.btnCancelRefund);
         Button btnConfirm = view.findViewById(R.id.btnConfirmRefund);
 
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        boolean isDark = false;
+        try {
+            isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        } catch (Exception e) {
+        }
         int textColor = isDark ? Color.WHITE : Color.BLACK;
 
         if (etOrderId != null) etOrderId.setTextColor(textColor);
@@ -456,7 +516,7 @@ public class SellList extends BaseActivity {
 
         String[] times = {"Today", "Yesterday", "Last 7 Days", "All Time"};
         ArrayAdapter<String> timeAdapter = getAdaptiveAdapter(times);
-        spinnerTime.setAdapter(timeAdapter);
+        if (spinnerTime != null) spinnerTime.setAdapter(timeAdapter);
 
         String[] reasons = {
                 "Spoiled / Bad Quality",
@@ -466,12 +526,13 @@ public class SellList extends BaseActivity {
                 "Other (Specify below)"
         };
         ArrayAdapter<String> reasonAdapter = getAdaptiveAdapter(reasons);
-        spinnerReason.setAdapter(reasonAdapter);
+        if (spinnerReason != null) spinnerReason.setAdapter(reasonAdapter);
 
         final List<Sales> foundSalesList = new ArrayList<>();
         final double[] totalRefundAmount = {0.0};
 
         Runnable fetchAndFilterSales = () -> {
+            if (etOrderId == null || spinnerTime == null) return;
             String searchTxt = etOrderId.getText().toString().trim().toLowerCase();
             String selectedTime = spinnerTime.getSelectedItem().toString();
 
@@ -491,15 +552,16 @@ public class SellList extends BaseActivity {
                 StringBuilder details = new StringBuilder();
 
                 for (Sales s : salesList) {
-                    if (s.getPaymentMethod() != null && s.getPaymentMethod().contains("REFUNDED")) continue;
+                    if (s.getPaymentMethod() != null && s.getPaymentMethod().contains("REFUNDED"))
+                        continue;
 
                     boolean matchesTime = (selectedTime.equals("All Time")) ||
                             (selectedTime.equals("Yesterday") && s.getTimestamp() >= finalTimeThreshold && s.getTimestamp() < (now - oneDay)) ||
                             (!selectedTime.equals("Yesterday") && s.getTimestamp() >= finalTimeThreshold);
 
                     boolean matchesSearch = searchTxt.isEmpty() ||
-                            s.getOrderId().toLowerCase().contains(searchTxt) ||
-                            s.getProductName().toLowerCase().contains(searchTxt);
+                            (s.getOrderId() != null && s.getOrderId().toLowerCase().contains(searchTxt)) ||
+                            (s.getProductName() != null && s.getProductName().toLowerCase().contains(searchTxt));
 
                     if (matchesTime && matchesSearch) {
                         foundSalesList.add(s);
@@ -508,72 +570,91 @@ public class SellList extends BaseActivity {
                         SimpleDateFormat sdf = new SimpleDateFormat("MM/dd hh:mm a", Locale.getDefault());
                         details.append("[").append(sdf.format(new Date(s.getTimestamp()))).append("] ")
                                 .append(s.getQuantity()).append("x ").append(s.getProductName())
-                                .append("\n   ID: ").append(s.getOrderId().substring(0,8).toUpperCase())
+                                .append("\n   ID: ").append(s.getOrderId().substring(0, 8).toUpperCase())
                                 .append(" | ₱").append(s.getTotalPrice()).append("\n\n");
                     }
                 }
 
                 if (foundSalesList.isEmpty()) {
-                    tvDetails.setText("No transactions found for the selected filters.");
-                    btnConfirm.setEnabled(false);
+                    if (tvDetails != null) tvDetails.setText("No transactions found for the selected filters.");
+                    if (btnConfirm != null) btnConfirm.setEnabled(false);
                 } else {
                     details.append("========================\nTOTAL ELIGIBLE REFUND: ₱").append(totalRefundAmount[0]);
-                    tvDetails.setText(details.toString());
-                    btnConfirm.setEnabled(true);
+                    if (tvDetails != null) tvDetails.setText(details.toString());
+                    if (btnConfirm != null) btnConfirm.setEnabled(true);
                 }
             });
         };
 
-        spinnerTime.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { fetchAndFilterSales.run(); }
-            @Override public void onNothingSelected(AdapterView<?> p) {}
-        });
-
-        etOrderId.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { fetchAndFilterSales.run(); }
-            @Override public void afterTextChanged(Editable s) {}
-        });
-
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-
-        btnConfirm.setOnClickListener(v -> {
-            String selectedReason = spinnerReason.getSelectedItem().toString();
-            String specificNotes = etSpecificReason.getText().toString().trim();
-            String finalReason = selectedReason + (specificNotes.isEmpty() ? "" : " - " + specificNotes);
-
-            String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-            if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
-
-            for (Sales sale : foundSalesList) {
-                sale.setPaymentMethod("REFUNDED: " + finalReason);
-
-                FirebaseFirestore.getInstance().collection("users").document(ownerId)
-                        .collection("sales").document(sale.getId())
-                        .update("paymentMethod", "REFUNDED: " + finalReason);
-
-                Product p = null;
-                for(Product invP : cachedInventoryList) {
-                    if (invP.getProductName().equalsIgnoreCase(sale.getProductName())) { p = invP; break; }
+        if (spinnerTime != null) {
+            spinnerTime.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                    fetchAndFilterSales.run();
                 }
 
-                if (p != null) {
-                    double newQty = p.getQuantity() + sale.getQuantity();
-                    productRepository.updateProductQuantity(p.getProductId(), newQty, null);
+                @Override
+                public void onNothingSelected(AdapterView<?> p) {
+                }
+            });
+        }
+
+        if (etOrderId != null) {
+            etOrderId.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
                 }
 
-                Map<String, Object> refundLog = new HashMap<>();
-                refundLog.put("orderId", sale.getOrderId());
-                refundLog.put("productName", sale.getProductName());
-                refundLog.put("amount", sale.getTotalPrice());
-                refundLog.put("reason", finalReason);
-                refundLog.put("timestamp", System.currentTimeMillis());
-                FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("refund_logs").add(refundLog);
-            }
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    fetchAndFilterSales.run();
+                }
 
-            Toast.makeText(this, "Refund Processed: " + finalReason, Toast.LENGTH_LONG).show();
-            dialog.dismiss();
-        });
+                @Override
+                public void afterTextChanged(Editable s) {
+                }
+            });
+        }
+
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        if (btnConfirm != null) {
+            btnConfirm.setOnClickListener(v -> {
+                String selectedReason = spinnerReason != null ? spinnerReason.getSelectedItem().toString() : "";
+                String specificNotes = etSpecificReason != null ? etSpecificReason.getText().toString().trim() : "";
+                String finalReason = selectedReason + (specificNotes.isEmpty() ? "" : " - " + specificNotes);
+
+                String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+                if (ownerId == null || ownerId.isEmpty())
+                    ownerId = AuthManager.getInstance().getCurrentUserId();
+
+                for (Sales sale : foundSalesList) {
+                    sale.setPaymentMethod("REFUNDED: " + finalReason);
+
+                    FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                            .collection("sales").document(sale.getId())
+                            .update("paymentMethod", "REFUNDED: " + finalReason);
+
+                    Product p = findInventoryProduct(sale.getProductName());
+
+                    if (p != null) {
+                        double newQty = p.getQuantity() + sale.getQuantity();
+                        productRepository.updateProductQuantity(p.getProductId(), newQty, null);
+                    }
+
+                    Map<String, Object> refundLog = new HashMap<>();
+                    refundLog.put("orderId", sale.getOrderId());
+                    refundLog.put("productName", sale.getProductName());
+                    refundLog.put("amount", sale.getTotalPrice());
+                    refundLog.put("reason", finalReason);
+                    refundLog.put("timestamp", System.currentTimeMillis());
+                    FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("refund_logs").add(refundLog);
+                }
+
+                Toast.makeText(this, "Refund Processed: " + finalReason, Toast.LENGTH_LONG).show();
+                dialog.dismiss();
+            });
+        }
 
         dialog.show();
     }
@@ -586,7 +667,27 @@ public class SellList extends BaseActivity {
             String norm = normalizeCategoryName(main);
             if (!mainCatsMap.containsKey(norm)) mainCatsMap.put(norm, main);
         }
-        setupHierarchicalCategoryChips(new ArrayList<>(mainCatsMap.values()));
+
+        List<String> sortedNorms = new ArrayList<>(mainCatsMap.keySet());
+        Collections.sort(sortedNorms);
+        String currentHash = sortedNorms.toString() + "_" + currentMainCategory + "_" + currentSubCategory;
+
+        if (!currentHash.equals(lastCategoryHash)) {
+            lastCategoryHash = currentHash;
+            setupHierarchicalCategoryChips(new ArrayList<>(mainCatsMap.values()));
+        }
+    }
+
+    private double safeGetDouble(Map<?, ?> map, String key) {
+        if (map == null || !map.containsKey(key) || map.get(key) == null) return 0.0;
+        Object val = map.get(key);
+        if (val instanceof Number) return ((Number) val).doubleValue();
+        if (val instanceof String) {
+            String strVal = ((String) val).trim();
+            if (strVal.isEmpty() || strVal.equalsIgnoreCase("null")) return 0.0;
+            try { return Double.parseDouble(strVal); } catch (Exception e) { return 0.0; }
+        }
+        return 0.0;
     }
 
     private void setupHierarchicalCategoryChips(List<String> mainCategories) {
@@ -605,6 +706,16 @@ public class SellList extends BaseActivity {
                 extractAndSetupCategories();
                 applyCategoryFilter();
             });
+            if (!main.equalsIgnoreCase("All")) {
+                chip.setOnLongClickListener(v -> {
+                    if (isReadOnly) {
+                        Toast.makeText(SellList.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                        return true;
+                    }
+                    showCategoryOptionsDialog(main, false);
+                    return true;
+                });
+            }
             mainRow.addView(chip);
         }
         layoutCategoryChips.addView(mainRow);
@@ -635,6 +746,16 @@ public class SellList extends BaseActivity {
                         extractAndSetupCategories();
                         applyCategoryFilter();
                     });
+                    if (!sub.equalsIgnoreCase("All")) {
+                        chip.setOnLongClickListener(v -> {
+                            if (isReadOnly) {
+                                Toast.makeText(SellList.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                                return true;
+                            }
+                            showCategoryOptionsDialog(sub, true);
+                            return true;
+                        });
+                    }
                     subRow.addView(chip);
                 }
                 layoutCategoryChips.addView(subRow);
@@ -672,9 +793,15 @@ public class SellList extends BaseActivity {
 
     private void applyCategoryFilter() {
         filteredProducts.clear();
-        String query = etSearchProduct != null ? etSearchProduct.getText().toString().toLowerCase().trim() : "";
+        String query = "";
+
+        if (etSearchProduct != null && etSearchProduct.getText() != null) {
+            query = etSearchProduct.getText().toString().toLowerCase().trim();
+        }
 
         for (Product p : allMenuProducts) {
+            if (p == null) continue;
+
             String pMain = p.getProductLine() != null ? p.getProductLine().trim() : "Uncategorized";
             String pSub = p.getCategoryName() != null ? p.getCategoryName().trim() : "Uncategorized";
             String pName = p.getProductName() != null ? p.getProductName().toLowerCase() : "";
@@ -694,10 +821,13 @@ public class SellList extends BaseActivity {
             }
         }
 
-        // --- NEW: Apply Sorting Logic Before Populating Adapter ---
         Collections.sort(filteredProducts, (p1, p2) -> {
-            String name1 = p1.getProductName() != null ? p1.getProductName() : "";
-            String name2 = p2.getProductName() != null ? p2.getProductName() : "";
+            if (p1 == null && p2 == null) return 0;
+            if (p1 == null) return 1;
+            if (p2 == null) return -1;
+
+            String name1 = p1.getProductName() != null ? p1.getProductName() : "Unnamed Product";
+            String name2 = p2.getProductName() != null ? p2.getProductName() : "Unnamed Product";
 
             switch (currentSortOption) {
                 case "A-Z":
@@ -709,15 +839,15 @@ public class SellList extends BaseActivity {
                 case "Price: High to Low":
                     return Double.compare(p2.getSellingPrice(), p1.getSellingPrice());
                 case "Recently Added":
-                    // Sort descending by DateAdded
                     return Long.compare(p2.getDateAdded(), p1.getDateAdded());
                 default:
-                    return 0;
+                    return name1.compareToIgnoreCase(name2);
             }
         });
-        // -----------------------------------------------------------
 
-        sellAdapter.filterList(filteredProducts, masterInventory);
+        if (sellAdapter != null) {
+            sellAdapter.filterList(filteredProducts, masterInventory);
+        }
     }
 
     private String normalizeCategoryName(String name) {
@@ -726,16 +856,20 @@ public class SellList extends BaseActivity {
     }
 
     private Product findInventoryProduct(String name) {
-        for (Product p : masterInventory) {
-            if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(name)) return p;
-        }
-        return null;
+        if (name == null || name.trim().isEmpty()) return null;
+        return fastInventoryLookup.get(name.toLowerCase().trim());
+    }
+
+    private void updateDialogTotalPrice(TextView tvPrice, double base, double size, double addons) {
+        double total = base + size + addons;
+        if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "₱%.2f", total));
     }
 
     private void showProductOptionsDialog(Product product, int maxBaseServings) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        if (dialog.getWindow() != null)
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
         boolean isDark = false;
         try {
@@ -748,217 +882,358 @@ public class SellList extends BaseActivity {
 
         TextView tvName = view.findViewById(R.id.tvOptionProductName);
         TextView tvPrice = view.findViewById(R.id.tvOptionProductPrice);
-        EditText etQty = view.findViewById(R.id.etOptionQty);
+        EditText etQty = view.findViewById(R.id.tvOptionQty);
         Button btnCancel = view.findViewById(R.id.btnOptionCancel);
         Button btnAddToCart = view.findViewById(R.id.btnOptionAddToCart);
 
-        LinearLayout layoutSizesContainer = view.findViewById(R.id.layoutSizesContainer);
+        // Replace the old layout bindings with these exact matching IDs:
+        LinearLayout layoutSizesContainer = view.findViewById(R.id.layoutSizes);
         RadioGroup rgSizes = view.findViewById(R.id.rgSizes);
 
-        LinearLayout layoutAddonsContainer = view.findViewById(R.id.layoutAddonsContainer);
-        LinearLayout containerAddonsList = view.findViewById(R.id.containerAddonsList);
+        LinearLayout layoutAddonsContainer = view.findViewById(R.id.layoutAddons);
+        LinearLayout containerAddonsList = view.findViewById(R.id.containerAddons);
 
-        LinearLayout layoutNotesContainer = view.findViewById(R.id.layoutNotesContainer);
-        LinearLayout containerNotesList = view.findViewById(R.id.containerNotesList);
+        // Mapped to your existing layoutSugar to prevent crashes
+        LinearLayout layoutNotesContainer = view.findViewById(R.id.layoutSugar);
+        LinearLayout containerNotesList = view.findViewById(R.id.layoutSugar);
 
-        tvName.setText(product.getProductName());
-        tvPrice.setText(String.format(Locale.US, "₱%.2f", product.getSellingPrice()));
+        String safeName = product.getProductName() != null ? product.getProductName() : "Unnamed Product";
+        if (tvName != null) tvName.setText(safeName);
+        if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "₱%.2f", product.getSellingPrice()));
 
         final double[] basePrice = {product.getSellingPrice()};
         final double[] selectedSizePrice = {0.0};
         final double[] selectedAddonsPrice = {0.0};
         final String[] selectedSizeName = {""};
 
-        // SIZES
-        List<Map<String, Object>> sizes = product.getSizesList();
-        if (sizes != null && !sizes.isEmpty()) {
-            layoutSizesContainer.setVisibility(View.VISIBLE);
-            boolean isFirstAvailableSizeSelected = false;
-            for (int i = 0; i < sizes.size(); i++) {
-                Map<String, Object> size = sizes.get(i);
-                RadioButton rb = new RadioButton(this);
-                rb.setTextColor(dynamicTextColor);
+        dynamicNoteViews.clear();
 
-                String sName = (String) size.get("name");
-                String linkedMat = (String) size.get("linkedMaterial");
+        Object sizesObj = product.getSizesList();
+        if (sizesObj instanceof List) {
+            List<?> sList = (List<?>) sizesObj;
+            if (!sList.isEmpty()) {
+                if (layoutSizesContainer != null) layoutSizesContainer.setVisibility(View.VISIBLE);
+                boolean isFirstAvailableSizeSelected = false;
+                Set<String> addedSizes = new HashSet<>();
 
-                double sPrice = 0.0;
-                double deductQty = 0.0;
-                try { sPrice = Double.parseDouble(String.valueOf(size.get("price"))); } catch (Exception ignored){}
-                try { deductQty = Double.parseDouble(String.valueOf(size.get("deductQty"))); } catch (Exception ignored){}
+                for (int i = 0; i < sList.size(); i++) {
+                    Object obj = sList.get(i);
+                    if (obj instanceof Map) {
+                        Map<?, ?> size = (Map<?, ?>) obj;
+                        String sName = (String) size.get("name");
 
-                String text = sName;
-                if (sPrice > 0) text += String.format(" (+₱%.2f)", sPrice);
+                        if (sName == null || addedSizes.contains(sName)) continue;
+                        addedSizes.add(sName);
 
-                if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
-                    Product sizeMat = findInventoryProduct(linkedMat);
-                    double currentStock = sizeMat != null ? sizeMat.getQuantity() : 0;
-                    if (currentStock < deductQty) {
-                        rb.setEnabled(false);
-                        text += " (Out of Stock)";
-                    }
-                }
+                        RadioButton rb = new RadioButton(this);
+                        rb.setTextColor(dynamicTextColor);
 
-                rb.setText(text);
-                rb.setId(View.generateViewId());
+                        String linkedMat = (String) size.get("linkedMaterial");
 
-                final double finalSPrice = sPrice;
-                final String finalSName = sName;
+                        // PERCENTAGE LOGIC FOR SIZES
+                        double sPrice = 0;
+                        if (size.containsKey("priceDiff")) {
+                            double pct = safeGetDouble(size, "priceDiff");
+                            sPrice = basePrice[0] * (pct / 100.0);
+                        } else {
+                            sPrice = safeGetDouble(size, "price");
+                        }
 
-                rb.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    if (isChecked) {
-                        selectedSizePrice[0] = finalSPrice;
-                        selectedSizeName[0] = finalSName;
-                        updateDialogTotalPrice(tvPrice, basePrice[0], selectedSizePrice[0], selectedAddonsPrice[0]);
-                    }
-                });
-                rgSizes.addView(rb);
+                        double deductQty = safeGetDouble(size, "deductQty");
 
-                if (rb.isEnabled() && !isFirstAvailableSizeSelected) {
-                    rb.setChecked(true);
-                    isFirstAvailableSizeSelected = true;
-                }
-            }
-        }
+                        String text = sName;
+                        if (sPrice > 0) text += String.format(Locale.US, " (+₱%.2f)", sPrice);
 
-        // ADDONS
-        List<CheckBox> addonBoxes = new ArrayList<>();
-        List<Map<String, Object>> addons = product.getAddonsList();
-        if (addons != null && !addons.isEmpty()) {
-            layoutAddonsContainer.setVisibility(View.VISIBLE);
-            for (Map<String, Object> addon : addons) {
-                CheckBox cb = new CheckBox(this);
-                cb.setTextColor(dynamicTextColor);
+                        if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
+                            Product sizeMat = findInventoryProduct(linkedMat);
+                            double currentStock = sizeMat != null ? sizeMat.getQuantity() : 0;
+                            if (currentStock < deductQty) {
+                                text += " (Out of Stock)";
+                                if (!isFlexibleHandlingEnabled) {
+                                    rb.setEnabled(false);
+                                }
+                            }
+                        }
+                        rb.setText(text);
+                        rb.setId(View.generateViewId());
+                        rb.setTag(size);
 
-                String aName = (String) addon.get("name");
-                String linkedMat = (String) addon.get("linkedMaterial");
+                        final double finalSPrice = sPrice;
+                        final String finalSName = sName;
 
-                double aPrice = 0.0;
-                double deductQty = 0.0;
-                try { aPrice = Double.parseDouble(String.valueOf(addon.get("price"))); } catch (Exception ignored){}
-                try { deductQty = Double.parseDouble(String.valueOf(addon.get("deductQty"))); } catch (Exception ignored){}
+                        rb.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                            if (isChecked) {
+                                selectedSizePrice[0] = finalSPrice;
+                                selectedSizeName[0] = finalSName;
+                                updateDialogTotalPrice(tvPrice, basePrice[0], selectedSizePrice[0], selectedAddonsPrice[0]);
+                            }
+                        });
+                        if (rgSizes != null) rgSizes.addView(rb);
 
-                String text = aName;
-                if (aPrice > 0) text += String.format(" (+₱%.2f)", aPrice);
-
-                if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
-                    Product addonMat = findInventoryProduct(linkedMat);
-                    double currentStock = addonMat != null ? addonMat.getQuantity() : 0;
-                    if (currentStock < deductQty) {
-                        cb.setEnabled(false);
-                        text += " (Out of Stock)";
-                    }
-                }
-
-                cb.setText(text);
-
-                final double finalAPrice = aPrice;
-                cb.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    if (isChecked) selectedAddonsPrice[0] += finalAPrice;
-                    else selectedAddonsPrice[0] -= finalAPrice;
-                    updateDialogTotalPrice(tvPrice, basePrice[0], selectedSizePrice[0], selectedAddonsPrice[0]);
-                });
-                addonBoxes.add(cb);
-                containerAddonsList.addView(cb);
-            }
-        }
-
-        // NOTES
-        List<Map<String, String>> notes = product.getNotesList();
-        final String[] selectedNoteText = {""};
-        if (notes != null && !notes.isEmpty()) {
-            layoutNotesContainer.setVisibility(View.VISIBLE);
-
-            Map<String, RadioGroup> noteGroups = new HashMap<>();
-            for (Map<String, String> note : notes) {
-                String type = note.get("type");
-                String value = note.get("value");
-
-                if (!noteGroups.containsKey(type)) {
-                    TextView tvTitle = new TextView(this);
-                    tvTitle.setText(type);
-                    tvTitle.setTextColor(dynamicTextColor);
-                    tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-                    tvTitle.setPadding(0, 16, 0, 8);
-                    containerNotesList.addView(tvTitle);
-
-                    RadioGroup rg = new RadioGroup(this);
-                    rg.setOrientation(LinearLayout.VERTICAL);
-                    containerNotesList.addView(rg);
-                    noteGroups.put(type, rg);
-                }
-
-                RadioButton rb = new RadioButton(this);
-                rb.setText(value);
-                rb.setTextColor(dynamicTextColor);
-                rb.setId(View.generateViewId());
-                noteGroups.get(type).addView(rb);
-            }
-
-            for (RadioGroup rg : noteGroups.values()) {
-                rg.setOnCheckedChangeListener((group, checkedId) -> {
-                    StringBuilder sb = new StringBuilder();
-                    for (RadioGroup g : noteGroups.values()) {
-                        int id = g.getCheckedRadioButtonId();
-                        if (id != -1) {
-                            RadioButton selectedRb = g.findViewById(id);
-                            sb.append(selectedRb.getText().toString()).append(", ");
+                        if (rb.isEnabled() && !isFirstAvailableSizeSelected) {
+                            rb.setChecked(true);
+                            isFirstAvailableSizeSelected = true;
                         }
                     }
-                    selectedNoteText[0] = sb.toString();
-                });
+                }
             }
         }
 
-        // INGREDIENTS
-        List<CheckBox> ingredientBoxes = new ArrayList<>();
-        List<Map<String, Object>> bomList = product.getBomList();
-        if (bomList != null && !bomList.isEmpty()) {
-            TextView tvIngredientsTitle = new TextView(this);
-            tvIngredientsTitle.setText("Recipe Ingredients (Uncheck to remove)");
-            tvIngredientsTitle.setTextColor(dynamicTextColor);
-            tvIngredientsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-            tvIngredientsTitle.setPadding(0, 24, 0, 8);
-            containerNotesList.addView(tvIngredientsTitle);
+        List<CheckBox> addonBoxes = new ArrayList<>();
+        Object addonsObj = product.getAddonsList();
+        if (addonsObj instanceof List) {
+            List<?> aList = (List<?>) addonsObj;
+            if (!aList.isEmpty()) {
+                if (layoutAddonsContainer != null) layoutAddonsContainer.setVisibility(View.VISIBLE);
+                Set<String> addedAddons = new HashSet<>();
 
-            for (Map<String, Object> bomItem : bomList) {
-                CheckBox cb = new CheckBox(this);
-                cb.setTextColor(dynamicTextColor);
+                for (Object obj : aList) {
+                    if (obj instanceof Map) {
+                        Map<?, ?> addon = (Map<?, ?>) obj;
+                        String aName = (String) addon.get("name");
 
-                String rawName = (String) bomItem.get("rawMaterialName");
-                String rawId = (String) bomItem.get("rawMaterialId");
+                        if (aName == null || addedAddons.contains(aName)) continue;
+                        addedAddons.add(aName);
 
-                cb.setChecked(true);
-                cb.setText(rawName != null ? rawName : "Unknown Ingredient");
-                cb.setTag(rawId);
+                        CheckBox cb = new CheckBox(this);
+                        cb.setTextColor(dynamicTextColor);
 
-                Product inventoryItem = findInventoryProduct(rawName);
-                if (inventoryItem != null) {
-                    double requiredQty = 0;
-                    try { requiredQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception e){}
-                    if (inventoryItem.getQuantity() < requiredQty) {
-                        cb.setText(rawName + " (OUT OF STOCK - Uncheck to proceed)");
-                        cb.setTextColor(Color.RED);
-                        cb.setChecked(false);
+                        String linkedMat = (String) addon.get("linkedMaterial");
+                        double aPrice = safeGetDouble(addon, "price");
+                        double deductQty = safeGetDouble(addon, "deductQty");
+
+                        String text = aName;
+                        if (aPrice > 0) text += String.format(Locale.US, " (+₱%.2f)", aPrice);
+
+                        if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
+                            Product addonMat = findInventoryProduct(linkedMat);
+                            double currentStock = addonMat != null ? addonMat.getQuantity() : 0;
+                            if (currentStock < deductQty) {
+                                text += " (Out of Stock)";
+                                if (!isFlexibleHandlingEnabled) {
+                                    cb.setEnabled(false);
+                                }
+                            }
+                        }
+                        cb.setText(text);
+
+                        final double finalAPrice = aPrice;
+                        cb.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                            if (isChecked) selectedAddonsPrice[0] += finalAPrice;
+                            else selectedAddonsPrice[0] -= finalAPrice;
+                            updateDialogTotalPrice(tvPrice, basePrice[0], selectedSizePrice[0], selectedAddonsPrice[0]);
+                        });
+                        addonBoxes.add(cb);
+                        if (containerAddonsList != null) containerAddonsList.addView(cb);
+                    }
+                }
+            }
+        }
+
+        final String[] selectedNoteText = {""};
+        Object notesObj = product.getNotesList();
+        if (notesObj instanceof List) {
+            List<?> nList = (List<?>) notesObj;
+            if (!nList.isEmpty()) {
+                if (layoutNotesContainer != null) layoutNotesContainer.setVisibility(View.VISIBLE);
+
+                Map<String, RadioGroup> noteGroups = new HashMap<>();
+                Set<String> addedNotes = new HashSet<>();
+
+                for (Object obj : nList) {
+                    if (obj instanceof Map) {
+                        Map<?, ?> noteMap = (Map<?, ?>) obj;
+                        String noteType = noteMap.containsKey("type") ? String.valueOf(noteMap.get("type")) : "Note";
+                        String value = noteMap.containsKey("value") ? String.valueOf(noteMap.get("value")) : "";
+
+                        String uniqueNoteKey = noteType + "_" + value;
+                        if (addedNotes.contains(uniqueNoteKey)) continue;
+                        addedNotes.add(uniqueNoteKey);
+
+                        if (noteType.toLowerCase().contains("sugar") || noteType.toLowerCase().contains("sweetness")) {
+                            // Handled dynamically below
+                        } else {
+                            if (!noteGroups.containsKey(noteType)) {
+                                TextView tvTitle = new TextView(this);
+                                tvTitle.setText(noteType);
+                                tvTitle.setTextColor(dynamicTextColor);
+                                tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+                                tvTitle.setPadding(0, 16, 0, 8);
+                                if (containerNotesList != null) containerNotesList.addView(tvTitle);
+
+                                RadioGroup rg = new RadioGroup(this);
+                                rg.setOrientation(LinearLayout.VERTICAL);
+                                if (containerNotesList != null) containerNotesList.addView(rg);
+                                noteGroups.put(noteType, rg);
+                            }
+
+                            RadioButton rb = new RadioButton(this);
+                            rb.setText(value);
+                            rb.setTextColor(dynamicTextColor);
+                            rb.setId(View.generateViewId());
+                            noteGroups.get(noteType).addView(rb);
+                        }
                     }
                 }
 
-                ingredientBoxes.add(cb);
-                containerNotesList.addView(cb);
+                for (RadioGroup rg : noteGroups.values()) {
+                    rg.setOnCheckedChangeListener((group, checkedId) -> {
+                        StringBuilder sb = new StringBuilder();
+                        for (RadioGroup g : noteGroups.values()) {
+                            int id = g.getCheckedRadioButtonId();
+                            if (id != -1) {
+                                RadioButton selectedRb = g.findViewById(id);
+                                sb.append(selectedRb.getText().toString()).append(", ");
+                            }
+                        }
+                        selectedNoteText[0] = sb.toString();
+                    });
+                }
+
+                boolean hasSugar = false;
+                String sugarNoteType = "Sugar Level";
+                for (Object obj : nList) {
+                    if (obj instanceof Map) {
+                        String type = String.valueOf(((Map<?, ?>) obj).get("type"));
+                        if (type.toLowerCase().contains("sugar") || type.toLowerCase().contains("sweetness")) {
+                            hasSugar = true;
+                            sugarNoteType = type;
+                            break;
+                        }
+                    }
+                }
+
+                if (hasSugar) {
+                    TextView lblTitle = new TextView(this);
+                    lblTitle.setText(sugarNoteType);
+                    lblTitle.setTextColor(dynamicTextColor);
+                    lblTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+                    lblTitle.setPadding(0, 16, 0, 8);
+                    if (containerNotesList != null) containerNotesList.addView(lblTitle);
+
+                    Spinner sugarSpinner = new Spinner(this);
+                    List<String> sugarNames = new ArrayList<>();
+                    for (Product p : masterInventory) {
+                        if (p.getProductName() != null) {
+                            String n = p.getProductName().toLowerCase();
+                            if (n.contains("sugar") || n.contains("syrup") || n.contains("sweetener")) {
+                                sugarNames.add(p.getProductName());
+                            }
+                        }
+                    }
+                    if (sugarNames.isEmpty()) sugarNames.add("Default Sugar");
+
+                    ArrayAdapter<String> sugarAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, sugarNames);
+                    sugarAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    sugarSpinner.setAdapter(sugarAdapter);
+
+                    TextView lblSugarSource = new TextView(this);
+                    lblSugarSource.setText("Sugar Type:");
+                    lblSugarSource.setTextColor(dynamicTextColor);
+                    lblSugarSource.setTextSize(12);
+                    if (containerNotesList != null) containerNotesList.addView(lblSugarSource);
+                    if (containerNotesList != null) containerNotesList.addView(sugarSpinner);
+
+                    Spinner levelSpinner = new Spinner(this);
+                    List<String> levels = Arrays.asList(
+                            "100% (Full Sugar)",
+                            "75% (Less Sugar)",
+                            "50% (Half Sugar)",
+                            "25% (Quarter Sugar)",
+                            "0% (No Sugar)"
+                    );
+                    ArrayAdapter<String> levelAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, levels);
+                    levelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                    levelSpinner.setAdapter(levelAdapter);
+
+                    TextView lblSugarLevel = new TextView(this);
+                    lblSugarLevel.setText("Sugar Level:");
+                    lblSugarLevel.setTextColor(dynamicTextColor);
+                    lblSugarLevel.setTextSize(12);
+                    if (containerNotesList != null) containerNotesList.addView(lblSugarLevel);
+                    if (containerNotesList != null) containerNotesList.addView(levelSpinner);
+
+                    dynamicNoteViews.put(sugarNoteType + "_sugarType", sugarSpinner);
+                    dynamicNoteViews.put(sugarNoteType + "_level", levelSpinner);
+                }
             }
         }
 
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-        btnAddToCart.setOnClickListener(v -> {
-            String qtyStr = etQty.getText().toString().trim();
+        List<CheckBox> ingredientBoxes = new ArrayList<>();
+        Object bomObj = product.getBomList();
+        if (bomObj instanceof List) {
+            List<?> bList = (List<?>) bomObj;
+            if (!bList.isEmpty()) {
+                List<View> missingIngredientViews = new ArrayList<>();
+                boolean hasMissingIngredients = false;
+
+                TextView tvIngredientsTitle = new TextView(this);
+                tvIngredientsTitle.setText("Missing Ingredients (Uncheck to bypass)");
+                tvIngredientsTitle.setTextColor(dynamicTextColor);
+                tvIngredientsTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvIngredientsTitle.setPadding(0, 24, 0, 8);
+                missingIngredientViews.add(tvIngredientsTitle);
+
+                Set<String> addedIngredients = new HashSet<>();
+
+                for (Object obj : bList) {
+                    if (obj instanceof Map) {
+                        Map<?, ?> bomItem = (Map<?, ?>) obj;
+
+                        String rawName = (String) bomItem.get("rawMaterialName");
+                        if (rawName == null) rawName = (String) bomItem.get("materialName");
+                        String rawId = (String) bomItem.get("rawMaterialId");
+
+                        String uniqueKey = rawId != null ? rawId : rawName;
+                        if (uniqueKey == null || addedIngredients.contains(uniqueKey)) continue;
+
+                        Product inventoryItem = findInventoryProduct(rawName);
+                        if (inventoryItem != null) {
+
+                            double requiredQty = safeGetDouble(bomItem, "quantityRequired");
+                            if (requiredQty == 0) requiredQty = safeGetDouble(bomItem, "quantity");
+
+                            if (inventoryItem.getQuantity() < requiredQty) {
+                                hasMissingIngredients = true;
+                                addedIngredients.add(uniqueKey);
+
+                                CheckBox cb = new CheckBox(this);
+                                cb.setText(rawName + " (OUT OF STOCK - Uncheck to bypass)");
+                                cb.setTextColor(Color.RED);
+                                cb.setChecked(true);
+                                cb.setTag(uniqueKey);
+
+                                if (!isFlexibleHandlingEnabled) {
+                                    cb.setEnabled(false);
+                                }
+
+                                ingredientBoxes.add(cb);
+                                missingIngredientViews.add(cb);
+                            }
+                        }
+                    }
+                }
+
+                if (hasMissingIngredients && containerNotesList != null) {
+                    for (View v : missingIngredientViews) {
+                        containerNotesList.addView(v);
+                    }
+                }
+            }
+        }
+
+        if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
+        if (btnAddToCart != null) btnAddToCart.setOnClickListener(v -> {
+            String qtyStr = etQty != null ? etQty.getText().toString().trim() : "1";
             int qty = qtyStr.isEmpty() ? 1 : Integer.parseInt(qtyStr);
             if (qty <= 0) return;
+
             StringBuilder excludedBuilder = new StringBuilder();
             StringBuilder excludedNamesBuilder = new StringBuilder();
 
             for (CheckBox cb : ingredientBoxes) {
                 if (!cb.isChecked()) {
-                    excludedBuilder.append(cb.getTag().toString()).append(",");
+                    excludedBuilder.append(cb.getTag() != null ? cb.getTag().toString() : "").append(",");
                     String ingName = cb.getText().toString().replaceAll(" \\(OUT OF STOCK.*\\)", "");
                     excludedNamesBuilder.append("No ").append(ingName).append(", ");
                 }
@@ -974,9 +1249,31 @@ public class SellList extends BaseActivity {
 
             StringBuilder extrasBuilder = new StringBuilder();
             for (CheckBox cb : addonBoxes) {
-                if (cb.isChecked()) extrasBuilder.append(cb.getText().toString().replaceAll(" \\(\\+₱.*\\)", "")).append(", ");
+                if (cb.isChecked())
+                    extrasBuilder.append(cb.getText().toString().replaceAll(" \\(\\+₱.*\\)", "")).append(", ");
             }
+
             if (!selectedNoteText[0].isEmpty()) extrasBuilder.append(selectedNoteText[0]);
+
+            for (String key : dynamicNoteViews.keySet()) {
+                if (key.endsWith("_sugarType")) continue;
+
+                if (key.endsWith("_level")) {
+                    String baseType = key.replace("_level", "");
+                    Spinner sType = (Spinner) dynamicNoteViews.get(baseType + "_sugarType");
+                    Spinner sLevel = (Spinner) dynamicNoteViews.get(key);
+
+                    String selectedSugar = sType != null && sType.getSelectedItem() != null ? sType.getSelectedItem().toString() : "Sugar";
+                    String selectedLevel = sLevel != null && sLevel.getSelectedItem() != null ? sLevel.getSelectedItem().toString() : "100%";
+
+                    extrasBuilder.append(selectedLevel).append(" ").append(selectedSugar).append(", ");
+                } else if (dynamicNoteViews.get(key) instanceof EditText) {
+                    String val = ((EditText) dynamicNoteViews.get(key)).getText().toString().trim();
+                    if (!val.isEmpty()) {
+                        extrasBuilder.append(key).append(": ").append(val).append(", ");
+                    }
+                }
+            }
 
             if (excludedNamesBuilder.length() > 0) {
                 extrasBuilder.append("(").append(excludedNamesBuilder.toString().trim());
@@ -987,10 +1284,13 @@ public class SellList extends BaseActivity {
             }
 
             String extraDetails = extrasBuilder.toString().trim();
-            if (extraDetails.endsWith(",")) extraDetails = extraDetails.substring(0, extraDetails.length() - 1).trim();
+            if (extraDetails.endsWith(","))
+                extraDetails = extraDetails.substring(0, extraDetails.length() - 1).trim();
 
             String safeId = product.getProductId() != null ? product.getProductId() : "local:" + product.getLocalId();
-            boolean added = cartManager.addItem(safeId, product.getProductName(), finalPrice, qty, maxBaseServings, selectedSizeName[0], extraDetails, excludedIngredients);
+            String saveName = product.getProductName() != null ? product.getProductName() : "Unnamed Product";
+
+            boolean added = cartManager.addItem(safeId, saveName, finalPrice, qty, maxBaseServings, selectedSizeName[0], extraDetails, excludedIngredients);
 
             if (added) {
                 Toast.makeText(this, "Added to cart", Toast.LENGTH_SHORT).show();
@@ -1002,11 +1302,6 @@ public class SellList extends BaseActivity {
         });
 
         dialog.show();
-    }
-
-    private void updateDialogTotalPrice(TextView tvPrice, double base, double size, double addons) {
-        double total = base + size + addons;
-        tvPrice.setText(String.format(Locale.US, "₱%.2f", total));
     }
 
     private void updateBulkActionBar(Set<String> selectedIds) {
@@ -1041,7 +1336,6 @@ public class SellList extends BaseActivity {
     }
 
     private void showCopyOptionsDialog(Product source) {
-        // 1. Grouped Options: Sizes, Add-ons, and Notes are now combined into ONE checkbox.
         String[] options = {
                 "Copy Pricing",
                 "Copy Recipe (BOM)",
@@ -1054,14 +1348,16 @@ public class SellList extends BaseActivity {
                 .setMultiChoiceItems(options, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
                 .setPositiveButton("Next", (dialog, w) -> {
                     boolean anyChecked = false;
-                    for (boolean b : checked) if (b) { anyChecked = true; break; }
+                    for (boolean b : checked)
+                        if (b) {
+                            anyChecked = true;
+                            break;
+                        }
 
                     if (!anyChecked) {
                         Toast.makeText(this, "Select at least one property to copy", Toast.LENGTH_SHORT).show();
                         return;
                     }
-
-                    // Proceed to Target Selection Dialog
                     showTargetScopeDialog(source, checked[0], checked[1], checked[2]);
                 })
                 .setNegativeButton("Cancel", null)
@@ -1077,19 +1373,14 @@ public class SellList extends BaseActivity {
                     dialog.dismiss();
 
                     if (which == 0) {
-                        // Apply to ALL products
                         List<Product> targets = new ArrayList<>();
                         for (Product p : allMenuProducts) {
                             if (!p.getProductId().equals(source.getProductId())) targets.add(p);
                         }
                         executeAdvancedCopy(source, targets, copyPricing, copyBom, copyVariants);
-
                     } else if (which == 1) {
-                        // Select a specific Category
                         showCategorySelectionDialog(source, copyPricing, copyBom, copyVariants);
-
                     } else if (which == 2) {
-                        // Select specific individual products
                         showProductMultiSelectDialog(source, copyPricing, copyBom, copyVariants);
                     }
                 })
@@ -1098,7 +1389,6 @@ public class SellList extends BaseActivity {
     }
 
     private void showCategorySelectionDialog(Product source, boolean copyPricing, boolean copyBom, boolean copyVariants) {
-        // Extract unique categories from the menu
         Set<String> categorySet = new HashSet<>();
         for (Product p : allMenuProducts) {
             if (p.getCategoryName() != null && !p.getCategoryName().isEmpty()) {
@@ -1118,7 +1408,6 @@ public class SellList extends BaseActivity {
                     dialog.dismiss();
                     String selectedCat = categories[which];
 
-                    // Find all products matching this category
                     List<Product> targets = new ArrayList<>();
                     for (Product p : allMenuProducts) {
                         if (!p.getProductId().equals(source.getProductId()) && selectedCat.equals(p.getCategoryName())) {
@@ -1184,13 +1473,11 @@ public class SellList extends BaseActivity {
             }
 
             if (copyBom) {
-                // Create a new list instance to avoid reference sharing bugs
                 target.setBomList(source.getBomList() != null ? new ArrayList<>(source.getBomList()) : new ArrayList<>());
                 changed = true;
             }
 
             if (copyVariants) {
-                // Copies Sizes, Add-ons, and Notes all at once
                 target.setSizesList(source.getSizesList() != null ? new ArrayList<>(source.getSizesList()) : new ArrayList<>());
                 target.setAddonsList(source.getAddonsList() != null ? new ArrayList<>(source.getAddonsList()) : new ArrayList<>());
                 target.setNotesList(source.getNotesList() != null ? new ArrayList<>(source.getNotesList()) : new ArrayList<>());
@@ -1198,23 +1485,20 @@ public class SellList extends BaseActivity {
             }
 
             if (changed) {
-                // FIX: We must pass a valid listener instead of 'null' to prevent background thread crashes
                 productRepository.updateProduct(target, null, new ProductRepository.OnProductUpdatedListener() {
                     @Override
                     public void onProductUpdated() {
-                        // Update successful, do nothing (to avoid spamming the UI)
                     }
 
                     @Override
                     public void onError(String error) {
-                        // Background error handler
                     }
                 });
                 count++;
             }
         }
 
-        sellAdapter.clearSelection();
+        if (sellAdapter != null) sellAdapter.clearSelection();
         hideBulkActionBar();
         Toast.makeText(this, "Successfully copied to " + count + " product(s)!", Toast.LENGTH_LONG).show();
     }
@@ -1222,22 +1506,154 @@ public class SellList extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (cartManager != null && btnCheckout != null) {
+        if (cartManager != null && btnCart != null) {
             updateCheckoutButton();
         }
     }
 
     private void updateCheckoutButton() {
-        if (cartManager == null || btnCheckout == null) return;
-
+        if (cartManager == null || btnCart == null) return;
         int count = cartManager.getItems().size();
         if (count > 0) {
-            btnCheckout.setVisibility(View.VISIBLE);
-            btnCheckout.setText("Checkout (" + count + ")");
-            btnCheckout.setEnabled(true);
+            btnCart.setVisibility(View.VISIBLE);
+            btnCart.setText("Cart (" + count + ")");
+            btnCart.setEnabled(true);
         } else {
-            btnCheckout.setVisibility(View.GONE);
-            btnCheckout.setEnabled(false);
+            btnCart.setVisibility(View.VISIBLE);
+            btnCart.setText("Cart");
+            btnCart.setEnabled(true);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (archiveListener != null) archiveListener.remove();
+    }
+
+    // =======================================================================================
+    // CATEGORY MANAGEMENT SYSTEM
+    // =======================================================================================
+    private void showCategoryOptionsDialog(String categoryName, boolean isSubCategory) {
+        String type = isSubCategory ? "Sub-Category" : "Main Category";
+        String[] options = {"Rename " + type, "Delete " + type};
+
+        new AlertDialog.Builder(this)
+                .setTitle("Manage: " + categoryName)
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        showRenameCategoryDialog(categoryName, isSubCategory);
+                    } else if (which == 1) {
+                        showDeleteCategoryDialog(categoryName, isSubCategory);
+                    }
+                })
+                .show();
+    }
+
+    private void showRenameCategoryDialog(String oldName, boolean isSubCategory) {
+        EditText input = new EditText(this);
+        input.setText(oldName);
+        input.setPadding(40, 40, 40, 40);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Rename Category")
+                .setView(input)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String newName = input.getText().toString().trim();
+                    if (!newName.isEmpty() && !newName.equalsIgnoreCase(oldName)) {
+                        updateCategoryInDatabase(oldName, newName, isSubCategory);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showDeleteCategoryDialog(String catName, boolean isSubCategory) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Category")
+                .setMessage("This will move all products in '" + catName + "' to 'Uncategorized'. It will NOT delete the products themselves. Continue?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    updateCategoryInDatabase(catName, "Uncategorized", isSubCategory);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void updateCategoryInDatabase(String oldName, String newName, boolean isSubCategory) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
+
+        int count = 0;
+        com.google.firebase.firestore.WriteBatch batch = com.google.firebase.firestore.FirebaseFirestore.getInstance().batch();
+        List<Product> productsToUpdateLocally = new java.util.ArrayList<>();
+
+        for (Product p : masterInventory) {
+            boolean changed = false;
+
+            String savedProductLine = p.getProductLine() != null ? p.getProductLine().trim() : "";
+            String savedCategoryName = p.getCategoryName() != null ? p.getCategoryName().trim() : "";
+
+            boolean isTargetingUncategorized = oldName.equalsIgnoreCase("Uncategorized");
+
+            boolean matchesMain = !isSubCategory && (
+                    oldName.equalsIgnoreCase(savedProductLine) ||
+                            (isTargetingUncategorized && (savedProductLine.isEmpty() || savedProductLine.equalsIgnoreCase("null") || savedProductLine.equalsIgnoreCase("Uncategorized")))
+            );
+
+            boolean matchesSub = isSubCategory && (
+                    oldName.equalsIgnoreCase(savedCategoryName) ||
+                            (isTargetingUncategorized && (savedCategoryName.isEmpty() || savedCategoryName.equalsIgnoreCase("null") || savedCategoryName.equalsIgnoreCase("Uncategorized")))
+            );
+
+            if (matchesMain) {
+                p.setProductLine(newName);
+                changed = true;
+            } else if (matchesSub) {
+                p.setCategoryName(newName);
+                changed = true;
+            }
+
+            if (changed) {
+                productsToUpdateLocally.add(p);
+
+                if (p.getProductId() != null && !p.getProductId().isEmpty() && !p.getProductId().startsWith("local:")) {
+                    com.google.firebase.firestore.DocumentReference ref = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                            .collection("users").document(ownerId)
+                            .collection("products").document(p.getProductId());
+
+                    java.util.Map<String, Object> updates = new java.util.HashMap<>();
+                    if (!isSubCategory) {
+                        updates.put("productLine", newName);
+                    } else {
+                        updates.put("categoryName", newName);
+                    }
+                    batch.set(ref, updates, com.google.firebase.firestore.SetOptions.merge());
+                }
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            final int finalCount = count;
+
+            SalesInventoryApplication.getProductRepository().upsertFromRemoteBulk(productsToUpdateLocally);
+
+            batch.commit().addOnCompleteListener(task -> {
+                if (task.isSuccessful()) {
+                    Toast.makeText(this, "Updated " + finalCount + " products to '" + newName + "'!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "Failed to update cloud: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                }
+            });
+
+            if (!isSubCategory && currentMainCategory.equalsIgnoreCase(oldName)) currentMainCategory = newName;
+            if (isSubCategory && currentSubCategory.equalsIgnoreCase(oldName)) currentSubCategory = newName;
+
+            extractAndSetupCategories();
+            applyCategoryFilter();
+        } else {
+            Toast.makeText(this, "No products found to update.", Toast.LENGTH_SHORT).show();
         }
     }
 }

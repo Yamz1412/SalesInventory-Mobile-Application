@@ -47,7 +47,7 @@ public class AddSupplierActivity extends BaseActivity {
 
     private ProductRepository productRepository;
     private ArrayAdapter<String> measurementAdapter;
-    private List<String> measurementList; // Made dynamic to support custom units
+    private List<String> measurementList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -83,16 +83,12 @@ public class AddSupplierActivity extends BaseActivity {
         btnCancelSupplier.setOnClickListener(v -> finish());
     }
 
-    // ================================================================
-    // FIX: Specialized Adapter for Spinner (White Background, Black Text)
-    // ================================================================
     private ArrayAdapter<String> getMeasurementAdapter(List<String> items) {
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                // Force white background and black text for visibility
                 view.setBackgroundColor(Color.WHITE);
                 ((TextView) view).setTextColor(Color.BLACK);
                 return view;
@@ -101,7 +97,6 @@ public class AddSupplierActivity extends BaseActivity {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
-                // Force white background and black text in the dropdown list
                 view.setBackgroundColor(Color.WHITE);
                 ((TextView) view).setTextColor(Color.BLACK);
                 return view;
@@ -112,7 +107,6 @@ public class AddSupplierActivity extends BaseActivity {
     }
 
     private void setupAdapters() {
-        // Made the list mutable and added "Custom..."
         measurementList = new ArrayList<>(Arrays.asList("pcs", "ml", "L", "g", "kg", "box", "pack", "Custom..."));
         measurementAdapter = getMeasurementAdapter(measurementList);
     }
@@ -144,27 +138,20 @@ public class AddSupplierActivity extends BaseActivity {
         builder.show();
     }
 
-    // ================================================================
-    // MISSING METHOD: Creates and adds a custom category chip to the UI
-    // ================================================================
     private void addCustomChip(String category) {
         Chip chip = new Chip(this);
         chip.setText(category);
         chip.setCheckable(true);
-        chip.setChecked(true); // Auto-check it since they just added it
+        chip.setChecked(true);
         chip.setClickable(true);
         chip.setFocusable(true);
 
-        // Add a close icon so they can delete it if they made a typo
         chip.setCloseIconVisible(true);
         chip.setOnCloseIconClickListener(v -> chipGroupCategories.removeView(chip));
 
         chipGroupCategories.addView(chip);
     }
 
-    // ================================================================
-    // NEW: Dialog to Add Custom Measurement Unit
-    // ================================================================
     private void showCustomUnitDialog(Spinner spinner) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Add Custom Unit");
@@ -184,18 +171,17 @@ public class AddSupplierActivity extends BaseActivity {
         builder.setPositiveButton("Add", (dialog, which) -> {
             String newUnit = input.getText().toString().trim();
             if (!newUnit.isEmpty()) {
-                // Add the new unit right before "Custom..."
                 int customIndex = measurementList.indexOf("Custom...");
                 if (customIndex == -1) customIndex = measurementList.size();
                 measurementList.add(customIndex, newUnit);
                 measurementAdapter.notifyDataSetChanged();
                 spinner.setSelection(customIndex);
             } else {
-                spinner.setSelection(0); // Fallback to 'pcs'
+                spinner.setSelection(0);
             }
         });
         builder.setNegativeButton("Cancel", (dialog, which) -> {
-            spinner.setSelection(0); // Fallback to 'pcs'
+            spinner.setSelection(0);
             dialog.cancel();
         });
         builder.show();
@@ -220,7 +206,6 @@ public class AddSupplierActivity extends BaseActivity {
                     return;
                 }
 
-                // If it's a bulk unit (not a standard single unit), show the sub-unit field
                 boolean isBulkUnit = !selectedUnit.equalsIgnoreCase("pcs") &&
                         !selectedUnit.equalsIgnoreCase("ml") &&
                         !selectedUnit.equalsIgnoreCase("L") &&
@@ -305,6 +290,11 @@ public class AddSupplierActivity extends BaseActivity {
     private void processSuppliedProducts(String supplierName, String supplierCategories) {
         String adminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (adminId == null || adminId.isEmpty()) adminId = AuthManager.getInstance().getCurrentUserId();
+
+        if (adminId == null || adminId.isEmpty()) {
+            runOnUiThread(this::finish);
+            return;
+        }
         final String finalAdminId = adminId;
 
         List<ProductRow> rows = collectProductRows();
@@ -319,54 +309,68 @@ public class AddSupplierActivity extends BaseActivity {
                 .whereEqualTo("isActive", true)
                 .get()
                 .addOnSuccessListener(snapshot -> {
+                    try {
+                        Map<String, String> existingByName = new HashMap<>();
 
-                    Map<String, String> existingByName = new HashMap<>();
-
-                    for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Product p = doc.toObject(Product.class);
-                        if (p == null) continue;
-                        String lowerName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
-                        if (!lowerName.isEmpty()) {
-                            existingByName.put(lowerName, doc.getId());
+                        for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                            try {
+                                Product p = doc.toObject(Product.class);
+                                if (p == null) continue;
+                                String lowerName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
+                                if (!lowerName.isEmpty()) {
+                                    existingByName.put(lowerName, doc.getId());
+                                }
+                            } catch (Exception e) {}
                         }
-                    }
 
-                    for (ProductRow row : rows) {
-                        String lowerName = row.name.toLowerCase();
+                        for (ProductRow row : rows) {
+                            String lowerName = row.name.toLowerCase();
 
-                        if (existingByName.containsKey(lowerName)) {
-                            String productId = existingByName.get(lowerName);
-                            com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                    .collection("users").document(finalAdminId)
-                                    .collection("products").document(productId)
-                                    .update("costPrice", row.cost, "supplier", supplierName);
-                        } else {
-                            Product newProduct = new Product();
-                            String newId = java.util.UUID.randomUUID().toString();
+                            if (existingByName.containsKey(lowerName)) {
+                                String productId = existingByName.get(lowerName);
+                                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                                        .collection("users").document(finalAdminId)
+                                        .collection("products").document(productId)
+                                        .update("costPrice", row.cost, "supplier", supplierName);
+                            } else {
+                                Product newProduct = new Product();
+                                String newId = java.util.UUID.randomUUID().toString();
 
-                            String inheritedCategory = "Supplies";
-                            if (supplierCategories != null && !supplierCategories.isEmpty()) {
-                                inheritedCategory = supplierCategories.split(",")[0].trim();
+                                String inheritedCategory = "Supplies";
+                                if (supplierCategories != null && !supplierCategories.isEmpty()) {
+                                    inheritedCategory = supplierCategories.split(",")[0].trim();
+                                }
+
+                                newProduct.setProductId(newId);
+                                newProduct.setProductName(row.name);
+                                newProduct.setQuantity(row.qty);
+                                newProduct.setCostPrice(row.cost);
+                                newProduct.setSellingPrice(row.cost * 1.5);
+                                newProduct.setUnit(row.unit);
+                                newProduct.setSupplier(supplierName);
+                                newProduct.setOwnerAdminId(finalAdminId);
+                                newProduct.setActive(true);
+                                newProduct.setProductType("raw");
+
+                                // =======================================================================
+                                // CRITICAL FIX: Ensure the product is fully visible and math-ready!
+                                // =======================================================================
+                                newProduct.setCategoryName(inheritedCategory);
+                                newProduct.setProductLine(inheritedCategory); // Forces visibility in dropdowns
+                                newProduct.setPiecesPerUnit(row.pcs);         // Forces PO conversion math to work
+                                newProduct.setSalesUnit("pcs");
+                                // =======================================================================
+
+                                newProduct.setDateAdded(System.currentTimeMillis());
+
+                                productRepository.addProduct(newProduct, "", null);
                             }
-
-                            newProduct.setProductId(newId);
-                            newProduct.setProductName(row.name);
-                            newProduct.setQuantity(0);
-                            newProduct.setCostPrice(row.cost);
-                            newProduct.setSellingPrice(row.cost * 1.5);
-                            newProduct.setUnit(row.unit);
-                            newProduct.setSupplier(supplierName);
-                            newProduct.setOwnerAdminId(finalAdminId);
-                            newProduct.setActive(true);
-                            newProduct.setProductType("raw");
-                            newProduct.setCategoryName(inheritedCategory);
-                            newProduct.setDateAdded(System.currentTimeMillis());
-
-                            productRepository.addProduct(newProduct, (String) null, null);
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        runOnUiThread(this::finish);
                     }
-
-                    runOnUiThread(this::finish);
                 })
                 .addOnFailureListener(e -> runOnUiThread(() -> {
                     Toast.makeText(this, "Could not verify existing products.", Toast.LENGTH_SHORT).show();
@@ -394,12 +398,23 @@ public class AddSupplierActivity extends BaseActivity {
             String qtyStr  = etQty.getText().toString().trim();
             String costStr = etCost.getText().toString().trim();
 
-            int qty     = qtyStr.isEmpty()  ? 0   : Integer.parseInt(qtyStr);
-            double cost = costStr.isEmpty() ? 0.0 : Double.parseDouble(costStr);
+            int qty = 0;
+            try {
+                if (!qtyStr.isEmpty()) qty = Integer.parseInt(qtyStr);
+            } catch (NumberFormatException e) {
+                try { qty = (int) Double.parseDouble(qtyStr); } catch (Exception ex) { qty = 0; }
+            }
+
+            double cost = 0.0;
+            try {
+                if (!costStr.isEmpty()) cost = Double.parseDouble(costStr);
+            } catch (NumberFormatException e) { cost = 0.0; }
 
             String finalProductName = baseName;
 
-            // Check if it's a bulk unit that requires a sub-unit multiplier appended to the name
+            // CRITICAL FIX: Track Pieces Per Unit so the delivery checklist math works!
+            int pcs = 1;
+
             boolean isBulkUnit = !measurement.equalsIgnoreCase("pcs") &&
                     !measurement.equalsIgnoreCase("ml") &&
                     !measurement.equalsIgnoreCase("L") &&
@@ -411,10 +426,11 @@ public class AddSupplierActivity extends BaseActivity {
                 String pcsStr = etPcsPerPack.getText().toString().trim();
                 if (!pcsStr.isEmpty()) {
                     finalProductName = baseName + " (" + pcsStr + "pcs/" + measurement + ")";
+                    try { pcs = Integer.parseInt(pcsStr); } catch (Exception ignored) {}
                 }
             }
 
-            rows.add(new ProductRow(finalProductName, qty, cost, measurement));
+            rows.add(new ProductRow(finalProductName, qty, cost, measurement, pcs));
         }
         return rows;
     }
@@ -424,12 +440,14 @@ public class AddSupplierActivity extends BaseActivity {
         final int    qty;
         final double cost;
         final String unit;
+        final int    pcs; // CRITICAL FIX: Added pcs tracking
 
-        ProductRow(String name, int qty, double cost, String unit) {
+        ProductRow(String name, int qty, double cost, String unit, int pcs) {
             this.name = name;
             this.qty  = qty;
             this.cost = cost;
             this.unit = unit;
+            this.pcs  = pcs;
         }
     }
 

@@ -144,17 +144,23 @@ public class SyncWorker extends Worker {
                     (android.app.Application) getApplicationContext().getApplicationContext()
             );
 
+            // ==============================================================================
+            // CRITICAL FIX: Gather all products into a single list instead of saving 1-by-1
+            // ==============================================================================
+            List<Product> fetchedProducts = new java.util.ArrayList<>();
+
             for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
                 Product p = doc.toObject(Product.class);
                 if (p != null) {
                     p.setProductId(doc.getId());
-                    repo.upsertFromRemote(p);
+                    fetchedProducts.add(p);
                 }
             }
+            repo.upsertFromRemoteBulk(fetchedProducts);
+
             Log.d(TAG, "Pulled " + snapshot.size() + " products from Firestore");
         } catch (Exception e) {
             Log.e(TAG, "pullFromFirestore failed", e);
-            // Non-fatal: don't fail the whole job
         }
     }
 
@@ -195,6 +201,9 @@ public class SyncWorker extends Worker {
         doc.put("isActive", pe.isActive);
         doc.put("expiryDate", pe.expiryDate);
         doc.put("productType", pe.productType);
+        doc.put("productLine", pe.productLine);
+        doc.put("salesUnit", pe.salesUnit);
+        doc.put("piecesPerUnit", pe.piecesPerUnit);
 
         // ==========================================
         // NEW: MAP THE JSON CONFIGURATION LISTS!

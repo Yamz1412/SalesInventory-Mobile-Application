@@ -33,11 +33,23 @@ public interface ProductDao {
     @Insert
     long insert(ProductEntity entity);
 
+    // --- FIX: Added missing insertProduct method ---
+    @Insert
+    long insertProduct(ProductEntity entity);
+
     @Update
     void update(ProductEntity entity);
 
+    // --- FIX: Added missing updateProduct method to prevent future errors ---
+    @Update
+    void updateProduct(ProductEntity entity);
+
     @Query("DELETE FROM products WHERE localId = :localId")
     void deleteByLocalId(long localId);
+
+    // --- FIX: Added missing deleteAllProducts method ---
+    @Query("DELETE FROM products")
+    int deleteAllProducts();
 
     @Query("UPDATE OR REPLACE products SET productId = :productId, syncState = :syncState WHERE localId = :localId")
     void setSyncInfo(long localId, String productId, String syncState);

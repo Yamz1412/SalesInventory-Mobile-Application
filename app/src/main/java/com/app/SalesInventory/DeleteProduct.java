@@ -23,19 +23,23 @@ public class DeleteProduct extends BaseActivity implements ProductDeleteAdapter.
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_delete_product);
+
         authManager = AuthManager.getInstance();
         if (!authManager.isCurrentUserAdmin()) {
             Toast.makeText(this, "Access denied", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
+
         productRepository = SalesInventoryApplication.getProductRepository();
         productsRecyclerView = findViewById(R.id.productsRecyclerView);
         searchView = findViewById(R.id.searchView);
         emptyStateTV = findViewById(R.id.emptyStateTV);
+
         productAdapter = new ProductDeleteAdapter(filteredProducts, this, this);
         productsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         productsRecyclerView.setAdapter(productAdapter);
+
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 allProducts = new ArrayList<>(products);
@@ -44,6 +48,7 @@ public class DeleteProduct extends BaseActivity implements ProductDeleteAdapter.
                 updateEmptyState();
             }
         });
+
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -65,7 +70,8 @@ public class DeleteProduct extends BaseActivity implements ProductDeleteAdapter.
         } else {
             String q = query.toLowerCase();
             for (Product p : allProducts) {
-                if (p.getProductName().toLowerCase().contains(q) || (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q))) {
+                if (p.getProductName().toLowerCase().contains(q) ||
+                        (p.getCategoryName() != null && p.getCategoryName().toLowerCase().contains(q))) {
                     filteredProducts.add(p);
                 }
             }
@@ -85,10 +91,11 @@ public class DeleteProduct extends BaseActivity implements ProductDeleteAdapter.
 
     @Override
     public void onProductDelete(String productId, String productName) {
+        // This automatically "Soft Deletes" it over to the Archive bin!
         productRepository.deleteProduct(productId, new ProductRepository.OnProductDeletedListener() {
             @Override
             public void onProductDeleted(String archiveFilename) {
-                runOnUiThread(() -> Toast.makeText(DeleteProduct.this, productName + " deleted successfully", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(DeleteProduct.this, productName + " sent to Archive!", Toast.LENGTH_SHORT).show());
             }
             @Override
             public void onError(String error) {

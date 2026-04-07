@@ -154,7 +154,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:visibility="gone">
+                android:visibility="visible">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_archive"

@@ -7,7 +7,6 @@ import androidx.annotation.Nullable;
 
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -23,6 +22,7 @@ public class ProductRemoteSyncer {
     private final ProductRepository productRepository;
     private final FirebaseFirestore db;
     private ListenerRegistration productsListener;
+    private boolean isInitialSnapshot = true; // NEW: Track the initial burst
 
     public ProductRemoteSyncer(Application application) {
         this.productRepository = ProductRepository.getInstance(application);
@@ -30,42 +30,31 @@ public class ProductRemoteSyncer {
     }
 
     public void syncAllProducts(@Nullable Runnable onFinished) {
-        String path = FirestoreManager.getInstance().getUserProductsPath();
-        db.collection(path)
-                .get()
-                .addOnSuccessListener(this::handleSnapshot)
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to download products", e);
-                    if (onFinished != null) onFinished.run();
-                })
-                .addOnCompleteListener(task -> {
-                    if (onFinished != null) onFinished.run();
-                });
+        if (onFinished != null) {
+            onFinished.run();
+        }
     }
 
     public void startListening() {
+        if (!FirestoreManager.getInstance().hasValidUser()) return;
         if (productsListener != null) return;
+
         String path = FirestoreManager.getInstance().getUserProductsPath();
-        productsListener = db.collection(path)
-                .addSnapshotListener((value, error) -> {
-                    if (error != null) {
-                        Log.e(TAG, "Listen failed.", error);
-                        return;
-                    }
-                    if (value != null) {
-                        for (DocumentChange dc : value.getDocumentChanges()) {
-                            switch (dc.getType()) {
-                                case ADDED:
-                                case MODIFIED:
-                                    Product p = documentToProduct(dc.getDocument());
-                                    productRepository.upsertFromRemote(p);
-                                    break;
-                                case REMOVED:
-                                    break;
-                            }
-                        }
-                    }
-                });
+        productsListener = db.collection(path).addSnapshotListener((snapshots, e) -> {
+            if (e != null) {
+                Log.e(TAG, "Listen failed.", e);
+                return;
+            }
+
+            // CRITICAL FIX: Ignore the initial massive burst of 166 items!
+            // SyncWorker already downloaded them efficiently in the background.
+            if (isInitialSnapshot) {
+                isInitialSnapshot = false;
+                return;
+            }
+
+            handleSnapshot(snapshots);
+        });
     }
 
     public void stopListening() {
@@ -110,7 +99,6 @@ public class ProductRemoteSyncer {
         p.setImagePath(getString(doc, "imagePath"));
 
         p.setBomList(getListObj(doc, "bomList", "bomListJson"));
-
         p.setUnifiedVariations(getListObj(doc, "variantsList", "variantsListJson"));
 
         return p;
@@ -169,8 +157,6 @@ public class ProductRemoteSyncer {
         String v = doc.getString(field);
         return v == null ? "" : v;
     }
-
-    // Replace these methods at the bottom of ProductRemoteSyncer.java
 
     private double getDouble(DocumentSnapshot doc, String field) {
         Object val = doc.get(field);

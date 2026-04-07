@@ -12,8 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH> {
+
+    // CRITICAL FIX: Changed interface so it passes the whole user object for a dialog menu!
     public interface OnManageActionListener {
-        void onPromote(String uid);
+        void onManageUser(AdminUserItem user);
     }
 
     private List<AdminUserItem> items;
@@ -41,11 +43,21 @@ public class ManageUserAdapter extends RecyclerView.Adapter<ManageUserAdapter.VH
 
         holder.name.setText(name);
         holder.email.setText(email);
+
+        // Highlight Sub-Admins in a different color if you want!
         holder.role.setText(role);
-        holder.phone.setText("");
+        if (role.equalsIgnoreCase("Sub-Admin")) {
+            holder.role.setTextColor(android.graphics.Color.parseColor("#FF9800")); // Orange for managers
+        } else if (role.equalsIgnoreCase("Admin")) {
+            holder.role.setTextColor(android.graphics.Color.parseColor("#4CAF50")); // Green for admins
+        } else {
+            holder.role.setTextColor(android.graphics.Color.GRAY); // Gray for staff
+        }
+
+        holder.phone.setText(it.getPhone() != null ? it.getPhone() : "");
 
         if (listener != null) {
-            holder.itemView.setOnClickListener(v -> listener.onPromote(it.getUid()));
+            holder.itemView.setOnClickListener(v -> listener.onManageUser(it));
         } else {
             holder.itemView.setOnClickListener(null);
         }

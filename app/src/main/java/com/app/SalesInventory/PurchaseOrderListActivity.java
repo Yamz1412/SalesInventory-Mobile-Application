@@ -38,15 +38,23 @@ public class PurchaseOrderListActivity extends BaseActivity  {
     private PurchaseOrderAdapter adapter;
     private List<PurchaseOrder> purchaseOrderList;
 
-    private Button btnCreatePO, btnAddSupplier, btnReturnProduct;
+    private Button btnCreatePO, btnAddSupplier, btnReturnProduct, btnChecklist;
     private DatabaseReference poRef;
+    private List<PurchaseOrder> fullList = new ArrayList<>(); // To store all data
+    private List<PurchaseOrder> displayedList = new ArrayList<>(); // For the adapter
+    private com.google.android.material.switchmaterial.SwitchMaterial switchCompletedOnly;
+    private android.widget.ImageButton btnFilterSort;
+    private String currentSortOption = "Recently Added";
+    private androidx.cardview.widget.CardView cardChecklistBadge;
+    private TextView tvChecklistBadge;
+    private DatabaseReference checklistRef;
+    private ValueEventListener checklistBadgeListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_purchase_order_list);
 
-        // SAFETY: Preserving your Toolbar and Back Arrow
         Toolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null) {
             setSupportActionBar(toolbar);
@@ -59,19 +67,24 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         btnCreatePO = findViewById(R.id.btnCreatePO);
         btnAddSupplier = findViewById(R.id.btnAddSupplier);
         btnReturnProduct = findViewById(R.id.btnReturnProduct);
+        btnChecklist = findViewById(R.id.btnChecklist);
+        cardChecklistBadge = findViewById(R.id.cardChecklistBadge); // NEW
+        tvChecklistBadge = findViewById(R.id.tvChecklistBadge);     // NEW
 
-        purchaseOrderList = new ArrayList<>();
-        adapter = new PurchaseOrderAdapter(this, purchaseOrderList, this::viewPurchaseOrder, this::showManageOptions);
-
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
+        // New UI Links
+        switchCompletedOnly = findViewById(R.id.switchCompletedOnly);
+        btnFilterSort = findViewById(R.id.btnFilterSortPO);
 
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
 
-        // TRIGGER MOCK DATA INJECTIONS FOR PANELISTS AUTOMATICALLY
+        adapter = new PurchaseOrderAdapter(this, displayedList, this::viewPurchaseOrder, this::showManageOptions);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setAdapter(adapter);
+
+        setupListeners();
         injectMockPOs();
         injectMockReturns();
-
+        listenToChecklistCount();
         loadPurchaseOrders();
 
         btnCreatePO.setOnClickListener(v -> {
@@ -90,9 +103,34 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         });
     }
 
-    /**
-     * MOCK DATA INJECTOR FOR SUPPLIER RETURNS
-     */
+    private void listenToChecklistCount() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (ownerId == null) return;
+
+        checklistRef = FirebaseDatabase.getInstance().getReference("DeliveryChecklist").child(ownerId);
+        checklistBadgeListener = checklistRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                long count = snapshot.getChildrenCount();
+                runOnUiThread(() -> {
+                    if (count > 0) {
+                        // Show the red badge and update the number
+                        if (cardChecklistBadge != null) cardChecklistBadge.setVisibility(View.VISIBLE);
+                        if (tvChecklistBadge != null) tvChecklistBadge.setText(String.valueOf(count));
+                    } else {
+                        // Hide the badge if checklist is empty
+                        if (cardChecklistBadge != null) cardChecklistBadge.setVisibility(View.GONE);
+                    }
+                });
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
+        });
+    }
+
     private void injectMockReturns() {
         String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (currentAdminId == null || currentAdminId.isEmpty()) {
@@ -126,7 +164,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         long now = System.currentTimeMillis();
         long oneDay = 24L * 60 * 60 * 1000L;
 
-        // RETURN 1: Damaged in Transit (Syrup Bottles)
         Map<String, Object> ret1 = new HashMap<>();
         ret1.put("ownerAdminId", adminId);
         ret1.put("date", now - (14 * oneDay));
@@ -140,7 +177,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         items1.add(item1a);
         ret1.put("items", items1);
 
-        // RETURN 2: Spoiled / Near Expiry Delivery
         Map<String, Object> ret2 = new HashMap<>();
         ret2.put("ownerAdminId", adminId);
         ret2.put("date", now - (5 * oneDay));
@@ -154,7 +190,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         items2.add(item2a);
         ret2.put("items", items2);
 
-        // RETURN 3: Wrong Item Delivered
         Map<String, Object> ret3 = new HashMap<>();
         ret3.put("ownerAdminId", adminId);
         ret3.put("date", now - (25 * oneDay));
@@ -173,9 +208,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         returnsRef.push().setValue(ret3);
     }
 
-    /**
-     * MOCK DATA INJECTOR FOR PURCHASE ORDERS
-     */
     private void injectMockPOs() {
         String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (currentAdminId == null || currentAdminId.isEmpty()) {
@@ -290,28 +322,87 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         }
     }
 
-    private void loadPurchaseOrders() {
-        String currentAdminId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (currentAdminId == null || currentAdminId.isEmpty()) {
-            currentAdminId = AuthManager.getInstance().getCurrentUserId();
-        }
-        if (currentAdminId == null) return;
+    private void setupListeners() {
+        btnCreatePO.setOnClickListener(v -> startActivity(new Intent(this, CreatePurchaseOrderActivity.class)));
+        btnAddSupplier.setOnClickListener(v -> startActivity(new Intent(this, AddSupplierActivity.class)));
+        btnReturnProduct.setOnClickListener(v -> startActivity(new Intent(this, ReturnProductActivity.class)));
+        btnChecklist.setOnClickListener(v -> startActivity(new Intent(this, DeliveryChecklistActivity.class)));
 
-        poRef.orderByChild("ownerAdminId").equalTo(currentAdminId).addValueEventListener(new ValueEventListener() {
+        // Handle Switch toggle
+        switchCompletedOnly.setOnCheckedChangeListener((buttonView, isChecked) -> applyFiltersAndSort());
+
+        // Handle Filter Button
+        btnFilterSort.setOnClickListener(v -> showSortDialog());
+    }
+
+    private void loadPurchaseOrders() {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        poRef.orderByChild("ownerAdminId").equalTo(ownerId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                purchaseOrderList.clear();
-                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
-                    PurchaseOrder po = dataSnapshot.getValue(PurchaseOrder.class);
+                fullList.clear();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    PurchaseOrder po = ds.getValue(PurchaseOrder.class);
                     if (po != null) {
-                        purchaseOrderList.add(po);
+                        po.setId(ds.getKey());
+                        fullList.add(po);
                     }
                 }
-                Collections.reverse(purchaseOrderList);
-                adapter.notifyDataSetChanged();
+                applyFiltersAndSort();
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) {}
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {}
         });
+    }
+
+    private void showSortDialog() {
+        String[] options = {"Recently Added", "Oldest First", "Nearest Delivery", "Highest Amount"};
+        int checkedItem = java.util.Arrays.asList(options).indexOf(currentSortOption);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Sort Orders")
+                .setSingleChoiceItems(options, checkedItem, (dialog, which) -> {
+                    currentSortOption = options[which];
+                    applyFiltersAndSort();
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private void applyFiltersAndSort() {
+        displayedList.clear();
+        boolean completedOnly = switchCompletedOnly.isChecked();
+
+        for (PurchaseOrder po : fullList) {
+            String status = po.getStatus() != null ? po.getStatus().toUpperCase() : "";
+            boolean isCompleted = status.equals("RECEIVED") || status.equals("COMPLETED");
+
+            if (completedOnly) {
+                if (isCompleted) displayedList.add(po);
+            } else {
+                if (!isCompleted && !status.equals("CANCELLED")) displayedList.add(po);
+            }
+        }
+
+        // Sorting Logic
+        Collections.sort(displayedList, (o1, o2) -> {
+            switch (currentSortOption) {
+                case "Recently Added":
+                    return Long.compare(o2.getOrderDate(), o1.getOrderDate());
+                case "Oldest First":
+                    return Long.compare(o1.getOrderDate(), o2.getOrderDate());
+                case "Nearest Delivery":
+                    long d1 = o1.getExpectedDeliveryDate() > 0 ? o1.getExpectedDeliveryDate() : Long.MAX_VALUE;
+                    long d2 = o2.getExpectedDeliveryDate() > 0 ? o2.getExpectedDeliveryDate() : Long.MAX_VALUE;
+                    return Long.compare(d1, d2);
+                case "Highest Amount":
+                    return Double.compare(o2.getTotalAmount(), o1.getTotalAmount());
+                default:
+                    return 0;
+            }
+        });
+
+        adapter.notifyDataSetChanged();
     }
 
     private void viewPurchaseOrder(PurchaseOrder po) {
@@ -338,7 +429,6 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                 .show();
     }
 
-    // SAFETY: Handle the back button click for the Toolbar
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
@@ -356,6 +446,10 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         private List<PurchaseOrder> orders;
         private OnItemClickListener clickListener;
         private OnItemLongClickListener longClickListener;
+
+        public PurchaseOrderAdapter(List<PurchaseOrder> orders) {
+            this.orders = orders;
+        }
 
         public PurchaseOrderAdapter(PurchaseOrderListActivity context, List<PurchaseOrder> orders, OnItemClickListener clickListener, OnItemLongClickListener longClickListener) {
             this.context = context;
@@ -376,20 +470,41 @@ public class PurchaseOrderListActivity extends BaseActivity  {
             PurchaseOrder po = orders.get(position);
             holder.tvPoNumber.setText("PO #: " + po.getPoNumber());
             holder.tvSupplier.setText(po.getSupplierName());
-            holder.tvStatus.setText(po.getStatus().toUpperCase());
-            holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%.2f", po.getTotalAmount()));
+
+            String status = po.getStatus() != null ? po.getStatus() : "PENDING";
+            holder.tvStatus.setText(status.toUpperCase());
+
+            holder.tvTotalAmount.setText(String.format(Locale.getDefault(), "₱%,.2f", po.getTotalAmount()));
 
             SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
-            holder.tvDate.setText(sdf.format((po.getOrderDate())));
+            holder.tvDate.setText(sdf.format(new java.util.Date(po.getOrderDate())));
 
-            holder.itemView.setOnClickListener(v -> clickListener.onItemClick(po));
+            boolean isDark = false;
+            try {
+                isDark = ThemeManager.getInstance(context).getCurrentTheme().name.equals("dark");
+            } catch (Exception e) {}
+            int mainTextColor = isDark ? Color.WHITE : Color.BLACK;
+
+            holder.tvPoNumber.setTextColor(mainTextColor);
+            holder.tvSupplier.setTextColor(mainTextColor);
+            holder.tvDate.setTextColor(mainTextColor);
+            holder.tvTotalAmount.setTextColor(mainTextColor);
+
+            // CRITICAL FIX: Added null safety checks for the listeners
+            holder.itemView.setOnClickListener(v -> {
+                if (clickListener != null) {
+                    clickListener.onItemClick(po);
+                }
+            });
             holder.itemView.setOnLongClickListener(v -> {
-                longClickListener.onItemLongClick(po);
+                if (longClickListener != null) {
+                    longClickListener.onItemLongClick(po);
+                }
                 return true;
             });
 
             int color;
-            switch (po.getStatus().toUpperCase()) {
+            switch (status.toUpperCase()) {
                 case "RECEIVED":
                 case "COMPLETED":
                     color = getResources().getColor(R.color.successGreen); break;
@@ -399,13 +514,13 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                 case "CANCELLED":
                     color = getResources().getColor(R.color.errorRed); break;
                 default:
-                    // FIX: Dynamically resolve the theme's text color so it's perfectly visible in Light/Dark mode!
                     TypedValue typedValue = new TypedValue();
                     context.getTheme().resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true);
                     color = typedValue.data;
             }
             holder.tvStatus.setTextColor(color);
         }
+
         @Override public int getItemCount() { return orders.size(); }
 
         class POViewHolder extends RecyclerView.ViewHolder {
@@ -418,6 +533,13 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                 tvDate = itemView.findViewById(R.id.tvOrderDate);
                 tvTotalAmount = itemView.findViewById(R.id.tvTotalAmount);
             }
+        }
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (checklistRef != null && checklistBadgeListener != null) {
+            checklistRef.removeEventListener(checklistBadgeListener);
         }
     }
 }

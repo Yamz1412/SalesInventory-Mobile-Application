@@ -131,7 +131,6 @@ public class DashboardRepository {
                 if (p == null || !p.isActive()) continue;
                 if ("Menu".equalsIgnoreCase(p.getProductType())) continue;
 
-                // FIX: Cost Price is already the Total Inventory Cash Value for that item!
                 inventoryValue += p.getCostPrice();
 
                 if (p.isCriticalStock() || p.isLowStock()) {
@@ -193,6 +192,9 @@ public class DashboardRepository {
                 long startOfToday = cal.getTimeInMillis();
 
                 for (Sales sale : sales) {
+                    // FIX: Do not include refunded items in Recent Activities
+                    if (sale.getPaymentMethod() != null && sale.getPaymentMethod().toUpperCase().contains("REFUNDED")) continue;
+
                     long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : sale.getDate();
                     if (ts >= startOfToday) {
                         RecentActivity activity = new RecentActivity(
@@ -219,6 +221,9 @@ public class DashboardRepository {
         long oneDayMillis = 24L * 60L * 60L * 1000L;
         Map<Integer, Double> dayIndexToAmount = new HashMap<>();
         for (Sales s : allSales) {
+            // FIX: Do not include refunded items in Sales Trend line chart
+            if (s.getPaymentMethod() != null && s.getPaymentMethod().toUpperCase().contains("REFUNDED")) continue;
+
             long ts = s.getTimestamp() > 0 ? s.getTimestamp() : s.getDate();
             if (ts <= 0) continue;
             long diff = now - ts;
@@ -242,6 +247,9 @@ public class DashboardRepository {
         if (allSales == null || allSales.isEmpty()) return new TopProductsResult(entries, labels);
         Map<String, Integer> productQty = new HashMap<>();
         for (Sales s : allSales) {
+            // FIX: Do not include refunded items in Top Selling Products chart
+            if (s.getPaymentMethod() != null && s.getPaymentMethod().toUpperCase().contains("REFUNDED")) continue;
+
             String productId = s.getProductId();
             if (productId == null) continue;
             int qty = s.getQuantity();

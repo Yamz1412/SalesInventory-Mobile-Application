@@ -42,20 +42,16 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     public interface OnSelectionChangeListener {
         void onSelectionChanged(Set<String> selectedIds);
     }
-    private OnSelectionChangeListener selectionListener;
-    // ----------------------------------------
+    private OnSelectionChangeListener selectionChangeListener;
+    // --------------------------------------
 
-    public ProductAdapter(Context ctx) {
+    public ProductAdapter(List<Product> initialItems, Context ctx) {
         this.ctx = ctx;
+        if (initialItems != null) {
+            this.items.addAll(initialItems);
+        }
         this.repository = ProductRepository.getInstance((Application) ctx.getApplicationContext());
         this.authManager = AuthManager.getInstance();
-    }
-
-    public ProductAdapter(List<Product> initialList, Context ctx) {
-        this(ctx);
-        if (initialList != null) {
-            items.addAll(initialList);
-        }
     }
 
     public void setReadOnly(boolean readOnly) {
@@ -63,37 +59,65 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         notifyDataSetChanged();
     }
 
-    public void setItems(List<Product> newProducts) {
-        updateProducts(newProducts);
-    }
-
-    public void updateProducts(List<Product> newProducts) {
+    public void updateProducts(List<Product> newItems) {
         items.clear();
-        if (newProducts != null) {
-            items.addAll(newProducts);
+        if (newItems != null) {
+            items.addAll(newItems);
         }
         notifyDataSetChanged();
     }
 
     // --- NEW: MULTI-SELECTION METHODS ---
     public void setSelectionListener(OnSelectionChangeListener listener) {
-        this.selectionListener = listener;
+        this.selectionChangeListener = listener;
+    }
+
+    public void setSelectionMode(boolean enabled) {
+        isSelectionMode = enabled;
+        if (!enabled) {
+            selectedIds.clear();
+        }
+        notifyDataSetChanged();
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedIds);
+        }
+    }
+
+    public Set<String> getSelectedIds() {
+        return selectedIds;
+    }
+
+    public void selectAll() {
+        selectedIds.clear();
+        for (Product p : items) {
+            if (p != null && p.getProductId() != null) {
+                selectedIds.add(p.getProductId());
+            }
+        }
+        notifyDataSetChanged();
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedIds);
+        }
     }
 
     public void clearSelection() {
         selectedIds.clear();
-        isSelectionMode = false;
         notifyDataSetChanged();
-        if (selectionListener != null) selectionListener.onSelectionChanged(selectedIds);
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedIds);
+        }
     }
 
-    private void toggleSelection(String id) {
-        if (selectedIds.contains(id)) selectedIds.remove(id);
-        else selectedIds.add(id);
-
-        if (selectedIds.isEmpty()) isSelectionMode = false;
+    public void toggleSelection(String productId) {
+        if (selectedIds.contains(productId)) {
+            selectedIds.remove(productId);
+        } else {
+            selectedIds.add(productId);
+        }
         notifyDataSetChanged();
-        if (selectionListener != null) selectionListener.onSelectionChanged(selectedIds);
+        if (selectionChangeListener != null) {
+            selectionChangeListener.onSelectionChanged(selectedIds);
+        }
     }
     // --------------------------------------
 
@@ -107,185 +131,153 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         Product p = items.get(position);
+        if (p == null) return;
 
-        holder.name.setText(p.getProductName());
+        holder.name.setText(p.getProductName() != null ? p.getProductName() : "Unnamed");
 
-        // Display Menu items appropriately
-        boolean isMenu = p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType());
-
-        if (isMenu) {
-            if (holder.stockText != null) holder.stockText.setText("Recipe");
-            if (holder.quantityText != null) holder.quantityText.setText("Menu Item (No physical stock)");
+        // =======================================================
+        // FIX: HIDE SELL PRICE IF IT IS 0.00
+        // =======================================================
+        if (p.getSellingPrice() > 0) {
+            // Show both Cost and Sell if there is a selling price
+            holder.costPriceText.setText(String.format(Locale.US, "Cost: ₱%,.2f | Sell: ₱%,.2f", p.getCostPrice(), p.getSellingPrice()));
         } else {
-            updateStockDisplay(holder, p.getQuantity(), p.getUnit(), p.getPiecesPerUnit());
+            // Show ONLY Cost if selling price is 0
+            holder.costPriceText.setText(String.format(Locale.US, "Cost: ₱%,.2f", p.getCostPrice()));
         }
+        // =======================================================
 
-        if (p.getCostPrice() > 0) {
-            holder.costPriceText.setVisibility(View.VISIBLE);
-            holder.costPriceText.setText(String.format(java.util.Locale.getDefault(), "Cost: ₱%.2f", p.getCostPrice()));
-        } else {
-            if (holder.costPriceText != null) holder.costPriceText.setVisibility(View.GONE);
-        }
-
-        loadImage(p.getImagePath(), p.getImageUrl(), holder.productImage);
-
-        // --- NEW: VISUAL HIGHLIGHT FOR SELECTION ---
-        if (selectedIds.contains(p.getProductId())) {
-            holder.itemView.setBackgroundColor(Color.parseColor("#40007BFF")); // Translucent Blue overlay
+        // --- NEW: Visual feedback for selection ---
+        if (isSelectionMode) {
+            if (selectedIds.contains(p.getProductId())) {
+                holder.itemView.setBackgroundColor(Color.parseColor("#E0F7FA")); // Light blue highlight
+            } else {
+                holder.itemView.setBackgroundColor(Color.TRANSPARENT);
+            }
         } else {
             holder.itemView.setBackgroundColor(Color.TRANSPARENT);
         }
+        // ------------------------------------------
 
-        // --- NEW: HANDLE LONG PRESS FOR MULTI-SELECTION ---
-        holder.itemView.setOnLongClickListener(v -> {
-            if (isReadOnly) return false;
-            isSelectionMode = true;
-            toggleSelection(p.getProductId());
-            return true;
-        });
+        String currentQtyStr = (p.getQuantity() % 1 == 0) ? String.valueOf((long) p.getQuantity()) : String.valueOf(p.getQuantity());
+        String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";
+        holder.stockText.setText("Stock: " + currentQtyStr + " " + unitStr);
 
-        // --- NEW: HANDLE NORMAL CLICKS (Selection vs Opening Details) ---
-        holder.itemView.setOnClickListener(v -> {
-            if (isSelectionMode) {
-                toggleSelection(p.getProductId());
-            } else {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    Product currentProduct = items.get(currentPos);
-                    Intent intent = new Intent(ctx, ProductDetailActivity.class);
-                    intent.putExtra("productId", currentProduct.getProductId());
-                    intent.putExtra("PRODUCT_ID", currentProduct.getProductId()); // Safety fallback
-                    ctx.startActivity(intent);
-                }
-            }
-        });
+        boolean isLowStock = p.getQuantity() <= p.getReorderLevel();
+        holder.stockText.setTextColor(isLowStock ? Color.RED : Color.parseColor("#4CAF50")); // Green if ok
 
-        holder.btnEdit.setOnClickListener(v -> {
-            int currentPos = holder.getAdapterPosition();
-            if (currentPos != RecyclerView.NO_POSITION) {
-                Product currentProduct = items.get(currentPos);
-
-                // Point to AddProductActivity instead of EditProduct
-                Intent intent = new Intent(ctx, AddProductActivity.class);
-                intent.putExtra("EDIT_PRODUCT_ID", currentProduct.getProductId());
-                intent.putExtra("productId", currentProduct.getProductId()); // Safety fallback
-                ctx.startActivity(intent);
-            }
-        });
-
-        // --- FIX: PROPERLY HIDE/SHOW BUTTONS FOR ADMINS ---
         if (isReadOnly) {
             holder.btnEdit.setVisibility(View.GONE);
             holder.btnIncrease.setVisibility(View.GONE);
             holder.btnDecrease.setVisibility(View.GONE);
+            holder.quantityText.setVisibility(View.GONE);
         } else {
             holder.btnEdit.setVisibility(View.VISIBLE);
+            holder.btnIncrease.setVisibility(View.VISIBLE);
+            holder.btnDecrease.setVisibility(View.VISIBLE);
+            holder.quantityText.setVisibility(View.VISIBLE);
 
-            // Hides the +/- stock buttons for Menu items
-            holder.btnIncrease.setVisibility(isMenu ? View.GONE : View.VISIBLE);
-            holder.btnDecrease.setVisibility(isMenu ? View.GONE : View.VISIBLE);
+            holder.btnIncrease.setOnClickListener(v -> handleStockChange(p, holder, 1));
+            holder.btnDecrease.setOnClickListener(v -> handleStockChange(p, holder, -1));
 
-            holder.btnIncrease.setOnClickListener(v -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    Product currentProduct = items.get(currentPos);
-                    double oldQty = currentProduct.getQuantity();
-                    double newQty = oldQty + 1;
-
-                    // 1. OPTIMISTIC UI UPDATE: Change the number instantly so it feels snappy
-                    currentProduct.setQuantity(newQty);
-                    updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-
-                    // 2. BACKGROUND SYNC: Update the database silently
-                    repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
-                        @Override
-                        public void onProductUpdated() {
-                            // Success! The UI is already updated, do nothing.
-                        }
-                        @Override
-                        public void onError(String error) {
-                            if (ctx instanceof Activity) {
-                                ((Activity) ctx).runOnUiThread(() -> {
-                                    // If database fails, safely revert the UI back to the old number
-                                    currentProduct.setQuantity(oldQty);
-                                    updateStockDisplay(holder, oldQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-                                    Toast.makeText(ctx, "Sync failed: " + error, Toast.LENGTH_SHORT).show();
-                                });
-                            }
-                        }
-                    });
-                }
-            });
-
-            holder.btnDecrease.setOnClickListener(v -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION) {
-                    Product currentProduct = items.get(currentPos);
-                    double oldQty = currentProduct.getQuantity();
-
-                    if (oldQty > 0) {
-                        double newQty = oldQty - 1;
-
-                        // 1. OPTIMISTIC UI UPDATE
-                        currentProduct.setQuantity(newQty);
-                        updateStockDisplay(holder, newQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-
-                        // 2. BACKGROUND SYNC
-                        repository.updateProductQuantity(currentProduct.getProductId(), newQty, new ProductRepository.OnProductUpdatedListener() {
-                            @Override
-                            public void onProductUpdated() {
-                                // Success!
-                            }
-                            @Override
-                            public void onError(String error) {
-                                if (ctx instanceof Activity) {
-                                    ((Activity) ctx).runOnUiThread(() -> {
-                                        // Revert on failure
-                                        currentProduct.setQuantity(oldQty);
-                                        updateStockDisplay(holder, oldQty, currentProduct.getUnit(), currentProduct.getPiecesPerUnit());
-                                        Toast.makeText(ctx, "Sync failed: " + error, Toast.LENGTH_SHORT).show();
-                                    });
-                                }
-                            }
-                        });
-                    }
-                }
+            holder.btnEdit.setOnClickListener(v -> {
+                Intent i = new Intent(ctx, EditProduct.class);
+                i.putExtra("PRODUCT_ID", p.getProductId());
+                ctx.startActivity(i);
             });
         }
-    }
 
-    private void updateStockDisplay(VH holder, double qty, String unit, int ppu) {
-        String qtyStr = (qty % 1 == 0) ? String.valueOf((long) qty) : String.format(Locale.US, "%.2f", qty).replaceAll("0*$", "").replaceAll("\\.$", "");
-        String displayStr = qtyStr;
+        loadImageWithOfflineFallback(p.getImageUrl(), p.getImagePath(), holder.productImage);
 
-        if (unit != null && !unit.isEmpty()) {
-            String u = unit.trim();
-
-            if (u.equalsIgnoreCase("pcs") || u.equalsIgnoreCase("box") || u.equalsIgnoreCase("pack")) {
-                displayStr += " " + u;
-            } else if (u.equalsIgnoreCase("g") || u.equalsIgnoreCase("kg") ||
-                    u.equalsIgnoreCase("ml") || u.equalsIgnoreCase("L") ||
-                    u.equalsIgnoreCase("oz")) {
-                displayStr += u;
+        // --- NEW: Toggle selection on click if in selection mode ---
+        holder.itemView.setOnClickListener(v -> {
+            if (isSelectionMode) {
+                toggleSelection(p.getProductId());
             } else {
-                displayStr += " " + u;
+                Intent i = new Intent(ctx, ProductDetailActivity.class);
+                i.putExtra("PRODUCT_ID", p.getProductId());
+                ctx.startActivity(i);
             }
-        }
+        });
 
-        if (holder.stockText != null) holder.stockText.setText(displayStr);
-        if (holder.quantityText != null) holder.quantityText.setText("Stock: " + displayStr);
+        // --- NEW: Enter selection mode on long click ---
+        holder.itemView.setOnLongClickListener(v -> {
+            if (!isReadOnly && !isSelectionMode) {
+                setSelectionMode(true);
+                toggleSelection(p.getProductId());
+                return true;
+            }
+            return false;
+        });
     }
 
-    private void loadImage(String localPath, String onlineUrl, ImageView imageView) {
-        // Decide the primary image to load (Online URL first, Local Path second)
-        String primaryLoad = (onlineUrl != null && !onlineUrl.isEmpty()) ? onlineUrl : localPath;
+    private void handleStockChange(Product p, VH holder, int change) {
+        if (!authManager.isCurrentUserApproved()) {
+            Toast.makeText(ctx, "You don't have permission to update stock.", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
+        double currentStock = p.getQuantity();
+        double newStock = currentStock + change;
+        if (newStock < 0) {
+            Toast.makeText(ctx, "Stock cannot be negative", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        p.setQuantity(newStock);
+        String updatedQtyStr = (newStock % 1 == 0) ? String.valueOf((long) newStock) : String.valueOf(newStock);
+        String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";
+        holder.stockText.setText("Stock: " + updatedQtyStr + " " + unitStr);
+
+        boolean isLowStock = newStock <= p.getReorderLevel();
+        holder.stockText.setTextColor(isLowStock ? Color.RED : Color.parseColor("#4CAF50"));
+
+        repository.updateProductQuantity(p.getProductId(), newStock, new ProductRepository.OnProductUpdatedListener() {
+            @Override
+            public void onProductUpdated() {
+                if (ctx instanceof Activity) {
+                    ((Activity) ctx).runOnUiThread(() -> notifyDataSetChanged());
+                }
+            }
+            @Override
+            public void onError(String error) {
+                if (ctx instanceof Activity) {
+                    ((Activity) ctx).runOnUiThread(() -> Toast.makeText(ctx, "Update failed: " + error, Toast.LENGTH_SHORT).show());
+                }
+            }
+        });
+    }
+
+    private void loadImageWithOfflineFallback(String firebaseUrl, String localPath, ImageView imageView) {
+        if (firebaseUrl != null && !firebaseUrl.isEmpty()) {
+            loadFromUrlWithFallback(firebaseUrl, localPath, imageView);
+        } else if (localPath != null && !localPath.isEmpty()) {
+            File imgFile = new File(localPath);
+            if (imgFile.exists()) {
+                Glide.with(ctx)
+                        .load(imgFile)
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .override(200, 200)
+                        .centerCrop()
+                        .placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_placeholder)
+                        .into(imageView);
+            } else {
+                imageView.setImageResource(R.drawable.ic_image_placeholder);
+            }
+        } else {
+            imageView.setImageResource(R.drawable.ic_image_placeholder);
+        }
+    }
+
+    private void loadFromUrlWithFallback(String url, String localPath, ImageView imageView) {
         Glide.with(ctx)
-                .load(primaryLoad)
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // Saves for offline use
+                .load(url)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .override(200, 200)
-                .placeholder(R.drawable.ic_image_placeholder)
                 .centerCrop()
+                .placeholder(R.drawable.ic_image_placeholder)
+                .timeout(3000) // Fast timeout so it doesn't hang if offline
                 .error(
                         // THE OFFLINE FALLBACK: If the URL fails because of no internet, try the local phone gallery path
                         Glide.with(ctx)

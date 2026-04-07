@@ -13,6 +13,7 @@ public class PurchaseOrder {
     public static final String STATUS_SENT = "SENT";
     public static final String STATUS_COMPLETED = "COMPLETED";
 
+
     private String poId;
     private String poNumber;
     private String supplierName;
@@ -77,6 +78,9 @@ public class PurchaseOrder {
 
     public String getOwnerAdminId() { return ownerAdminId; }
     public void setOwnerAdminId(String ownerAdminId) { this.ownerAdminId = ownerAdminId; }
+    public void setId(String id) {
+        this.poId = id;
+    }
 
     public String getPurchaseOrderId() { return purchaseOrderId; }
     public void setPurchaseOrderId(String purchaseOrderId) { this.purchaseOrderId = purchaseOrderId; }

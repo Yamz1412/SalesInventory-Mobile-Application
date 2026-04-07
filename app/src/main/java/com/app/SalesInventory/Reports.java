@@ -206,6 +206,32 @@ public class Reports extends BaseActivity {
                 }
             }
         });
+
+        AuthManager.getInstance().isCurrentUserAdminAsync(isAdmin -> {
+            runOnUiThread(() -> {
+                if (!isAdmin) {
+                    // Hide ALL 5 action buttons from Staff accounts
+                    if (btnOperatingExpenses != null) btnOperatingExpenses.setVisibility(View.GONE);
+                    if (btnExportPDF != null) btnExportPDF.setVisibility(View.GONE);
+                    if (btnDetailedReport != null) btnDetailedReport.setVisibility(View.GONE);
+                    if (btnInventoryReport != null) btnInventoryReport.setVisibility(View.GONE);
+                    if (btnPOReport != null) btnPOReport.setVisibility(View.GONE);
+
+                    // Hide the entire Income Statement Card safely
+                    if (tvISBusinessName != null && tvISBusinessName.getParent() != null) {
+                        View parent = (View) tvISBusinessName.getParent();
+                        parent.setVisibility(View.GONE);
+
+                        // If it's wrapped in a CardView layout, hide that too
+                        if (parent.getParent() instanceof androidx.cardview.widget.CardView) {
+                            ((View) parent.getParent()).setVisibility(View.GONE);
+                        } else if (parent.getParent() instanceof View) {
+                            ((View) parent.getParent()).setVisibility(View.GONE);
+                        }
+                    }
+                }
+            });
+        });
     }
 
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
@@ -962,15 +988,14 @@ public class Reports extends BaseActivity {
             Map<String, Object> data = new HashMap<>();
             data.put("id", expenseId);
             data.put("dateLogged", System.currentTimeMillis());
-            data.put("items", temporarySessionExpenses);
+            data.put("items", new HashMap<>(temporarySessionExpenses));
 
             expensesRef.child(expenseId).setValue(data).addOnSuccessListener(aVoid -> {
                 Toast.makeText(this, "Operating Expenses Saved to Database!", Toast.LENGTH_SHORT).show();
-                for (Map.Entry<String, Double> entry : temporarySessionExpenses.entrySet()) {
-                    databaseExpenses.put(entry.getKey(), databaseExpenses.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
-                }
+
                 temporarySessionExpenses.clear();
-                mergeAndRenderOperatingExpenses();
+
+                calculateMetricsAndList();
             });
         }
     }

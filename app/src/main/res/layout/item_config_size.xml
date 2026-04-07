@@ -14,33 +14,49 @@
         android:layout_marginBottom="8dp"
         android:weightSum="3">
 
-
-        <AutoCompleteTextView
-            android:id="@+id/actvLinkedInventory"
+        <Spinner
+            android:id="@+id/spinnerLinkedInventory"
             android:layout_width="0dp"
             android:layout_height="45dp"
             android:layout_weight=".7"
-            android:hint="Link"
-            android:textSize="14sp"
             android:background="@drawable/edite_round"
-            android:padding="12dp"
             android:layout_marginEnd="4dp"/>
 
-        <EditText
-            android:id="@+id/etSizeName"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggleHotCold"
             android:layout_width="0dp"
             android:layout_height="45dp"
             android:layout_weight="1.4"
-            android:hint="Size (e.g. Large / 16oz)"
-            android:textSize="14sp"
-            android:background="@drawable/edite_round"
-            android:padding="12dp"
-            android:layout_marginEnd="4dp"/>
+            android:layout_marginEnd="4dp"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:checkedButton="@+id/btnHot">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnHot"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Hot"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCold"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="Cold"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <EditText
             android:id="@+id/etSizePrice"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="45dp"
             android:layout_weight="0.8"
             android:hint="+ Price Diff"
             android:textSize="14sp"

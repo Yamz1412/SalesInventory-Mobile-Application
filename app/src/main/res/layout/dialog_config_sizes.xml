@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="8dp">
 
         <TextView
             android:layout_width="0dp"
@@ -32,12 +32,24 @@
             app:tint="@android:color/white" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/tvHelperInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Note: Input size pricing as Percentage Markup (e.g., 20 for +20%). Leave blank to use Base Price."
+        android:textSize="12sp"
+        android:textColor="?attr/colorOnBackground"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"
+        android:paddingHorizontal="4dp" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:layout_marginBottom="16dp"
         android:minHeight="220dp">
+
         <LinearLayout
             android:id="@+id/containerRows"
             android:layout_width="match_parent"
@@ -49,7 +61,21 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
-        <Button android:id="@+id/btnCancel" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Cancel"/>
-        <Button android:id="@+id/btnSave" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Save Sizes"/>
+
+        <Button
+            android:id="@+id/btnCancel"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Cancel"/>
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Save Sizes"/>
     </LinearLayout>
+
 </LinearLayout>

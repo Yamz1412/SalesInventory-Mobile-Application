@@ -5,7 +5,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@android:color/white">
+    android:background="?attr/colorSurface"
+    >
 
     <TextView
         android:id="@+id/tvEditStaffTitle"
@@ -14,7 +15,7 @@
         android:text="Edit Staff Account"
         android:textSize="18sp"
         android:textStyle="bold"
-        android:textColor="@color/black"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="12dp" />
 
     <TextView
@@ -22,7 +23,8 @@
         android:layout_height="wrap_content"
         android:text="Full Name"
         android:textSize="14sp"
-        android:textColor="@color/black" />
+        android:textColor="?attr/colorOnBackground"
+        />
 
     <EditText
         android:id="@+id/etEditStaffName"
@@ -38,7 +40,8 @@
         android:layout_height="wrap_content"
         android:text="Email"
         android:textSize="14sp"
-        android:textColor="@color/black" />
+        android:textColor="?attr/colorOnBackground"
+        />
 
     <EditText
         android:id="@+id/etEditStaffEmail"
@@ -54,7 +57,8 @@
         android:layout_height="wrap_content"
         android:text="Phone Number"
         android:textSize="14sp"
-        android:textColor="@color/black" />
+        android:textColor="?attr/colorOnBackground"
+        />
 
     <EditText
         android:id="@+id/etEditStaffPhone"
@@ -70,7 +74,8 @@
         android:layout_height="wrap_content"
         android:text="Password"
         android:textSize="14sp"
-        android:textColor="@color/black" />
+        android:textColor="?attr/colorOnBackground"
+        />
 
     <EditText
         android:id="@+id/etEditPassword"
@@ -92,7 +97,7 @@
             android:layout_height="wrap_content"
             android:text="Cancel"
             android:backgroundTint="@android:color/darker_gray"
-            android:textColor="@android:color/white"
+            android:textColor="?attr/colorOnBackground"
             android:layout_marginEnd="8dp" />
 
         <Button
@@ -100,8 +105,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Update"
-            android:backgroundTint="@color/colorPrimary"
-            android:textColor="@android:color/white" />
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorOnBackground"
+            />
     </LinearLayout>
 
 </LinearLayout>

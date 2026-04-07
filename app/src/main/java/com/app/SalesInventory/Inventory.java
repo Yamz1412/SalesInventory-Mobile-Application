@@ -3,6 +3,9 @@ package com.app.SalesInventory;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.view.ActionMode;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -70,6 +73,66 @@ public class Inventory extends BaseActivity {
     private com.google.android.material.switchmaterial.SwitchMaterial switchShowOutOfStock;
     private boolean showOutOfStock = false;
 
+    private ActionMode actionMode;
+
+    private ActionMode.Callback actionModeCallback = new ActionMode.Callback() {
+        @Override
+        public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            menu.add(0, 1, 0, "Edit").setIcon(android.R.drawable.ic_menu_edit).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            menu.add(0, 2, 0, "Delete").setIcon(android.R.drawable.ic_menu_delete).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+            return true;
+        }
+
+        @Override
+        public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+            Set<String> selectedIds = productAdapter.getSelectedIds();
+            mode.setTitle(selectedIds.size() + " Selected");
+            menu.findItem(1).setVisible(selectedIds.size() == 1);
+            return true;
+        }
+
+        @Override
+        public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+            Set<String> selectedIds = productAdapter.getSelectedIds();
+
+            if (item.getItemId() == 1) {
+                if (selectedIds.size() == 1) {
+                    String id = selectedIds.iterator().next();
+                    Intent i = new Intent(Inventory.this, EditProduct.class);
+                    i.putExtra("PRODUCT_ID", id);
+                    startActivity(i);
+                    mode.finish();
+                }
+                return true;
+            } else if (item.getItemId() == 2) {
+                new android.app.AlertDialog.Builder(Inventory.this)
+                        .setTitle("Delete Selected")
+                        .setMessage("Are you sure you want to delete " + selectedIds.size() + " selected items?")
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            for (String id : selectedIds) {
+                                productRepository.deleteProduct(id, new ProductRepository.OnProductDeletedListener() {
+                                    @Override public void onProductDeleted(String message) {}
+                                    @Override public void onError(String error) {}
+                                });
+                            }
+                            Toast.makeText(Inventory.this, "Items Deleted Successfully", Toast.LENGTH_SHORT).show();
+                            mode.finish();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void onDestroyActionMode(ActionMode mode) {
+            productAdapter.clearSelection();
+            productAdapter.setSelectionMode(false);
+            actionMode = null;
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,6 +157,7 @@ public class Inventory extends BaseActivity {
         layoutArchiveContainer = findViewById(R.id.layout_archive_container);
         tvArchiveBadge = findViewById(R.id.tvArchiveBadge);
 
+        switchShowOutOfStock = findViewById(R.id.switchShowOutOfStock);
         if (switchShowOutOfStock != null) {
             switchShowOutOfStock.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 showOutOfStock = isChecked;
@@ -106,54 +170,44 @@ public class Inventory extends BaseActivity {
 
         isReadOnly = getIntent().getBooleanExtra("readonly", false);
 
+        if (isReadOnly) {
+            if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
+            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+            if (btnArchive != null) btnArchive.setVisibility(View.GONE);
+            if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+        }
+
         productAdapter = new ProductAdapter(filteredProducts, this);
         productAdapter.setReadOnly(isReadOnly);
 
-        // --- NEW: LISTEN FOR MULTI-SELECTION TO TRIGGER BULK ARCHIVE ---
         productAdapter.setSelectionListener(selectedIds -> {
             if (selectedIds.isEmpty()) {
-                // Return to normal "Archive" button state
-                btnArchive.setText("Archive");
-                btnArchive.setOnClickListener(v -> startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
+                if (actionMode != null) {
+                    actionMode.finish();
+                }
             } else {
-                // Switch to Bulk Archive Mode
-                btnArchive.setText("Archive (" + selectedIds.size() + ")");
-                btnArchive.setOnClickListener(v -> {
-                    new android.app.AlertDialog.Builder(Inventory.this)
-                            .setTitle("Archive Multiple")
-                            .setMessage("Are you sure you want to archive " + selectedIds.size() + " selected items?")
-                            .setPositiveButton("Archive", (dialog, which) -> {
-                                for (String id : selectedIds) {
-                                    // Submit deletion logic without expecting UI update strings
-                                    productRepository.deleteProduct(id, new ProductRepository.OnProductDeletedListener() {
-                                        @Override public void onProductDeleted(String message) {}
-                                        @Override public void onError(String error) {}
-                                    });
-                                }
-                                productAdapter.clearSelection();
-                                Toast.makeText(Inventory.this, "Items Archived", Toast.LENGTH_SHORT).show();
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                });
+                if (actionMode == null) {
+                    actionMode = startActionMode(actionModeCallback);
+                } else {
+                    actionMode.invalidate();
+                }
             }
         });
 
         productsRecyclerView.setLayoutManager(new GridLayoutManager(this, getResponsiveSpanCount()));
         productsRecyclerView.setAdapter(productAdapter);
 
-        // --- NEW: FIX INVISIBLE BUTTONS BY FORCING ADAPTER REFRESH ---
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
             boolean isRealAdmin = authManager.isCurrentUserAdmin();
             isReadOnly = !isRealAdmin;
 
-            // This line fixes the hidden button bug!
             if (productAdapter != null) productAdapter.setReadOnly(isReadOnly);
 
             if (isReadOnly) {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
                 if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+                if (btnArchive != null) btnArchive.setVisibility(View.GONE);
             } else {
                 if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
                 if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.VISIBLE);
@@ -201,20 +255,29 @@ public class Inventory extends BaseActivity {
                     if (snapshot != null) {
                         int archiveCount = snapshot.size();
                         runOnUiThread(() -> {
-                            if (archiveCount > 0 && !isReadOnly) {
-                                if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.VISIBLE);
-                                if (tvArchiveBadge != null) tvArchiveBadge.setText(String.valueOf(archiveCount));
-                            } else {
-                                if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+                            boolean shouldShow = (archiveCount > 0 && !isReadOnly);
+
+                            if (layoutArchiveContainer != null) {
+                                layoutArchiveContainer.setVisibility(shouldShow ? View.VISIBLE : View.GONE);
+                            }
+                            if (btnArchive != null) {
+                                btnArchive.setVisibility(shouldShow ? View.VISIBLE : View.GONE);
+                            }
+                            if (tvArchiveBadge != null) {
+                                tvArchiveBadge.setText(String.valueOf(archiveCount));
+                                tvArchiveBadge.setVisibility(archiveCount > 0 ? View.VISIBLE : View.GONE);
                             }
                         });
                     }
                 });
     }
 
+    // FIX: Adaptive adapter now sets a background color so text doesn't blend
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e){}
         int textColor = isDark ? Color.WHITE : Color.BLACK;
+        int bgColor = isDark ? Color.parseColor("#2C2C2C") : Color.WHITE;
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
@@ -229,6 +292,7 @@ public class Inventory extends BaseActivity {
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
                 ((TextView) view).setTextColor(textColor);
+                view.setBackgroundColor(bgColor);
                 return view;
             }
         };
@@ -392,7 +456,8 @@ public class Inventory extends BaseActivity {
         android.widget.TextView searchEditText = searchView.findViewById(id);
 
         if (searchEditText != null) {
-            boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
+            boolean isDark = false;
+            try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch(Exception e){}
             searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
             searchEditText.setHintTextColor(Color.GRAY);
 
@@ -427,65 +492,45 @@ public class Inventory extends BaseActivity {
     }
 
     private void setupActionButtons() {
+        // 1. Forcefully hide the buttons immediately if it's a staff account
+        if (isReadOnly) {
+            if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
+            if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+            if (btnArchive != null) btnArchive.setVisibility(View.GONE);
+            if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+        }
+
+        // 2. Add strict click-blocks just in case they somehow become visible
         if (btnAddProduct != null) {
-            btnAddProduct.setOnClickListener(v -> startActivity(new Intent(Inventory.this, AddProductActivity.class)));
+            btnAddProduct.setOnClickListener(v -> {
+                if (isReadOnly) {
+                    Toast.makeText(Inventory.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(Inventory.this, AddProductActivity.class));
+            });
         }
 
         if (btnAdjustStock != null) {
-            btnAdjustStock.setOnClickListener(v -> startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class)));
-        }
-        if (btnArchive != null) {
-            // Default action if nothing is selected
-            btnArchive.setOnClickListener(v -> startActivity(new Intent(Inventory.this, DeleteProductActivity.class)));
-        }
-    }
-
-    private void listenToCategoriesForFilter() {
-        String tempId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (tempId == null || tempId.isEmpty()) {
-            tempId = AuthManager.getInstance().getCurrentUserId();
-        }
-
-        final String finalUnifiedId = tempId;
-
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Categories");
-
-        if (categoryListener != null) ref.removeEventListener(categoryListener);
-
-        categoryListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                List<String> options = new ArrayList<>();
-                options.add("All");
-
-                for (DataSnapshot child : snapshot.getChildren()) {
-                    Category c = child.getValue(Category.class);
-                    if (c != null && c.isActive() && finalUnifiedId.equals(c.getOwnerAdminId())) {
-                        options.add(c.getCategoryName());
-                    }
+            btnAdjustStock.setOnClickListener(v -> {
+                if (isReadOnly) {
+                    Toast.makeText(Inventory.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                    return;
                 }
+                startActivity(new Intent(Inventory.this, StockAdjustmentActivity.class));
+            });
+        }
 
-                ArrayAdapter<String> adapter = getAdaptiveAdapter(options);
-                spinnerCategoryFilter.setAdapter(adapter);
-
-                spinnerCategoryFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                        currentCategoryFilter = (String) parent.getItemAtPosition(position);
-                        applyFilters();
-                    }
-                    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-                });
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(Inventory.this, "Error loading categories", Toast.LENGTH_SHORT).show();
-            }
-        };
-        ref.addValueEventListener(categoryListener);
+        if (btnArchive != null) {
+            btnArchive.setOnClickListener(v -> {
+                if (isReadOnly) {
+                    Toast.makeText(Inventory.this, "Admin access required", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(Inventory.this, DeleteProductActivity.class));
+            });
+        }
     }
-
 
     private void applyFilters() {
         String cat = currentCategoryFilter == null ? "All" : currentCategoryFilter.trim();
@@ -493,13 +538,11 @@ public class Inventory extends BaseActivity {
         String q = currentSearchQuery == null ? "" : currentSearchQuery.toLowerCase().trim();
 
         filteredProducts.clear();
-        Set<String> seenNames = new HashSet<>();
 
         for (Product p : allProducts) {
             if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
 
             String pName = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
-            if (!pName.isEmpty() && seenNames.contains(pName)) continue;
 
             String pCat = p.getCategoryName() != null ? p.getCategoryName().trim() : "Uncategorized";
             String pLine = p.getProductLine() != null ? p.getProductLine().trim() : "Uncategorized";
@@ -516,8 +559,9 @@ public class Inventory extends BaseActivity {
 
             if (matchesSearch && matchesCategory && matchesProductLine) {
 
+                // FIX: Out of stock logic works logically now
                 if (!showOutOfStock && p.getQuantity() <= 0) {
-                    continue;
+                    continue; // Hide items with no stock when switch is OFF
                 }
 
                 if (showLowStockOnly && (!p.isCriticalStock() && !p.isLowStock())) continue;
@@ -529,7 +573,6 @@ public class Inventory extends BaseActivity {
                     if (days > 7) continue;
                 }
 
-                seenNames.add(pName);
                 filteredProducts.add(p);
             }
         }
@@ -576,14 +619,9 @@ public class Inventory extends BaseActivity {
     private void updateHeaderStats() {
         int total = 0;
         int lowOrCritical = 0;
-        Set<String> seenNames = new HashSet<>();
 
         for (Product p : allProducts) {
             if (p == null || !p.isActive() || p.isSellable() || "finished".equalsIgnoreCase(p.getProductType()) || "Menu".equalsIgnoreCase(p.getProductType())) continue;
-
-            String nameKey = p.getProductName() != null ? p.getProductName().trim().toLowerCase() : "";
-            if (!nameKey.isEmpty() && seenNames.contains(nameKey)) continue;
-            seenNames.add(nameKey);
 
             total++;
             if (p.isCriticalStock() || p.isLowStock()) {

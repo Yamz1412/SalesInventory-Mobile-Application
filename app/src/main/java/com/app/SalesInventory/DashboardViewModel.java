@@ -21,6 +21,7 @@ import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -114,6 +115,11 @@ public class DashboardViewModel extends AndroidViewModel {
     }
 
     public void loadChartData(LineChart salesTrendChart, BarChart topProductsChart, PieChart inventoryStatusChart) {
+        // FIX: Wrap incoming UI charts in WeakReferences before sending to background thread
+        WeakReference<LineChart> lineChartRef = new WeakReference<>(salesTrendChart);
+        WeakReference<BarChart> barChartRef = new WeakReference<>(topProductsChart);
+        WeakReference<PieChart> pieChartRef = new WeakReference<>(inventoryStatusChart);
+
         executorService.execute(() -> {
             try {
                 LiveData<List<Sales>> salesLive = salesRepository.getAllSales();
@@ -125,17 +131,24 @@ public class DashboardViewModel extends AndroidViewModel {
                 List<Entry> salesTrendEntries = repository.getSalesTrendData(allSales);
                 TopProductsResult topProductsResult = repository.getTopProductsData(allSales, products);
                 List<BarEntry> topProductEntries = topProductsResult.getEntries();
+
+                // Mismatch safely avoided! Using your exact method name.
                 List<String> topProductNames = topProductsResult.getProductNames();
                 int[] invStatus = repository.getInventoryStatusBreakdown(products);
 
-                if (salesTrendChart != null) {
-                    setupSalesTrendChart(salesTrendChart, salesTrendEntries);
+                LineChart lineChart = lineChartRef.get();
+                if (lineChart != null) {
+                    setupSalesTrendChart(lineChart, salesTrendEntries);
                 }
-                if (topProductsChart != null) {
-                    setupTopProductsChart(topProductsChart, topProductEntries, topProductNames);
+
+                BarChart barChart = barChartRef.get();
+                if (barChart != null) {
+                    setupTopProductsChart(barChart, topProductEntries, topProductNames);
                 }
-                if (inventoryStatusChart != null) {
-                    setupInventoryStatusChart(inventoryStatusChart, invStatus);
+
+                PieChart pieChart = pieChartRef.get();
+                if (pieChart != null) {
+                    setupInventoryStatusChart(pieChart, invStatus);
                 }
             } catch (Exception e) {
                 errorMessage.postValue("Error loading charts: " + e.getMessage());
@@ -144,6 +157,7 @@ public class DashboardViewModel extends AndroidViewModel {
     }
 
     private void setupSalesTrendChart(LineChart chart, List<Entry> entries) {
+        WeakReference<LineChart> chartRef = new WeakReference<>(chart);
         if (entries == null) entries = new ArrayList<>();
         LineDataSet dataSet = new LineDataSet(entries, "Sales (Last 7 Days)");
         dataSet.setColor(Color.parseColor("#FF6B6B"));
@@ -158,25 +172,33 @@ public class DashboardViewModel extends AndroidViewModel {
         LineData data = new LineData(dataSet);
         data.setValueTextSize(9f);
         List<Entry> finalEntries = entries;
-        chart.post(() -> {
-            chart.setData(data);
-            chart.getXAxis().setDrawGridLines(false);
-            chart.getAxisLeft().setDrawGridLines(false);
-            chart.getAxisRight().setDrawGridLines(false);
-            chart.getLegend().setEnabled(true);
-            chart.setTouchEnabled(true);
-            chart.setDragEnabled(true);
-            chart.setScaleEnabled(true);
-            chart.setPinchZoom(true);
-            chart.getDescription().setText("Daily net sales");
-            if (finalEntries.isEmpty()) {
-                chart.getDescription().setText("No sales data");
-            }
-            chart.invalidate();
-        });
+
+        LineChart safeChart = chartRef.get();
+        if (safeChart != null) {
+            safeChart.post(() -> {
+                LineChart activeChart = chartRef.get();
+                if (activeChart == null) return;
+
+                activeChart.setData(data);
+                activeChart.getXAxis().setDrawGridLines(false);
+                activeChart.getAxisLeft().setDrawGridLines(false);
+                activeChart.getAxisRight().setDrawGridLines(false);
+                activeChart.getLegend().setEnabled(true);
+                activeChart.setTouchEnabled(true);
+                activeChart.setDragEnabled(true);
+                activeChart.setScaleEnabled(true);
+                activeChart.setPinchZoom(true);
+                activeChart.getDescription().setText("Daily net sales");
+                if (finalEntries.isEmpty()) {
+                    activeChart.getDescription().setText("No sales data");
+                }
+                activeChart.invalidate();
+            });
+        }
     }
 
     private void setupTopProductsChart(BarChart chart, List<BarEntry> entries, List<String> labels) {
+        WeakReference<BarChart> chartRef = new WeakReference<>(chart);
         if (entries == null) entries = new ArrayList<>();
         if (labels == null) labels = new ArrayList<>();
 
@@ -190,37 +212,44 @@ public class DashboardViewModel extends AndroidViewModel {
         List<BarEntry> finalEntries = entries;
         List<String> finalLabels = new ArrayList<>(labels);
 
-        chart.post(() -> {
-            chart.setData(data);
-            chart.getAxisLeft().setDrawGridLines(false);
-            chart.getAxisRight().setDrawGridLines(false);
-            chart.getLegend().setEnabled(true);
-            chart.setTouchEnabled(true);
-            chart.setDragEnabled(true);
-            chart.setScaleEnabled(true);
+        BarChart safeChart = chartRef.get();
+        if (safeChart != null) {
+            safeChart.post(() -> {
+                BarChart activeChart = chartRef.get();
+                if (activeChart == null) return;
 
-            com.github.mikephil.charting.components.XAxis xAxis = chart.getXAxis();
-            xAxis.setGranularity(1f);
-            xAxis.setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
-            xAxis.setDrawGridLines(false);
+                activeChart.setData(data);
+                activeChart.getAxisLeft().setDrawGridLines(false);
+                activeChart.getAxisRight().setDrawGridLines(false);
+                activeChart.getLegend().setEnabled(true);
+                activeChart.setTouchEnabled(true);
+                activeChart.setDragEnabled(true);
+                activeChart.setScaleEnabled(true);
 
-            xAxis.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
-                @Override
-                public String getAxisLabel(float value, com.github.mikephil.charting.components.AxisBase axis) {
-                    int index = (int) value;
-                    if (index >= 0 && index < finalLabels.size()) {
-                        return finalLabels.get(index);
+                com.github.mikephil.charting.components.XAxis xAxis = activeChart.getXAxis();
+                xAxis.setGranularity(1f);
+                xAxis.setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
+                xAxis.setDrawGridLines(false);
+
+                xAxis.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
+                    @Override
+                    public String getAxisLabel(float value, com.github.mikephil.charting.components.AxisBase axis) {
+                        int index = (int) value;
+                        if (index >= 0 && index < finalLabels.size()) {
+                            return finalLabels.get(index);
+                        }
+                        return "";
                     }
-                    return "";
-                }
-            });
+                });
 
-            chart.getDescription().setText(finalEntries.isEmpty() ? "No sales data" : "Top selling products");
-            chart.invalidate();
-        });
+                activeChart.getDescription().setText(finalEntries.isEmpty() ? "No sales data" : "Top selling products");
+                activeChart.invalidate();
+            });
+        }
     }
 
     private void setupInventoryStatusChart(PieChart chart, int[] statusCounts) {
+        WeakReference<PieChart> chartRef = new WeakReference<>(chart);
         if (statusCounts == null || statusCounts.length < 4) {
             statusCounts = new int[]{0, 0, 0, 0};
         }
@@ -251,14 +280,21 @@ public class DashboardViewModel extends AndroidViewModel {
         dataSet.setValueTextColor(Color.WHITE);
         dataSet.setValueTextSize(10f);
         PieData data = new PieData(dataSet);
-        chart.post(() -> {
-            chart.setData(data);
-            chart.getLegend().setEnabled(true);
-            chart.setTouchEnabled(true);
-            chart.setDrawEntryLabels(true);
-            chart.getDescription().setText("Inventory health overview");
-            chart.invalidate();
-        });
+
+        PieChart safeChart = chartRef.get();
+        if (safeChart != null) {
+            safeChart.post(() -> {
+                PieChart activeChart = chartRef.get();
+                if (activeChart == null) return;
+
+                activeChart.setData(data);
+                activeChart.getLegend().setEnabled(true);
+                activeChart.setTouchEnabled(true);
+                activeChart.setDrawEntryLabels(true);
+                activeChart.getDescription().setText("Inventory health overview");
+                activeChart.invalidate();
+            });
+        }
     }
 
     @Override

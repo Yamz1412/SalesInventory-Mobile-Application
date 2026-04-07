@@ -2,6 +2,7 @@ package com.app.SalesInventory;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -59,6 +60,14 @@ public class AdminStaffList extends BaseActivity {
         btnCreateStaff.setOnClickListener(v -> AdminCreateStaffsActivity.startForCreate(this));
         btnEditStaff.setOnClickListener(v -> showEditForSelected());
 
+        // --- NEW: Connect the View Logs Button ---
+        Button btnViewLogs = findViewById(R.id.btnViewLogs);
+        if (btnViewLogs != null) {
+            btnViewLogs.setOnClickListener(v -> {
+                startActivity(new Intent(AdminStaffList.this, AttendanceLogsActivity.class));
+            });
+        }
+
         authManager.refreshCurrentUserStatus(success -> {
             if (!authManager.isCurrentUserAdmin()) {
                 Toast.makeText(AdminStaffList.this, "Error: Admin access only", Toast.LENGTH_SHORT).show();
@@ -79,16 +88,44 @@ public class AdminStaffList extends BaseActivity {
 
     private void showStaffContextMenu(AdminUserItem staff) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(staff.getName());
-        builder.setItems(new CharSequence[]{"Edit", "Delete"}, (dialog, which) -> {
+
+        // Show their current role next to their name in the title
+        String currentRole = staff.getRole() != null ? staff.getRole() : "Staff";
+        builder.setTitle(staff.getName() + " (" + currentRole + ")");
+
+        // Dynamically build the options based on their current role
+        String roleOption = currentRole.equalsIgnoreCase("Sub-Admin") ? "Demote to Staff" : "Promote to Sub-Admin";
+        CharSequence[] options = new CharSequence[]{"Edit Profile", roleOption, "Delete Account"};
+
+        builder.setItems(options, (dialog, which) -> {
             if (which == 0) {
                 showEditDialog(staff);
             } else if (which == 1) {
+                // Change Role Action
+                String newRole = currentRole.equalsIgnoreCase("Sub-Admin") ? "Staff" : "Sub-Admin";
+                changeStaffRole(staff, newRole);
+            } else if (which == 2) {
                 showDeleteConfirmation(staff);
             }
         });
         builder.setNegativeButton("Cancel", null);
         builder.show();
+    }
+
+    private void changeStaffRole(AdminUserItem staff, String newRole) {
+        progressBar.setVisibility(View.VISIBLE);
+
+        authManager.changeUserRole(staff.getUid(), newRole, success -> {
+            runOnUiThread(() -> {
+                progressBar.setVisibility(View.GONE);
+                if (success) {
+                    Toast.makeText(AdminStaffList.this, staff.getName() + " is now a " + newRole + "!", Toast.LENGTH_SHORT).show();
+                    loadStaff(); // Refresh the list to show the new role
+                } else {
+                    Toast.makeText(AdminStaffList.this, "Failed to change role. Please check connection.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
     }
 
     private void showEditDialog(AdminUserItem staff) {

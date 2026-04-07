@@ -41,12 +41,20 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
 
     public void setReceiveMode(boolean receiveMode) {
         this.receiveMode = receiveMode;
-        this.viewOnlyMode = false;
+        notifyDataSetChanged();
+    }
+
+    public void setViewOnlyMode(boolean viewOnlyMode) {
+        this.viewOnlyMode = viewOnlyMode;
         notifyDataSetChanged();
     }
 
     public Map<Integer, Double> getNewlyReceivedMap() {
         return newlyReceivedMap;
+    }
+
+    public Map<Integer, Long> getNewlyReceivedExpiryMap() {
+        return newlyReceivedExpiryMap;
     }
 
     @NonNull
@@ -59,88 +67,104 @@ public class POItemAdapter extends RecyclerView.Adapter<POItemAdapter.ViewHolder
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         POItem item = items.get(position);
-        holder.tvName.setText(item.getProductName());
 
-        // 1. ALWAYS remove the old text watcher before doing anything else
-        if (holder.textWatcher != null) {
-            holder.etQty.removeTextChangedListener(holder.textWatcher);
-        }
+        String unit = item.getUnit() != null ? item.getUnit() : "pcs";
+        holder.tvName.setText(item.getProductName() + " (" + unit + ")");
 
-        // Reset listener
-        holder.btnDelete.setOnClickListener(null);
+        // FORMAT FIX: Safely applied comma formatting to PO Item Subtotal
+        holder.tvPrice.setText(String.format(Locale.US, "₱%,.2f", item.getSubtotal()));
 
-        if (receiveMode) {
+        if (viewOnlyMode) {
             holder.btnDelete.setVisibility(View.GONE);
-            holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f / %s", item.getUnitPrice(), item.getUnit()));
+            holder.etQty.setEnabled(false);
+            holder.etQty.setText(String.valueOf(item.getQuantity()));
+            holder.tvExpiryDate.setVisibility(View.GONE);
+        } else if (receiveMode) {
+            holder.btnDelete.setVisibility(View.GONE);
+            holder.etQty.setEnabled(true);
 
-            double remaining = item.getQuantity() - item.getReceivedQuantity();
+            Double currentlyInputted = newlyReceivedMap.get(position);
+            holder.etQty.setText(currentlyInputted != null ? String.valueOf(currentlyInputted) : "");
+            holder.etQty.setHint("Max: " + (item.getQuantity() - item.getReceivedQuantity()));
 
-            if (remaining > 0) {
-                holder.etQty.setVisibility(View.VISIBLE);
-                holder.etQty.setText(newlyReceivedMap.containsKey(holder.getAdapterPosition()) ?
-                        String.valueOf(newlyReceivedMap.get(holder.getAdapterPosition())) : "");
-
-                holder.textWatcher = new TextWatcher() {
-                    @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                    @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                    @Override public void afterTextChanged(Editable s) {
-                        String input = s.toString().trim();
-                        if (input.isEmpty()) { newlyReceivedMap.remove(holder.getAdapterPosition()); return; }
-                        try {
-                            double qty = Double.parseDouble(input);
-                            if (qty > remaining) {
-                                holder.etQty.setText(String.valueOf(remaining));
-                                holder.etQty.setSelection(holder.etQty.getText().length());
-                                newlyReceivedMap.put(holder.getAdapterPosition(), remaining);
-                            } else {
-                                newlyReceivedMap.put(holder.getAdapterPosition(), qty);
-                            }
-                        } catch (Exception e) { newlyReceivedMap.remove(holder.getAdapterPosition()); }
-                    }
-                };
-                holder.etQty.addTextChangedListener(holder.textWatcher);
+            holder.tvExpiryDate.setVisibility(View.VISIBLE);
+            Long currentExpiry = newlyReceivedExpiryMap.get(position);
+            if (currentExpiry != null && currentExpiry > 0) {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                holder.tvExpiryDate.setText("Expiry: " + sdf.format(new java.util.Date(currentExpiry)));
             } else {
-                holder.etQty.setVisibility(View.GONE);
-            }
-        } else {
-            // --- CART MODE LOGIC ---
-            holder.btnDelete.setVisibility(View.VISIBLE);
-            holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", item.getSubtotal()));
-
-            // Set text WITHOUT triggering listeners
-            if (item.getQuantity() == (long) item.getQuantity()) {
-                holder.etQty.setText(String.format(Locale.getDefault(), "%d", (long) item.getQuantity()));
-            } else {
-                holder.etQty.setText(String.valueOf(item.getQuantity()));
+                holder.tvExpiryDate.setText("Set Expiry (Opt)");
             }
 
-            // Handle Item Deletion
-            holder.btnDelete.setOnClickListener(v -> {
-                int currentPos = holder.getAdapterPosition();
-                if (currentPos != RecyclerView.NO_POSITION && removeListener != null) {
-                    removeListener.onItemRemoved(currentPos);
-                    notifyItemRemoved(currentPos);
-                    notifyItemRangeChanged(currentPos, items.size());
-                }
+            holder.tvExpiryDate.setOnClickListener(v -> {
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                if (currentExpiry != null && currentExpiry > 0) cal.setTimeInMillis(currentExpiry);
+
+                new android.app.DatePickerDialog(context, (view, year, month, dayOfMonth) -> {
+                    java.util.Calendar newCal = java.util.Calendar.getInstance();
+                    newCal.set(year, month, dayOfMonth, 23, 59, 59);
+                    newlyReceivedExpiryMap.put(position, newCal.getTimeInMillis());
+                    notifyItemChanged(position);
+                }, cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show();
             });
 
-            // Handle Quantity Updates
+            if (holder.textWatcher != null) holder.etQty.removeTextChangedListener(holder.textWatcher);
             holder.textWatcher = new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                 @Override public void afterTextChanged(Editable s) {
+                    if (holder.getAdapterPosition() == RecyclerView.NO_POSITION) return;
                     int currentPos = holder.getAdapterPosition();
-                    if (currentPos == RecyclerView.NO_POSITION) return;
+                    String input = s.toString();
+                    if (input.isEmpty()) {
+                        newlyReceivedMap.remove(currentPos);
+                    } else {
+                        try {
+                            double qty = Double.parseDouble(input);
+                            double maxAllowed = items.get(currentPos).getQuantity() - items.get(currentPos).getReceivedQuantity();
+                            if (qty > maxAllowed) {
+                                holder.etQty.setError("Cannot exceed " + maxAllowed);
+                                qty = maxAllowed;
+                            } else {
+                                holder.etQty.setError(null);
+                            }
+                            newlyReceivedMap.put(currentPos, qty);
+                        } catch (NumberFormatException ignored) {}
+                    }
+                }
+            };
+            holder.etQty.addTextChangedListener(holder.textWatcher);
+        } else {
+            holder.btnDelete.setVisibility(View.VISIBLE);
+            holder.etQty.setEnabled(true);
 
-                    String input = s.toString().trim();
+            String qtyStr = (item.getQuantity() % 1 == 0) ? String.valueOf((long)item.getQuantity()) : String.valueOf(item.getQuantity());
+            holder.etQty.setText(qtyStr);
+            holder.tvExpiryDate.setVisibility(View.GONE);
+
+            holder.btnDelete.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION && removeListener != null) {
+                    removeListener.onItemRemoved(pos);
+                }
+            });
+
+            if (holder.textWatcher != null) holder.etQty.removeTextChangedListener(holder.textWatcher);
+            holder.textWatcher = new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (holder.getAdapterPosition() == RecyclerView.NO_POSITION) return;
+                    int currentPos = holder.getAdapterPosition();
+                    String input = s.toString();
                     if (!input.isEmpty()) {
                         try {
                             double newQty = Double.parseDouble(input);
                             if (newQty >= 0) {
                                 items.get(currentPos).setQuantity(newQty);
-                                holder.tvPrice.setText(String.format(Locale.getDefault(), "₱%.2f", items.get(currentPos).getSubtotal()));
+                                // FORMAT FIX: Safely applied comma formatting on real-time text edits
+                                holder.tvPrice.setText(String.format(Locale.US, "₱%,.2f", items.get(currentPos).getSubtotal()));
                                 if (onQtyChangedTask != null) {
-                                    // Trigger the activity calculation without refreshing the whole list
                                     holder.itemView.post(() -> onQtyChangedTask.run());
                                 }
                             }

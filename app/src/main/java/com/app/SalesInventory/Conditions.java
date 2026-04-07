@@ -1,8 +1,8 @@
 package com.app.SalesInventory;
 
-import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 
@@ -15,6 +15,12 @@ public class Conditions extends BaseActivity  {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_conditions);
 
+        // FIX: Force the top-left back arrow to appear
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Terms and Conditions");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
         btnAgree = findViewById(R.id.btnAgreeTerms);
 
         btnAgree.setOnClickListener(new View.OnClickListener() {
@@ -25,5 +31,16 @@ public class Conditions extends BaseActivity  {
                 finish();
             }
         });
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            // If they click back, it means they cancelled/declined the terms
+            setResult(RESULT_CANCELED);
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

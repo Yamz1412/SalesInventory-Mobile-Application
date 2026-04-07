@@ -28,7 +28,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
-public class DamagedProductsReportActivity extends BaseActivity {
+public class  DamagedProductsReportActivity extends BaseActivity {
 
     private TextView tvTotalItems, tvTotalLoss, tvNoData;
     private Button btnDateFilter;

@@ -36,7 +36,6 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:layout_marginBottom="20dp">
-
                 <ImageButton
                     android:id="@+id/btnEditPhoto"
                     android:layout_width="140dp"
@@ -62,7 +61,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Basic Details"
+                    android:text="General Details"
                     android:textStyle="bold"
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="12dp"/>
@@ -70,8 +69,8 @@
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/CustomTextInputLayout"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/productNameET"
                         android:layout_width="match_parent"
@@ -80,20 +79,84 @@
                         android:hint="Product Name" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp">
-
-                    <AutoCompleteTextView
-                        android:id="@+id/productTypeET"
-                        android:layout_width="match_parent"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:textColor="?attr/colorOnSurface"
-                        android:hint="Category"
-                        android:inputType="text" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginEnd="6dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/productLineET"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="?attr/colorOnSurface"
+                            android:hint="Category" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp">
+                        <AutoCompleteTextView
+                            android:id="@+id/productTypeET"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="?attr/colorOnSurface"
+                            android:hint="Type"
+                            android:inputType="text" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layoutConfigurations"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorSurface"
+                android:padding="16dp"
+                android:elevation="1dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Menu Configurations"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="12dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:weightSum="4">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Recipe" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                    </LinearLayout>
+                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sugar" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout
@@ -104,7 +167,7 @@
                 android:backgroundTint="?attr/colorSurface"
                 android:padding="16dp"
                 android:elevation="1dp"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="24dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -118,15 +181,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:weightSum="2">
-
+                    android:weightSum="3">
                     <com.google.android.material.textfield.TextInputLayout
                         style="@style/CustomTextInputLayout"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginEnd="6dp">
-
+                        android:layout_marginEnd="4dp">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/costPriceET"
                             android:layout_width="match_parent"
@@ -142,69 +203,31 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="6dp">
-
+                        android:layout_marginHorizontal="4dp">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/sellingPriceET"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="numberDecimal"
                             android:textColor="?attr/colorOnSurface"
-                            android:hint="Selling Price (₱)" />
+                            android:hint="Selling" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/CustomTextInputLayout"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/lowStockET"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="number"
+                            android:textColor="?attr/colorOnSurface"
+                            android:hint="Low Alert" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/layoutConfigurations"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/edite_round"
-                android:backgroundTint="?attr/colorSurface"
-                android:padding="16dp"
-                android:elevation="1dp"
-                android:layout_marginBottom="24dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Menu Configurations"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"
-                    android:layout_marginBottom="12dp"/>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchBOM"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Standard Recipe (Auto-Deduct)"
-                    android:textColor="?attr/colorOnSurface"
-                    android:checked="false" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchSizes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Multiple Sizes"
-                    android:textColor="?attr/colorOnSurface"
-                    android:checked="false" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchAddons"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Has Add-ons / Sinkers"
-                    android:textColor="?attr/colorOnSurface"
-                    android:checked="false" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchNotes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Custom Notes (e.g. Sugar Level)"
-                    android:textColor="?attr/colorOnSurface"
-                    android:checked="false" />
             </LinearLayout>
 
             <LinearLayout
@@ -213,7 +236,6 @@
                 android:orientation="horizontal"
                 android:weightSum="2"
                 android:layout_marginBottom="24dp">
-
                 <Button
                     android:id="@+id/btnCancelEdit"
                     style="@style/CustomButtonOutlined"
@@ -222,7 +244,6 @@
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
                     android:text="Cancel"/>
-
                 <Button
                     android:id="@+id/btnSaveEdit"
                     style="@style/CustomButton"

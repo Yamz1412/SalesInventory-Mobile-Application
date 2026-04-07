@@ -67,6 +67,17 @@
                     android:gravity="center_vertical"
                     android:layout_marginBottom="16dp">
 
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardProductImage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        app:cardCornerRadius="14dp"
+                        app:cardElevation="0dp"
+                        app:strokeWidth="0dp"
+                        app:cardBackgroundColor="@android:color/transparent">
+
                     <ImageView
                         android:id="@+id/ivBusinessLogo"
                         android:layout_width="46dp"
@@ -76,6 +87,8 @@
                         android:background="@drawable/bg_circle_light"
                         android:layout_marginEnd="12dp"
                         android:visibility="gone" />
+                    </com.google.android.material.card.MaterialCardView>
+
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -104,6 +117,18 @@
                             android:alpha="0.7"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/btn_lock_screen"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_lock"
+                        app:tint="?attr/colorOnBackground"
+                        android:scaleType="centerInside"
+                        android:contentDescription="lock system" />
+
 
                     <FrameLayout
                         android:layout_width="44dp"
@@ -809,5 +834,66 @@
         app:backgroundTint="?attr/colorOnSurface"
         style="@style/CustomButtonOutlined"
         android:contentDescription="Expand Menu" />
+
+    <LinearLayout
+        android:id="@+id/layout_lock_screen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="?attr/colorSurface"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="30dp"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_lock"
+            app:tint="?attr/colorError"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="System Locked"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enter your password to unlock the register."
+            android:textSize="14sp"
+            android:textColor="?attr/colorOnBackground"
+            android:alpha="0.7"
+            android:textAlignment="center"
+            android:layout_marginBottom="32dp"/>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Account Password">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_unlock_password"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textPassword"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_unlock"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Unlock POS"
+            android:layout_marginTop="24dp"
+            style="@style/CustomButton"/>
+    </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

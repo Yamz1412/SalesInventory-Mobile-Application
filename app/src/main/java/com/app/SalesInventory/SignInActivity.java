@@ -172,6 +172,11 @@ public class SignInActivity extends BaseActivity {
                         ProductRepository.getInstance(getApplication()).clearLocalData();
                         SalesRepository.getInstance(getApplication()).clearData();
 
+                        // Get User Name for Shift Logging
+                        String name = userSnap != null ? userSnap.getString("name") : "Staff";
+                        if (name == null && userSnap != null) name = userSnap.getString("Name");
+                        if (name == null) name = "Staff";
+
                         if ("Admin".equalsIgnoreCase(role)) {
                             if (reloaded.isEmailVerified()) {
                                 if (!approved) fStore.collection("users").document(uid).update("approved", true);
@@ -182,7 +187,6 @@ public class SignInActivity extends BaseActivity {
                                 FirestoreManager.getInstance().setBusinessOwnerId(uid);
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
-
                                 syncer.startListening();
 
                                 if (rememberCheck != null && rememberCheck.isChecked()) {
@@ -191,6 +195,9 @@ public class SignInActivity extends BaseActivity {
                                 } else {
                                     clearRememberedUser();
                                 }
+
+                                // Start Shift
+                                AuthManager.getInstance().startAutomatedShift(name);
 
                                 proceedToNextScreen(uid, uid, "Admin");
                                 cb.onProceed(true, "Admin");
@@ -213,10 +220,10 @@ public class SignInActivity extends BaseActivity {
                             updateUserProfileFromAuth(reloaded, userSnap);
                             FirestoreManager.getInstance().updateCurrentUserId(uid);
                             String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+
                             if (owner != null && !owner.isEmpty()) {
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
-
                                 syncer.startListening();
                             }
 
@@ -227,6 +234,9 @@ public class SignInActivity extends BaseActivity {
                                 clearRememberedUser();
                             }
 
+                            // Start Shift
+                            AuthManager.getInstance().startAutomatedShift(name);
+
                             proceedToNextScreen(uid, owner, "Staff");
                             cb.onProceed(true, "Staff");
                         }
@@ -236,7 +246,6 @@ public class SignInActivity extends BaseActivity {
         });
     }
 
-    // FIXED: Removed the deleted custom color methods and only sync the theme name
     private void applyRemoteTheme(DocumentSnapshot doc) {
         if (doc == null) return;
         String themeName = doc.getString("themeName");
@@ -291,6 +300,9 @@ public class SignInActivity extends BaseActivity {
         editor.apply();
     }
 
+    // =========================================================================================
+    // FIX: Smart Username Lookup Engine (Handles Case-Sensitivity & DB Key variations)
+    // =========================================================================================
     public void SingInB(View view) {
         String input = Email.getText().toString().trim();
         String password = Password.getText().toString().trim();
@@ -302,25 +314,50 @@ public class SignInActivity extends BaseActivity {
         progressBar.setVisibility(View.VISIBLE);
 
         if (!input.contains("@")) {
-            String usernameLower = input.toLowerCase();
-            fStore.collection("users").whereEqualTo("username", usernameLower).get().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
-                    String fetchedEmail = task.getResult().getDocuments().get(0).getString("email");
-                    if (fetchedEmail != null) {
-                        performFirebaseAuthLogin(fetchedEmail, password);
-                    } else {
-                        progressBar.setVisibility(View.INVISIBLE);
-                        Toast.makeText(SignInActivity.this, "Error: Account has no email linked", Toast.LENGTH_LONG).show();
-                    }
-                } else {
-                    progressBar.setVisibility(View.INVISIBLE);
-                    Toast.makeText(SignInActivity.this, "Username not found", Toast.LENGTH_LONG).show();
-                }
-            });
+            lookupUsernameAndLogin(input, password);
         } else {
             performFirebaseAuthLogin(input, password);
         }
     }
+
+    private void lookupUsernameAndLogin(final String username, final String password) {
+        // 1. Try exact match on "username" field
+        fStore.collection("users").whereEqualTo("username", username).get().addOnCompleteListener(task1 -> {
+            if (task1.isSuccessful() && task1.getResult() != null && !task1.getResult().isEmpty()) {
+                extractEmailAndLogin(task1.getResult().getDocuments().get(0), password);
+            } else {
+                // 2. Try exact match on capitalized "Username" field (Just in case)
+                fStore.collection("users").whereEqualTo("Username", username).get().addOnCompleteListener(task2 -> {
+                    if (task2.isSuccessful() && task2.getResult() != null && !task2.getResult().isEmpty()) {
+                        extractEmailAndLogin(task2.getResult().getDocuments().get(0), password);
+                    } else {
+                        // 3. Fallback to lowercase search (In case it was forcibly lowercased during sign up)
+                        fStore.collection("users").whereEqualTo("username", username.toLowerCase()).get().addOnCompleteListener(task3 -> {
+                            if (task3.isSuccessful() && task3.getResult() != null && !task3.getResult().isEmpty()) {
+                                extractEmailAndLogin(task3.getResult().getDocuments().get(0), password);
+                            } else {
+                                progressBar.setVisibility(View.INVISIBLE);
+                                Toast.makeText(SignInActivity.this, "Username not found", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    private void extractEmailAndLogin(DocumentSnapshot doc, String password) {
+        String fetchedEmail = doc.getString("email");
+        if (fetchedEmail == null) fetchedEmail = doc.getString("Email");
+
+        if (fetchedEmail != null && !fetchedEmail.isEmpty()) {
+            performFirebaseAuthLogin(fetchedEmail, password);
+        } else {
+            progressBar.setVisibility(View.INVISIBLE);
+            Toast.makeText(SignInActivity.this, "Error: Account has no email linked", Toast.LENGTH_LONG).show();
+        }
+    }
+    // =========================================================================================
 
     private void performFirebaseAuthLogin(String email, String password) {
         fAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {

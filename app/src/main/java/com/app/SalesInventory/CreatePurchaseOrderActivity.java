@@ -1,5 +1,6 @@
 package com.app.SalesInventory;
 
+import java.util.HashMap;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.Toolbar;
@@ -104,16 +105,13 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
             double[] costs = intent.getDoubleArrayExtra("MULTI_PO_COSTS");
 
             if (ids != null && !ids.isEmpty()) {
-                // 1. Set the supplier dropdown to the FIRST item's supplier automatically
                 if (suppliers != null && !suppliers.isEmpty() && suppliers.get(0) != null) {
-                    // Create a dummy supplier just for tracking the name
                     selectedSupplier = new SupplierItem("", suppliers.get(0), "", "", "", "", new ArrayList<>());
                     if (tvSelectedSupplierName != null) {
                         tvSelectedSupplierName.setText(suppliers.get(0));
                     }
                 }
 
-                // 2. Loop through all passed items and push them to cartItems
                 for (int i = 0; i < ids.size(); i++) {
                     boolean exists = false;
                     for (POItem existingItem : cartItems) {
@@ -135,72 +133,74 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                         cartItems.add(newItem);
                     }
                 }
-
-                // 3. Just update the text totals, no adapter needed here!
                 updateCartTotals();
                 Toast.makeText(this, ids.size() + " items added to Purchase Order!", Toast.LENGTH_LONG).show();
             }
         }
 
-            toolbar = findViewById(R.id.toolbar);
-            setSupportActionBar(toolbar);
-            if (getSupportActionBar() != null)
-                getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null)
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-            poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
-            suppliersRef = FirebaseDatabase.getInstance().getReference("Suppliers");
-            productRepository = SalesInventoryApplication.getProductRepository();
+        poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
+        suppliersRef = FirebaseDatabase.getInstance().getReference("Suppliers");
+        productRepository = SalesInventoryApplication.getProductRepository();
 
-            initViews();
-            applySplitScreenLayout(getResources().getConfiguration().orientation);
+        initViews();
+        applySplitScreenLayout(getResources().getConfiguration().orientation);
 
-            supplierAdapter = new SupplierAdapter(new ArrayList<>(), new SupplierAdapter.OnSupplierClickListener() {
-                @Override
-                public void onSupplierSelected(SupplierItem supplier) {
-                    selectSupplier(supplier);
-                }
+        supplierAdapter = new SupplierAdapter(new ArrayList<>(), new SupplierAdapter.OnSupplierClickListener() {
+            @Override
+            public void onSupplierSelected(SupplierItem supplier) {
+                selectSupplier(supplier);
+            }
 
-                @Override
-                public void onSupplierDoubleClicked(SupplierItem supplier) {
-                    showSupplierDetailsDialog(supplier);
-                }
+            @Override
+            public void onSupplierDoubleClicked(SupplierItem supplier) {
+                showSupplierDetailsDialog(supplier);
+            }
 
-                @Override
-                public void onSupplierLongClicked(SupplierItem supplier) {
-                    showSupplierOptionsDialog(supplier);
-                }
-            });
+            @Override
+            public void onSupplierLongClicked(SupplierItem supplier) {
+                showSupplierOptionsDialog(supplier);
+            }
+        });
 
-            productAdapter = new SupplierProductAdapter(new ArrayList<>(), new SupplierProductAdapter.OnProductClickListener() {
-                @Override
-                public void onProductClick(Product product) {
-                    showAddProductToPODialog(product);
-                }
+        productAdapter = new SupplierProductAdapter(new ArrayList<>(), new SupplierProductAdapter.OnProductClickListener() {
+            @Override
+            public void onProductClick(Product product) {
+                showAddProductToPODialog(product);
+            }
 
-                @Override
-                public void onProductLongClick(Product product) {
-                    showProductOptionsDialog(product);
-                }
-            });
+            @Override
+            public void onProductLongClick(Product product) {
+                showProductOptionsDialog(product);
+            }
+        });
 
-            setupRecyclerViews();
-            loadSuppliersAndProducts();
-            setupSearchListeners();
+        setupRecyclerViews();
+        loadSuppliersAndProducts();
+        setupSearchListeners();
 
-            btnReviewCheckout.setOnClickListener(v -> {
-                if (cartItems.isEmpty()) {
-                    Toast.makeText(this, "Cart is empty!", Toast.LENGTH_SHORT).show();
-                } else {
-                    showCheckoutDialog();
-                }
-            });
+        btnReviewCheckout.setOnClickListener(v -> {
+            if (cartItems.isEmpty()) {
+                Toast.makeText(this, "Cart is empty!", Toast.LENGTH_SHORT).show();
+            } else {
+                showCheckoutDialog();
+            }
+        });
 
-            btnQuickAddSupplier.setOnClickListener(v -> {
-                startActivity(new Intent(CreatePurchaseOrderActivity.this, AddSupplierActivity.class));
-            });
-            SyncScheduler.enqueueImmediateSync(this);
-        }
+        btnQuickAddSupplier.setOnClickListener(v -> {
+            startActivity(new Intent(CreatePurchaseOrderActivity.this, AddSupplierActivity.class));
+        });
+        SyncScheduler.enqueueImmediateSync(this);
+    }
 
+    // ================================================================
+    // FIX 1: The Adapters now FORCE the correct text color
+    // based on the App's ThemeManager (Dark vs Light)
+    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
@@ -269,7 +269,9 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         Button btnAdd = dialogView.findViewById(R.id.btnDialogAdd);
         Button btnCancel = dialogView.findViewById(R.id.btnDialogCancel);
 
-        // Force text colors to match the theme dynamically
+        // ================================================================
+        // FIX 2: Dialog EditTexts and TextViews are explicitly colored
+        // ================================================================
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
 
@@ -666,7 +668,8 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         }
 
         tvCartSummary.setText(itemCount + " Items in PO");
-        tvCartTotal.setText(String.format(Locale.getDefault(), "Total: ₱%.2f", total));
+        // FIX 3: Clean currency formatting
+        tvCartTotal.setText(String.format(Locale.getDefault(), "Total: ₱%,.2f", total));
 
         if (itemCount > 0) {
             cvCartBadge.setVisibility(View.VISIBLE);
@@ -686,7 +689,9 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         TextView tvEmail = view.findViewById(R.id.dlgSupplierEmail);
         TextView tvAddress = view.findViewById(R.id.dlgSupplierAddress);
 
-        // Force text colors to match the theme
+        // ================================================================
+        // FIX 4: Explicit color on checkout screen text elements
+        // ================================================================
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
         if (tvName != null) tvName.setTextColor(textColor);
@@ -729,7 +734,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         if (actvPayment != null) actvPayment.setTextColor(textColor);
         String[] paymentOptions = {"Cash", "GCash", "Custom (Bank Transfer / Credit Card)"};
 
-        // Use Adaptive adapter so dropdown entries are visible
         ArrayAdapter<String> paymentAdapter = getAdaptiveDropdownAdapter(paymentOptions);
         actvPayment.setAdapter(paymentAdapter);
 
@@ -780,75 +784,118 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
     }
 
     private void createPurchaseOrder(String paymentMethod) {
-        if (cartItems.isEmpty()) { Toast.makeText(this, "Please add at least one item", Toast.LENGTH_SHORT).show(); return; }
-
-        String id = poRef.push().getKey();
-        if (id == null) return;
-
-        String poNumber = "PO-" + System.currentTimeMillis() / 1000;
-        double total = 0;
-        for (POItem item : cartItems) total += item.getSubtotal();
-
-        final double finalTotal = total;
-
-        Set<String> uniqueSuppliers = new HashSet<>();
-        for (POItem item : cartItems) {
-            String name = item.getProductName();
-            if (name.contains("[") && name.endsWith("]")) {
-                uniqueSuppliers.add(name.substring(name.lastIndexOf("[") + 1, name.length() - 1));
-            }
+        if (cartItems.isEmpty()) {
+            Toast.makeText(this, "Cart is empty!", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        String supplierNames = uniqueSuppliers.size() == 1 ? uniqueSuppliers.iterator().next() : "Multiple Suppliers (" + String.join(", ", uniqueSuppliers) + ")";
-        String phoneStr = uniqueSuppliers.size() == 1 && selectedSupplier != null ? selectedSupplier.phone : "Multiple Contacts";
-
-        PurchaseOrder po = new PurchaseOrder(
-                id, poNumber, supplierNames, phoneStr, PurchaseOrder.STATUS_PENDING,
-                System.currentTimeMillis(), total, new ArrayList<>(cartItems)
-        );
-        po.setOwnerAdminId(AuthManager.getInstance().getCurrentUserId());
-
-        Map<String, Object> poData = po.toMap();
-        poData.put("expectedDeliveryDate", System.currentTimeMillis() + (3L * 24 * 60 * 60 * 1000));
-        poData.put("paymentMethod", paymentMethod);
-
-        poRef.child(id).setValue(poData)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Purchase Order Created Successfully", Toast.LENGTH_LONG).show();
-
-                    if (uniqueSuppliers.size() > 1) {
-                        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                        builder.setTitle("Combined PO Saved");
-                        builder.setMessage("This Purchase Order contains items from multiple suppliers. It has been saved to your records.");
-                        builder.setPositiveButton("OK", (d, which) -> finish());
-                        builder.setCancelable(false);
-                        builder.show();
-                    } else {
-                        fetchBusinessDetailsAndPrompt(poNumber, finalTotal, paymentMethod);
-                    }
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-    }
-
-    private void fetchBusinessDetailsAndPrompt(String poNumber, double total, String paymentMethod) {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (ownerId == null || ownerId.isEmpty()) {
             ownerId = AuthManager.getInstance().getCurrentUserId();
         }
 
+        DatabaseReference poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
+
+        // 1. SPLIT THE CART BY SUPPLIER
+        Map<String, List<POItem>> splitOrders = new HashMap<>();
+
+        for (POItem item : cartItems) {
+            String supplierName = "Unknown Supplier";
+            String displayName = item.getProductName();
+
+            // Extract the supplier name from the brackets [Supplier Name]
+            if (displayName != null && displayName.contains("[") && displayName.contains("]")) {
+                supplierName = displayName.substring(displayName.lastIndexOf("[") + 1, displayName.lastIndexOf("]")).trim();
+            }
+
+            if (!splitOrders.containsKey(supplierName)) {
+                splitOrders.put(supplierName, new ArrayList<>());
+            }
+            splitOrders.get(supplierName).add(item);
+        }
+
+        // 2. GENERATE A SEPARATE P.O. FOR EACH SUPPLIER
+        for (Map.Entry<String, List<POItem>> entry : splitOrders.entrySet()) {
+            String supplierName = entry.getKey();
+            List<POItem> supplierItems = entry.getValue();
+
+            double totalAmount = 0;
+            for (POItem i : supplierItems) {
+                totalAmount += (i.getUnitPrice() * i.getQuantity());
+            }
+
+            String poId = poRef.push().getKey();
+            String poNumber = "PO-" + System.currentTimeMillis() + "-" + (int)(Math.random() * 100);
+
+            PurchaseOrder newPO = new PurchaseOrder(
+                    poId,
+                    poNumber,
+                    supplierName,
+                    "Check Supplier DB", // Phone
+                    PurchaseOrder.STATUS_PENDING,
+                    System.currentTimeMillis(),
+                    totalAmount,
+                    supplierItems
+            );
+            newPO.setOwnerAdminId(ownerId);
+
+            if (poId != null) {
+                poRef.child(poId).setValue(newPO.toMap());
+            }
+
+            // 3. MATCH SUPPLIER DETAILS FOR THE PDF EMAIL PROMPT
+            SupplierItem matchedSupplier = null;
+            if (uiSupplierItems != null) {
+                for (SupplierItem s : uiSupplierItems) {
+                    if (s.name.equalsIgnoreCase(supplierName)) {
+                        matchedSupplier = s;
+                        break;
+                    }
+                }
+            }
+            if (matchedSupplier == null) {
+                // Fallback if supplier isn't strictly in the visual list
+                matchedSupplier = new SupplierItem("", supplierName, "", "", "", "", new ArrayList<>());
+            }
+
+            // 4. TRIGGER THE EMAIL / PDF PROMPT FOR THIS SPECIFIC P.O.
+            fetchBusinessDetailsAndPromptForSplit(poNumber, totalAmount, paymentMethod, matchedSupplier, supplierItems);
+        }
+
+        Toast.makeText(this, splitOrders.size() + " Purchase Order(s) Created Successfully!", Toast.LENGTH_LONG).show();
+    }
+
+    private void fetchBusinessDetailsAndPromptForSplit(String poNumber, double total, String paymentMethod, SupplierItem supplier, List<POItem> specificItems) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+
         FirebaseFirestore.getInstance().collection("users").document(ownerId).get()
                 .addOnSuccessListener(doc -> {
                     String bizName = doc.getString("businessName");
                     String bizType = doc.getString("businessType");
+                    if (bizName == null) bizName = "Our Store";
+                    if (bizType == null) bizType = "Business";
 
-                    if (bizName == null || bizName.isEmpty()) bizName = "Our Store";
-                    if (bizType == null || bizType.isEmpty()) bizType = "Business";
-
-                    promptSendPO(poNumber, total, paymentMethod, bizName, bizType);
-                })
-                .addOnFailureListener(e -> {
-                    promptSendPO(poNumber, total, paymentMethod, "Our Store", "Business");
+                    promptSendPOForSplit(poNumber, total, paymentMethod, bizName, bizType, supplier, specificItems);
                 });
+    }
+
+    private void promptSendPOForSplit(String poNumber, double total, String paymentMethod, String bizName, String bizType, SupplierItem supplier, List<POItem> specificItems) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Send PO to " + supplier.name);
+        builder.setMessage("Purchase Order " + poNumber + " is ready. Would you like to send the PDF to this supplier?");
+
+        builder.setPositiveButton("Send Email (PDF)", (dialog, which) -> {
+            // Here we pass the specificItems so the PDF only contains what belongs to this supplier
+            generatePdfAndSendEmail(poNumber, total, paymentMethod, bizName, bizType, supplier.email, "Purchase Order: " + poNumber, "Please see attached PO.", supplier, specificItems);
+        });
+
+        builder.setNegativeButton("Done", (dialog, which) -> {
+            if (supplier.name.equals(selectedSupplier != null ? selectedSupplier.name : "")) {
+                finish(); // Only close if it was the last/main one
+            }
+        });
+        builder.show();
     }
 
     private void sendPurchaseOrderViaEmail(PurchaseOrder po) {
@@ -863,12 +910,10 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
             String pdfName = exportUtil.generateFileName("Purchase_Order_" + po.getPoNumber(), ReportExportUtil.EXPORT_PDF);
             File poPdfFile = new File(exportDir, pdfName);
 
-            // 1. Generate the PDF using the iText7 generator we built
             PDFGenerator generator = new PDFGenerator(this);
-            String businessName = "Sales Inventory System"; // Change this if you fetch the name dynamically
+            String businessName = "Sales Inventory System";
             generator.generatePurchaseOrderPDF(poPdfFile, businessName, po);
 
-            // 2. Trigger the Email App Chooser
             exportUtil.shareFileViaEmail(poPdfFile, "Purchase Order: " + po.getPoNumber());
 
         } catch (Exception e) {
@@ -895,7 +940,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         builder.setMessage("The PO has been successfully saved. Would you like to generate a PDF and send it to the supplier now?");
 
         builder.setPositiveButton("Send Email (PDF)", (dialog, which) ->
-                generatePdfAndSendEmail(poNumber, total, paymentMethod, bizName, bizType, selectedSupplier.email, subject, messageBody));
+                generatePdfAndSendEmail(poNumber, total, paymentMethod, bizName, bizType, selectedSupplier.email, subject, messageBody, selectedSupplier, cartItems));
 
         builder.setNeutralButton("Send SMS", (dialog, which) -> sendSMS(selectedSupplier.phone, messageBody));
 
@@ -904,18 +949,20 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         builder.show();
     }
 
-    private void generatePdfAndSendEmail(String poNumber, double total, String paymentMethod, String bizName, String bizType, String emailAddress, String subject, String body) {
+    private void generatePdfAndSendEmail(String poNumber, double total, String paymentMethod, String bizName, String bizType, String emailAddress, String subject, String body, SupplierItem supplier, List<POItem> specificItems) {
         if (emailAddress == null || emailAddress.isEmpty()) {
-            Toast.makeText(this, "No email address found for this supplier. Falling back to SMS if available.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "No email address found for this supplier.", Toast.LENGTH_LONG).show();
             return;
         }
 
         PdfDocument document = new PdfDocument();
+        // A4 Paper Size
         PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(595, 842, 1).create();
         PdfDocument.Page page = document.startPage(pageInfo);
         Canvas canvas = page.getCanvas();
         Paint paint = new Paint();
 
+        // HEADER
         paint.setTextSize(24f);
         paint.setFakeBoldText(true);
         paint.setColor(Color.BLACK);
@@ -924,13 +971,14 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         paint.setTextSize(14f);
         paint.setFakeBoldText(false);
         canvas.drawText("From: " + bizName + " (" + bizType + ")", 50, 100, paint);
-        canvas.drawText("To: " + selectedSupplier.name, 50, 120, paint);
+        canvas.drawText("To: " + supplier.name, 50, 120, paint); // Use the passed supplier object
         canvas.drawText("PO Number: " + poNumber, 350, 100, paint);
         canvas.drawText("Payment Method: " + paymentMethod, 350, 120, paint);
 
         paint.setStrokeWidth(2f);
         canvas.drawLine(50, 140, 545, 140, paint);
 
+        // TABLE HEADERS
         paint.setFakeBoldText(true);
         canvas.drawText("Qty / Unit", 50, 170, paint);
         canvas.drawText("Description", 150, 170, paint);
@@ -938,20 +986,32 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         canvas.drawText("Subtotal", 480, 170, paint);
         canvas.drawLine(50, 180, 545, 180, paint);
 
+        // TABLE CONTENT (Using the specific items for this supplier)
         paint.setFakeBoldText(false);
         int startY = 210;
-        for (POItem item : cartItems) {
-            canvas.drawText(item.getQuantity() + " " + item.getUnit(), 50, startY, paint);
-            canvas.drawText(item.getProductName(), 150, startY, paint);
+        for (POItem item : specificItems) {
+            String unitDisplay = item.getUnit() != null ? item.getUnit() : "pcs";
+            canvas.drawText(item.getQuantity() + " " + unitDisplay, 50, startY, paint);
+
+            // Clean up display name (remove brackets if they exist)
+            String displayName = item.getProductName();
+            if (displayName.contains("[")) {
+                displayName = displayName.substring(0, displayName.indexOf("[")).trim();
+            }
+            canvas.drawText(displayName, 150, startY, paint);
+
             canvas.drawText("₱" + String.format(Locale.US, "%.2f", item.getUnitPrice()), 400, startY, paint);
             canvas.drawText("₱" + String.format(Locale.US, "%.2f", item.getSubtotal()), 480, startY, paint);
             startY += 30;
+
+            // Simple page overflow protection
+            if (startY > 750) break;
         }
 
         canvas.drawLine(50, startY, 545, startY, paint);
         paint.setFakeBoldText(true);
         paint.setTextSize(16f);
-        canvas.drawText("TOTAL AMOUNT: ₱" + String.format(Locale.US, "%.2f", total), 350, startY + 30, paint);
+        canvas.drawText("TOTAL AMOUNT: ₱" + String.format(Locale.US, "%.2f", total), 350, startY + 40, paint);
 
         document.finishPage(page);
 
@@ -963,7 +1023,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
             document.writeTo(new FileOutputStream(file));
             document.close();
 
-            android.net.Uri pdfUri = FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
+            android.net.Uri pdfUri = androidx.core.content.FileProvider.getUriForFile(this, getApplicationContext().getPackageName() + ".provider", file);
 
             Intent emailIntent = new Intent(Intent.ACTION_SEND);
             emailIntent.setType("application/pdf");
@@ -973,13 +1033,11 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
             emailIntent.putExtra(Intent.EXTRA_STREAM, pdfUri);
             emailIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            startActivity(Intent.createChooser(emailIntent, "Send PO Email via..."));
-            finish();
+            startActivity(Intent.createChooser(emailIntent, "Send PO via Email..."));
 
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Failed to generate PDF. Falling back to text email.", Toast.LENGTH_LONG).show();
-            sendEmailFallback(emailAddress, subject, body);
+            Toast.makeText(this, "Failed to generate PDF.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1053,7 +1111,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         TextView tvAddress = dialog.findViewById(R.id.tvDialogSupplierAddress);
         Button btnClose = dialog.findViewById(R.id.btnDialogClose);
 
-        // Force text colors to match the theme
         boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
         int textColor = isDark ? Color.WHITE : Color.BLACK;
         if (tvName != null) tvName.setTextColor(textColor);
@@ -1121,20 +1178,18 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                 })
                 .setNegativeButton("Cancel", null).show();
     }
+
     private void showAddToDraftDialog(Product product) {
-        // Create a simple layout for the dialog programmatically
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         int padding = (int) (20 * getResources().getDisplayMetrics().density);
         layout.setPadding(padding, padding, padding, padding);
 
-        // Text showing the item name and supplier
         android.widget.TextView tvDetails = new android.widget.TextView(this);
         tvDetails.setText("Item: " + product.getProductName() + "\nSupplier: " + product.getSupplier());
         tvDetails.setTextSize(16f);
         tvDetails.setPadding(0, 0, 0, 20);
 
-        // Ensure text is visible in dark mode
         boolean isDark = false;
         try {
             isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
@@ -1146,7 +1201,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         tvDetails.setTextColor(textColor);
         layout.addView(tvDetails);
 
-        // Input field for Quantity
         final android.widget.EditText etQuantity = new android.widget.EditText(this);
         etQuantity.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         etQuantity.setHint("Enter quantity to order (e.g., 50)");
@@ -1154,7 +1208,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         etQuantity.setHintTextColor(android.graphics.Color.GRAY);
         layout.addView(etQuantity);
 
-        // ADDED: Input field for Unit Cost to fix the ₱0.00 bug
         final android.widget.EditText etUnitCost = new android.widget.EditText(this);
         etUnitCost.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         etUnitCost.setHint("Unit Cost (₱)");
@@ -1171,7 +1224,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         etUnitCost.setLayoutParams(params);
         layout.addView(etUnitCost);
 
-        // Build and show the Dialog
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Add to Purchase Order")
                 .setView(layout)
@@ -1190,7 +1242,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
 
                     String displayName = product.getProductName() + " [" + product.getSupplier() + "]";
 
-                    // Check if item already exists in cart to prevent duplicates
                     boolean exists = false;
                     for (POItem item : cartItems) {
                         if (item.getProductName().equals(displayName)) {
@@ -1201,7 +1252,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                         }
                     }
 
-                    // Add the item to your main cart list
                     if (!exists) {
                         POItem newItem = new POItem(
                                 product.getProductId(),
@@ -1213,7 +1263,6 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
                         cartItems.add(newItem);
                     }
 
-                    // No adapter to notify here! Just update the text.
                     updateCartTotals();
 
                     android.widget.Toast.makeText(CreatePurchaseOrderActivity.this, product.getProductName() + " added to PO Cart!", android.widget.Toast.LENGTH_SHORT).show();

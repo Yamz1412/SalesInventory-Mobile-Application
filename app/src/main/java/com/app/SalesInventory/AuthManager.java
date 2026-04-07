@@ -71,7 +71,14 @@ public class AuthManager {
     }
 
     public boolean isCurrentUserAdmin() {
-        return cachedRole != null && cachedRole.equalsIgnoreCase("Admin");
+        return cachedRole != null && (cachedRole.equalsIgnoreCase("Admin") || cachedRole.equalsIgnoreCase("Owner") || cachedRole.equalsIgnoreCase("BusinessOwner"));
+    }
+
+    public boolean isCurrentUserSubAdmin() {
+        return cachedRole != null && cachedRole.equalsIgnoreCase("Sub-Admin");
+    }
+    public boolean hasManagerAccess() {
+        return isCurrentUserAdmin() || isCurrentUserSubAdmin();
     }
 
     public boolean isCurrentUserApproved() {
@@ -429,9 +436,94 @@ public class AuthManager {
         });
     }
 
+    // NEW: Flexible Promotion/Demotion System
+    public void changeUserRole(String uid, String newRole, final SimpleCallback callback) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("role", newRole);
+        updates.put("approved", true); // Ensure they stay approved when role changes
+
+        // Update the database
+        fStore.collection("users").document(uid).update(updates).addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                // If they are demoted to Staff or Sub-Admin, make sure they are removed from the super-admin collection
+                if (!newRole.equalsIgnoreCase("Admin")) {
+                    fStore.collection("admin").document(uid).delete();
+                }
+
+                // Sync with Firebase Cloud Functions
+                callAdminUpdateUser(uid, true, newRole, newRole.equalsIgnoreCase("Admin"), success -> {
+                    callback.onComplete(true);
+                });
+            } else {
+                callback.onComplete(false);
+            }
+        });
+    }
+
+    // =========================================================
+    // AUTOMATED SHIFT MANAGEMENT (REVISION 3)
+    // =========================================================
+    private String activeShiftId = null;
+
+    public void startAutomatedShift(String cashierName) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        String uid = getCurrentUserId();
+        if (uid == null || ownerId == null) return;
+
+        fStore.collection("SystemSettings").document(ownerId).get().addOnSuccessListener(doc -> {
+            boolean autoShift = true; // Default to true if not set
+            if (doc.exists() && doc.contains("autoShiftEnabled")) {
+                Boolean val = doc.getBoolean("autoShiftEnabled");
+                if (val != null) autoShift = val;
+            }
+
+            if (autoShift) {
+                activeShiftId = "SHIFT_" + System.currentTimeMillis();
+                Shift newShift = new Shift();
+                newShift.setShiftId(activeShiftId);
+                newShift.setCashierId(uid);
+                newShift.setCashierName(cashierName != null ? cashierName : "Staff");
+                newShift.setStartTime(System.currentTimeMillis());
+                newShift.setActive(true);
+                newShift.setLocked(false);
+                newShift.setStatus("Ongoing");
+
+                fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).set(newShift.toMap());
+            }
+        });
+    }
+
+    public void endAutomatedShift() {
+        if (activeShiftId == null) return;
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId != null) {
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("active", false);
+            updates.put("endTime", System.currentTimeMillis());
+            updates.put("status", "Completed");
+            fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).update(updates);
+        }
+        activeShiftId = null;
+    }
+
+    public void logShiftLock(boolean isLocking) {
+        if (activeShiftId == null) return;
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null) return;
+
+        String arrayField = isLocking ? "lockTimes" : "unlockTimes";
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("locked", isLocking);
+        updates.put(arrayField, com.google.firebase.firestore.FieldValue.arrayUnion(System.currentTimeMillis()));
+
+        fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).update(updates);
+    }
+
     public void signOutAndCleanup(final Runnable onComplete) {
         final String uid = getCurrentUserId();
         final String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+        endAutomatedShift();
 
         if (application != null) {
             ProductRepository.getInstance(application).clearLocalData();

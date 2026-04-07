@@ -4,6 +4,7 @@
     android:layout_height="wrap_content"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
+    android:gravity="center_vertical"
     android:paddingVertical="4dp"
     android:paddingHorizontal="8dp">
 
@@ -31,6 +32,20 @@
             android:textSize="12sp"
             android:textColor="?attr/colorOnBackground"
             />
+
+        <EditText
+            android:id="@+id/etCartNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Note (e.g. 0% Sugar)"
+            android:textSize="12sp"
+            android:inputType="text"
+            android:maxLines="1"
+            android:background="@null"
+            android:paddingVertical="4dp"
+            android:textColor="?attr/colorPrimary"
+            android:layout_marginTop="2dp"/>
+
     </LinearLayout>
 
     <TextView
@@ -49,14 +64,15 @@
         android:text="₱0.00"
         android:textSize="14sp"
         android:textColor="?attr/colorOnBackground"
+        android:layout_marginEnd="8dp"
         />
 
     <ImageButton
         android:id="@+id/btnRemoveItem"
         android:layout_width="46dp"
         android:layout_height="36dp"
-        android:src="@android:drawable/ic_delete"
+        android:src="@android:drawable/ic_menu_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
-        app:tint="@color/errorRed"
-        android:contentDescription="Remove item" />
+        app:tint="@color/errorRed"/>
+
 </LinearLayout>

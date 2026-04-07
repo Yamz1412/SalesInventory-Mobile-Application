@@ -1,6 +1,8 @@
 package com.app.SalesInventory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Shift {
@@ -17,8 +19,12 @@ public class Shift {
     private double actualCash;
     private double difference;
     private String status;
-    // ADDED: Tracks if the shift is currently running for real-time sync
     private boolean active;
+
+    // === NEW FIELDS FOR LOCK TRACKING ===
+    private boolean locked;
+    private List<Long> lockTimes = new ArrayList<>();
+    private List<Long> unlockTimes = new ArrayList<>();
 
     public Shift() {}
 
@@ -48,10 +54,16 @@ public class Shift {
     public void setDifference(double difference) { this.difference = difference; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-
-    // ADDED: Getter and Setter for the active status
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    // === NEW GETTERS & SETTERS ===
+    public boolean isLocked() { return locked; }
+    public void setLocked(boolean locked) { this.locked = locked; }
+    public List<Long> getLockTimes() { return lockTimes; }
+    public void setLockTimes(List<Long> lockTimes) { this.lockTimes = lockTimes; }
+    public List<Long> getUnlockTimes() { return unlockTimes; }
+    public void setUnlockTimes(List<Long> unlockTimes) { this.unlockTimes = unlockTimes; }
 
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();
@@ -68,7 +80,10 @@ public class Shift {
         map.put("actualCash", actualCash);
         map.put("difference", difference);
         map.put("status", status);
-        map.put("active", active); // ADDED: Include active state in Firestore mapping
+        map.put("active", active);
+        map.put("locked", locked);
+        map.put("lockTimes", lockTimes);
+        map.put("unlockTimes", unlockTimes);
         return map;
     }
 }

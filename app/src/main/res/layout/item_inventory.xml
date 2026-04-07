@@ -8,6 +8,8 @@
     app:cardCornerRadius="8dp"
     app:cardElevation="2dp"
     app:cardBackgroundColor="?attr/colorSurface"
+    app:strokeColor="?attr/colorPrimary"
+    app:strokeWidth=".5dp"
     >
 
     <RelativeLayout
@@ -119,7 +121,7 @@
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:gravity="center"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnBackground" />
 
             <androidx.appcompat.widget.AppCompatImageButton
                 android:id="@+id/btnIncreaseQty"

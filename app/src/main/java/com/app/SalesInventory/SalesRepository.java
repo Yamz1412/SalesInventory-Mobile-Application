@@ -75,6 +75,8 @@ public class SalesRepository {
 
     private void loadOverallRevenue() {
         if (monthlyRevenueListener != null) monthlyRevenueListener.remove();
+        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+
         monthlyRevenueListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .addSnapshotListener(MetadataChanges.INCLUDE, (snapshot, error) -> {
                     if (error != null) return;
@@ -90,6 +92,8 @@ public class SalesRepository {
     }
 
     public void getSalesByDateRange(long startTime, long endTime, MutableLiveData<List<Sales>> targetLiveData) {
+        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+
         firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .whereGreaterThanOrEqualTo("timestamp", startTime)
                 .whereLessThanOrEqualTo("timestamp", endTime)
@@ -107,6 +111,8 @@ public class SalesRepository {
 
     private void loadAllSales() {
         if (allSalesListener != null) allSalesListener.remove();
+        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+
         allSalesListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener(MetadataChanges.INCLUDE, (snapshot, error) -> {
@@ -131,6 +137,8 @@ public class SalesRepository {
         long startOfDay = getStartOfDay();
         long endOfDay = getEndOfDay();
         if (todaySalesListener != null) todaySalesListener.remove();
+        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+
         todaySalesListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .whereGreaterThanOrEqualTo("timestamp", startOfDay)
                 .whereLessThanOrEqualTo("timestamp", endOfDay)
@@ -153,6 +161,8 @@ public class SalesRepository {
 
     private void loadRecentSales() {
         if (recentSalesListener != null) recentSalesListener.remove();
+        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+
         recentSalesListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .limit(10)
@@ -438,25 +448,20 @@ public class SalesRepository {
 
         return sale;
     }
-    // ==========================================
-    // NEW: OFFLINE-FIRST LOCAL SAVE
-    // ==========================================
+
     public void saveOrderOfflineFirst(SalesOrderEntity order, List<SalesOrderItemEntity> items, OnSaleAddedListener listener) {
         java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 AppDatabase db = AppDatabase.getInstance(application);
 
-                // 1. Save to Local Room DB instantly
                 long localOrderId = db.salesDao().insertOrder(order);
                 for(SalesOrderItemEntity item : items) {
                     item.orderLocalId = localOrderId;
                 }
                 db.salesDao().insertOrderItems(items);
 
-                // 2. Tell the background worker to sync to Firebase when internet is available
                 SyncScheduler.enqueueImmediateSync(application);
 
-                // 3. Return success to UI immediately
                 if(listener != null) listener.onSaleAdded(String.valueOf(localOrderId));
 
             } catch (Exception e) {
@@ -464,6 +469,7 @@ public class SalesRepository {
             }
         });
     }
+
     public void reloadAllData() {
         loadAllSales();
         loadTodaySales();

@@ -48,19 +48,27 @@ public class CriticalStockNotifier {
             return;
         }
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setTitle(alertTitle);
-        builder.setMessage(alertMessage);
+        final String finalAlertTitle = alertTitle;
+        final String finalAlertMessage = alertMessage;
 
-        builder.setPositiveButton("Confirm", (dialog, which) -> {
-            dismissedForProduct.add(productId);
-            dialog.dismiss();
+        // Force the dialog to run on the Main UI Thread!
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            if (activity.isFinishing() || activity.isDestroyed()) return;
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+            builder.setTitle(finalAlertTitle);     // Use the final copy
+            builder.setMessage(finalAlertMessage); // Use the final copy
+
+            builder.setPositiveButton("Confirm", (dialog, which) -> {
+                dismissedForProduct.add(productId);
+                dialog.dismiss();
+            });
+
+            builder.setNegativeButton("Remind Me Later", (dialog, which) -> dialog.dismiss());
+
+            AlertDialog dialog = builder.create();
+            dialog.show();
         });
-
-        builder.setNegativeButton("Remind Me Later", (dialog, which) -> dialog.dismiss());
-
-        AlertDialog dialog = builder.create();
-        dialog.show();
     }
 
     public void clearForProduct(String productId) {
