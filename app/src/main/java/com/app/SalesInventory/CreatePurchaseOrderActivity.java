@@ -409,47 +409,54 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         DatabaseReference supplierRef = FirebaseDatabase.getInstance().getReference("Suppliers");
         supplierRef.keepSynced(true);
 
-        supplierRef.orderByChild("ownerAdminId").equalTo(finalOwnerId)
-                .addValueEventListener(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        uiSupplierItems.clear();
-                        dbSuppliersList.clear();
+        // FIX 1: Fetch suppliers and filter locally so older legacy suppliers aren't hidden
+        supplierRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                uiSupplierItems.clear();
+                dbSuppliersList.clear();
 
-                        for (DataSnapshot ds : snapshot.getChildren()) {
-                            String supId = ds.getKey();
-                            String name = ds.child("name").getValue(String.class);
-                            String email = ds.child("email").getValue(String.class);
-                            String phone = ds.child("contact").getValue(String.class);
-                            String address = ds.child("address").getValue(String.class);
-                            String categories = ds.child("categories").getValue(String.class);
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    String dbOwnerId = ds.child("ownerAdminId").getValue(String.class);
 
-                            if (name != null) {
-                                Supplier supplier = new Supplier();
-                                supplier.setId(supId);
-                                supplier.setName(name);
-                                supplier.setEmail(email);
-                                supplier.setContact(phone);
-                                supplier.setAddress(address);
-                                supplier.setCategories(categories);
-                                supplier.setOwnerAdminId(finalOwnerId);
-                                dbSuppliersList.add(supplier);
-
-                                SupplierItem item = new SupplierItem(supId, name, email, phone, address, categories, new ArrayList<>());
-                                uiSupplierItems.add(item);
-                            }
-                        }
-
-                        if (supplierAdapter != null) {
-                            supplierAdapter.filterList(new ArrayList<>(uiSupplierItems));
-                        }
-                        populateSupplierSpinner();
+                    // If it belongs to someone else, skip it. If it is null (legacy data), allow it!
+                    if (dbOwnerId != null && !dbOwnerId.equals(finalOwnerId)) {
+                        continue;
                     }
 
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
+                    String supId = ds.getKey();
+                    String name = ds.child("name").getValue(String.class);
+                    String email = ds.child("email").getValue(String.class);
+                    String phone = ds.child("contact").getValue(String.class);
+                    String address = ds.child("address").getValue(String.class);
+                    String categories = ds.child("categories").getValue(String.class);
+
+                    if (name != null) {
+                        Supplier supplier = new Supplier();
+                        supplier.setId(supId);
+                        supplier.setName(name);
+                        supplier.setEmail(email);
+                        supplier.setContact(phone);
+                        supplier.setAddress(address);
+                        supplier.setCategories(categories);
+                        supplier.setOwnerAdminId(finalOwnerId);
+                        dbSuppliersList.add(supplier);
+
+                        SupplierItem item = new SupplierItem(supId, name, email, phone, address, categories, new ArrayList<>());
+                        uiSupplierItems.add(item);
                     }
-                });
+                }
+
+                if (supplierAdapter != null) {
+                    supplierAdapter.filterList(new ArrayList<>(uiSupplierItems));
+                }
+                populateSupplierSpinner();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+            }
+        });
 
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
@@ -585,9 +592,22 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         }
         if (supplierAdapter != null) supplierAdapter.filterList(filteredList);
 
-        selectedSupplier = null;
-        tvSelectedSupplierName.setText("2. Select Products");
-        if (productAdapter != null) productAdapter.filterList(new ArrayList<>());
+        // FIX 2: Only clear the Products list if the currently selected supplier is no longer visible!
+        boolean isSupplierStillVisible = false;
+        if (selectedSupplier != null) {
+            for (SupplierItem item : filteredList) {
+                if (item.id.equals(selectedSupplier.id)) {
+                    isSupplierStillVisible = true;
+                    break;
+                }
+            }
+        }
+
+        if (!isSupplierStillVisible) {
+            selectedSupplier = null;
+            tvSelectedSupplierName.setText("2. Select Products");
+            if (productAdapter != null) productAdapter.filterList(new ArrayList<>());
+        }
     }
 
     private void filterProducts() {
@@ -639,8 +659,7 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         String supCats = supplier.categories != null ? supplier.categories.toLowerCase() : "";
 
         for (Product p : dbInventoryProducts) {
-            boolean matchesSupplierName = p.getSupplier() != null && p.getSupplier().equalsIgnoreCase(supplier.name);
-            boolean matchesCategory = false;
+            boolean matchesSupplierName = p.getSupplier() != null && p.getSupplier().trim().equalsIgnoreCase(supplier.name.trim());            boolean matchesCategory = false;
             if (p.getCategoryName() != null && !supCats.isEmpty()) {
                 matchesCategory = supCats.contains(p.getCategoryName().toLowerCase());
             }

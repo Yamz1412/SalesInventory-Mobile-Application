@@ -68,8 +68,14 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         btnAddSupplier = findViewById(R.id.btnAddSupplier);
         btnReturnProduct = findViewById(R.id.btnReturnProduct);
         btnChecklist = findViewById(R.id.btnChecklist);
-        cardChecklistBadge = findViewById(R.id.cardChecklistBadge); // NEW
-        tvChecklistBadge = findViewById(R.id.tvChecklistBadge);     // NEW
+        cardChecklistBadge = findViewById(R.id.cardChecklistBadge);
+        tvChecklistBadge = findViewById(R.id.tvChecklistBadge);
+
+        if (!AuthManager.getInstance().hasManagerAccess()) {
+            btnCreatePO.setVisibility(View.GONE);
+            btnAddSupplier.setVisibility(View.GONE);
+            btnReturnProduct.setVisibility(View.GONE);
+        }
 
         // New UI Links
         switchCompletedOnly = findViewById(R.id.switchCompletedOnly);
@@ -356,7 +362,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
     }
 
     private void showSortDialog() {
-        String[] options = {"Recently Added", "Oldest First", "Nearest Delivery", "Highest Amount"};
+        String[] options = {"Recently Added", "Oldest First", "Highest Amount"};
         int checkedItem = java.util.Arrays.asList(options).indexOf(currentSortOption);
 
         new AlertDialog.Builder(this)
@@ -391,10 +397,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
                     return Long.compare(o2.getOrderDate(), o1.getOrderDate());
                 case "Oldest First":
                     return Long.compare(o1.getOrderDate(), o2.getOrderDate());
-                case "Nearest Delivery":
-                    long d1 = o1.getExpectedDeliveryDate() > 0 ? o1.getExpectedDeliveryDate() : Long.MAX_VALUE;
-                    long d2 = o2.getExpectedDeliveryDate() > 0 ? o2.getExpectedDeliveryDate() : Long.MAX_VALUE;
-                    return Long.compare(d1, d2);
+                // FIXED: Removed the Nearest Delivery math logic
                 case "Highest Amount":
                     return Double.compare(o2.getTotalAmount(), o1.getTotalAmount());
                 default:

@@ -199,10 +199,10 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
                 ctx.startActivity(i);
             }
         });
-
-        // --- NEW: Enter selection mode on long click ---
         holder.itemView.setOnLongClickListener(v -> {
-            if (!isReadOnly && !isSelectionMode) {
+            if (isReadOnly) return true;
+
+            if (!isSelectionMode) {
                 setSelectionMode(true);
                 toggleSelection(p.getProductId());
                 return true;

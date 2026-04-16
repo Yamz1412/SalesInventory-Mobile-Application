@@ -79,6 +79,11 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
         layoutActionButtons = findViewById(R.id.layoutActionButtons);
         recyclerViewOrderItems = findViewById(R.id.recyclerViewOrderItems);
 
+        if (!AuthManager.getInstance().hasManagerAccess()) {
+            if (layoutActionButtons != null) layoutActionButtons.setVisibility(View.GONE);
+            if (tilDeliveryNote != null) tilDeliveryNote.setVisibility(View.GONE);
+        }
+
         recyclerViewOrderItems.setLayoutManager(new LinearLayoutManager(this));
 
         loadPurchaseOrder();
@@ -255,7 +260,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             if (newlyReceived > 0) {
                 hasNewReceives = true;
 
-                POItem tempItem = new POItem(item.getProductId(), item.getProductName(), newlyReceived, item.getUnitPrice(), item.getUnit());
+                POItem tempItem = new POItem(item.getProductId(), item.getProductName(), item.getQuantity(), item.getUnitPrice(), item.getUnit());
+                tempItem.setReceivedQuantity(newlyReceived);
                 itemsReceivedNow.add(tempItem);
             }
 
@@ -365,7 +371,8 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
             Map<String, Object> map = new HashMap<>();
             map.put("productId", item.getProductId());
             map.put("productName", item.getProductName());
-            map.put("receivedQuantity", item.getReceivedQuantity());
+            map.put("quantity", item.getReceivedQuantity());
+            map.put("expectedQuantity", item.getQuantity());
             map.put("unitPrice", item.getUnitPrice());
             map.put("unit", item.getUnit());
             stagingRef.child(key).setValue(map);

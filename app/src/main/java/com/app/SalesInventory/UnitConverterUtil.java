@@ -54,6 +54,9 @@ public class UnitConverterUtil {
         } else if (invUnit.equals("oz") && salesUnit.equals("ml")) {
             finalDeduction /= 29.5735;
         }
+        else if (invUnit.equals("oz") && salesUnit.equals("l")) {
+            finalDeduction *= 33.814;
+        }
         else if (piecesPerUnit > 1 && !isStandardConversion(invUnit, salesUnit)) {
             finalDeduction /= piecesPerUnit;
         }

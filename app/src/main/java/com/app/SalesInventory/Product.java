@@ -58,11 +58,12 @@ public class Product {
     private List<Map<String, Object>> addonsList;
     private List<Map<String, String>> notesList;
 
-    private boolean isPromo;
-    private boolean isTemporaryPromo;
-    private String promoName;
     private long promoStartDate;
     private long promoEndDate;
+    private boolean isPromo = false;
+    private String promoName;
+    private boolean isTemporaryPromo = false;
+    private double promoPrice = 0.0;
 
     @com.google.firebase.firestore.Exclude
     private String cartNote = "";
@@ -184,14 +185,28 @@ public class Product {
     @Exclude public long getDateAdded()                      { return dateAdded != null ? dateAdded.getTime() : 0L; }
     @Exclude public void setDateAdded(long millis)           { this.dateAdded = (millis > 0) ? new Date(millis) : null; }
 
-    @com.google.firebase.firestore.PropertyName("expiryDate")
-    public Date getExpiryDateAsDate()                        { return expiryDate; }
-    @com.google.firebase.firestore.PropertyName("expiryDate")
-    public void setExpiryDateAsDate(Date expiryDate)         { this.expiryDate = expiryDate; }
 
-    @Exclude public long getExpiryDate()                     { return expiryDate != null ? expiryDate.getTime() : 0L; }
-    @Exclude public void setExpiryDate(long millis)          { this.expiryDate = (millis > 0) ? new Date(millis) : null; }
+    @com.google.firebase.firestore.PropertyName("expiryDate")
+    public Date getExpiryDateAsDate() {
+        return expiryDate;
+    }
 
+    @com.google.firebase.firestore.PropertyName("expiryDate")
+    public void setExpiryDateAsDate(Date expiryDate) {
+        this.expiryDate = expiryDate;
+    }
+
+    // This is the method your NotificationAdapter relies on
+    @Exclude
+    public java.util.Date getExpiryDate() {
+        return expiryDate;
+    }
+
+    @Exclude
+    public void setExpiryDate(long millis) {
+        this.expiryDate = (millis > 0) ? new Date(millis) : null;
+    }
+    // -----------------------------------------------------------------
     @com.google.firebase.firestore.PropertyName("isActive")
     public boolean getIsActive()                             { return isActive; }
     @com.google.firebase.firestore.PropertyName("isActive")
@@ -229,17 +244,23 @@ public class Product {
     public boolean isPromo() { return isPromo; }
     public void setPromo(boolean promo) { isPromo = promo; }
 
-    public boolean isTemporaryPromo() { return isTemporaryPromo; }
-    public void setTemporaryPromo(boolean temporaryPromo) { isTemporaryPromo = temporaryPromo; }
-
     public String getPromoName() { return promoName; }
     public void setPromoName(String promoName) { this.promoName = promoName; }
 
+    public boolean isTemporaryPromo() { return isTemporaryPromo; }
+    public void setTemporaryPromo(boolean temporaryPromo) { isTemporaryPromo = temporaryPromo; }
+    public double getPromoPrice() { return promoPrice; }
+    public void setPromoPrice(double promoPrice) { this.promoPrice = promoPrice; }
     public long getPromoStartDate() { return promoStartDate; }
     public void setPromoStartDate(long promoStartDate) { this.promoStartDate = promoStartDate; }
 
-    public long getPromoEndDate() { return promoEndDate; }
-    public void setPromoEndDate(long promoEndDate) { this.promoEndDate = promoEndDate; }
+    public long getPromoEndDate() {
+        return promoEndDate;
+    }
+
+    public void setPromoEndDate(long promoEndDate) {
+        this.promoEndDate = promoEndDate;
+    }
     @Exclude public boolean isCriticalStock() { return criticalLevel > 0 && quantity <= criticalLevel; }
     @Exclude public boolean isLowStock()      { return quantity > criticalLevel && reorderLevel > 0 && quantity <= reorderLevel; }
     @Exclude public boolean isOverstock()     { return ceilingLevel > 0 && quantity > ceilingLevel; }
@@ -320,6 +341,12 @@ public class Product {
         m.put("addonsList", addonsList);
         m.put("notesList", notesList);
         m.put("bomList", bomList);
+        m.put("isPromo",         isPromo);
+        m.put("promoName",       promoName);
+        m.put("isTemporaryPromo",isTemporaryPromo);
+        m.put("promoStartDate",  promoStartDate);
+        m.put("promoEndDate",    promoEndDate);
+        m.put("promoPrice",      promoPrice); // <-- ADD THIS
         return m;
     }
 
@@ -355,6 +382,13 @@ public class Product {
         o = m.get("piecesPerUnit"); if (o instanceof Number) p.piecesPerUnit = ((Number)o).intValue();
         o = m.get("isActive");      if (o instanceof Boolean) p.isActive    = (Boolean)o;
         o = m.get("isSellable");    if (o instanceof Boolean) p.isSellable  = (Boolean)o;
+        o = m.get("isPromo");         if (o instanceof Boolean) p.isPromo = (Boolean)o;
+        o = m.get("promoName");       if (o != null) p.promoName = String.valueOf(o);
+        o = m.get("isTemporaryPromo");if (o instanceof Boolean) p.isTemporaryPromo = (Boolean)o;
+        o = m.get("promoPrice");      if (o instanceof Number) p.promoPrice = ((Number)o).doubleValue();
+
+        o = m.get("promoStartDate");  if (o instanceof Number) p.promoStartDate = ((Number)o).longValue();
+        o = m.get("promoEndDate");    if (o instanceof Number) p.promoEndDate = ((Number)o).longValue();
 
         if (m.get("imagePath") != null) p.imagePath = (String) m.get("imagePath");
         if (m.get("imageUrl") != null) p.imageUrl = (String) m.get("imageUrl");
@@ -372,9 +406,6 @@ public class Product {
         Object lm = m.get("linkedMaterials");
         if (lm instanceof Map) p.linkedMaterials = (Map<String,Integer>) lm;
 
-        // =======================================================
-        // CRITICAL FIX: Safe Cloud Sync Parsing for Nested Lists
-        // =======================================================
         try {
             if (m.get("sizesList") instanceof List) {
                 List<?> raw = (List<?>) m.get("sizesList");
@@ -444,5 +475,20 @@ public class Product {
     public List<Map<String, String>> getNotesList() { return notesList; }
     public void setNotesList(List<Map<String, String>> notesList) { this.notesList = notesList; }
 
+    @com.google.firebase.firestore.Exclude
+    public boolean isFinishedProduct() {
+        // If it explicitly belongs to the Menu
+        if (productType != null && productType.toLowerCase().contains("menu")) return true;
+        if (productType != null && productType.toLowerCase().contains("finished")) return true;
+
+        // If it has a recipe/ingredients linked to it, it's a finished product!
+        if (linkedMaterials != null && !linkedMaterials.isEmpty()) return true;
+
+        try {
+            if (getBomList() != null && !getBomList().isEmpty()) return true;
+        } catch (Exception ignored) {}
+
+        return false;
+    }
 
 }

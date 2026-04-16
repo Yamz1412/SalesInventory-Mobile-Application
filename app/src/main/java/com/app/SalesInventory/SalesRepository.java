@@ -11,6 +11,9 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.MetadataChanges;
 import com.google.firebase.firestore.Transaction;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -204,6 +207,7 @@ public class SalesRepository {
             return;
         }
 
+        // 1. Queue the Void Status (Works Offline)
         firestoreManager.getDb().collection("users")
                 .document(ownerId)
                 .collection("sales")
@@ -211,6 +215,7 @@ public class SalesRepository {
                 .update("status", "VOIDED")
                 .addOnSuccessListener(aVoid -> {
 
+                    // 2. Restore Inventory Locally (Works Offline)
                     ProductRepository pr = SalesInventoryApplication.getProductRepository();
                     pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
                         @Override
@@ -223,18 +228,83 @@ public class SalesRepository {
                         @Override public void onError(String error) {}
                     });
 
+                    // 3. Refund Wallet Balance safely without a Transaction (Works Offline)
                     String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
                     DocumentReference walletRef = firestoreManager.getDb().collection("users")
                             .document(ownerId).collection("wallets").document(walletId);
 
-                    firestoreManager.getDb().runTransaction(transaction -> {
-                        DocumentSnapshot snap = transaction.get(walletRef);
+                    walletRef.get().addOnSuccessListener(snap -> {
                         if (snap.exists() && snap.getDouble("balance") != null) {
                             double currentBal = snap.getDouble("balance");
-                            transaction.update(walletRef, "balance", currentBal - sale.getTotalPrice());
+                            walletRef.update("balance", currentBal - sale.getTotalPrice());
                         }
-                        return null;
                     });
+
+                    if (listener != null) listener.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    if (listener != null) listener.onError(e.getMessage());
+                });
+    }
+
+    public void processRefund(Sales sale, boolean restockItems, OnSaleVoidedListener listener) {
+        String ownerId = firestoreManager.getBusinessOwnerId();
+        if (ownerId == null || sale.getId() == null) {
+            if (listener != null) listener.onError("Invalid user or sale ID");
+            return;
+        }
+
+        FirebaseFirestore db = firestoreManager.getDb();
+
+        // 1. Mark Sale as REFUNDED (Works Offline)
+        db.collection("users")
+                .document(ownerId)
+                .collection("sales")
+                .document(sale.getId())
+                .update("status", "REFUNDED")
+                .addOnSuccessListener(aVoid -> {
+
+                    // 2. Optional: Restore Inventory Locally (Works Offline)
+                    if (restockItems) {
+                        ProductRepository pr = SalesInventoryApplication.getProductRepository();
+                        pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
+                            @Override
+                            public void onProductFetched(Product p) {
+                                if (p != null) {
+                                    double newQty = p.getQuantity() + sale.getQuantity();
+                                    pr.updateProductQuantity(p.getProductId(), newQty, null);
+                                }
+                            }
+                            @Override public void onError(String error) {}
+                        });
+                    }
+
+                    // 3. Deduct from Wallet (Offline-Safe using FieldValue)
+                    String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
+                    DocumentReference walletRef = db.collection("users").document(ownerId).collection("wallets").document(walletId);
+
+                    Map<String, Object> walletUpdates = new HashMap<>();
+                    walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+                    walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
+
+                    // 4. Deduct from Active Shift (Offline-Safe using FieldValue)
+                    String currentUserId = AuthManager.getInstance().getCurrentUserId();
+                    db.collection("users").document(ownerId).collection("shifts")
+                            .whereEqualTo("status", "ACTIVE")
+                            .whereEqualTo("cashierId", currentUserId)
+                            .get()
+                            .addOnSuccessListener(shiftSnapshot -> {
+                                if (!shiftSnapshot.isEmpty()) {
+                                    DocumentReference shiftRef = shiftSnapshot.getDocuments().get(0).getReference();
+                                    Map<String, Object> shiftUpdates = new HashMap<>();
+                                    if (walletId.equals("CASH")) {
+                                        shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+                                    } else {
+                                        shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+                                    }
+                                    shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
+                                }
+                            });
 
                     if (listener != null) listener.onSuccess();
                 })
@@ -253,7 +323,6 @@ public class SalesRepository {
         void onError(String error);
     }
 
-    // Helper method to keep data mapping identical for both addSale and processSaleWithInventoryDeduction
     private Map<String, Object> createSaleDataMap(Sales sale) {
         long now = System.currentTimeMillis();
         long date = sale.getDate() > 0 ? sale.getDate() : now;
@@ -266,6 +335,9 @@ public class SalesRepository {
         map.put("quantity", sale.getQuantity());
         map.put("price", sale.getPrice());
         map.put("totalPrice", sale.getTotalPrice());
+        map.put("totalCost", sale.getTotalCost());
+        map.put("discountAmount", sale.getDiscountAmount());
+        map.put("extraDetails", sale.getExtraDetails() != null ? sale.getExtraDetails() : "");
         map.put("paymentMethod", sale.getPaymentMethod() != null ? sale.getPaymentMethod() : "");
         map.put("deliveryType", sale.getDeliveryType() != null ? sale.getDeliveryType() : "");
         map.put("deliveryStatus", sale.getDeliveryStatus() != null ? sale.getDeliveryStatus() : "");
@@ -298,7 +370,6 @@ public class SalesRepository {
                 .addOnFailureListener(e -> { if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to add sale"); });
     }
 
-    // NEW: Advanced Add Sale (With Automatic Inventory Deduction via Transaction)
     public void processSaleWithInventoryDeduction(Sales sale, List<RecipeItem> ingredientsUsed, OnSaleAddedListener listener) {
         if (!AuthManager.getInstance().isCurrentUserApproved()) {
             listener.onError("User not approved");
@@ -308,45 +379,37 @@ public class SalesRepository {
         DocumentReference newSaleRef = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).document();
         String saleId = newSaleRef.getId();
         sale.setId(saleId);
-
         Map<String, Object> saleMap = createSaleDataMap(sale);
 
-        firestoreManager.getDb().runTransaction((Transaction.Function<Void>) transaction -> {
+        // We use a WriteBatch because it caches perfectly offline and syncs when internet returns
+        com.google.firebase.firestore.WriteBatch batch = firestoreManager.getDb().batch();
+        batch.set(newSaleRef, saleMap);
 
-            // 1. Loop through ingredients and deduct stock based on the quantity of finished goods sold
+        // Execute the sale save
+        batch.commit().addOnSuccessListener(aVoid -> {
+
+            // Deduct the ingredients locally using your offline-first repository
             if (ingredientsUsed != null && !ingredientsUsed.isEmpty()) {
+                ProductRepository pr = SalesInventoryApplication.getProductRepository();
                 for (RecipeItem ingredient : ingredientsUsed) {
-                    // NOTE: Ensure your inventory path is correct for your schema
-                    DocumentReference inventoryRef = firestoreManager.getDb()
-                            .collection("users")
-                            .document(firestoreManager.getBusinessOwnerId())
-                            .collection("products") // Or "inventory" depending on where raw materials live
-                            .document(ingredient.getRawMaterialId());
-
-                    DocumentSnapshot snapshot = transaction.get(inventoryRef);
-                    Double currentStock = snapshot.getDouble("quantity"); // Adjust if your field is named differently
-
-                    if (currentStock == null) currentStock = 0.0;
-
-                    double totalDeduction = ingredient.getQuantityRequired() * sale.getQuantity();
-                    double newStock = currentStock - totalDeduction;
-
-                    if (newStock < 0) {
-                        throw new RuntimeException("Insufficient stock for ingredient ID: " + ingredient.getRawMaterialId());
-                    }
-
-                    transaction.update(inventoryRef, "quantity", newStock);
+                    pr.getProductById(ingredient.getRawMaterialId(), new ProductRepository.OnProductFetchedListener() {
+                        @Override
+                        public void onProductFetched(Product p) {
+                            if (p != null) {
+                                double totalDeduction = ingredient.getQuantityRequired() * sale.getQuantity();
+                                double newStock = p.getQuantity() - totalDeduction;
+                                // Save the new stock locally (will trigger auto-sync to cloud)
+                                pr.updateProductQuantity(p.getProductId(), newStock, null);
+                            }
+                        }
+                        @Override public void onError(String error) {}
+                    });
                 }
             }
-
-            // 2. Save the sale record
-            transaction.set(newSaleRef, saleMap);
-
-            return null; // Transaction successful
-        }).addOnSuccessListener(aVoid -> {
             if (listener != null) listener.onSaleAdded(saleId);
+
         }).addOnFailureListener(e -> {
-            Log.e(TAG, "Transaction failed: ", e);
+            Log.e(TAG, "Batch failed: ", e);
             if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to process sale");
         });
     }

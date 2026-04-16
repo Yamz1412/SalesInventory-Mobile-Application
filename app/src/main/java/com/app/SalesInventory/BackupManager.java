@@ -21,12 +21,11 @@ public class BackupManager {
         return context.getDatabasePath(DB_NAME);
     }
 
+    // 1. STANDARD MANUAL EXPORT
     public static boolean exportDatabase(Context context, Uri destUri) {
-        // 1. Check point (Force save) or Close DB to ensure all data is in the main .db file
         AppDatabase.closeDatabase();
 
         File dbFile = getDatabaseFile(context);
-        // Also check for WAL files if they exist, though closing usually merges them
         if (dbFile == null || !dbFile.exists()) {
             Log.e(TAG, "Source database file does not exist.");
             return false;
@@ -45,7 +44,6 @@ public class BackupManager {
                 out.write(buffer, 0, len);
             }
             out.flush();
-            // Re-open DB after export if needed
             AppDatabase.getInstance(context);
             return true;
         } catch (Exception e) {
@@ -54,28 +52,56 @@ public class BackupManager {
         }
     }
 
+    // 2. NEW: AUTOMATED DAILY OVERWRITE BACKUP
+    public static boolean createAutomatedBackup(Context context) {
+        AppDatabase.closeDatabase();
+        File dbFile = getDatabaseFile(context);
+
+        if (dbFile == null || !dbFile.exists()) return false;
+
+        // Saves to the app's internal Documents folder so it overwrites safely
+        File backupDir = new File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "SalesInventory_AutoBackups");
+        if (!backupDir.exists()) backupDir.mkdirs();
+
+        File autoBackupFile = new File(backupDir, "AutoBackup_24hr.db");
+
+        // The 'false' parameter ensures it overwrites yesterday's file
+        try (FileInputStream in = new FileInputStream(dbFile);
+             FileOutputStream out = new FileOutputStream(autoBackupFile, false)) {
+
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = in.read(buffer)) > 0) {
+                out.write(buffer, 0, len);
+            }
+            out.flush();
+            AppDatabase.getInstance(context);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Auto-Backup failed", e);
+            return false;
+        }
+    }
+
+    // 3. STANDARD RESTORE
     public static boolean importDatabase(Context context, Uri srcUri) {
-        // 1. Close the active database connection to remove locks
         AppDatabase.closeDatabase();
 
         File dbFile = getDatabaseFile(context);
         if (dbFile == null) return false;
 
-        // 2. Delete temporary WAL/SHM files to prevent version conflicts
         File dbWal = new File(dbFile.getPath() + "-wal");
         File dbShm = new File(dbFile.getPath() + "-shm");
         if (dbWal.exists()) dbWal.delete();
         if (dbShm.exists()) dbShm.delete();
 
         File parent = dbFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs();
-        }
+        if (parent != null && !parent.exists()) parent.mkdirs();
 
         ContentResolver resolver = context.getContentResolver();
         try (ParcelFileDescriptor pfd = resolver.openFileDescriptor(srcUri, "r");
              InputStream in = new FileInputStream(pfd.getFileDescriptor());
-             OutputStream out = new FileOutputStream(dbFile, false)) { // 'false' overwrites file
+             OutputStream out = new FileOutputStream(dbFile, false)) {
 
             if (pfd == null) return false;
 
@@ -86,12 +112,25 @@ public class BackupManager {
             }
             out.flush();
 
-            // 3. Re-initialize the database instance
             AppDatabase.getInstance(context.getApplicationContext());
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Import failed", e);
             return false;
+        }
+    }
+
+    // 4. NEW: ACCOUNT MIGRATION FIX
+    // Forces the newly restored database to upload everything to the new Firebase account
+    public static void prepareDatabaseForNewAccount(Context context) {
+        try {
+            androidx.sqlite.db.SupportSQLiteDatabase db = AppDatabase.getInstance(context).getOpenHelper().getWritableDatabase();
+            // Mark all items as unsynced (0) so SyncWorker pushes them to the new cloud account
+            db.execSQL("UPDATE products SET isSynced = 0");
+            db.execSQL("UPDATE sales SET isSynced = 0");
+            Log.d(TAG, "Database prepped for new account migration.");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to prep database", e);
         }
     }
 }

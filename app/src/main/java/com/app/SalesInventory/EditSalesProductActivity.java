@@ -61,13 +61,12 @@ public class EditSalesProductActivity extends BaseActivity {
 
     private ImageButton btnEditPhoto;
     private TextInputEditText productNameET, sellingPriceET, costPriceET, lowStockET;
+    private TextView tvRecipeSummary, tvSizesSummary, tvAddonsSummary, tvSugarSummary;
     private AutoCompleteTextView productLineET;
     private AutoCompleteTextView productTypeET;
     private Button btnSaveEdit, btnCancelEdit;
 
-    private SwitchMaterial switchSizes, switchAddons, switchNotes, switchBOM;
-
-    // GLOBAL PRICING RULES (REVISION 1)
+    private SwitchMaterial switchSizes, switchAddons, switchEnableSugar, switchBOM;
     private boolean usePercentageMarkup = false;
     private double defaultMarkupPercent = 0.0;
     private String currentUserId;
@@ -136,13 +135,19 @@ public class EditSalesProductActivity extends BaseActivity {
         switchBOM    = findViewById(R.id.switchBOM);
         switchSizes  = findViewById(R.id.switchSizes);
         switchAddons = findViewById(R.id.switchAddons);
-        switchNotes  = findViewById(R.id.switchNotes);
+        switchEnableSugar = findViewById(R.id.switchEnableSugar);
+
+        tvRecipeSummary = findViewById(R.id.tvRecipeSummary);
+        tvSizesSummary = findViewById(R.id.tvSizesSummary);
+        tvAddonsSummary = findViewById(R.id.tvAddonsSummary);
+        tvSugarSummary = findViewById(R.id.tvSugarSummary);
 
         btnSaveEdit   = findViewById(R.id.btnSaveEdit);
         btnCancelEdit = findViewById(R.id.btnCancelEdit);
 
         // Fetch pricing rules from Settings
         loadPricingRules();
+        updateConfigUI();
 
         setupImagePickers();
         loadInventoryForCalculations();
@@ -158,16 +163,27 @@ public class EditSalesProductActivity extends BaseActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        if (switchSizes != null)  switchSizes.setOnCheckedChangeListener((btn, isChecked)  -> { if (isChecked) showSizesDialog();  else savedSizes.clear();  });
-        if (switchAddons != null) switchAddons.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showAddonsDialog(); else savedAddons.clear(); });
-        if (switchNotes != null)  switchNotes.setOnCheckedChangeListener((btn, isChecked)  -> { if (isChecked) showNotesDialog();  else savedNotes.clear();  });
-        if (switchBOM != null)    switchBOM.setOnCheckedChangeListener((btn, isChecked)    -> { if (isChecked) showBOMDialog();    else savedBOM.clear();    });
-
         btnEditPhoto.setOnClickListener(v -> tryPickImage());
         btnCancelEdit.setOnClickListener(v -> finish());
         btnSaveEdit.setOnClickListener(v -> attemptEdit());
 
         loadProductData();
+
+        if (switchSizes != null) {
+            handleSwitchLogic(switchSizes, savedSizes, "Sizes", this::showSizesDialog);
+            tvSizesSummary.setOnClickListener(v -> showSizesDialog());
+        }
+        if (switchAddons != null) {
+            handleSwitchLogic(switchAddons, savedAddons, "Add-ons", this::showAddonsDialog);
+            tvAddonsSummary.setOnClickListener(v -> showAddonsDialog());
+        }
+        if (switchBOM != null) {
+            handleSwitchLogic(switchBOM, savedBOM, "Recipe", this::showBOMDialog);
+            tvRecipeSummary.setOnClickListener(v -> showBOMDialog());
+        }
+        if (switchEnableSugar != null) {
+            switchEnableSugar.setOnCheckedChangeListener((btn, isChecked) -> updateConfigUI());
+        }
     }
 
     // =========================================================
@@ -414,22 +430,51 @@ public class EditSalesProductActivity extends BaseActivity {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_sizes, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
         LinearLayout containerRows = view.findViewById(R.id.containerRows);
         ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
         Button btnCancel = view.findViewById(R.id.btnCancel);
-        Button btnSave   = view.findViewById(R.id.btnSave);
+        Button btnSave = view.findViewById(R.id.btnSave);
+
+        TextView tvHelperInfo = view.findViewById(R.id.tvHelperInfo);
+        if(tvHelperInfo == null) {
+            TextView helper = new TextView(this);
+            helper.setText("Note: Input size pricing as Percentage Markup (e.g., 20 for +20%). Leave blank to use Base Price.");
+            helper.setTextSize(12);
+            helper.setTextColor(Color.GRAY);
+            helper.setPadding(32, 8, 32, 16);
+            ((LinearLayout) view).addView(helper, 1);
+        }
+
+        String[] sizeOptions = {"Small", "Medium", "Large", "8oz", "12oz", "16oz", "Custom"};
+        ArrayAdapter<String> sizeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, sizeOptions);
 
         Runnable addRow = () -> {
             View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
             Spinner spinnerLinked = row.findViewById(R.id.spinnerLinkedInventory);
-            MaterialButtonToggleGroup toggleHotCold = row.findViewById(R.id.toggleHotCold);
+            Spinner spinnerSizeName = row.findViewById(R.id.spinnerSizeName);
+            EditText etCustomSizeName = row.findViewById(R.id.etCustomSizeName);
+            SwitchMaterial switchHotCold = row.findViewById(R.id.switchHotCold);
+            TextView tvHotColdLabel = row.findViewById(R.id.tvHotColdLabel);
             EditText etPrice = row.findViewById(R.id.etSizePrice);
 
-            if (etPrice != null) etPrice.setHint("+ Markup %"); // Hint indicates percentage
+            if(etPrice != null) etPrice.setHint("+ Markup %");
+            spinnerSizeName.setAdapter(sizeAdapter);
+
+            spinnerSizeName.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    if ("Custom".equals(sizeOptions[position])) {
+                        etCustomSizeName.setVisibility(View.VISIBLE);
+                    } else {
+                        etCustomSizeName.setVisibility(View.GONE);
+                        etCustomSizeName.setText("");
+                    }
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
 
             Runnable updateCups = () -> {
-                boolean isHot = toggleHotCold.getCheckedButtonId() == R.id.btnHot;
+                boolean isHot = switchHotCold.isChecked();
                 List<String> filteredCups = new ArrayList<>();
                 filteredCups.add("Select Cup...");
                 for (Product p : inventoryProducts) {
@@ -442,9 +487,17 @@ public class EditSalesProductActivity extends BaseActivity {
                 if (spinnerLinked != null) spinnerLinked.setAdapter(getAdaptiveAdapter(filteredCups));
             };
 
-            if (toggleHotCold != null) {
-                toggleHotCold.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-                    if (isChecked) updateCups.run();
+            if (switchHotCold != null) {
+                switchHotCold.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    if (isChecked) {
+                        tvHotColdLabel.setText("Hot");
+                        tvHotColdLabel.setTextColor(Color.parseColor("#FF5722"));
+                        spinnerSizeName.setSelection(0); // Force to Small
+                    } else {
+                        tvHotColdLabel.setText("Cold");
+                        tvHotColdLabel.setTextColor(Color.parseColor("#2196F3"));
+                    }
+                    updateCups.run();
                 });
                 updateCups.run();
             }
@@ -459,21 +512,53 @@ public class EditSalesProductActivity extends BaseActivity {
             for (Map<String, Object> size : savedSizes) {
                 View row = LayoutInflater.from(this).inflate(R.layout.item_config_size, null);
                 Spinner spinnerLinked = row.findViewById(R.id.spinnerLinkedInventory);
-                MaterialButtonToggleGroup toggleHotCold = row.findViewById(R.id.toggleHotCold);
+                Spinner spinnerSizeName = row.findViewById(R.id.spinnerSizeName);
+                EditText etCustomSizeName = row.findViewById(R.id.etCustomSizeName);
+                SwitchMaterial switchHotCold = row.findViewById(R.id.switchHotCold);
+                TextView tvHotColdLabel = row.findViewById(R.id.tvHotColdLabel);
                 EditText etPrice = row.findViewById(R.id.etSizePrice);
+
+                spinnerSizeName.setAdapter(sizeAdapter);
 
                 if (etPrice != null) {
                     etPrice.setHint("+ Markup %");
-                    Object priceObj = size.get("price");
-                    if (priceObj != null && !priceObj.toString().equals("0.0") && !priceObj.toString().equals("0")) {
-                        etPrice.setText(String.valueOf(priceObj));
+                    Object savedPrice = size.get("priceDiff");
+                    if (savedPrice == null) savedPrice = size.get("price"); // Fallback to old format
+                    if(savedPrice != null && !savedPrice.toString().equals("0") && !savedPrice.toString().equals("0.0")) {
+                        etPrice.setText(String.valueOf(savedPrice));
                     }
                 }
 
+                // Restore Size Name
+                String savedName = (String) size.get("name");
+                int nameIndex = -1;
+                for (int i = 0; i < sizeOptions.length; i++) {
+                    if (sizeOptions[i].equalsIgnoreCase(savedName)) {
+                        nameIndex = i; break;
+                    }
+                }
+                if (nameIndex != -1) {
+                    spinnerSizeName.setSelection(nameIndex);
+                } else if (savedName != null && !savedName.isEmpty()) {
+                    spinnerSizeName.setSelection(sizeOptions.length - 1); // "Custom"
+                    etCustomSizeName.setVisibility(View.VISIBLE);
+                    etCustomSizeName.setText(savedName);
+                }
+
+                spinnerSizeName.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                        if ("Custom".equals(sizeOptions[position])) etCustomSizeName.setVisibility(View.VISIBLE);
+                        else { etCustomSizeName.setVisibility(View.GONE); etCustomSizeName.setText(""); }
+                    }
+                    @Override public void onNothingSelected(AdapterView<?> parent) {}
+                });
+
                 String savedLinked = (String) size.get("linkedMaterial");
+                String savedType = (String) size.get("type");
 
                 Runnable updateCups = () -> {
-                    boolean isHot = toggleHotCold.getCheckedButtonId() == R.id.btnHot;
+                    boolean isHot = switchHotCold.isChecked();
                     List<String> filteredCups = new ArrayList<>();
                     filteredCups.add("Select Cup...");
                     for (Product p : inventoryProducts) {
@@ -497,19 +582,22 @@ public class EditSalesProductActivity extends BaseActivity {
                     }
                 };
 
-                if (toggleHotCold != null) {
-                    toggleHotCold.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
-                        if (isChecked) updateCups.run();
-                    });
-                    if (savedLinked != null) {
-                        String lower = savedLinked.toLowerCase();
-                        if (lower.contains("cold") || lower.contains("plastic") || lower.contains("pet")) {
-                            toggleHotCold.check(R.id.btnCold);
+                if (switchHotCold != null) {
+                    switchHotCold.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                        if (isChecked) {
+                            tvHotColdLabel.setText("Hot");
+                            tvHotColdLabel.setTextColor(Color.parseColor("#FF5722"));
                         } else {
-                            toggleHotCold.check(R.id.btnHot);
+                            tvHotColdLabel.setText("Cold");
+                            tvHotColdLabel.setTextColor(Color.parseColor("#2196F3"));
                         }
+                        updateCups.run();
+                    });
+
+                    if ("Hot".equalsIgnoreCase(savedType)) {
+                        switchHotCold.setChecked(true);
                     } else {
-                        toggleHotCold.check(R.id.btnHot);
+                        switchHotCold.setChecked(false);
                     }
                     updateCups.run();
                 }
@@ -521,31 +609,35 @@ public class EditSalesProductActivity extends BaseActivity {
         }
 
         btnAddRow.setOnClickListener(v -> addRow.run());
-        btnCancel.setOnClickListener(v -> {
-            if (savedSizes.isEmpty() && switchSizes != null) switchSizes.setChecked(false);
-            dialog.dismiss();
-        });
+        btnCancel.setOnClickListener(v -> { if (savedSizes.isEmpty() && switchSizes != null) switchSizes.setChecked(false); dialog.dismiss(); });
+
         btnSave.setOnClickListener(v -> {
             savedSizes.clear();
             for (int i = 0; i < containerRows.getChildCount(); i++) {
                 View row = containerRows.getChildAt(i);
-                Spinner spinnerLinked = row.findViewById(R.id.spinnerLinkedInventory);
+                Spinner spinnerSizeName = row.findViewById(R.id.spinnerSizeName);
+                EditText etCustomSizeName = row.findViewById(R.id.etCustomSizeName);
                 EditText etPrice = row.findViewById(R.id.etSizePrice);
+                SwitchMaterial switchHotCold = row.findViewById(R.id.switchHotCold);
+                Spinner spinnerLinked = row.findViewById(R.id.spinnerLinkedInventory);
 
-                if (etPrice != null && spinnerLinked != null) {
-                    String priceStr = etPrice.getText().toString().trim();
-                    String linkedMaterial = spinnerLinked.getSelectedItem() != null && !spinnerLinked.getSelectedItem().toString().equals("Select Cup...") ? spinnerLinked.getSelectedItem().toString() : "";
+                String selectedSize = spinnerSizeName.getSelectedItem().toString();
+                String finalSizeName = "Custom".equals(selectedSize) ? etCustomSizeName.getText().toString().trim() : selectedSize;
 
-                    if (!linkedMaterial.isEmpty()) {
-                        Map<String, Object> map = new HashMap<>();
-                        map.put("name", linkedMaterial);
-                        map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
-                        map.put("linkedMaterial", linkedMaterial);
-                        map.put("deductQty", 1.0);
-                        map.put("unit", "pcs");
-                        savedSizes.add(map);
-                    }
-                }
+                if (finalSizeName.isEmpty()) continue; // Skip blank rows
+
+                String priceStr = etPrice.getText().toString().trim();
+                String linkedMaterial = spinnerLinked.getSelectedItem() != null && !spinnerLinked.getSelectedItem().toString().equals("Select Cup...") ? spinnerLinked.getSelectedItem().toString() : "";
+                String type = switchHotCold.isChecked() ? "Hot" : "Cold";
+
+                Map<String, Object> map = new HashMap<>();
+                map.put("name", finalSizeName);
+                map.put("type", type);
+                map.put("priceDiff", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
+                map.put("linkedMaterial", linkedMaterial);
+                map.put("deductQty", 1.0);
+                map.put("unit", "pcs");
+                savedSizes.add(map);
             }
             if (savedSizes.isEmpty() && switchSizes != null) switchSizes.setChecked(false);
             else Toast.makeText(this, "Sizes saved!", Toast.LENGTH_SHORT).show();
@@ -667,79 +759,6 @@ public class EditSalesProductActivity extends BaseActivity {
         dialog.show();
     }
 
-    private void showNotesDialog() {
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_notes, null);
-        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
-        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-
-        LinearLayout containerRows = view.findViewById(R.id.containerRows);
-        ImageButton btnAddRow = view.findViewById(R.id.btnAddRow);
-        Button btnCancel = view.findViewById(R.id.btnCancel);
-        Button btnSave = view.findViewById(R.id.btnSave);
-
-        List<String> sugarLevels = Arrays.asList("100", "75", "50", "25", "0");
-
-        Runnable addRow = () -> {
-            View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
-            Spinner spinnerNoteValue = row.findViewById(R.id.spinnerNoteValue);
-
-            if (spinnerNoteValue != null) spinnerNoteValue.setAdapter(getAdaptiveAdapter(sugarLevels));
-
-            View btnDelete = row.findViewById(R.id.btnDelete);
-            if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
-            containerRows.addView(row);
-        };
-
-        if (savedNotes.isEmpty()) addRow.run();
-        else {
-            for (Map<String, String> note : savedNotes) {
-                View row = LayoutInflater.from(this).inflate(R.layout.item_config_note, null);
-                Spinner spinnerNoteValue = row.findViewById(R.id.spinnerNoteValue);
-
-                if (spinnerNoteValue != null) {
-                    spinnerNoteValue.setAdapter(getAdaptiveAdapter(sugarLevels));
-                    String cleanValue = note.get("value");
-                    if (cleanValue != null && cleanValue.endsWith("%")) cleanValue = cleanValue.replace("%", "");
-                    int pos = sugarLevels.indexOf(cleanValue);
-                    if (pos >= 0) spinnerNoteValue.setSelection(pos);
-                }
-
-                View btnDelete = row.findViewById(R.id.btnDelete);
-                if (btnDelete != null) btnDelete.setOnClickListener(v -> containerRows.removeView(row));
-                containerRows.addView(row);
-            }
-        }
-
-        btnAddRow.setOnClickListener(v -> addRow.run());
-        btnCancel.setOnClickListener(v -> { if (savedNotes.isEmpty() && switchNotes != null) switchNotes.setChecked(false); dialog.dismiss(); });
-        btnSave.setOnClickListener(v -> {
-            savedNotes.clear();
-            for (int i = 0; i < containerRows.getChildCount(); i++) {
-                View row = containerRows.getChildAt(i);
-                TextView tvType = row.findViewById(R.id.tvNoteType);
-                Spinner spinnerNoteValue = row.findViewById(R.id.spinnerNoteValue);
-
-                if (tvType != null && spinnerNoteValue != null) {
-                    String type = tvType.getText().toString().trim();
-                    String value = spinnerNoteValue.getSelectedItem() != null ? spinnerNoteValue.getSelectedItem().toString() : "";
-                    if (!value.isEmpty()) {
-                        Map<String, String> map = new HashMap<>();
-                        map.put("type", type);
-                        map.put("value", value + "%");
-                        savedNotes.add(map);
-                    }
-                }
-            }
-            if (savedNotes.isEmpty() && switchNotes != null) switchNotes.setChecked(false);
-            else Toast.makeText(this, "Notes saved!", Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
-        });
-        dialog.show();
-    }
-
-    // =========================================================
-    // INVENTORY SELECTION
-    // =========================================================
     private void showInventorySelectionDialog(OnInventorySelectedListener listener) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_inventory_selection, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
@@ -778,7 +797,10 @@ public class EditSalesProductActivity extends BaseActivity {
             for (Product p : inventoryProducts) {
                 boolean matchesSearch = p.getProductName().toLowerCase().contains(query);
                 boolean matchesCat    = cat.equals("All Categories") || cat.equals(p.getCategoryName());
-                if (matchesSearch && matchesCat) filteredList.add(p);
+
+                if (matchesSearch && matchesCat && p.getQuantity() > 0) {
+                    filteredList.add(p);
+                }
             }
             listAdapter.notifyDataSetChanged();
         };
@@ -909,19 +931,19 @@ public class EditSalesProductActivity extends BaseActivity {
 
                         if (switchSizes  != null) switchSizes.setOnCheckedChangeListener(null);
                         if (switchAddons != null) switchAddons.setOnCheckedChangeListener(null);
-                        if (switchNotes  != null) switchNotes.setOnCheckedChangeListener(null);
                         if (switchBOM    != null) switchBOM.setOnCheckedChangeListener(null);
 
                         if (switchSizes  != null) switchSizes.setChecked(!savedSizes.isEmpty());
                         if (switchAddons != null) switchAddons.setChecked(!savedAddons.isEmpty());
-                        if (switchNotes  != null) switchNotes.setChecked(!savedNotes.isEmpty());
-                        if (switchBOM    != null) switchBOM.setChecked(!savedBOM.isEmpty());
-
-                        if (switchSizes  != null) switchSizes.setOnCheckedChangeListener((btn, isChecked)  -> { if (isChecked) showSizesDialog();  else savedSizes.clear();  });
-                        if (switchAddons != null) switchAddons.setOnCheckedChangeListener((btn, isChecked) -> { if (isChecked) showAddonsDialog(); else savedAddons.clear(); });
-                        if (switchNotes  != null) switchNotes.setOnCheckedChangeListener((btn, isChecked)  -> { if (isChecked) showNotesDialog();  else savedNotes.clear();  });
-                        if (switchBOM    != null) switchBOM.setOnCheckedChangeListener((btn, isChecked)    -> { if (isChecked) showBOMDialog();    else savedBOM.clear();    });
-
+                        boolean hasSugar = false;
+                        if (savedNotes != null) {
+                            for (Map<String, String> note : savedNotes) {
+                                if ("sugar_enabled".equals(note.get("type"))) {
+                                    hasSugar = true;
+                                    break;
+                                }
+                            }
+                        }
                         updateMainCostFromBOM();
                     }
                 });
@@ -965,8 +987,17 @@ public class EditSalesProductActivity extends BaseActivity {
 
         existingProductToEdit.setSizesList(savedSizes);
         existingProductToEdit.setAddonsList(savedAddons);
-        existingProductToEdit.setNotesList(savedNotes);
         existingProductToEdit.setBomList(savedBOM);
+
+        // Process the simplified Sugar Switch
+        List<Map<String, String>> finalNotes = new ArrayList<>();
+        if (switchEnableSugar != null && switchEnableSugar.isChecked()) {
+            Map<String, String> sugarNote = new HashMap<>();
+            sugarNote.put("type", "sugar_enabled");
+            sugarNote.put("value", "true");
+            finalNotes.add(sugarNote);
+        }
+        existingProductToEdit.setNotesList(finalNotes);
 
         productRepository.updateProduct(existingProductToEdit, selectedImagePath, new ProductRepository.OnProductUpdatedListener() {
             @Override public void onProductUpdated() {
@@ -987,5 +1018,73 @@ public class EditSalesProductActivity extends BaseActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == android.R.id.home) { finish(); return true; }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void handleSwitchLogic(SwitchMaterial sw, List<?> list, String title, Runnable showDialogAction) {
+        sw.setOnClickListener(v -> {
+            boolean isChecked = sw.isChecked();
+            if (isChecked) {
+                if (list.isEmpty()) {
+                    showDialogAction.run();
+                } else {
+                    new AlertDialog.Builder(this)
+                            .setTitle(title + " Active")
+                            .setMessage("You have saved details. Do you want to edit them or just enable?")
+                            .setPositiveButton("Edit Items", (d, w) -> showDialogAction.run())
+                            .setNegativeButton("Just Enable", (d, w) -> updateConfigUI())
+                            .setNeutralButton("Cancel", (d, w) -> {
+                                sw.setChecked(false);
+                                updateConfigUI();
+                            })
+                            .show();
+                }
+            } else {
+                new AlertDialog.Builder(this)
+                        .setTitle("Disable " + title + "?")
+                        .setMessage("Your details will be hidden but NOT deleted. Continue?")
+                        .setPositiveButton("Disable", (d, w) -> updateConfigUI())
+                        .setNegativeButton("Keep On", (d, w) -> {
+                            sw.setChecked(true);
+                            updateConfigUI();
+                        })
+                        .show();
+            }
+        });
+    }
+
+    private void updateConfigUI() {
+        if (tvSizesSummary != null) {
+            if (savedSizes.isEmpty()) tvSizesSummary.setText("Click to Add");
+            else {
+                StringBuilder sb = new StringBuilder();
+                for (Map<String, Object> size : savedSizes) sb.append(size.get("name")).append(", ");
+                String text = sb.toString();
+                if (text.length() > 20) text = text.substring(0, 17) + "...";
+                tvSizesSummary.setText(text.endsWith(", ") ? text.substring(0, text.length() - 2) : text);
+            }
+            tvSizesSummary.setAlpha(switchSizes.isChecked() ? 1.0f : 0.4f);
+        }
+
+        if (tvAddonsSummary != null) {
+            if (savedAddons.isEmpty()) tvAddonsSummary.setText("Click to Add");
+            else {
+                StringBuilder sb = new StringBuilder();
+                for (Map<String, Object> addon : savedAddons) sb.append(addon.get("name")).append(", ");
+                String text = sb.toString();
+                if (text.length() > 20) text = text.substring(0, 17) + "...";
+                tvAddonsSummary.setText(text.endsWith(", ") ? text.substring(0, text.length() - 2) : text);
+            }
+            tvAddonsSummary.setAlpha(switchAddons.isChecked() ? 1.0f : 0.4f);
+        }
+
+        if (tvRecipeSummary != null) {
+            if (savedBOM.isEmpty()) tvRecipeSummary.setText("Click to Add");
+            else tvRecipeSummary.setText(savedBOM.size() + " Items Added");
+            tvRecipeSummary.setAlpha(switchBOM.isChecked() ? 1.0f : 0.4f);
+        }
+
+        if (tvSugarSummary != null) {
+            tvSugarSummary.setText(switchEnableSugar.isChecked() ? "Enabled" : "Off");
+        }
     }
 }

@@ -44,6 +44,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:paddingRight="50dp"
                     android:text="Status: Active"
                     android:textColor="?attr/colorPrimary"
                     android:textStyle="bold"
@@ -253,18 +254,31 @@
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
 
-                <EditText
-                    android:id="@+id/etSearchProducts"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/search_background"
-                    android:hint="Search menu to apply promo..."
-                    android:padding="8dp"
-                    android:textSize="14sp"
-                    android:textColor="?attr/colorOnSurface"
-                    android:drawableStart="@drawable/edite_round"
-                    android:drawablePadding="8dp"
-                    android:layout_marginBottom="12dp"/>
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp"
+                    android:weightSum="2">
+
+                    <EditText
+                        android:id="@+id/etSearchProducts"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:hint="Search products..."
+                        android:background="@drawable/edite_round"
+                        android:paddingHorizontal="16dp"
+                        android:layout_marginEnd="4dp"/>
+
+                    <Spinner
+                        android:id="@+id/spinnerCategoryFilter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/edite_round"
+                        android:layout_marginStart="4dp"/>
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvPromoProducts"

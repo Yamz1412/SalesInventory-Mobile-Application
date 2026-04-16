@@ -105,13 +105,7 @@ public class SignInActivity extends BaseActivity {
         if (businessOwner != null && !businessOwner.isEmpty()) {
             FirestoreManager.getInstance().setBusinessOwnerId(businessOwner);
         }
-
-        Intent intent;
-        if ("Admin".equalsIgnoreCase(role)) {
-            intent = new Intent(getApplicationContext(), MainActivity.class);
-        } else {
-            intent = new Intent(getApplicationContext(), MainActivity.class);
-        }
+        Intent intent = new Intent(getApplicationContext(), MainActivity.class);
 
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         intent.putExtra("offline_mode", true);
@@ -185,6 +179,7 @@ public class SignInActivity extends BaseActivity {
                                 updateUserProfileFromAuth(reloaded, userSnap);
                                 FirestoreManager.getInstance().updateCurrentUserId(uid);
                                 FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                                prefs.edit().putString("business_owner_routing", uid).apply();
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + uid);
                                 ProductRemoteSyncer syncer = new ProductRemoteSyncer((Application) getApplicationContext());
                                 syncer.startListening();
@@ -220,6 +215,7 @@ public class SignInActivity extends BaseActivity {
                             updateUserProfileFromAuth(reloaded, userSnap);
                             FirestoreManager.getInstance().updateCurrentUserId(uid);
                             String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+                            prefs.edit().putString("business_owner_routing", owner).apply();
 
                             if (owner != null && !owner.isEmpty()) {
                                 FirebaseMessaging.getInstance().subscribeToTopic("owner_" + owner);
@@ -228,7 +224,7 @@ public class SignInActivity extends BaseActivity {
                             }
 
                             if (rememberCheck != null && rememberCheck.isChecked()) {
-                                cacheUserData(uid, owner, "Staff");
+                                cacheUserData(uid, owner, role); // Pass the real role!
                                 prefs.edit().putBoolean(KEY_REMEMBER, true).apply();
                             } else {
                                 clearRememberedUser();
@@ -237,8 +233,8 @@ public class SignInActivity extends BaseActivity {
                             // Start Shift
                             AuthManager.getInstance().startAutomatedShift(name);
 
-                            proceedToNextScreen(uid, owner, "Staff");
-                            cb.onProceed(true, "Staff");
+                            proceedToNextScreen(uid, owner, role);
+                            cb.onProceed(true, role);
                         }
                     }
                 });
@@ -384,10 +380,8 @@ public class SignInActivity extends BaseActivity {
                                             } else {
                                                 clearRememberedUser();
                                             }
-
-                                            if ("Admin".equalsIgnoreCase(role)) {
-                                                startActivity(new Intent(SignInActivity.this, MainActivity.class));
-                                            }
+                                            SalesInventoryApplication.logAttendance("SHIFT_START");
+                                            startActivity(new Intent(SignInActivity.this, MainActivity.class));
                                             finish();
                                         }
                                     }

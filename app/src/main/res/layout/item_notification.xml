@@ -9,7 +9,7 @@
     android:layout_marginHorizontal="8dp"
     app:cardCornerRadius="12dp"
     app:cardElevation="2dp"
-    app:cardBackgroundColor="?android:attr/windowBackground">
+    app:cardBackgroundColor="?attr/colorSurface"    >
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -41,7 +41,7 @@
             android:layout_marginEnd="8dp"
             android:textStyle="bold"
             android:textSize="15sp"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="?attr/colorOnBackground"
             tools:text="Low Stock Alert"
             app:layout_constraintStart_toEndOf="@id/icon_container"
             app:layout_constraintEnd_toStartOf="@id/tv_time"
@@ -53,7 +53,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:textSize="13sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="?attr/colorOnBackground"
             android:maxLines="3"
             android:ellipsize="end"
             tools:text="Item 'Coffee Beans' is running low (Remaining: 5)."
@@ -66,7 +66,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="12sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="?attr/colorPrimary"
             tools:text="2m ago"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="@id/tv_title"

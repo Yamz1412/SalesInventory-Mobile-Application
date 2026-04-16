@@ -5,6 +5,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="horizontal"
     android:gravity="center_vertical"
+    android:background="?attr/colorSurface"
     android:paddingVertical="4dp"
     android:paddingHorizontal="8dp">
 
@@ -48,14 +49,39 @@
 
     </LinearLayout>
 
-    <TextView
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/edite_round">
+
+        <ImageButton
+            android:id="@+id/btnCartMinus"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_remove"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="?attr/colorPrimary" />
+
+        <TextView
         android:id="@+id/tvCartQty"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="x1"
+        android:text="1"
         android:textSize="14sp"
-        android:textColor="@color/textColorSecondary"
-        android:layout_marginEnd="8dp" />
+        android:textStyle="bold"
+        android:textColor="?attr/colorOnBackground"
+        android:paddingHorizontal="8dp" />
+
+        <ImageButton
+            android:id="@+id/btnCartPlus"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_add"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="?attr/colorPrimary" /> </LinearLayout>
 
     <TextView
         android:id="@+id/tvCartLineTotal"

@@ -94,11 +94,12 @@ public class Reports extends BaseActivity {
     private double currentTotalCOGS = 0.0, currentGrossProfit = 0.0, currentTotalOpex = 0.0, currentNetIncome = 0.0;
     private double currentCashSales = 0, currentGcashSales = 0, currentInventoryValue = 0;
     private int currentTransactionCount = 0;
+    private double currentTaxAmount = 0.0;
 
     // Operating Expenses Tracking
     private Map<String, Double> databaseExpenses = new HashMap<>(); // Saved in DB
-    private Map<String, Double> temporarySessionExpenses = new HashMap<>(); // Temporary in memory
-
+    private Map<String, Double> temporarySessionExpenses = new HashMap<>();
+    private Map<String, Double> currentMergedExpenses = new HashMap<>();
     private StringBuilder detailedProductsStr = new StringBuilder();
     private StringBuilder detailedDamagesStr = new StringBuilder();
     private StringBuilder detailedPOsStr = new StringBuilder();
@@ -113,6 +114,7 @@ public class Reports extends BaseActivity {
     private List<Product> currentInventory = new ArrayList<>();
     private List<Sales> allSalesList = new ArrayList<>();
 
+
     // --- NEW: Real-Time Cache Variables ---
     private List<DataSnapshot> cachedOpex = new ArrayList<>();
     private List<StockAdjustment> cachedAdjustments = new ArrayList<>();
@@ -120,6 +122,11 @@ public class Reports extends BaseActivity {
     private List<DataSnapshot> cachedReturns = new ArrayList<>();
 
     private ValueEventListener opexListener, adjListener, poListener, returnsListener;
+    private String currentUserName = "Authorized User";
+    private String currentUserRole = "Staff";
+
+    private double savedTaxRate = 0.0;
+    private String savedTaxType = "Inclusive";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -134,6 +141,16 @@ public class Reports extends BaseActivity {
         }
 
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        String uid = AuthManager.getInstance().getCurrentUserId();
+        if (uid != null && !uid.isEmpty()) {
+            FirebaseFirestore.getInstance().collection("users").document(uid).get().addOnSuccessListener(doc -> {
+                if (doc.exists()) {
+                    if (doc.getString("name") != null) currentUserName = doc.getString("name");
+                    if (doc.getString("role") != null) currentUserRole = doc.getString("role");
+                }
+            });
+        }
+
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
 
@@ -207,9 +224,9 @@ public class Reports extends BaseActivity {
             }
         });
 
-        AuthManager.getInstance().isCurrentUserAdminAsync(isAdmin -> {
+        AuthManager.getInstance().refreshCurrentUserStatus(success -> {
             runOnUiThread(() -> {
-                if (!isAdmin) {
+                if (!AuthManager.getInstance().hasManagerAccess()) {
                     // Hide ALL 5 action buttons from Staff accounts
                     if (btnOperatingExpenses != null) btnOperatingExpenses.setVisibility(View.GONE);
                     if (btnExportPDF != null) btnExportPDF.setVisibility(View.GONE);
@@ -266,7 +283,6 @@ public class Reports extends BaseActivity {
 
         ArrayAdapter<String> spinAdapter = getAdaptiveAdapter(options);
         spinnerDateFilter.setAdapter(spinAdapter);
-        spinnerDateFilter.setSelection(7);
 
         spinnerDateFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -328,7 +344,6 @@ public class Reports extends BaseActivity {
     }
 
     private void loadLocalData() {
-        // 1. Listen to Products
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
                 currentInventory = products;
@@ -553,19 +568,19 @@ public class Reports extends BaseActivity {
                 double netPrice = s.getTotalPrice();
                 double cost = s.getTotalCost();
 
+                // 1. Calculate missing cost for products from inventory
                 if (cost <= 0 && s.getQuantity() > 0 && !s.getOrderId().startsWith("MOCK-")) {
-                    String rawName = s.getProductName() != null ? s.getProductName() : "";
+                    String rawName = s.getProductName() != null ? s.getProductName() : "Unknown Product";
                     String baseName = rawName;
-                    int parenIdx = rawName.indexOf(" (");
-                    int bracketIdx = rawName.indexOf(" [");
-                    int minIdx = rawName.length();
-                    if (parenIdx != -1) minIdx = Math.min(minIdx, parenIdx);
-                    if (bracketIdx != -1) minIdx = Math.min(minIdx, bracketIdx);
-                    if (minIdx != rawName.length()) baseName = rawName.substring(0, minIdx).trim();
+                    int bracketOrParen = rawName.length();
+                    int parenIdx2 = rawName.indexOf(" (");
+                    int bracketIdx2 = rawName.indexOf(" [");
+                    if (parenIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, parenIdx2);
+                    if (bracketIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, bracketIdx2);
+                    if (bracketOrParen != rawName.length()) { baseName = rawName.substring(0, bracketOrParen).trim(); }
 
                     for (Product p : currentInventory) {
                         if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(baseName)) {
-
                             if ("Menu".equalsIgnoreCase(p.getProductType()) && p.getBomList() != null && !p.getBomList().isEmpty()) {
                                 double recipeCost = 0.0;
                                 for (Map<String, Object> bomItem : p.getBomList()) {
@@ -591,6 +606,7 @@ public class Reports extends BaseActivity {
                     }
                 }
 
+                // 2. Establish variables securely
                 double discount = s.getDiscountAmount();
                 String paymentType = s.getPaymentMethod() != null ? s.getPaymentMethod() : "Unknown";
                 if (paymentType.toLowerCase().contains("cash")) { cashCount++; currentCashSales += netPrice; }
@@ -600,6 +616,7 @@ public class Reports extends BaseActivity {
                 currentTotalCOGS += cost;
                 currentTotalDiscounts += discount;
 
+                // 3. Format Strings for PDF
                 String rawName = s.getProductName() != null ? s.getProductName() : "Unknown Product";
                 String baseName = rawName;
                 String options = "";
@@ -609,15 +626,23 @@ public class Reports extends BaseActivity {
                 if (parenIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, parenIdx2);
                 if (bracketIdx2 != -1) bracketOrParen = Math.min(bracketOrParen, bracketIdx2);
                 if (bracketOrParen != rawName.length()) { baseName = rawName.substring(0, bracketOrParen).trim(); options = rawName.substring(bracketOrParen).trim(); }
+
                 String displayName = baseName;
                 String details = paymentType;
                 if (!options.isEmpty()) details += "\n" + options;
+
+                // FIX: Use extraDetails to securely grab the Promo Information without crashing
+                if (s.getExtraDetails() != null && !s.getExtraDetails().isEmpty()) {
+                    details += "\n" + s.getExtraDetails();
+                }
+
                 String dateStr = timeFormat.format(new Date(ts));
 
                 ReportItem ri = new ReportItem(displayName, dateStr, String.valueOf(s.getQuantity()), String.format(Locale.US, "₱%.2f", netPrice), details, discount);
                 if (netPrice < 0) ri.isRefund = true;
                 allReportItems.add(ri);
 
+                // 4. Update Best Sellers
                 if (!bsMap.containsKey(displayName)) bsMap.put(displayName, new BestSellerItem(displayName));
                 BestSellerItem bsItem = bsMap.get(displayName);
                 bsItem.quantitySold += s.getQuantity(); bsItem.totalRevenue += netPrice; bsItem.totalCost += cost;
@@ -779,15 +804,47 @@ public class Reports extends BaseActivity {
             mergedExpenses.put(entry.getKey(), mergedExpenses.getOrDefault(entry.getKey(), 0.0) + entry.getValue());
         }
 
+        currentMergedExpenses.clear();
+        currentMergedExpenses.putAll(mergedExpenses);
+
         currentTotalOpex = 0.0;
         for (Map.Entry<String, Double> entry : mergedExpenses.entrySet()) {
             currentTotalOpex += entry.getValue();
             addExpenseRowToIncomeStatement(entry.getKey(), entry.getValue());
         }
 
-        currentNetIncome = currentGrossProfit - currentTotalOpex;
-        tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
-        tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
+        FirebaseDatabase.getInstance().getReference("SystemSettings").child(currentOwnerId)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        double taxAmount = 0.0;
+                        boolean taxEnabled = snapshot.child("taxEnabled").getValue(Boolean.class) != null ? snapshot.child("taxEnabled").getValue(Boolean.class) : false;
+
+                        if (taxEnabled) {
+                            double taxRate = snapshot.child("taxRate").getValue(Double.class) != null ? snapshot.child("taxRate").getValue(Double.class) : 0.0;
+                            String taxType = snapshot.child("taxType").getValue(String.class) != null ? snapshot.child("taxType").getValue(String.class) : "Inclusive";
+
+                            if (taxRate > 0) {
+                                if (taxType.equals("Inclusive")) {
+                                    double vatableSales = currentNetSales / (1 + (taxRate / 100));
+                                    taxAmount = currentNetSales - vatableSales;
+                                } else {
+                                    taxAmount = currentNetSales * (taxRate / 100);
+                                }
+
+                                currentTaxAmount = taxAmount;
+                                addExpenseRowToIncomeStatement("Tax / VAT Payable (" + taxRate + "%)", taxAmount);
+                                currentTotalOpex += taxAmount;
+                            }
+                        }
+
+                        // Finalize the Income Statement Math
+                        currentNetIncome = currentGrossProfit - currentTotalOpex;
+                        tvISOpex.setText(String.format(Locale.US, "%,.2f", currentTotalOpex));
+                        tvISNetIncome.setText(String.format(Locale.US, "₱ %,.2f", currentNetIncome));
+                    }
+                    @Override public void onCancelled(@NonNull DatabaseError error) {}
+                });
     }
 
     private void generateDetailedStrings() {
@@ -1072,23 +1129,39 @@ public class Reports extends BaseActivity {
 
             PDFGenerator generator = new PDFGenerator(this);
             String dateRange = btnStartDate.getText().toString() + " to " + btnEndDate.getText().toString();
+            String preparedBy = currentUserName + " (" + currentUserRole + ")"; // FORMATS NAME AND ROLE
 
             if (reportTypeIndex == 0) {
                 generator.generateAccountingReportPDF(
-                        tempPdfFile, dateRange, businessName,
-                        currentGrossSales, currentTotalDiscounts, currentNetSales,
-                        currentTotalCOGS, currentGrossProfit, currentTotalOpex, currentNetIncome,
-                        currentCashSales, currentGcashSales, currentTransactionCount, currentInventoryValue,
-                        allReportItems
+                        tempPdfFile,
+                        dateRange,
+                        businessName,
+                        currentGrossSales,
+                        currentTotalDiscounts,
+                        currentNetSales,
+                        currentTotalCOGS,
+                        currentGrossProfit,
+                        currentMergedExpenses,
+                        currentTotalOpex,
+                        currentTaxAmount,
+                        currentNetIncome,
+                        currentCashSales,
+                        currentGcashSales,
+                        currentTransactionCount,
+                        currentInventoryValue,
+                        allReportItems,
+                        bestSellersList,
+                        preparedBy
                 );
             } else if (reportTypeIndex == 1) {
                 generator.generateInventoryMasterPDF(
-                        tempPdfFile, businessName, currentInventory, currentInventoryValue
+                        tempPdfFile, businessName, currentInventory, currentInventoryValue, preparedBy
                 );
             } else if (reportTypeIndex == 2) {
                 generator.generateOperationsAndReceivingReportPDF(
                         tempPdfFile, dateRange, businessName,
-                        detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), detailedDamagesStr.toString()
+                        detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), detailedDamagesStr.toString(),
+                        preparedBy
                 );
             }
 

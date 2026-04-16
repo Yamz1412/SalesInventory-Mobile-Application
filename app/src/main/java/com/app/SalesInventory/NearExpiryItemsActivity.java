@@ -56,7 +56,7 @@ public class NearExpiryItemsActivity extends BaseActivity {
             if (products != null) {
                 for (Product p : products) {
                     if (p == null || !p.isActive()) continue;
-                    long expiry = p.getExpiryDate();
+                    long expiry = p.getExpiryDate() != null ? p.getExpiryDate().getTime() : 0L;
                     if (expiry <= 0) continue;
                     long diffMillis = expiry - now;
                     long days = diffMillis / (24L * 60L * 60L * 1000L);

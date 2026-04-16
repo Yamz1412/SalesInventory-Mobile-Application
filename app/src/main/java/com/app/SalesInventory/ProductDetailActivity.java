@@ -12,6 +12,9 @@ import androidx.appcompat.app.AlertDialog;
 
 import com.bumptech.glide.Glide;
 
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+
 public class ProductDetailActivity extends BaseActivity {
 
     private TextView tvName, tvProductLine, tvCategory, tvType, tvPrice, tvCost, tvQty, tvUnit, tvExpiry, tvSupplier;
@@ -100,9 +103,9 @@ public class ProductDetailActivity extends BaseActivity {
         String pLine = p.getProductLine() != null && !p.getProductLine().isEmpty() ? p.getProductLine() : "None Assigned";
         tvProductLine.setText("Product Line: " + pLine);
 
-        if (p.getExpiryDate() > 0) {
-            java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault());
-            tvExpiry.setText("Expiry: " + fmt.format(new java.util.Date(p.getExpiryDate())));
+        if (p.getExpiryDate() != null && p.getExpiryDate().getTime() > 0) {
+            SimpleDateFormat fmt = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+            tvExpiry.setText("Expiry: " + fmt.format(p.getExpiryDate()));
         } else {
             tvExpiry.setText("Expiry: N/A");
         }

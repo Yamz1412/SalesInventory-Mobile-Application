@@ -46,13 +46,6 @@ public class ProductRemoteSyncer {
                 return;
             }
 
-            // CRITICAL FIX: Ignore the initial massive burst of 166 items!
-            // SyncWorker already downloaded them efficiently in the background.
-            if (isInitialSnapshot) {
-                isInitialSnapshot = false;
-                return;
-            }
-
             handleSnapshot(snapshots);
         });
     }
@@ -66,9 +59,16 @@ public class ProductRemoteSyncer {
 
     private void handleSnapshot(QuerySnapshot snapshot) {
         if (snapshot == null) return;
+
+        List<Product> productsToSync = new ArrayList<>();
+
         for (DocumentSnapshot doc : snapshot.getDocuments()) {
             Product p = documentToProduct(doc);
-            productRepository.upsertFromRemote(p);
+            productsToSync.add(p);
+        }
+
+        if (!productsToSync.isEmpty()) {
+            productRepository.upsertFromRemoteBulk(productsToSync);
         }
     }
 
@@ -98,7 +98,11 @@ public class ProductRemoteSyncer {
         p.setImageUrl(getString(doc, "imageUrl"));
         p.setImagePath(getString(doc, "imagePath"));
 
+        // FIX: Add missing menu configuration lists so they sync across devices!
         p.setBomList(getListObj(doc, "bomList", "bomListJson"));
+        p.setSizesList(getListObj(doc, "sizesList", "sizesListJson"));
+        p.setAddonsList(getListObj(doc, "addonsList", "addonsListJson"));
+        p.setNotesList(getMapStringList(doc, "notesList", "notesListJson"));
         p.setUnifiedVariations(getListObj(doc, "variantsList", "variantsListJson"));
 
         return p;
@@ -123,6 +127,35 @@ public class ProductRemoteSyncer {
                     while (keys.hasNext()) {
                         String key = keys.next();
                         map.put(key, obj.get(key));
+                    }
+                    list.add(map);
+                }
+                return list;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        return new ArrayList<>();
+    }
+
+    // FIX: Helper to safely extract String-based maps (used for Notes/Sugar)
+    private List<Map<String, String>> getMapStringList(DocumentSnapshot doc, String field, String jsonField) {
+        Object val = doc.get(field);
+        if (val instanceof List) {
+            try {
+                return (List<Map<String, String>>) val;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+        String json = doc.getString(jsonField);
+        if (json != null && !json.isEmpty()) {
+            try {
+                org.json.JSONArray array = new org.json.JSONArray(json);
+                List<Map<String, String>> list = new ArrayList<>();
+                for (int i = 0; i < array.length(); i++) {
+                    org.json.JSONObject obj = array.getJSONObject(i);
+                    Map<String, String> map = new HashMap<>();
+                    java.util.Iterator<String> keys = obj.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        map.put(key, String.valueOf(obj.get(key)));
                     }
                     list.add(map);
                 }

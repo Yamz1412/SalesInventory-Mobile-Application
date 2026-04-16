@@ -6,6 +6,18 @@ import android.app.Application;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.appcheck.FirebaseAppCheck;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
+import androidx.annotation.NonNull;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
+import androidx.lifecycle.ProcessLifecycleOwner;
+
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.firestore.FirebaseFirestore;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public class SalesInventoryApplication extends Application {
     private static SalesInventoryApplication instance;
@@ -18,14 +30,32 @@ public class SalesInventoryApplication extends Application {
         super.onCreate();
         instance = this;
 
-        // 1. Explicitly initialize Firebase first
         FirebaseApp.initializeApp(this);
-
-        // 2. Initialize AppCheck with Play Integrity instead of SafetyNet
+        FirebaseDatabase.getInstance().setPersistenceEnabled(true);
         FirebaseAppCheck firebaseAppCheck = FirebaseAppCheck.getInstance();
         firebaseAppCheck.installAppCheckProviderFactory(
                 PlayIntegrityAppCheckProviderFactory.getInstance()
         );
+
+        ProcessLifecycleOwner.get().getLifecycle().addObserver(new DefaultLifecycleObserver() {
+            @Override
+            public void onStart(@NonNull LifecycleOwner owner) {
+                // App is opened or unlocked -> End Break
+                if (AuthManager.getInstance().getCurrentUserId() != null) {
+                    logAttendance("BREAK_END");
+                }
+            }
+
+            @Override
+            public void onStop(@NonNull LifecycleOwner owner) {
+                // App is minimized, screen locked, or swiped away -> Start Break
+                if (AuthManager.getInstance().getCurrentUserId() != null) {
+                    logAttendance("BREAK_START");
+                }
+            }
+        });
+        // -------------------------------------------------------------------------
+
 
         // 3. Initialize your local repositories
         productRepository = ProductRepository.getInstance(this);
@@ -36,6 +66,7 @@ public class SalesInventoryApplication extends Application {
         if (owner != null && !owner.isEmpty()) {
             productRemoteSyncer.startListening();
         }
+        SyncScheduler.schedulePeriodicSync(this);
     }
 
     public static SalesInventoryApplication getInstance() {
@@ -52,5 +83,49 @@ public class SalesInventoryApplication extends Application {
 
     public static SalesRepository getSalesRepository() {
         return instance.salesRepository;
+    }
+
+    // --- NEW: Centralized Real-Time Attendance Logger ---
+    public static void logAttendance(String action) {
+        String userId = AuthManager.getInstance().getCurrentUserId();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (userId == null || ownerId == null) return;
+
+        com.google.firebase.firestore.CollectionReference attendanceRef = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId)
+                .collection("attendance");
+
+        // Find the open shift for this user
+        attendanceRef.whereEqualTo("staffId", userId)
+                .whereIn("status", java.util.Arrays.asList("ACTIVE", "ON_BREAK"))
+                .get().addOnSuccessListener(querySnapshot -> {
+
+                    if (!querySnapshot.isEmpty()) {
+                        com.google.firebase.firestore.DocumentSnapshot doc = querySnapshot.getDocuments().get(0);
+                        String docId = doc.getId();
+                        java.util.Map<String, Object> updates = new java.util.HashMap<>();
+
+                        long now = System.currentTimeMillis();
+
+                        if (action.equals("TIME_OUT")) {
+                            updates.put("endTime", now);
+                            updates.put("status", "COMPLETED");
+                        } else if (action.equals("BREAK_START")) {
+                            updates.put("currentBreakStart", now);
+                            updates.put("status", "ON_BREAK");
+                        } else if (action.equals("BREAK_END")) {
+                            long breakStart = doc.getLong("currentBreakStart") != null ? doc.getLong("currentBreakStart") : now;
+                            long totalBreak = doc.getLong("totalBreakTime") != null ? doc.getLong("totalBreakTime") : 0;
+
+                            long newBreakDurationMins = (now - breakStart) / (60 * 1000);
+
+                            updates.put("totalBreakTime", totalBreak + newBreakDurationMins);
+                            updates.put("currentBreakStart", 0);
+                            updates.put("status", "ACTIVE");
+                        }
+
+                        attendanceRef.document(docId).update(updates);
+                    }
+                });
     }
 }

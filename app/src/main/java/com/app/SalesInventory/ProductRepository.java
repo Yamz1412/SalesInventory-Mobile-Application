@@ -323,7 +323,7 @@ public class ProductRepository {
                 existing.floorLevel = product.getFloorLevel();
                 existing.unit = product.getUnit();
                 existing.dateAdded = product.getDateAdded();
-                existing.expiryDate = product.getExpiryDate();
+                existing.expiryDate = product.getExpiryDate() != null ? product.getExpiryDate().getTime() : 0L;
                 existing.productType = product.getProductType();
 
                 // FIX: Ensure subunit fields aren't dropped during updates
@@ -850,7 +850,7 @@ public class ProductRepository {
 
         e.productType = p.getProductType();
         e.ownerAdminId = p.getOwnerAdminId();
-        e.expiryDate = p.getExpiryDate();
+        e.expiryDate = p.getExpiryDate() != null ? p.getExpiryDate().getTime() : 0L;
 
         // FIX: Map Sub-units reliably
         e.salesUnit = p.getSalesUnit();
@@ -1226,10 +1226,9 @@ public class ProductRepository {
 
                     ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
 
-                    // Fallback: Check if it exists by name if ID is missing locally
                     if (existing == null && allLocal != null) {
                         for (ProductEntity e : allLocal) {
-                            if (e.productId == null && e.productName != null &&
+                            if (e.productName != null && p.getProductName() != null &&
                                     e.productName.trim().equalsIgnoreCase(p.getProductName().trim())) {
                                 existing = e;
                                 break;
@@ -1257,16 +1256,24 @@ public class ProductRepository {
         });
     }
 
-    // =======================================================================================
-    // CRITICAL FIX: Safe JSON Converters to prevent local database crashes!
-    // =======================================================================================
     private String safeListToJson(List<?> list) {
         if (list == null || list.isEmpty()) return "[]";
         try {
             org.json.JSONArray jsonArray = new org.json.JSONArray();
             for (Object item : list) {
                 if (item instanceof Map) {
-                    jsonArray.put(new org.json.JSONObject((Map<?, ?>) item));
+                    // FIXED: Manually map entries to prevent Android's JSONObject(Map) from dropping nested/null data
+                    org.json.JSONObject obj = new org.json.JSONObject();
+                    Map<?, ?> map = (Map<?, ?>) item;
+                    for (Map.Entry<?, ?> entry : map.entrySet()) {
+                        Object val = entry.getValue();
+                        if (val == null) {
+                            obj.put(String.valueOf(entry.getKey()), org.json.JSONObject.NULL);
+                        } else {
+                            obj.put(String.valueOf(entry.getKey()), val);
+                        }
+                    }
+                    jsonArray.put(obj);
                 } else if (item instanceof String) {
                     jsonArray.put(item);
                 }
@@ -1288,7 +1295,13 @@ public class ProductRepository {
                 java.util.Iterator<String> keys = obj.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
-                    map.put(key, obj.get(key));
+                    Object value = obj.get(key);
+                    // Ensure NULLs are handled properly
+                    if (value == org.json.JSONObject.NULL) {
+                        map.put(key, null);
+                    } else {
+                        map.put(key, value);
+                    }
                 }
                 result.add(map);
             }

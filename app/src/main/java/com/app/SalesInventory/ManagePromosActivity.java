@@ -13,6 +13,9 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.PopupMenu;
+import android.view.Menu;
+import androidx.appcompat.app.AlertDialog;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
@@ -21,11 +24,11 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,10 +49,9 @@ public class ManagePromosActivity extends BaseActivity {
     private List<PromoModel> allPromos = new ArrayList<>();
     private List<PromoModel> filteredPromos = new ArrayList<>();
 
-    // To map product IDs to actual Product names/prices
     private Map<String, Product> productLookupMap = new HashMap<>();
 
-    private DatabaseReference promosRef;
+    private CollectionReference promosRef;
     private String currentUserId;
 
     @Override
@@ -66,11 +68,11 @@ public class ManagePromosActivity extends BaseActivity {
         currentUserId = AuthManager.getInstance().getCurrentUserId();
         if (currentUserId == null) currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
 
-        promosRef = FirebaseDatabase.getInstance().getReference("Promos").child(currentUserId);
+        promosRef = FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("promos");
 
         initViews();
         setupRecyclerView();
-        loadAllProductsForLookup(); // Load menu items first, then load promos
+        loadAllProductsForLookup();
     }
 
     private void initViews() {
@@ -78,32 +80,41 @@ public class ManagePromosActivity extends BaseActivity {
         tvNoPromos = findViewById(R.id.tvNoPromos);
         etSearchPromos = findViewById(R.id.etSearchPromos);
         fabAddPromo = findViewById(R.id.fabAddPromo);
+
+        // SAFEGUARD: Only setup the filter button if you actually add it to your XML later
         btnFilterPromos = findViewById(R.id.btnFilterPromos);
+        if (btnFilterPromos != null) {
+            btnFilterPromos.setOnClickListener(v -> {
+                Toast.makeText(this, "Filter options coming soon", Toast.LENGTH_SHORT).show();
+            });
+        }
 
-        fabAddPromo.setOnClickListener(v -> {
-            startActivity(new Intent(ManagePromosActivity.this, CreatePromoActivity.class));
-        });
+        // SAFEGUARD: Prevent crashes if these IDs are missing or named differently in XML
+        if (fabAddPromo != null) {
+            fabAddPromo.setOnClickListener(v -> {
+                startActivity(new Intent(ManagePromosActivity.this, CreatePromoActivity.class));
+            });
+        }
 
-        etSearchPromos.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                filterPromos(s.toString());
-            }
-        });
-
-        btnFilterPromos.setOnClickListener(v -> {
-            Toast.makeText(this, "Filter options coming soon", Toast.LENGTH_SHORT).show();
-        });
+        if (etSearchPromos != null) {
+            etSearchPromos.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    filterPromos(s.toString());
+                }
+            });
+        }
     }
 
     private void setupRecyclerView() {
-        adapter = new ManagePromosAdapter();
-        rvManagePromos.setLayoutManager(new LinearLayoutManager(this));
-        rvManagePromos.setAdapter(adapter);
+        if (rvManagePromos != null) {
+            adapter = new ManagePromosAdapter();
+            rvManagePromos.setLayoutManager(new LinearLayoutManager(this));
+            rvManagePromos.setAdapter(adapter);
+        }
     }
 
-    // 1. Fetch menu products so we can show names and prices inside the promo cards
     private void loadAllProductsForLookup() {
         SalesInventoryApplication.getProductRepository().getAllProducts().observe(this, products -> {
             productLookupMap.clear();
@@ -114,33 +125,27 @@ public class ManagePromosActivity extends BaseActivity {
                     }
                 }
             }
-            loadPromosFromDatabase(); // Now fetch the promos
+            loadPromosFromDatabase();
         });
     }
 
-    // 2. Fetch the Promos from Firebase
     private void loadPromosFromDatabase() {
-        promosRef.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                allPromos.clear();
-                for (DataSnapshot data : snapshot.getChildren()) {
-                    PromoModel promo = data.getValue(PromoModel.class);
+        promosRef.addSnapshotListener((snapshot, error) -> {
+            if (error != null) {
+                Toast.makeText(ManagePromosActivity.this, "Failed to load promos", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            allPromos.clear();
+            if (snapshot != null) {
+                for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                    PromoModel promo = doc.toObject(PromoModel.class);
                     if (promo != null) {
                         allPromos.add(promo);
                     }
                 }
-
-                // Sort by newest first
-                Collections.sort(allPromos, (p1, p2) -> Long.compare(p2.createdAt, p1.createdAt));
-
-                filterPromos(etSearchPromos.getText().toString());
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(ManagePromosActivity.this, "Failed to load promos", Toast.LENGTH_SHORT).show();
-            }
+            Collections.sort(allPromos, (p1, p2) -> Long.compare(p2.createdAt, p1.createdAt));
+            filterPromos(etSearchPromos.getText().toString());
         });
     }
 
@@ -174,9 +179,6 @@ public class ManagePromosActivity extends BaseActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    // ==========================================
-    // RECYCLERVIEW ADAPTER FOR PROMOS
-    // ==========================================
     private class ManagePromosAdapter extends RecyclerView.Adapter<ManagePromosAdapter.PromoViewHolder> {
 
         @NonNull
@@ -192,7 +194,6 @@ public class ManagePromosActivity extends BaseActivity {
 
             holder.tvPromoName.setText(promo.promoName != null ? promo.promoName : "Unnamed Promo");
 
-            // Format Discount Text
             String discountStr = "Discount: ";
             if ("Percentage (%)".equals(promo.discountType)) {
                 discountStr += promo.discountValue + "% Off";
@@ -203,35 +204,42 @@ public class ManagePromosActivity extends BaseActivity {
             }
             holder.tvPromoDiscount.setText(discountStr);
 
-            // Format Validity Text
             if (promo.isTemporary) {
                 holder.tvPromoValidity.setText("Valid: " + promo.startDate + " to " + promo.endDate);
             } else {
                 holder.tvPromoValidity.setText("Permanent Series (No Expiration)");
             }
 
-            // Temporarily detach listener to avoid unwanted database triggers during scroll recycling
             holder.switchShowInMenu.setOnCheckedChangeListener(null);
-
             holder.switchShowInMenu.setChecked(promo.isActive);
             holder.switchShowInMenu.setText(promo.isActive ? "Active" : "Hidden");
 
-            // Handle Hide/Show Toggle
             holder.switchShowInMenu.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 holder.switchShowInMenu.setText(isChecked ? "Active" : "Hidden");
-                promosRef.child(promo.promoId).child("isActive").setValue(isChecked)
-                        .addOnSuccessListener(aVoid -> Toast.makeText(ManagePromosActivity.this, isChecked ? "Promo activated" : "Promo hidden from menu", Toast.LENGTH_SHORT).show());
+
+                WriteBatch batch = FirebaseFirestore.getInstance().batch();
+
+                batch.update(promosRef.document(promo.promoId), "isActive", isChecked);
+
+                if (promo.applicableProductIds != null) {
+                    for (String productId : promo.applicableProductIds) {
+                        batch.update(FirebaseFirestore.getInstance()
+                                .collection("users").document(currentUserId)
+                                .collection("products").document(productId), "isPromo", isChecked);
+                    }
+                }
+
+                batch.commit().addOnFailureListener(e -> {
+                    Toast.makeText(ManagePromosActivity.this, "Failed to update: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    holder.switchShowInMenu.setChecked(!isChecked);
+                });
             });
 
-            // Dynamically add the products inside the layout container
-            holder.containerPromoProducts.removeAllViews(); // Clear old views first
+            holder.containerPromoProducts.removeAllViews();
 
             if (promo.applicableProductIds != null && !promo.applicableProductIds.isEmpty()) {
                 for (String productId : promo.applicableProductIds) {
-
-                    // Look up the actual product details using the map we built earlier
                     Product product = productLookupMap.get(productId);
-
                     if (product != null) {
                         View rowView = LayoutInflater.from(ManagePromosActivity.this).inflate(R.layout.item_promo_product_row, holder.containerPromoProducts, false);
                         TextView tvRowName = rowView.findViewById(R.id.tvRowProductName);
@@ -239,7 +247,6 @@ public class ManagePromosActivity extends BaseActivity {
 
                         tvRowName.setText("• " + product.getProductName());
 
-                        // Calculate price if it's an override or discount
                         double finalPrice = product.getSellingPrice();
                         if ("Percentage (%)".equals(promo.discountType)) {
                             finalPrice = finalPrice - (finalPrice * (promo.discountValue / 100.0));
@@ -254,7 +261,6 @@ public class ManagePromosActivity extends BaseActivity {
                     }
                 }
             } else {
-                // If no products found
                 TextView emptyText = new TextView(ManagePromosActivity.this);
                 emptyText.setText("No active products linked.");
                 emptyText.setAlpha(0.6f);
@@ -262,8 +268,21 @@ public class ManagePromosActivity extends BaseActivity {
             }
 
             holder.btnPromoOptions.setOnClickListener(v -> {
-                // Future Implementation: Edit Promo Details
-                Toast.makeText(ManagePromosActivity.this, "Edit Promo feature coming soon!", Toast.LENGTH_SHORT).show();
+                PopupMenu popup = new PopupMenu(ManagePromosActivity.this, holder.btnPromoOptions);
+                popup.getMenu().add(Menu.NONE, 1, 1, "Edit");
+                popup.getMenu().add(Menu.NONE, 2, 2, "Delete");
+
+                popup.setOnMenuItemClickListener(item -> {
+                    if (item.getItemId() == 1) {
+                        Toast.makeText(ManagePromosActivity.this, "Edit Promo feature coming soon!", Toast.LENGTH_SHORT).show();
+                        return true;
+                    } else if (item.getItemId() == 2) {
+                        showDeleteConfirmation(promo);
+                        return true;
+                    }
+                    return false;
+                });
+                popup.show();
             });
         }
 
@@ -284,15 +303,55 @@ public class ManagePromosActivity extends BaseActivity {
                 tvPromoDiscount = itemView.findViewById(R.id.tvPromoDiscount);
                 tvPromoValidity = itemView.findViewById(R.id.tvPromoValidity);
                 switchShowInMenu = itemView.findViewById(R.id.switchShowInMenu);
-                btnPromoOptions = findViewById(R.id.btnPromoOptions);
+                btnPromoOptions = itemView.findViewById(R.id.btnPromoOptions);
                 containerPromoProducts = itemView.findViewById(R.id.containerPromoProducts);
             }
         }
     }
 
-    // ==========================================
-    // DATA MODEL FOR PROMOS
-    // ==========================================
+    private void showDeleteConfirmation(PromoModel promo) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Promo")
+                .setMessage("Are you sure you want to permanently delete '" + promo.promoName + "'?\n\nAll linked products will return to their normal prices and the promo will be removed from the Sell List.")
+                .setPositiveButton("Delete", (dialog, which) -> deletePromo(promo))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deletePromo(PromoModel promo) {
+        WriteBatch batch = FirebaseFirestore.getInstance().batch();
+
+        // 1. Delete the actual promo document from Firestore
+        batch.delete(promosRef.document(promo.promoId));
+
+        // 2. Revert all associated products back to their normal state
+        if (promo.applicableProductIds != null) {
+            for (String productId : promo.applicableProductIds) {
+                DocumentReference productRef = FirebaseFirestore.getInstance()
+                        .collection("users").document(currentUserId)
+                        .collection("products").document(productId);
+
+                Map<String, Object> productUpdates = new HashMap<>();
+                productUpdates.put("isPromo", false);
+                productUpdates.put("promoName", "");
+                productUpdates.put("isTemporaryPromo", false);
+                productUpdates.put("promoPrice", 0.0);
+                productUpdates.put("promoStartDate", 0);
+                productUpdates.put("promoEndDate", 0);
+
+                batch.update(productRef, productUpdates);
+            }
+        }
+
+        // 3. Execute the batch
+        batch.commit().addOnSuccessListener(aVoid -> {
+            Toast.makeText(ManagePromosActivity.this, "Promo deleted successfully", Toast.LENGTH_SHORT).show();
+            // The list will automatically refresh because of the SnapshotListener
+        }).addOnFailureListener(e -> {
+            Toast.makeText(ManagePromosActivity.this, "Failed to delete: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        });
+    }
+
     public static class PromoModel {
         public String promoId;
         public String promoName;
@@ -305,8 +364,6 @@ public class ManagePromosActivity extends BaseActivity {
         public List<String> applicableProductIds;
         public long createdAt;
 
-        public PromoModel() {
-            // Empty constructor required for Firebase DataSnapshot mapping
-        }
+        public PromoModel() {}
     }
 }

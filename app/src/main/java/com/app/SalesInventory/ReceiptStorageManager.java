@@ -34,16 +34,27 @@ public class ReceiptStorageManager {
         File localFile = new File(receiptsDir, fileName);
 
         try {
-            // Generate the actual PDF document
             PDFGenerator pdfGenerator = new PDFGenerator(context);
             String businessName = "Sales Inventory System"; // Fallback name
-            pdfGenerator.generateReceiptPDF(localFile, businessName, orderId, receiptContent);
 
-            Log.d("ReceiptManager", "Saved PDF locally to: " + localFile.getAbsolutePath());
+            String uid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+            if (uid != null) {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(uid).get()
+                        .addOnSuccessListener(doc -> {
+                            String name = doc.exists() && doc.getString("name") != null ? doc.getString("name") : "Staff";
+                            String role = doc.exists() && doc.getString("role") != null ? doc.getString("role") : "";
+                            String preparedBy = name + (role.isEmpty() ? "" : " (" + role + ")");
 
-            // Upload the newly generated PDF to Firebase
-            uploadToCloud(localFile, dateFolder, fileName);
-
+                            try {
+                                pdfGenerator.generateReceiptPDF(localFile, businessName, orderId, receiptContent, preparedBy);
+                                Log.d("ReceiptManager", "Saved PDF locally to: " + localFile.getAbsolutePath());
+                                uploadToCloud(localFile, dateFolder, fileName);
+                            } catch (Exception e) { e.printStackTrace(); }
+                        });
+            } else {
+                pdfGenerator.generateReceiptPDF(localFile, businessName, orderId, receiptContent, "Staff");
+                uploadToCloud(localFile, dateFolder, fileName);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(context, "Failed to save local receipt PDF.", Toast.LENGTH_SHORT).show();

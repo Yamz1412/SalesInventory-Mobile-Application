@@ -27,4 +27,7 @@ public class SalesOrderItemEntity {
     public String size;
     public String addons;
     public String excludedIngredients;
+    public double totalCost = 0.0;
+    public double discountAmount = 0.0;
+    public String extraDetails = "";
 }

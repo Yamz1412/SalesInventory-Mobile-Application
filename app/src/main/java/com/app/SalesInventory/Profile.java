@@ -97,7 +97,7 @@ public class Profile extends BaseActivity {
         });
 
         imgAvatar.setOnClickListener(v -> chooseNewAvatar());
-        btnLogout.setOnClickListener(v -> performLogout());
+        btnLogout.setOnClickListener(v -> performActualLogout());
 
         btnEditBusiness.setOnClickListener(v -> {
             startActivity(new Intent(Profile.this, BusinessSetupActivity.class));
@@ -319,16 +319,38 @@ public class Profile extends BaseActivity {
         });
     }
 
-    private void performLogout() {
-        new AlertDialog.Builder(this)
-                .setTitle("Logout")
-                .setMessage("Are you sure?")
-                .setPositiveButton("Logout", (dialog, which) -> {
-                    fAuth.signOut();
-                    navigateToLogin();
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+    private void performActualLogout() {
+        String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+
+        if (currentUid != null) {
+            SalesInventoryApplication.logAttendance("SHIFT_END");
+            com.google.firebase.database.FirebaseDatabase.getInstance().getReference("UsersStatus")
+                    .child(currentUid)
+                    .setValue("offline");
+            executeFinalSignOut();
+        } else {
+            executeFinalSignOut();
+        }
+    }
+
+    private void executeFinalSignOut() {
+        // Use your existing AuthManager cleanup method
+        if (AuthManager.getInstance() != null) {
+            AuthManager.getInstance().signOutAndCleanup(() -> {
+                // This block runs AFTER the AuthManager finishes wiping local data and signing out
+                Intent intent = new Intent(Profile.this, SignInActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
+            });
+        } else {
+            // Fallback if AuthManager is null
+            com.google.firebase.auth.FirebaseAuth.getInstance().signOut();
+            Intent intent = new Intent(Profile.this, SignInActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+        }
     }
 
     private void setupAvatarPicker() {

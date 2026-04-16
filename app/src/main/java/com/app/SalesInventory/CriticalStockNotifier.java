@@ -23,6 +23,7 @@ public class CriticalStockNotifier {
 
     public void showCriticalDialog(Activity activity, Product product) {
         if (activity == null || activity.isFinishing()) return;
+        if (product != null && product.isFinishedProduct()) return;
         String productId = product.getProductId();
         if (productId == null) return;
         if (dismissedForProduct.contains(productId)) return;

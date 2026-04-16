@@ -30,154 +30,199 @@ public class DeleteProductActivity extends BaseActivity {
     private Button btnRefresh;
     private SearchView searchView;
 
-    // NEW: Cloud Archive List
     private List<Product> allArchivedProducts = new ArrayList<>();
+    private List<Product> filteredArchivedProducts = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_delete_product);
 
-        rootView = findViewById(R.id.root_layout);
+        // FIX 1: Safely grab the root view so Snackbar never crashes
+        rootView = findViewById(android.R.id.content);
         recyclerView = findViewById(R.id.productsRecyclerView);
+
+        // These might be null depending on the XML, which is fine
         btnRefresh = findViewById(R.id.btn_refresh_archives);
         searchView = findViewById(R.id.searchView);
 
+        AuthManager authManager = AuthManager.getInstance();
+        if (!authManager.isCurrentUserAdmin()) {
+            Toast.makeText(this, "Access denied", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         productRepository = SalesInventoryApplication.getProductRepository();
 
-        // NEW: Replaced old file adapter with our custom Cloud Adapter
-        adapter = new ArchiveAdapter();
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
+        if (recyclerView != null) {
+            recyclerView.setLayoutManager(new LinearLayoutManager(this));
+            adapter = new ArchiveAdapter(new ArrayList<>());
+            recyclerView.setAdapter(adapter);
+        }
 
-        btnRefresh.setOnClickListener(v -> loadArchivesFromFirestore());
+        if (btnRefresh != null) {
+            btnRefresh.setOnClickListener(v -> loadArchivedProducts());
+        }
 
-        View clearBtn = findViewById(R.id.clearSearchBtn);
-        if (clearBtn != null) {
-            clearBtn.setOnClickListener(v -> {
-                searchView.setQuery("", false);
-                loadArchivesFromFirestore();
+        if (searchView != null) {
+            searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    filterArchives(query);
+                    return true;
+                }
+
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    filterArchives(newText);
+                    return true;
+                }
             });
         }
 
-        setupSearchView();
-
-        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            @Override public boolean onQueryTextSubmit(String query) { filter(query); return true; }
-            @Override public boolean onQueryTextChange(String newText) { filter(newText); return true; }
-        });
-
-        loadArchivesFromFirestore();
+        loadArchivedProducts();
     }
 
-    private void setupSearchView() {
-        int id = searchView.getContext().getResources().getIdentifier("android:id/search_src_text", null, null);
-        TextView searchEditText = searchView.findViewById(id);
-        if (searchEditText != null) {
-            boolean isDark = false;
-            try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch(Exception e){}
-            searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
-            searchEditText.setHintTextColor(Color.GRAY);
-        }
-    }
-
-    // =========================================================================
-    // NEW FEATURE: FETCH SOFT-DELETED PRODUCTS FROM FIREBASE INSTEAD OF FILES
-    // =========================================================================
-    private void loadArchivesFromFirestore() {
+    private void loadArchivedProducts() {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
-        if (ownerId == null) return;
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (ownerId == null) {
+            Toast.makeText(this, "Authentication error", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        FirebaseFirestore.getInstance().collection("users").document(ownerId)
-                .collection("products")
-                .whereEqualTo("isActive", false) // Looks for soft-deleted items!
+        FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("products")
+                .whereEqualTo("isActive", false)
                 .get()
-                .addOnSuccessListener(snapshot -> {
+                .addOnSuccessListener(queryDocumentSnapshots -> {
                     allArchivedProducts.clear();
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        Product p = doc.toObject(Product.class);
-                        if (p != null) {
+                    for (DocumentSnapshot doc : queryDocumentSnapshots) {
+                        try {
+                            // FIX: Manually map only the fields we need.
+                            // This completely bypasses the Date/Long crash from Firebase!
+                            Product p = new Product();
                             p.setProductId(doc.getId());
+
+                            String name = doc.getString("productName");
+                            p.setProductName(name != null ? name : "Unknown Product");
+
+                            String cat = doc.getString("categoryName");
+                            p.setCategoryName(cat != null ? cat : "Uncategorized");
+
                             allArchivedProducts.add(p);
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
-                    filter(searchView.getQuery() != null ? searchView.getQuery().toString() : "");
+                    filterArchives(searchView != null && searchView.getQuery() != null ? searchView.getQuery().toString() : "");
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "Failed to load archives", Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e -> Toast.makeText(DeleteProductActivity.this, "Failed to load archives", Toast.LENGTH_SHORT).show());
     }
 
-    private void filter(String q) {
-        List<Product> filtered = new ArrayList<>();
-        if (q == null || q.trim().isEmpty()) {
-            filtered.addAll(allArchivedProducts);
-        } else {
-            String ql = q.toLowerCase();
-            for (Product p : allArchivedProducts) {
-                if (p.getProductName() != null && p.getProductName().toLowerCase().contains(ql)) {
-                    filtered.add(p);
-                }
-            }
-        }
-        adapter.setProducts(filtered);
-        View emptyState = findViewById(R.id.emptyStateTV);
-        if (emptyState != null) {
-            emptyState.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
-        }
-    }
-
-    // --- RESTORE LOGIC ---
     private void performRestore(Product p) {
-        p.setActive(true); // Bring it back to life!
-        productRepository.updateProduct(p, null, new ProductRepository.OnProductUpdatedListener() {
-            @Override
-            public void onProductUpdated() {
-                runOnUiThread(() -> {
-                    if (rootView != null) Snackbar.make(rootView, "Product restored successfully!", Snackbar.LENGTH_SHORT).show();
-                    else Toast.makeText(DeleteProductActivity.this, "Product restored successfully!", Toast.LENGTH_SHORT).show();
-                    loadArchivesFromFirestore();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        if (ownerId == null) return;
+
+        // 1. Restore the product in the Cloud
+        FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                .collection("products").document(p.getProductId())
+                .update("isActive", true)
+                .addOnSuccessListener(aVoid -> {
+
+                    // 2. FIXED: Immediately restore the product in the Local Database too!
+                    new Thread(() -> {
+                        try {
+                            AppDatabase db = AppDatabase.getInstance(DeleteProductActivity.this);
+                            ProductEntity entity = db.productDao().getByProductIdSync(p.getProductId());
+                            if (entity != null) {
+                                entity.isActive = true;
+                                db.productDao().update(entity);
+                            }
+
+                            runOnUiThread(() -> {
+                                if (rootView != null) Snackbar.make(rootView, "Restored: " + p.getProductName(), Snackbar.LENGTH_SHORT).show();
+                                loadArchivedProducts(); // Refresh the archive list
+                            });
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }).start();
+
+                })
+                .addOnFailureListener(e -> {
+                    runOnUiThread(() -> Toast.makeText(DeleteProductActivity.this, "Error restoring", Toast.LENGTH_SHORT).show());
                 });
-            }
-            @Override
-            public void onError(String error) {
-                runOnUiThread(() -> Toast.makeText(DeleteProductActivity.this, "Restore failed: " + error, Toast.LENGTH_LONG).show());
-            }
-        });
     }
 
-    // --- PERMANENT DELETE LOGIC ---
     private void confirmPermanentDelete(Product p) {
         new AlertDialog.Builder(this)
-                .setTitle("Permanently Delete")
-                .setMessage("This will permanently delete '" + p.getProductName() + "'. This cannot be undone. Continue?")
-                .setPositiveButton("Delete", (d, w) -> performPermanentDelete(p))
+                .setTitle("Permanent Delete")
+                .setMessage("Are you sure you want to completely erase " + p.getProductName() + "? This cannot be undone.")
+                .setPositiveButton("Erase", (d, w) -> {
+                    String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+                    if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+                    if (ownerId == null) return;
+
+                    // 1. FIXED: Physically delete the document from the Cloud (No more soft deletes)
+                    FirebaseFirestore.getInstance().collection("users").document(ownerId)
+                            .collection("products").document(p.getProductId())
+                            .delete()
+                            .addOnSuccessListener(aVoid -> {
+
+                                // 2. FIXED: Wipe it from the Local Database
+                                new Thread(() -> {
+                                    try {
+                                        AppDatabase db = AppDatabase.getInstance(DeleteProductActivity.this);
+                                        ProductEntity entity = db.productDao().getByProductIdSync(p.getProductId());
+                                        if (entity != null) {
+                                            db.productDao().deleteByLocalId(entity.localId);
+                                        }
+                                        runOnUiThread(() -> {
+                                            if (rootView != null) Snackbar.make(rootView, "Permanently Deleted", Snackbar.LENGTH_SHORT).show();
+                                            loadArchivedProducts(); // Refresh the archive list
+                                        });
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                }).start();
+
+                            })
+                            .addOnFailureListener(e -> Toast.makeText(DeleteProductActivity.this, "Delete failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void performPermanentDelete(Product p) {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
-
-        FirebaseFirestore.getInstance().collection("users").document(ownerId)
-                .collection("products").document(p.getProductId())
-                .delete()
-                .addOnSuccessListener(aVoid -> {
-                    if (rootView != null) Snackbar.make(rootView, "Product permanently deleted", Snackbar.LENGTH_SHORT).show();
-                    loadArchivesFromFirestore();
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Delete failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+    private void filterArchives(String query) {
+        filteredArchivedProducts.clear();
+        if (query == null || query.trim().isEmpty()) {
+            filteredArchivedProducts.addAll(allArchivedProducts);
+        } else {
+            String lowerQ = query.toLowerCase();
+            for (Product p : allArchivedProducts) {
+                if (p.getProductName() != null && p.getProductName().toLowerCase().contains(lowerQ)) {
+                    filteredArchivedProducts.add(p);
+                }
+            }
+        }
+        if (adapter != null) adapter.updateItems(filteredArchivedProducts);
     }
 
-    // =========================================================================
-    // DYNAMIC UI ADAPTER (Guarantees no layout crashes for the buttons!)
-    // =========================================================================
     class ArchiveAdapter extends RecyclerView.Adapter<ArchiveAdapter.VH> {
-        private List<Product> items = new ArrayList<>();
+        private List<Product> items;
 
-        public void setProducts(List<Product> products) {
-            this.items.clear();
-            if (products != null) this.items.addAll(products);
+        ArchiveAdapter(List<Product> items) {
+            this.items = items;
+        }
+
+        public void updateItems(List<Product> newItems) {
+            this.items = newItems;
             notifyDataSetChanged();
         }
 
@@ -185,28 +230,23 @@ public class DeleteProductActivity extends BaseActivity {
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LinearLayout container = new LinearLayout(parent.getContext());
-            container.setLayoutParams(new ViewGroup.LayoutParams(
+            container.setOrientation(LinearLayout.HORIZONTAL);
+            container.setPadding(16, 16, 16, 16);
+            container.setLayoutParams(new RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
             ));
-            container.setOrientation(LinearLayout.HORIZONTAL);
-            int p = (int) (16 * parent.getContext().getResources().getDisplayMetrics().density);
-            container.setPadding(p, p, p, p);
-            container.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
             TextView tvName = new TextView(parent.getContext());
+            tvName.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             tvName.setTextSize(16f);
-            tvName.setTypeface(null, android.graphics.Typeface.BOLD);
-            LinearLayout.LayoutParams tvParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            container.addView(tvName, tvParams);
+            container.addView(tvName);
 
             Button btnRestore = new Button(parent.getContext());
             btnRestore.setText("Restore");
             btnRestore.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#4CAF50")));
             btnRestore.setTextColor(Color.WHITE);
-            LinearLayout.LayoutParams brParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            brParams.setMargins(0, 0, 16, 0);
-            container.addView(btnRestore, brParams);
+            container.addView(btnRestore);
 
             Button btnDelete = new Button(parent.getContext());
             btnDelete.setText("Delete");
@@ -224,7 +264,10 @@ public class DeleteProductActivity extends BaseActivity {
             holder.tvName.setText(p.getProductName() + "\n(" + cat + ")");
 
             boolean isDark = false;
-            try { isDark = ThemeManager.getInstance(DeleteProductActivity.this).getCurrentTheme().name.equals("dark"); } catch(Exception e){}
+            try {
+                isDark = ThemeManager.getInstance(DeleteProductActivity.this).getCurrentTheme().name.equals("dark");
+            } catch (Exception e) {
+            }
             holder.tvName.setTextColor(isDark ? Color.WHITE : Color.BLACK);
 
             holder.btnRestore.setOnClickListener(v -> performRestore(p));
@@ -232,14 +275,19 @@ public class DeleteProductActivity extends BaseActivity {
         }
 
         @Override
-        public int getItemCount() { return items.size(); }
+        public int getItemCount() {
+            return items.size();
+        }
 
         class VH extends RecyclerView.ViewHolder {
             TextView tvName;
             Button btnRestore, btnDelete;
+
             VH(View v, TextView tv, Button br, Button bd) {
                 super(v);
-                tvName = tv; btnRestore = br; btnDelete = bd;
+                tvName = tv;
+                btnRestore = br;
+                btnDelete = bd;
             }
         }
     }

@@ -42,12 +42,21 @@
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp"/>
 
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchEnableMarkup"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Use Percentage (%) Markup"
-                    android:textColor="?attr/colorOnBackground"/>
+                    android:text="Business Type (Auto-sets Markup)"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnBackground"
+                    android:layout_marginBottom="4dp"/>
+
+                <Spinner
+                    android:id="@+id/spinnerBusinessType"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="?attr/colorControlHighlight"
+                    android:layout_marginBottom="12dp"/>
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/CustomTextInputLayout"
@@ -90,22 +99,83 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Staff Shift Control"
+                    android:text="Tax / VAT Configuration"
                     android:textStyle="bold"
                     android:textColor="?attr/colorPrimary"
                     android:layout_marginBottom="8dp"/>
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchAutoShift"
+                    android:id="@+id/switchEnableTax"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Auto Time-In on POS PIN Login"
-                    android:textColor="?attr/colorOnBackground"/>
+                    android:text="Enable Tax Calculation"
+                    android:textColor="?attr/colorOnBackground"
+                    android:layout_marginBottom="8dp"/>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Tax Rate (e.g. 12 for VAT)">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etTaxRate"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"/>
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="If enabled, staff will no longer need to press a 'Start Shift' button."
+                    android:text="Tax Calculation Method"
+                    android:textSize="12sp"
+                    android:layout_marginTop="12dp"
+                    android:textColor="?attr/colorOnBackground"/>
+
+                <Spinner
+                    android:id="@+id/spinnerTaxType"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/edite_round"
+                    android:backgroundTint="?attr/colorControlHighlight"
+                    android:layout_marginBottom="12dp"/>
+
+                <Button
+                    android:id="@+id/btnSaveTax"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Save Tax Settings"
+                    style="@style/CustomButton"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="?attr/colorSurface">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Staff Shift Control"
+                    android:textStyle="bold"
+                    android:textColor="?attr/colorPrimary"
+                    android:layout_marginBottom="8dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Shifts and attendance logs are fully automated for Staff and Sub-Admins. You can view their activity here, or lock their accounts from the Staff Accounts page."
                     android:textSize="12sp"
                     android:textColor="#888888"
                     android:layout_marginBottom="12dp"/>
@@ -157,6 +227,5 @@
                     style="@style/CustomButtonOutlined"/>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
     </LinearLayout>
 </ScrollView>

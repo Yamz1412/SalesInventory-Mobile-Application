@@ -182,6 +182,53 @@ public class MainActivity extends BaseActivity {
         });
     }
 
+    // Inside MainActivity class
+    private void checkAndShowOnboarding() {
+        // Only show for Admin/Managers, not regular staff
+        if (!isAdminFlag && !isManagerFlag) return;
+
+        android.content.SharedPreferences prefs = getSharedPreferences("HanZaiPrefs", MODE_PRIVATE);
+        boolean isFirstRun = prefs.getBoolean("is_first_launch_admin", true);
+
+        /*if (isFirstRun) {
+            showOnboardingOverlay(prefs);
+        }*/
+    }
+
+    /*private void showOnboardingOverlay(android.content.SharedPreferences prefs) {
+        final FrameLayout rootLayout = findViewById(android.R.id.content);
+        View onboardingView = getLayoutInflater().inflate(R.layout.layout_onboarding_overlay, rootLayout, false);
+        rootLayout.addView(onboardingView);
+
+        Button btnNext = onboardingView.findViewById(R.id.btnNextStep);
+        Button btnSkip = onboardingView.findViewById(R.id.btnSkipTutorial);
+        ImageView ivStep = onboardingView.findViewById(R.id.ivTutorialStep);
+        TextView tvDesc = onboardingView.findViewById(R.id.tvTutorialDesc);
+
+        final int[] currentStep = {1};
+
+        btnNext.setOnClickListener(v -> {
+            currentStep[0]++;
+            if (currentStep[0] == 2) {
+                ivStep.setImageResource(R.drawable.tutorial_step_2);
+                tvDesc.setText("Manage your inventory and stock levels here.");
+            } else if (currentStep[0] == 3) {
+                ivStep.setImageResource(R.drawable.tutorial_step_3);
+                tvDesc.setText("Generate detailed VAT and sales reports.");
+                btnNext.setText("Finish");
+            } else {
+                completeOnboarding(rootLayout, onboardingView, prefs);
+            }
+        });
+
+        btnSkip.setOnClickListener(v -> completeOnboarding(rootLayout, onboardingView, prefs));
+    }*/
+
+    private void completeOnboarding(FrameLayout root, View view, android.content.SharedPreferences prefs) {
+        root.removeView(view);
+        prefs.edit().putBoolean("is_first_launch_admin", false).apply();
+    }
+
     private void listenForFactoryReset() {
         resetSignalListener = FirestoreManager.getInstance().getResetSignalRef()
                 .addSnapshotListener((snapshot, e) -> {
@@ -359,33 +406,46 @@ public class MainActivity extends BaseActivity {
             }
             applyRoleVisibility();
         }));
+        checkAndShowOnboarding();
     }
 
     private void applyRoleVisibility() {
         if (isManagerFlag) {
+            // --- ADMIN / MANAGER VIEW ---
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.VISIBLE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.VISIBLE);
             if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
             if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
-        }
-        else {
+
+            // Show Financial Charts
+            if (salesTrendChart != null) salesTrendChart.setVisibility(View.VISIBLE);
+            if (topProductsChart != null) topProductsChart.setVisibility(View.VISIBLE);
+        } else {
+            // --- STAFF VIEW RESTRICTIONS ---
+            // Allow POS and Inventory
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
+            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
+
+            // Hide restricted features from Staff
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
-            if (btnViewReports != null) btnViewReports.setVisibility(View.VISIBLE);
-            if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
-            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
+            if (btnViewReports != null) btnViewReports.setVisibility(View.GONE);
 
+            // FIXED: Un-hide the Financial Charts so Staff can see the analytics dashboard
+            if (salesTrendChart != null) salesTrendChart.setVisibility(View.VISIBLE);
+            if (topProductsChart != null) topProductsChart.setVisibility(View.VISIBLE);
+
+            // Hide the Add Product FAB menu
             if (dimOverlay != null) dimOverlay.setVisibility(View.GONE);
             if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
             isFabOpen = false;
         }
-            if (btnManageUsers != null) btnManageUsers.setVisibility(isAdminFlag ? View.VISIBLE : View.GONE);
 
-            arrangeQuickActions();
-        }
+        if (btnManageUsers != null) btnManageUsers.setVisibility(isAdminFlag ? View.VISIBLE : View.GONE);
+
+        arrangeQuickActions();
+    }
 
     private void exitImpersonation() {
         isImpersonating = false;
@@ -464,14 +524,12 @@ public class MainActivity extends BaseActivity {
 
         double profit = totalSales - totalCost;
 
-        if (tvTotalSales != null) tvTotalSales.setText(String.format(Locale.US, "₱%,.2f", totalSales));
+        if (tvTotalSales != null) {
+            tvTotalSales.setText(String.format(Locale.US, "₱%,.2f", totalSales));
+        }
 
         if (tvTotalProfit != null) {
-            if (isAdminFlag && isManagerFlag) {
-                tvTotalProfit.setText(String.format(Locale.US, "₱%,.2f", profit));
-            } else {
-                tvTotalProfit.setText("₱ ***.**"); // Hidden from staff
-            }
+            tvTotalProfit.setText(String.format(Locale.US, "₱%,.2f", profit));
         }
     }
 
@@ -484,7 +542,7 @@ public class MainActivity extends BaseActivity {
                 long now = System.currentTimeMillis();
                 for (Product p : products) {
                     if (p == null || !p.isActive()) continue;
-                    long expiry = p.getExpiryDate();
+                    long expiry = (p.getExpiryDate() != null) ? p.getExpiryDate().getTime() : 0L;
                     if (expiry <= 0) continue;
                     long diffMillis = expiry - now;
                     long days = diffMillis / (24L * 60L * 60L * 1000L);
@@ -615,7 +673,6 @@ public class MainActivity extends BaseActivity {
 
         if (btnInventory != null) btnInventory.setOnClickListener(v -> {
             Intent i = new Intent(this, Inventory.class);
-            // Gives Managers full edit access, but keeps staff on read-only!
             i.putExtra("readonly", !isManagerFlag);
             startActivity(i);
         });
@@ -647,10 +704,13 @@ public class MainActivity extends BaseActivity {
 
         if (btnLockScreen != null) {
             btnLockScreen.setOnClickListener(v -> {
-                // Show lock screen and log to Firebase
                 layoutLockScreen.setVisibility(View.VISIBLE);
-                authManager.logShiftLock(true);
-                Toast.makeText(this, "Register Locked", Toast.LENGTH_SHORT).show();
+
+                // FIXED: Start Break Time and turn dot red
+                SalesInventoryApplication.logAttendance("BREAK_START");
+                updateOnlineStatus(false);
+
+                Toast.makeText(this, "Register Locked (On Break)", Toast.LENGTH_SHORT).show();
             });
         }
 
@@ -665,7 +725,7 @@ public class MainActivity extends BaseActivity {
                 progressBar.setVisibility(View.VISIBLE);
                 String email = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getEmail();
 
-                // Re-authenticate to ensure it's the right person
+                // Re-authenticate to unlock
                 com.google.firebase.auth.FirebaseAuth.getInstance()
                         .signInWithEmailAndPassword(email, pass)
                         .addOnCompleteListener(task -> {
@@ -673,7 +733,10 @@ public class MainActivity extends BaseActivity {
                             if (task.isSuccessful()) {
                                 layoutLockScreen.setVisibility(View.GONE);
                                 etUnlockPassword.setText("");
-                                authManager.logShiftLock(false); // Log unlock to Firebase
+
+                                SalesInventoryApplication.logAttendance("BREAK_END");
+                                updateOnlineStatus(true);
+
                                 Toast.makeText(MainActivity.this, "Unlocked Successfully", Toast.LENGTH_SHORT).show();
                             } else {
                                 Toast.makeText(MainActivity.this, "Incorrect Password", Toast.LENGTH_SHORT).show();
@@ -818,22 +881,46 @@ public class MainActivity extends BaseActivity {
             }
         });
 
+        adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onChanged() {
+                super.onChanged();
+                // Morph the button if items are long-pressed
+                if (adapter.getSelectedIds() != null && adapter.getSelectedIds().size() > 0) {
+                    btnClearAll.setText("Delete Selected (" + adapter.getSelectedIds().size() + ")");
+                    btnClearAll.setTextColor(Color.parseColor("#E53935")); // Warning Red
+                } else {
+                    btnClearAll.setText("Clear All");
+                    btnClearAll.setTextColor(Color.parseColor("#888888")); // Standard Gray
+                }
+            }
+        });
+
         btnClearAll.setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Clear All")
-                    .setMessage("Are you sure you want to delete all notifications?")
-                    .setPositiveButton("Clear", (dialog, which) -> {
-                        repo.clearAllAlerts();
-                        NotificationHelper.clearAllNotifications(MainActivity.this);
-                        Toast.makeText(MainActivity.this, "Notifications cleared", Toast.LENGTH_SHORT).show();
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
+            if (adapter.getSelectedIds() != null && adapter.getSelectedIds().size() > 0) {
+                // DELETE ONLY SELECTED (Long Press)
+                repo.deleteSelectedAlerts(adapter.getSelectedIds());
+                adapter.clearSelection();
+                Toast.makeText(MainActivity.this, "Selected notifications deleted", Toast.LENGTH_SHORT).show();
+            } else {
+                // CLEAR EVERYTHING
+                new AlertDialog.Builder(this)
+                        .setTitle("Clear All")
+                        .setMessage("Are you sure you want to delete all notifications?")
+                        .setPositiveButton("Clear", (dialog, which) -> {
+                            repo.clearAllAlerts();
+                            NotificationHelper.clearAllNotifications(MainActivity.this);
+                            Toast.makeText(MainActivity.this, "All notifications cleared", Toast.LENGTH_SHORT).show();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            }
         });
 
         Spinner spinnerFilter = sheetView.findViewById(R.id.spinnerNotificationFilter);
-        String[] filterOptionsArray = {"All Notifications", "Low Stock", "Expiration", "Damaged/Spoiled", "Supplier Updates"};
-        ArrayAdapter<String> spinnerAdapter = getAdaptiveAdapter(java.util.Arrays.asList(filterOptionsArray));
+        String[] filterOptionsArray = {"All", "Low Stock", "Expiration", "Damaged", "Supplier"};
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, filterOptionsArray);
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerFilter.setAdapter(spinnerAdapter);
         spinnerFilter.setSelection(0);
 
@@ -882,12 +969,28 @@ public class MainActivity extends BaseActivity {
         }
     }
 
+    private void updateOnlineStatus(boolean isOnline) {
+        String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+        if (currentUid != null) {
+            FirebaseFirestore.getInstance().collection("users")
+                    .document(currentUid).update("isOnline", isOnline);
+            FirebaseDatabase.getInstance().getReference("UsersStatus")
+                    .child(currentUid).setValue(isOnline ? "online" : "offline");
+        }
+    }
+
     @Override
     protected void onDestroy() {
         if (resetSignalListener != null) {
             resetSignalListener.remove();
             resetSignalListener = null;
         }
+
+        try {
+            SalesInventoryApplication.logAttendance("BREAK_START");
+            updateOnlineStatus(false);
+        } catch (Exception ignored) {}
+
         super.onDestroy();
     }
 }

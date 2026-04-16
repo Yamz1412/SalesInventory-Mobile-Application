@@ -27,6 +27,7 @@ import java.util.Map;
 
 public class AdminCreateStaffsActivity extends BaseActivity {
     private EditText etStaffName;
+    private EditText etStaffUsername;
     private EditText etStaffEmail;
     private EditText etStaffPhone;
     private EditText etStaffPassword;
@@ -49,6 +50,7 @@ public class AdminCreateStaffsActivity extends BaseActivity {
         setContentView(R.layout.activity_admin_create_staffs);
 
         etStaffName = findViewById(R.id.etStaffFullName);
+        etStaffUsername = findViewById(R.id.etStaffUsername);
         etStaffEmail = findViewById(R.id.etStaffEmail);
         etStaffPhone = findViewById(R.id.etStaffPhone);
         etStaffPassword = findViewById(R.id.etStaffPassword);
@@ -157,6 +159,10 @@ public class AdminCreateStaffsActivity extends BaseActivity {
                                 Map<String, Object> userData = new HashMap<>();
                                 userData.put("uid", newUid);
                                 userData.put("name", name);
+
+                                String username = etStaffUsername != null && etStaffUsername.getText() != null ? etStaffUsername.getText().toString().trim().toLowerCase() : "";
+                                userData.put("username", username);
+
                                 userData.put("email", email);
                                 userData.put("phone", phone);
                                 userData.put("role", "Staff");

@@ -48,7 +48,7 @@ public class NearExpiryItemsAdapter extends RecyclerView.Adapter<NearExpiryItems
         holder.name.setText(p.getProductName() != null ? p.getProductName() : "");
         holder.category.setText(p.getCategoryName() != null ? p.getCategoryName() : "");
 
-        long expiry = p.getExpiryDate();
+        long expiry = p.getExpiryDate() != null ? p.getExpiryDate().getTime() : 0L;
         if (expiry > 0) {
             holder.expiryDate.setText("Expires: " + dateFormat.format(new Date(expiry)));
             long now = System.currentTimeMillis();

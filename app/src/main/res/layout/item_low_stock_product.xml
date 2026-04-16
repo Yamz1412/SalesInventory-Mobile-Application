@@ -46,7 +46,8 @@
                 android:text="Product Name"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface" />
+                android:textColor="?attr/colorOnBackground"
+                />
 
             <TextView
                 android:id="@+id/tvCategory"
@@ -54,7 +55,7 @@
                 android:layout_height="wrap_content"
                 android:text="Category"
                 android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorOnBackground"
                 android:alpha="0.7"
                 android:layout_marginTop="2dp" />
 
@@ -64,7 +65,7 @@
                 android:layout_height="wrap_content"
                 android:text="Reorder: 0 | Critical: 0"
                 android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorOnBackground"
                 android:alpha="0.7"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
@@ -80,7 +81,7 @@
                 android:layout_height="wrap_content"
                 android:text="Left"
                 android:textSize="10sp"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorOnBackground"
                 android:alpha="0.5"/>
 
             <TextView
@@ -90,7 +91,8 @@
                 android:text="0 pcs"
                 android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="#E53935" />
+                android:textColor="?attr/colorOnBackground"
+                />
         </LinearLayout>
 
     </LinearLayout>

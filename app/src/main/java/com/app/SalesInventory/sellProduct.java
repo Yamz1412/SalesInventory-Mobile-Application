@@ -29,6 +29,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -594,14 +595,55 @@ public class sellProduct extends BaseActivity {
                 TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
                 TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
                 ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
+
+                // NEW: Plus and Minus Buttons
+                ImageButton btnMinus  = convertView.findViewById(R.id.btnCartMinus);
+                ImageButton btnPlus   = convertView.findViewById(R.id.btnCartPlus);
                 EditText etNote = convertView.findViewById(R.id.etCartNote);
 
                 btnRemove.setOnClickListener(v -> {
-                    cartManager.removeItemById(item.productId);
-                    cartNotes.remove(item.productId);
+                    cartManager.removeItem(item);
                     updateCartUI();
                     calculateTotalFromCart();
                 });
+
+                // NEW: Minus Button Logic with Warning
+                if (btnMinus != null) {
+                    btnMinus.setOnClickListener(v -> {
+                        if (item.quantity > 1) {
+                            item.quantity--;
+                            updateCartUI();
+                            calculateTotalFromCart();
+                        } else {
+                            // Warn the user before erasing the order
+                            new AlertDialog.Builder(sellProduct.this)
+                                    .setTitle("Remove Order")
+                                    .setMessage("Are you sure you want to remove " + item.productName + " from the order?")
+                                    .setPositiveButton("Remove", (d, w) -> {
+                                        cartManager.removeItem(item);
+                                        updateCartUI();
+                                        calculateTotalFromCart();
+                                    })
+                                    .setNegativeButton("Cancel", null)
+                                    .show();
+                        }
+                    });
+                }
+
+                // NEW: Plus Button Logic (With Limit 10 & Stock Check)
+                if (btnPlus != null) {
+                    btnPlus.setOnClickListener(v -> {
+                        if (item.quantity >= 10) {
+                            Toast.makeText(sellProduct.this, "Limit reached: Cannot order more than 10.", Toast.LENGTH_SHORT).show();
+                        } else if (item.quantity < item.stock) {
+                            item.quantity++;
+                            updateCartUI();
+                            calculateTotalFromCart();
+                        } else {
+                            Toast.makeText(sellProduct.this, "Max stock reached! (Only " + (int)item.stock + " available)", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
 
                 tvName.setText(item.productName);
 
@@ -609,9 +651,9 @@ public class sellProduct extends BaseActivity {
                 if (item.size != null && !item.size.isEmpty()) {
                     detailBuilder.append("Size: ").append(item.size);
                 }
-                if (item.addon != null && !item.addon.isEmpty()) {
+                if (item.extraDetails != null && !item.extraDetails.isEmpty()) {
                     if (detailBuilder.length() > 0) detailBuilder.append("\n");
-                    detailBuilder.append(item.addon);
+                    detailBuilder.append(item.extraDetails);
                 }
 
                 if (detailBuilder.length() > 0) {
@@ -621,24 +663,26 @@ public class sellProduct extends BaseActivity {
                     tvDetails.setVisibility(View.GONE);
                 }
 
-                tvQty.setText("x" + item.quantity);
+                // Updated: Remove the "x" since it's now a counter
+                tvQty.setText(String.valueOf(item.quantity));
                 tvLineTotal.setText("₱" + String.format(Locale.US, "%,.2f", item.getLineTotal()));
 
                 if (etNote != null) {
                     if (etNote.getTag() instanceof TextWatcher) {
                         etNote.removeTextChangedListener((TextWatcher) etNote.getTag());
                     }
-                    String currentNote = cartNotes.get(item.productId);
-                    if (currentNote == null || currentNote.trim().isEmpty()) {
-                        currentNote = "0% Sugar";
-                        cartNotes.put(item.productId, currentNote);
+
+                    // Load the note directly from the isolated item
+                    if (item.itemNote == null || item.itemNote.trim().isEmpty()) {
+                        item.itemNote = "0% Sugar";
                     }
-                    etNote.setText(currentNote);
+                    etNote.setText(item.itemNote);
+
                     TextWatcher watcher = new TextWatcher() {
                         @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                         @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                         @Override public void afterTextChanged(Editable s) {
-                            cartNotes.put(item.productId, s.toString());
+                            item.itemNote = s.toString(); // Save directly to the item instance!
                         }
                     };
                     etNote.addTextChangedListener(watcher);
@@ -674,7 +718,7 @@ public class sellProduct extends BaseActivity {
 
         if (!"Cash".equals(method)) {
             tvChange.setText("Change: ₱0.00");
-            btnConfirmSale.setEnabled(finalTotal > 0);
+            btnConfirmSale.setEnabled(finalTotal >= 0);
             return;
         }
 
@@ -730,13 +774,13 @@ public class sellProduct extends BaseActivity {
         for (CartManager.CartItem it : items) {
             editItems.add(new CartManager.CartItem(
                     it.productId, it.productName, it.unitPrice,
-                    it.quantity, it.stock, it.size, it.addon, it.excludedIngredients
+                    it.quantity, it.stock, it.size, it.extraDetails, it.excludedIngredients
             ));
         }
 
-        final android.widget.BaseAdapter[] editAdapter = new android.widget.BaseAdapter[1];
+        final BaseAdapter[] editAdapter = new BaseAdapter[1];
 
-        editAdapter[0] = new android.widget.BaseAdapter() {
+        editAdapter[0] = new BaseAdapter() {
             @Override public int getCount() { return editItems.size(); }
             @Override public Object getItem(int position) { return editItems.get(position); }
             @Override public long getItemId(int position) { return position; }
@@ -751,22 +795,70 @@ public class sellProduct extends BaseActivity {
                 TextView tvDetails   = convertView.findViewById(R.id.tvCartDetails);
                 TextView tvQty       = convertView.findViewById(R.id.tvCartQty);
                 TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
+                ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
 
+                // Bind new buttons
+                ImageButton btnMinus  = convertView.findViewById(R.id.btnCartMinus);
+                ImageButton btnPlus   = convertView.findViewById(R.id.btnCartPlus);
                 View layoutNote = convertView.findViewById(R.id.etCartNote);
+
                 if(layoutNote != null) layoutNote.setVisibility(View.GONE);
+
+                // Minus logic for the dialog with warning
+                if (btnMinus != null) {
+                    btnMinus.setOnClickListener(v -> {
+                        if (item.quantity > 1) {
+                            item.quantity--;
+                            notifyDataSetChanged();
+                        } else {
+                            new AlertDialog.Builder(sellProduct.this)
+                                    .setTitle("Remove Order")
+                                    .setMessage("Are you sure you want to remove " + item.productName + " from the order?")
+                                    .setPositiveButton("Remove", (d, w) -> {
+                                        item.quantity = 0; // Marks for removal
+                                        editItems.remove(position);
+                                        notifyDataSetChanged();
+                                    })
+                                    .setNegativeButton("Cancel", null)
+                                    .show();
+                        }
+                    });
+                }
+
+                // Plus logic for the dialog (Limit 10)
+                if (btnPlus != null) {
+                    btnPlus.setOnClickListener(v -> {
+                        if (item.quantity >= 10) {
+                            Toast.makeText(sellProduct.this, "Limit reached: Cannot order more than 10.", Toast.LENGTH_SHORT).show();
+                        } else if (item.quantity < item.stock) {
+                            item.quantity++;
+                            notifyDataSetChanged();
+                        } else {
+                            Toast.makeText(sellProduct.this, "Max stock reached!", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+
+                // Allow removing directly from edit dialog
+                if (btnRemove != null) {
+                    btnRemove.setOnClickListener(v -> {
+                        item.quantity = 0; // Marks for removal
+                        editItems.remove(position);
+                        notifyDataSetChanged();
+                    });
+                }
 
                 tvName.setText(item.productName);
                 String detailText = "";
                 if (item.size != null && !item.size.isEmpty()) detailText += item.size;
-                if (item.addon != null && !item.addon.isEmpty()) {
+                if (item.extraDetails != null && !item.extraDetails.isEmpty()) {
                     if (!detailText.isEmpty()) detailText += " / ";
-                    detailText += item.addon;
+                    detailText += item.extraDetails;
                 }
                 tvDetails.setText(detailText);
-                tvQty.setText("x" + item.quantity);
+                tvQty.setText(String.valueOf(item.quantity)); // Removed "x"
                 tvLineTotal.setText("₱" + String.format(Locale.US, "%,.2f", item.getLineTotal()));
 
-                convertView.setOnClickListener(v -> showEditSingleItemDialog(item, editAdapter[0]));
                 return convertView;
             }
         };
@@ -789,7 +881,7 @@ public class sellProduct extends BaseActivity {
                 if (item.quantity > 0) {
                     cartManager.addItem(
                             item.productId, item.productName, item.unitPrice,
-                            item.quantity, item.stock, item.size, item.addon, item.excludedIngredients
+                            item.quantity, item.stock, item.size, item.extraDetails, item.excludedIngredients
                     );
                 }
             }
@@ -931,16 +1023,15 @@ public class sellProduct extends BaseActivity {
         CartManager.CartItem item = items.get(index);
         String extra = "";
         if (item.size != null && !item.size.isEmpty()) extra += item.size;
-        if (item.addon != null && !item.addon.isEmpty()) {
+        if (item.extraDetails != null && !item.extraDetails.isEmpty()) {
             if (!extra.isEmpty()) extra += " | ";
-            extra += item.addon;
+            extra += item.extraDetails;
         }
         enrichedNames.put(item.productId, extra);
 
         fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
     }
 
-    @SuppressWarnings("unchecked")
     private void saveSale(String paymentMethod, boolean isDelivery, String dName, String dPhone,
                           String dAddr, String dPay, Map<String, String> enrichedNames, String orderId) {
 
@@ -966,7 +1057,7 @@ public class sellProduct extends BaseActivity {
 
             StringBuilder nameBuilder = new StringBuilder(item.productName);
             if (item.size != null && !item.size.isEmpty()) nameBuilder.append(" (").append(item.size).append(")");
-            if (item.addon != null && !item.addon.isEmpty()) nameBuilder.append(" [").append(item.addon).append("]");
+            if (item.extraDetails != null && !item.extraDetails.isEmpty()) nameBuilder.append(" [").append(item.extraDetails).append("]");
             String finalDbProductName = nameBuilder.toString();
 
             Product p = null;
@@ -994,12 +1085,10 @@ public class sellProduct extends BaseActivity {
             sale.setDeliveryPhone(dPhone);
             sale.setDeliveryAddress(dAddr);
             sale.setDeliveryPaymentMethod(dPay);
+            sale.setExtraDetails(item.extraDetails);
+            sale.setExcludedIngredients(item.excludedIngredients);
 
             if(p != null) {
-                // =======================================================================================
-                // CRITICAL FIX: Safe Inventory Deduction
-                // Prevents deducting the phantom base quantity if the item strictly uses Recipes/Variations!
-                // =======================================================================================
                 boolean hasBaseRecipe = p.getBomList() != null && !p.getBomList().isEmpty();
                 boolean hasVariationRecipe = p.getUnifiedVariations() != null && !p.getUnifiedVariations().isEmpty();
 
@@ -1008,9 +1097,6 @@ public class sellProduct extends BaseActivity {
                     productRepository.updateProductQuantity(p.getProductId(), p.getQuantity(), null);
                 }
 
-                // =======================================================================================
-                // COMBINED BOM LOGIC TO PREVENT DOUBLE-DEDUCTIONS AND NULL-POINTER CRASHES
-                // =======================================================================================
                 List<Map<String, Object>> activeRecipe = p.getBomList();
                 if (hasVariationRecipe) {
                     for (Map<String, Object> var : p.getUnifiedVariations()) {
@@ -1045,8 +1131,7 @@ public class sellProduct extends BaseActivity {
                             try { bQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
                         }
 
-                        // SAFE DYNAMIC SUGAR LOGIC (Prevents NullPointerException if matName is null)
-                        String note = cartNotes.get(item.productId);
+                        String note = item.itemNote; // FIXED: Use the isolated item note
                         if (note != null && matName != null) {
                             String noteLower = note.toLowerCase();
                             String materialLower = matName.toLowerCase();
@@ -1081,10 +1166,10 @@ public class sellProduct extends BaseActivity {
                     }
                 }
 
-                if (p.getAddonsList() != null && item.addon != null && !item.addon.isEmpty()) {
+                if (p.getAddonsList() != null && item.extraDetails != null && !item.extraDetails.isEmpty()) {
                     for (Map<String, Object> addonItem : p.getAddonsList()) {
                         String aName = (String) addonItem.get("name");
-                        if (item.addon.contains(aName)) {
+                        if (item.extraDetails.contains(aName)) {
                             String linkedMat = (String) addonItem.get("linkedMaterial");
                             double deductQty = 0;
                             try { deductQty = Double.parseDouble(String.valueOf(addonItem.get("deductQty"))); } catch (Exception ignored) {}
@@ -1098,22 +1183,11 @@ public class sellProduct extends BaseActivity {
             }
 
             salesRepository.addSale(sale, new SalesRepository.OnSaleAddedListener() {
-                @Override
-                public void onSaleAdded(String saleId) {
-                    savedCount[0]++;
-                    if (savedCount[0] == items.size()) {
-                        finalizeSaleCompletion(paymentMethod, orderId, enrichedNames);
-                    }
-                }
-                @Override
-                public void onError(String error) {
-                    savedCount[0]++;
-                    if (savedCount[0] == items.size()) {
-                        finalizeSaleCompletion(paymentMethod, orderId, enrichedNames);
-                    }
-                }
+                @Override public void onSaleAdded(String saleId) {}
+                @Override public void onError(String error) {}
             });
         }
+        finalizeSaleCompletion(paymentMethod, orderId, enrichedNames);
     }
 
     private void finalizeSaleCompletion(String paymentMethod, String orderId, Map<String, String> enrichedNames) {
@@ -1132,25 +1206,55 @@ public class sellProduct extends BaseActivity {
                         }
                     }
                 }
+
                 @Override
-                public void onError(String error) {}
+                public void onError(String error) {
+                }
             });
         }
 
         StringBuilder receiptText = new StringBuilder();
         receiptText.append("Order ID: ").append(orderId.substring(0, 8).toUpperCase()).append("\n");
         receiptText.append("Date: ").append(new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault()).format(new java.util.Date())).append("\n\n");
+
         for (CartManager.CartItem item : cartManager.getItems()) {
+            receiptText.append(item.quantity).append("x ").append(item.productName)
+                    .append("   ₱").append(String.format(Locale.US, "%,.2f", item.getLineTotal())).append("\n");
+
+            if (item.size != null && !item.size.isEmpty()) {
+                receiptText.append("    Size: ").append(item.size).append("\n");
+            }
+
+            if (item.extraDetails != null && !item.extraDetails.isEmpty()) {
+                receiptText.append("    Mods: ").append(item.extraDetails).append("\n");
+            }
+
             String note = cartNotes.get(item.productId);
-            String notePrint = (note != null && !note.trim().isEmpty()) ? "\n    Note: " + note : "";
-            receiptText.append(item.quantity).append("x ").append(item.productName).append(notePrint).append("   ₱").append(String.format(Locale.US, "%,.2f", item.getLineTotal())).append("\n");
+            if (note != null && !note.trim().isEmpty()) {
+                receiptText.append("    Note: ").append(note).append("\n");
+            }
+
+            // SIR TAN'S REQUIREMENT: Boldly print Missing/Excluded Ingredients
+            if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
+                String[] missingItems = item.excludedIngredients.split(",");
+                for (String missing : missingItems) {
+                    if (!missing.trim().isEmpty()) {
+                        receiptText.append("    *** NO ").append(missing.trim().toUpperCase()).append(" ***\n");
+                    }
+                }
+            }
+            receiptText.append("\n"); // Space between items
         }
-        receiptText.append("\n-------------------\n");
+
+        receiptText.append("-------------------\n");
         receiptText.append("TOTAL: ₱").append(String.format(Locale.US, "%,.2f", finalTotal)).append("\n");
         receiptText.append("PAYMENT: ").append(paymentMethod).append("\n");
 
-        ReceiptStorageManager.generateAndSaveReceipt(this, orderId, receiptText.toString());
-
+        try {
+            ReceiptStorageManager.generateAndSaveReceipt(this, orderId, receiptText.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         runOnUiThread(() -> {
             if (loadingDialog != null) loadingDialog.dismiss();
 
@@ -1165,7 +1269,10 @@ public class sellProduct extends BaseActivity {
             ImageView ivBusinessLogo = dialogView.findViewById(R.id.ivReceiptBusinessLogo);
             TextView tvOrderId = dialogView.findViewById(R.id.tvReceiptOrderId);
             TextView tvDate = dialogView.findViewById(R.id.tvReceiptDateTime);
-            ListView lvReceiptItems = dialogView.findViewById(R.id.lvReceiptItems);
+
+            // FIX: Changed to LinearLayout to prevent addView() crash
+            LinearLayout lvReceiptItems = dialogView.findViewById(R.id.lvReceiptItems);
+
             TextView tvTotal = dialogView.findViewById(R.id.tvReceiptTotal);
             TextView tvPaymentMethodStr = dialogView.findViewById(R.id.tvReceiptPaymentMethod);
             View layoutChange = dialogView.findViewById(R.id.layoutReceiptChange);
@@ -1179,27 +1286,40 @@ public class sellProduct extends BaseActivity {
                 Glide.with(this).load(cachedBusinessLogoUrl).into(ivBusinessLogo);
             }
 
-            if (tvOrderId != null) tvOrderId.setText("Order ID: #" + orderId.substring(0, 8).toUpperCase());
-            if (tvDate != null) tvDate.setText(new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()));
+            if (tvOrderId != null)
+                tvOrderId.setText("Order ID: #" + orderId.substring(0, 8).toUpperCase());
+            if (tvDate != null)
+                tvDate.setText(new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()));
 
             if (tvTotal != null) tvTotal.setText(String.format(Locale.US, "₱%,.2f", finalTotal));
             if (tvPaymentMethodStr != null) tvPaymentMethodStr.setText(paymentMethod);
 
+            // 2. Build the Digital UI List
             if (lvReceiptItems != null) {
                 lvReceiptItems.removeAllViews();
                 for (CartManager.CartItem item : cartManager.getItems()) {
                     TextView tv = new TextView(this);
-                    String extraDetails = enrichedNames != null ? enrichedNames.get(item.productId) : "";
-                    if (extraDetails == null) extraDetails = "";
-                    String nameWithDetails = item.productName + (extraDetails.isEmpty() ? "" : "\n" + extraDetails);
+
+                    String sizeInfo = (item.size != null && !item.size.isEmpty()) ? "\n  Size: " + item.size : "";
+                    String modInfo = (item.extraDetails != null && !item.extraDetails.isEmpty()) ? "\n  Mods: " + item.extraDetails : "";
+                    String nameWithDetails = item.productName + sizeInfo + modInfo;
 
                     String cNote = cartNotes.get(item.productId);
                     if (cNote != null && !cNote.trim().isEmpty()) {
-                        nameWithDetails += "\nNote: " + cNote;
+                        nameWithDetails += "\n  Note: " + cNote;
+                    }
+
+                    if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
+                        String[] missingItems = item.excludedIngredients.split(",");
+                        for (String missing : missingItems) {
+                            if (!missing.trim().isEmpty()) {
+                                nameWithDetails += "\n  *** NO " + missing.trim().toUpperCase() + " ***";
+                            }
+                        }
                     }
 
                     tv.setText(item.quantity + "x " + nameWithDetails + " - " + String.format(Locale.US, "₱%,.2f", item.getLineTotal()));
-                    tv.setPadding(0, 0, 0, 8);
+                    tv.setPadding(0, 0, 0, 16);
                     lvReceiptItems.addView(tv);
                 }
             }
@@ -1209,8 +1329,10 @@ public class sellProduct extends BaseActivity {
                 try {
                     String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
                     double cashGiven = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
-                    if (tvReceiptChange != null) tvReceiptChange.setText(String.format(Locale.US, "₱%,.2f", (cashGiven - finalTotal)));
-                } catch (Exception e) {}
+                    if (tvReceiptChange != null)
+                        tvReceiptChange.setText(String.format(Locale.US, "₱%,.2f", (cashGiven - finalTotal)));
+                } catch (Exception e) {
+                }
             } else {
                 if (layoutChange != null) layoutChange.setVisibility(View.GONE);
             }
@@ -1262,34 +1384,43 @@ public class sellProduct extends BaseActivity {
         String targetUnit = bUnit != null ? bUnit.toLowerCase().trim() : "pcs";
 
         try {
-            // 1. Calculate the exact fraction to deduct in terms of the Main Inventory Unit
-            // Example: Sold 500ml, Inventory is in L. utilDeductAmt = 0.5 L.
+            // 1. Calculate the exact fraction to deduct
             double utilDeductAmt = UnitConverterUtil.calculateDeductionAmount(deductAmt, matUnit, targetUnit, ppu);
 
-            // 2. Subtract the fraction from the current stock (e.g., 5.0 L - 0.5 L = 4.5 L)
+            // 2. Subtract from current stock safely
             double finalMQty = material.getQuantity() - utilDeductAmt;
             if (finalMQty < 0) finalMQty = 0;
 
-            // 3. Pro-rate the cost value of the inventory
-            double unitCost = material.getCostPrice() / material.getQuantity();
+            // CRITICAL FIX: Prevent Division by Zero (NaN Corruption)
+            double unitCost = 0.0;
+            if (material.getQuantity() > 0) {
+                unitCost = material.getCostPrice() / material.getQuantity();
+            }
+
+            // 3. Pro-rate the cost value
             double deductedCost = utilDeductAmt * unitCost;
             double newTotalCost = Math.max(0.0, material.getCostPrice() - deductedCost);
 
-            // 4. Update Database (Unit is NEVER permanently overwritten to ml/pcs anymore!)
+            // 4. Update Database
             productRepository.updateProductQuantityAndCost(material.getProductId(), finalMQty, newTotalCost, null);
 
-            // Update local memory
             material.setQuantity(finalMQty);
             material.setCostPrice(newTotalCost);
 
         } catch (Exception e) {
             double finalMQty = material.getQuantity() - deductAmt;
-            double unitCost = material.getCostPrice() / material.getQuantity();
+            if (finalMQty < 0) finalMQty = 0;
+
+            // CRITICAL FIX: Prevent Division by Zero in fallback block
+            double unitCost = 0.0;
+            if (material.getQuantity() > 0) {
+                unitCost = material.getCostPrice() / material.getQuantity();
+            }
             double newTotalCost = Math.max(0.0, material.getCostPrice() - (deductAmt * unitCost));
 
-            productRepository.updateProductQuantityAndCost(material.getProductId(), Math.max(0, finalMQty), newTotalCost, null);
+            productRepository.updateProductQuantityAndCost(material.getProductId(), finalMQty, newTotalCost, null);
 
-            material.setQuantity(Math.max(0, finalMQty));
+            material.setQuantity(finalMQty);
             material.setCostPrice(newTotalCost);
         }
     }
@@ -1314,53 +1445,46 @@ public class sellProduct extends BaseActivity {
 
         String finalWalletDocId = walletDocId;
 
-        db.runTransaction(transaction -> {
-            DocumentSnapshot snapshot = transaction.get(walletRef);
-            double newBalance = amount;
+        // 1. Use FieldValue.increment() for offline-safe atomic wallet updates (No transaction needed!)
+        Map<String, Object> walletUpdates = new HashMap<>();
+        walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(amount));
+        walletUpdates.put("name", finalWalletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
+        walletUpdates.put("type", finalWalletDocId.equals("CASH") ? "Physical Cash" : "E-Wallet");
 
-            if (snapshot.exists() && snapshot.getDouble("balance") != null) {
-                newBalance += snapshot.getDouble("balance");
-                transaction.update(walletRef, "balance", newBalance);
-            } else {
-                Map<String, Object> newWallet = new HashMap<>();
-                newWallet.put("name", finalWalletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
-                newWallet.put("type", finalWalletDocId.equals("CASH") ? "Physical Cash" : "E-Wallet");
-                newWallet.put("balance", newBalance);
-                transaction.set(walletRef, newWallet);
-            }
-            return null;
-        }).addOnSuccessListener(aVoid -> {
-            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault());
-            Map<String, Object> transLog = new HashMap<>();
-            transLog.put("title", "Sale: Order " + orderId.substring(0, 8).toUpperCase());
-            transLog.put("date", sdf.format(new Date()));
-            transLog.put("amount", amount);
-            transLog.put("isIncome", true);
-            transLog.put("timestamp", System.currentTimeMillis());
+        walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
 
-            db.collection("users").document(ownerId).collection("cash_transactions").add(transLog);
+        // 2. Add Transaction Log (Safely caches offline)
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault());
+        Map<String, Object> transLog = new HashMap<>();
+        transLog.put("title", "Sale: Order " + orderId.substring(0, 8).toUpperCase());
+        transLog.put("date", sdf.format(new Date()));
+        transLog.put("amount", amount);
+        transLog.put("isIncome", true);
+        transLog.put("timestamp", System.currentTimeMillis());
 
-            String currentUserId = AuthManager.getInstance().getCurrentUserId();
-            db.collection("users").document(ownerId).collection("shifts")
-                    .whereEqualTo("status", "ACTIVE")
-                    .whereEqualTo("cashierId", currentUserId)
-                    .get()
-                    .addOnSuccessListener(shiftSnapshot -> {
-                        if (!shiftSnapshot.isEmpty()) {
-                            DocumentSnapshot shiftDoc = shiftSnapshot.getDocuments().get(0);
-                            double currentCashSales = shiftDoc.getDouble("cashSales") != null ? shiftDoc.getDouble("cashSales") : 0.0;
-                            double currentEPaymentSales = shiftDoc.getDouble("ePaymentSales") != null ? shiftDoc.getDouble("ePaymentSales") : 0.0;
+        db.collection("users").document(ownerId).collection("cash_transactions").add(transLog);
 
-                            if (paymentMethod.equalsIgnoreCase("Cash")) {
-                                shiftDoc.getReference().update("cashSales", currentCashSales + finalTotal);
-                            } else {
-                                shiftDoc.getReference().update("ePaymentSales", currentEPaymentSales + finalTotal);
-                            }
+        // 3. Update the Active Shift safely
+        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        db.collection("users").document(ownerId).collection("shifts")
+                .whereEqualTo("status", "ACTIVE")
+                .whereEqualTo("cashierId", currentUserId)
+                .get()
+                .addOnSuccessListener(shiftSnapshot -> {
+                    if (!shiftSnapshot.isEmpty()) {
+                        DocumentReference shiftRef = shiftSnapshot.getDocuments().get(0).getReference();
+
+                        Map<String, Object> shiftUpdates = new HashMap<>();
+                        if (paymentMethod.equalsIgnoreCase("Cash")) {
+                            shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(finalTotal));
+                        } else {
+                            shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(finalTotal));
                         }
-                    });
 
-        }).addOnFailureListener(e -> {
-        });
+                        // Updates the shift totals instantly, even if the internet is down
+                        shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
+                    }
+                });
     }
 
     private void handleSaveError(String msg) {

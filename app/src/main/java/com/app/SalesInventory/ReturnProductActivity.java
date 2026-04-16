@@ -133,10 +133,14 @@ public class ReturnProductActivity extends BaseActivity {
     private void setupAdapters() {
         supplierAdapter = getAdaptiveDropdownAdapter(supplierNames);
         actvReturnSupplier.setAdapter(supplierAdapter);
+        // FIXED: Prevent keyboard from popping up and blocking the dropdown
+        actvReturnSupplier.setInputType(android.text.InputType.TYPE_NULL);
 
         List<String> reasons = Arrays.asList("Damaged / Defective", "Expired", "Wrong Item Delivered", "Excess Quantity");
         reasonAdapter = getAdaptiveDropdownAdapter(reasons);
         actvReturnReason.setAdapter(reasonAdapter);
+        // FIXED: Prevent keyboard from popping up and blocking the dropdown
+        actvReturnReason.setInputType(android.text.InputType.TYPE_NULL);
 
         productAdapter = getAdaptiveDropdownAdapter(filteredProductNames);
 
@@ -208,6 +212,7 @@ public class ReturnProductActivity extends BaseActivity {
         AutoCompleteTextView actvProduct = row.findViewById(R.id.actvReturnProductItem);
         Spinner spinnerUnit = row.findViewById(R.id.spinnerReturnUnitItem);
         ImageButton btnDelete = row.findViewById(R.id.btnDeleteReturnItem);
+        actvProduct.setInputType(android.text.InputType.TYPE_NULL);
 
         actvProduct.setAdapter(productAdapter);
         actvProduct.setOnClickListener(v -> actvProduct.showDropDown());

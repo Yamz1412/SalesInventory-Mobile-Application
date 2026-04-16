@@ -21,13 +21,14 @@ public class Shift {
     private String status;
     private boolean active;
 
-    // === NEW FIELDS FOR LOCK TRACKING ===
+    // LOCK / BREAK TRACKING
     private boolean locked;
     private List<Long> lockTimes = new ArrayList<>();
     private List<Long> unlockTimes = new ArrayList<>();
 
     public Shift() {}
 
+    // ... (Keep all your existing basic getters and setters here) ...
     public String getShiftId() { return shiftId; }
     public void setShiftId(String shiftId) { this.shiftId = shiftId; }
     public String getCashierId() { return cashierId; }
@@ -57,13 +58,29 @@ public class Shift {
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 
-    // === NEW GETTERS & SETTERS ===
     public boolean isLocked() { return locked; }
     public void setLocked(boolean locked) { this.locked = locked; }
     public List<Long> getLockTimes() { return lockTimes; }
     public void setLockTimes(List<Long> lockTimes) { this.lockTimes = lockTimes; }
     public List<Long> getUnlockTimes() { return unlockTimes; }
     public void setUnlockTimes(List<Long> unlockTimes) { this.unlockTimes = unlockTimes; }
+
+    // --- NEW: Calculate Total Break Time in Milliseconds ---
+    public long calculateTotalBreakTime() {
+        long totalBreak = 0;
+        if (lockTimes == null || unlockTimes == null) return 0;
+
+        int pairs = Math.min(lockTimes.size(), unlockTimes.size());
+        for (int i = 0; i < pairs; i++) {
+            totalBreak += (unlockTimes.get(i) - lockTimes.get(i));
+        }
+
+        // If currently locked, calculate break time up to NOW
+        if (lockTimes.size() > unlockTimes.size()) {
+            totalBreak += (System.currentTimeMillis() - lockTimes.get(lockTimes.size() - 1));
+        }
+        return totalBreak;
+    }
 
     public Map<String, Object> toMap() {
         Map<String, Object> map = new HashMap<>();

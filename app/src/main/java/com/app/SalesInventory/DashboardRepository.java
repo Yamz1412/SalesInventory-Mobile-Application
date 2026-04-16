@@ -137,7 +137,7 @@ public class DashboardRepository {
                     lowOrCriticalCount++;
                 }
 
-                long expiry = p.getExpiryDate();
+                long expiry = p.getExpiryDate() != null ? p.getExpiryDate().getTime() : 0L;
                 if (expiry > 0) {
                     long diffMillis = expiry - now;
                     long days = diffMillis / (24L * 60L * 60L * 1000L);

@@ -72,44 +72,6 @@ public class AlertRepository {
         });
     }
 
-//    public void createOrUpdateStockAlert(String productId, String productName, String type, double currentQty) {
-//        CollectionReference alertsRef = firestore.collection("alerts");
-//        String businessId = getBusinessId(); // Ensure user is logged in
-//
-//        // Query for existing alert: Same business, product, and alert type (e.g., 'LOW_STOCK')
-//        alertsRef.whereEqualTo("businessId", businessId)
-//                .whereEqualTo("productId", productId)
-//                .whereEqualTo("type", type)
-//                .get()
-//                .addOnSuccessListener(querySnapshot -> {
-//                    String message = "Stock Alert: " + productName + " (" + currentQty + " remaining)";
-//                    long timestamp = System.currentTimeMillis();
-//
-//                    if (!querySnapshot.isEmpty()) {
-//                        // 1. UPDATE EXISTING ALERT
-//                        String docId = querySnapshot.getDocuments().get(0).getId();
-//                        Map<String, Object> updates = new HashMap<>();
-//                        updates.put("message", message);
-//                        updates.put("timestamp", timestamp);
-//                        updates.put("isRead", false); // Optional: reset to unread on updates
-//
-//                        alertsRef.document(docId).update(updates);
-//                    } else {
-//                        // 2. CREATE NEW ALERT
-//                        Map<String, Object> newAlert = new HashMap<>();
-//                        newAlert.put("businessId", businessId);
-//                        newAlert.put("productId", productId);
-//                        newAlert.put("productName", productName);
-//                        newAlert.put("type", type);
-//                        newAlert.put("message", message);
-//                        newAlert.put("timestamp", timestamp);
-//                        newAlert.put("isRead", false);
-//
-//                        alertsRef.add(newAlert);
-//                    }
-//                });
-//    }
-
     private Alert createAlertFromSnapshot(DocumentSnapshot document) {
         // We skip toObject() to prevent log spam about Timestamp conversion
         Alert alert = createAlertFromMap(document.getData());
@@ -303,34 +265,40 @@ public class AlertRepository {
                 .addOnFailureListener(e -> Log.e(TAG, "Error deleting alert", e));
     }
 
+    // --- NEW: Clear All Notifications (Works Offline using WriteBatch) ---
     public void clearAllAlerts() {
-        if (!firestoremanagerIsReady()) return;
+        if (allAlerts.getValue() == null || allAlerts.getValue().isEmpty()) return;
 
-        // FIXED: Use the exact same path helper that is used for fetching/adding alerts
-        // This fixes the bug where alerts wouldn't clear because we were deleting from the wrong path
-        firestoreManager.getDb().collection(firestoreManager.getUserAlertsPath()).get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        WriteBatch batch = firestoreManager.getDb().batch();
-                        int count = 0;
-                        for (DocumentSnapshot doc : task.getResult()) {
-                            batch.delete(doc.getReference());
-                            count++;
-                            // Firestore batch limit is 500
-                            if (count >= 400) {
-                                batch.commit();
-                                batch = firestoreManager.getDb().batch();
-                                count = 0;
-                            }
-                        }
-                        if (count > 0) {
-                            batch.commit();
-                        }
-                        Log.d(TAG, "All alerts cleared from path: " + firestoreManager.getUserAlertsPath());
-                    } else {
-                        Log.e(TAG, "Failed to fetch alerts for deletion: " + task.getException());
-                    }
-                });
+        String ownerId = firestoreManager.getBusinessOwnerId();
+        if (ownerId == null) return;
+
+        // FIXED: Changed getFirestore() to getDb()
+        com.google.firebase.firestore.WriteBatch batch = firestoreManager.getDb().batch();
+        for (Alert alert : allAlerts.getValue()) {
+            com.google.firebase.firestore.DocumentReference ref = firestoreManager.getDb()
+                    .collection("users").document(ownerId)
+                    .collection("alerts").document(alert.getId());
+            batch.delete(ref);
+        }
+        batch.commit();
+    }
+
+    // --- NEW: Delete Selected Notifications (Works Offline using WriteBatch) ---
+    public void deleteSelectedAlerts(java.util.Set<String> selectedIds) {
+        if (selectedIds == null || selectedIds.isEmpty()) return;
+
+        String ownerId = firestoreManager.getBusinessOwnerId();
+        if (ownerId == null) return;
+
+        // FIXED: Changed getFirestore() to getDb()
+        com.google.firebase.firestore.WriteBatch batch = firestoreManager.getDb().batch();
+        for (String id : selectedIds) {
+            com.google.firebase.firestore.DocumentReference ref = firestoreManager.getDb()
+                    .collection("users").document(ownerId)
+                    .collection("alerts").document(id);
+            batch.delete(ref);
+        }
+        batch.commit();
     }
 
     public void getAlertsByType(String type, OnAlertsFetchedListener listener) {

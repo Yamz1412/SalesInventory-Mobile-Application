@@ -12,6 +12,7 @@ import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -34,6 +35,7 @@ import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -50,13 +52,14 @@ import java.util.Map;
 public class EditProduct extends BaseActivity {
 
     private ImageButton btnEditPhoto;
-    private TextInputEditText productNameET, costPriceET, lowStockET, expiryDateET, etPiecesPerUnit;
-    private MaterialAutoCompleteTextView quantityET;
+    // Removed lowStockET, changed quantityET and etPiecesPerUnit to match the new XML
+    private TextInputEditText productNameET, costPriceET, expiryDateET, quantityET, etPiecesPerUnit;
     private AutoCompleteTextView productLineET, productTypeET;
-    private Button updateBtn, cancelBtn;
+    private MaterialButton updateBtn, cancelBtn; // Updated to MaterialButton
     private Spinner unitSpinner, subUnitSpinner;
     private LinearLayout layoutPiecesPerUnit;
 
+    private TextView tvReorderLevel, tvCriticalLevel;
     private ProductRepository productRepository;
     private AuthManager authManager;
     private SimpleDateFormat expiryFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
@@ -103,18 +106,18 @@ public class EditProduct extends BaseActivity {
         productLineET = findViewById(R.id.productLineET);
         productTypeET = findViewById(R.id.productTypeET);
         costPriceET = findViewById(R.id.costPriceET);
-        lowStockET = findViewById(R.id.lowStockET);
-        quantityET = findViewById(R.id.quantityET);
+        quantityET = findViewById(R.id.quantityET); // Now mapped as TextInputEditText
         unitSpinner = findViewById(R.id.unitSpinner);
         subUnitSpinner = findViewById(R.id.subUnitSpinner);
         layoutPiecesPerUnit = findViewById(R.id.layoutPiecesPerUnit);
-        etPiecesPerUnit = findViewById(R.id.etPiecesPerUnit);
+        etPiecesPerUnit = findViewById(R.id.etPiecesPerUnit); // Now mapped as TextInputEditText
         expiryDateET = findViewById(R.id.expiryDateET);
         updateBtn = findViewById(R.id.updateBtn);
         cancelBtn = findViewById(R.id.cancelBtn);
 
         setupImagePickers();
         loadInventoryForCalculations();
+        setupDynamicCategoryDropdowns();
 
         // Setup Spinners
         String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
@@ -150,7 +153,36 @@ public class EditProduct extends BaseActivity {
         btnEditPhoto.setOnClickListener(v -> tryPickImage());
         expiryDateET.setOnClickListener(v -> showExpiryDatePicker());
 
+        tvReorderLevel = findViewById(R.id.tvReorderLevel);
+        tvCriticalLevel = findViewById(R.id.tvCriticalLevel);
+
+        quantityET.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateStockAlertsDisplay();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
         loadProductData();
+    }
+
+    private void updateStockAlertsDisplay() {
+        int qty = 0;
+        try {
+            String qtyStr = quantityET.getText() != null ? quantityET.getText().toString() : "0";
+            qty = Integer.parseInt(qtyStr.isEmpty() ? "0" : qtyStr);
+        } catch (Exception ignored) {}
+
+        if (qty < 0) qty = 0;
+
+        // 20% for Reorder, 5% for Critical
+        int reorderLevel = (int) Math.ceil(qty * 0.20);
+        int criticalLevel = (int) Math.ceil(qty * 0.05);
+        if (criticalLevel == 0 && qty > 0) criticalLevel = 1;
+
+        if (tvReorderLevel != null) tvReorderLevel.setText("Reorder: " + reorderLevel);
+        if (tvCriticalLevel != null) tvCriticalLevel.setText("Critical: " + criticalLevel);
     }
 
     private void loadProductData() {
@@ -165,10 +197,12 @@ public class EditProduct extends BaseActivity {
                         productLineET.setText(p.getProductLine());
                         costPriceET.setText(String.valueOf(p.getCostPrice()));
                         quantityET.setText(String.valueOf(p.getQuantity()));
-                        lowStockET.setText(String.valueOf(p.getReorderLevel()));
 
-                        if (p.getExpiryDate() > 0) {
-                            expiryCalendar.setTimeInMillis(p.getExpiryDate());
+                        // We removed lowStockET, so we don't load it anymore.
+                        // The UI alerts will auto-calculate based on quantity.
+
+                        if (p.getExpiryDate() != null && p.getExpiryDate().getTime() > 0) {
+                            expiryCalendar.setTimeInMillis(p.getExpiryDate().getTime());
                             expiryDateET.setText(expiryFormat.format(expiryCalendar.getTime()));
                         }
 
@@ -184,6 +218,9 @@ public class EditProduct extends BaseActivity {
                         if (selectedImagePath != null && !isFinishing()) {
                             Glide.with(EditProduct.this).load(selectedImagePath).diskCacheStrategy(DiskCacheStrategy.ALL).into(btnEditPhoto);
                         }
+
+                        // Refresh the UI text views once data is loaded
+                        updateStockAlertsDisplay();
                     }
                 });
             }
@@ -207,18 +244,23 @@ public class EditProduct extends BaseActivity {
 
         try {
             double cost = Double.parseDouble(costPriceET.getText().toString().isEmpty() ? "0" : costPriceET.getText().toString());
-            double qty = Double.parseDouble(quantityET.getText().toString().isEmpty() ? "0" : quantityET.getText().toString());
-            int reorder = Integer.parseInt(lowStockET.getText().toString().isEmpty() ? "0" : lowStockET.getText().toString());
+            int qty = Integer.parseInt(quantityET.getText().toString().isEmpty() ? "0" : quantityET.getText().toString());
             int ppu = Integer.parseInt(etPiecesPerUnit.getText().toString().isEmpty() ? "1" : etPiecesPerUnit.getText().toString());
 
             if (existingProductToEdit == null) existingProductToEdit = new Product();
+
+            // Calculate and lock in the levels when saving
+            int reorderLevel = (int) Math.ceil(qty * 0.20);
+            int criticalLevel = (int) Math.ceil(qty * 0.05);
+            if (criticalLevel == 0 && qty > 0) criticalLevel = 1;
 
             existingProductToEdit.setProductName(name);
             existingProductToEdit.setCategoryName(type);
             existingProductToEdit.setProductLine(line);
             existingProductToEdit.setCostPrice(cost);
             existingProductToEdit.setQuantity(qty);
-            existingProductToEdit.setReorderLevel(reorder);
+            existingProductToEdit.setReorderLevel(reorderLevel);
+            existingProductToEdit.setCriticalLevel(criticalLevel);
             existingProductToEdit.setPiecesPerUnit(ppu > 0 ? ppu : 1);
 
             String mainUnit = unitSpinner.getSelectedItem().toString();
@@ -292,9 +334,64 @@ public class EditProduct extends BaseActivity {
         });
     }
 
+    private void setupDynamicCategoryDropdowns() {
+        // We only want to load this once when the activity starts
+        productRepository.getAllProducts().observe(this, products -> {
+            java.util.Set<String> uniqueCategories = new java.util.HashSet<>();
+            java.util.Set<String> uniqueTypes = new java.util.HashSet<>();
+
+            // 1. Add default fallbacks just in case the database is empty
+            uniqueCategories.add("Food");
+            uniqueCategories.add("Drinks");
+            uniqueCategories.add("Add-ons");
+
+            uniqueTypes.add("Menu");
+            uniqueTypes.add("Raw");
+            uniqueTypes.add("Finished");
+            uniqueTypes.add("Packaging");
+
+            // 2. Extract dynamically from database
+            if (products != null) {
+                for (Product p : products) {
+                    // Extract existing Product Lines (Categories like "Beverages")
+                    if (p.getProductLine() != null && !p.getProductLine().trim().isEmpty()) {
+                        uniqueCategories.add(p.getProductLine());
+                    }
+                    // Extract existing Product Types
+                    if (p.getCategoryName() != null && !p.getCategoryName().trim().isEmpty()) {
+                        uniqueTypes.add(p.getCategoryName());
+                    }
+                }
+            }
+
+            // 3. Convert to Lists and Sort Alphabetically
+            List<String> categoryList = new ArrayList<>(uniqueCategories);
+            java.util.Collections.sort(categoryList);
+
+            List<String> typeList = new ArrayList<>(uniqueTypes);
+            java.util.Collections.sort(typeList);
+
+            // 4. Apply to Adapters
+            ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, categoryList);
+            if (productLineET != null) productLineET.setAdapter(catAdapter);
+
+            ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, typeList);
+            if (productTypeET != null) productTypeET.setAdapter(typeAdapter);
+        });
+    }
+
     private ArrayAdapter<String> getAdaptiveAdapter(String[] items) {
         List<String> list = new ArrayList<>();
         Collections.addAll(list, items);
         return new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, list);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }

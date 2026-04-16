@@ -16,21 +16,26 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.FileProvider;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
 
 public class SettingsActivity extends BaseActivity {
     private static final String TAG = "SettingsActivity";
 
     private RadioGroup rgTheme;
     private RadioButton rbLight, rbDark, rbDefault;
-    private MaterialSwitch switchColorblind;
-
+    private SwitchMaterial switchColorblind;
+    private SwitchMaterial switchAutoBackup;
     private Button btnBackup, btnRestore, btnUserManual, btnClearCache, btnSystemControls;
     private TextView tvAdminTitle;
     private View cardAdmin;
@@ -66,6 +71,7 @@ public class SettingsActivity extends BaseActivity {
         rbDark = findViewById(R.id.rbDark);
         rbDefault = findViewById(R.id.rbDefault);
         switchColorblind = findViewById(R.id.switchColorblind);
+        switchAutoBackup = findViewById(R.id.switchAutoBackup);
 
         btnBackup = findViewById(R.id.btnBackup);
         btnRestore = findViewById(R.id.btnRestore);
@@ -78,10 +84,8 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void checkUserRoleForPermissions() {
-        // Refresh the current user's role from AuthManager
         authManager.refreshCurrentUserStatus(success -> {
             runOnUiThread(() -> {
-                // Only show the Administration card if the user is an Admin
                 if (authManager.isCurrentUserAdmin()) {
                     tvAdminTitle.setVisibility(View.VISIBLE);
                     cardAdmin.setVisibility(View.VISIBLE);
@@ -105,21 +109,19 @@ public class SettingsActivity extends BaseActivity {
 
         boolean isColorblind = prefs.getBoolean("ColorblindMode", false);
         switchColorblind.setChecked(isColorblind);
+
+        boolean isAutoBackupOn = prefs.getBoolean("AutoBackupEnabled", false);
+        switchAutoBackup.setChecked(isAutoBackupOn);
+        btnBackup.setVisibility(isAutoBackupOn ? View.GONE : View.VISIBLE);
     }
 
     private void setupListeners() {
-        btnSystemControls.setOnClickListener(v -> {
-            Intent intent = new Intent(this, ControlSettingsActivity.class);
-            startActivity(intent);
-        });
+        btnSystemControls.setOnClickListener(v -> startActivity(new Intent(this, ControlSettingsActivity.class)));
 
         rgTheme.setOnCheckedChangeListener((group, checkedId) -> {
             String selectedTheme = "default";
-            if (checkedId == R.id.rbDark) {
-                selectedTheme = "dark";
-            } else if (checkedId == R.id.rbLight) {
-                selectedTheme = "light";
-            }
+            if (checkedId == R.id.rbDark) selectedTheme = "dark";
+            else if (checkedId == R.id.rbLight) selectedTheme = "light";
 
             String currentTheme = ThemeManager.getInstance(this).getCurrentTheme().name;
             if (!selectedTheme.equals(currentTheme)) {
@@ -128,7 +130,6 @@ public class SettingsActivity extends BaseActivity {
             }
         });
 
-        // Colorblind Mode Toggle
         switchColorblind.setOnCheckedChangeListener((buttonView, isChecked) -> {
             boolean currentVal = prefs.getBoolean("ColorblindMode", false);
             if (currentVal != isChecked) {
@@ -138,14 +139,30 @@ public class SettingsActivity extends BaseActivity {
             }
         });
 
-        // Other buttons
+        // NEW: Auto-Backup Switch Logic
+        switchAutoBackup.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean("AutoBackupEnabled", isChecked).apply();
+
+            if (isChecked) {
+                btnBackup.setVisibility(View.GONE);
+                PeriodicWorkRequest backupWorkRequest = new PeriodicWorkRequest.Builder(
+                        AutoBackupWorker.class, 24, TimeUnit.HOURS).build();
+                WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                        "DailyAutoBackup", ExistingPeriodicWorkPolicy.REPLACE, backupWorkRequest);
+                Toast.makeText(this, "Automated backups enabled (Every 24hrs)", Toast.LENGTH_SHORT).show();
+            } else {
+                btnBackup.setVisibility(View.VISIBLE);
+                WorkManager.getInstance(this).cancelUniqueWork("DailyAutoBackup");
+                Toast.makeText(this, "Automated backups disabled", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         btnBackup.setOnClickListener(v -> backupLauncher.launch("HanZai_Backup_" + System.currentTimeMillis() + ".db"));
         btnRestore.setOnClickListener(v -> restoreLauncher.launch(new String[]{"*/*"}));
         btnUserManual.setOnClickListener(v -> openUserManual());
         btnClearCache.setOnClickListener(v -> showClearCacheConfirmation());
     }
 
-    // Custom recreate method to bypass MIUI ClassCastException crash loops during standard recreate()
     private void safeRecreate() {
         new android.os.Handler().postDelayed(() -> {
             finish();
@@ -163,7 +180,6 @@ public class SettingsActivity extends BaseActivity {
                 .setPositiveButton("Clean Now", (dialog, which) -> clearAppCacheAggressively())
                 .setNegativeButton("Cancel", null)
                 .create();
-
         clearCacheDialog.show();
     }
 
@@ -178,7 +194,6 @@ public class SettingsActivity extends BaseActivity {
             Toast.makeText(this, "Images and memory cache cleared successfully!", Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Failed to completely clear cache", Toast.LENGTH_SHORT).show();
-            Log.e(TAG, "Error clearing cache", e);
         }
     }
 
@@ -207,10 +222,14 @@ public class SettingsActivity extends BaseActivity {
         restoreLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
             if (uri != null) {
                 restoreConfirmDialog = new AlertDialog.Builder(SettingsActivity.this)
-                        .setTitle("⚠️ Confirm Restore")
-                        .setMessage("This will completely overwrite your current data. Are you sure?")
+                        .setTitle("⚠️ Confirm Restore & Migration")
+                        .setMessage("This will completely overwrite your current data. If you are migrating this backup to a NEW account, the data will be synced to the new account's cloud. Are you sure?")
                         .setPositiveButton("Yes, Restore", (dialog, which) -> {
                             if (BackupManager.importDatabase(SettingsActivity.this, uri)) {
+
+                                // NEW: Fixes the Account Migration by forcing a fresh sync!
+                                BackupManager.prepareDatabaseForNewAccount(SettingsActivity.this);
+
                                 Toast.makeText(SettingsActivity.this, "Restore Successful! Restarting app...", Toast.LENGTH_LONG).show();
                                 AuthManager.getInstance().signOutAndCleanup(() -> {
                                     Intent intent = new Intent(SettingsActivity.this, SignInActivity.class);
@@ -250,7 +269,6 @@ public class SettingsActivity extends BaseActivity {
             startActivity(Intent.createChooser(intent, "Open User Manual"));
 
         } catch (Exception e) {
-            e.printStackTrace();
             Toast.makeText(this, "Unable to open manual: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }

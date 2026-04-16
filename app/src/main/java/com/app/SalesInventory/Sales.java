@@ -15,6 +15,8 @@ public class Sales {
     private double discountAmount;
     private String paymentMethod;
     private String status = "COMPLETED";
+    private String extraDetails;
+    private String excludedIngredients;
 
     @ServerTimestamp
     private Date date;
@@ -64,7 +66,6 @@ public class Sales {
     public double getTotalCost() { return totalCost; }
     public void setTotalCost(double totalCost) { this.totalCost = totalCost; }
 
-    // NEW: Getters and Setters for Discount
     public double getDiscountAmount() { return discountAmount; }
     public void setDiscountAmount(double discountAmount) { this.discountAmount = discountAmount; }
 
@@ -124,4 +125,11 @@ public class Sales {
 
     public String getDeliveryPaymentMethod() { return deliveryPaymentMethod; }
     public void setDeliveryPaymentMethod(String deliveryPaymentMethod) { this.deliveryPaymentMethod = deliveryPaymentMethod; }
+
+    public String getExtraDetails() { return extraDetails != null ? extraDetails : ""; }
+    public void setExtraDetails(String extraDetails) { this.extraDetails = extraDetails; }
+
+    public String getExcludedIngredients() { return excludedIngredients != null ? excludedIngredients : ""; }
+    public void setExcludedIngredients(String excludedIngredients) { this.excludedIngredients = excludedIngredients; }
+
 }

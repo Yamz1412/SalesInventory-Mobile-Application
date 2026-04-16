@@ -6,6 +6,7 @@ import androidx.room.Delete;
 import androidx.room.Insert;
 import androidx.room.Query;
 import androidx.room.Update;
+import androidx.room.OnConflictStrategy;
 
 import java.util.List;
 
@@ -30,24 +31,20 @@ public interface ProductDao {
     @Query("SELECT * FROM products WHERE quantity <= reorderLevel")
     List<ProductEntity> getLowStockProductsSync();
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     long insert(ProductEntity entity);
 
-    // --- FIX: Added missing insertProduct method ---
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     long insertProduct(ProductEntity entity);
-
     @Update
     void update(ProductEntity entity);
 
-    // --- FIX: Added missing updateProduct method to prevent future errors ---
     @Update
     void updateProduct(ProductEntity entity);
 
     @Query("DELETE FROM products WHERE localId = :localId")
     void deleteByLocalId(long localId);
 
-    // --- FIX: Added missing deleteAllProducts method ---
     @Query("DELETE FROM products")
     int deleteAllProducts();
 
@@ -57,9 +54,7 @@ public interface ProductDao {
     @Query("SELECT * FROM products ORDER BY lastUpdated DESC")
     List<ProductEntity> getAllProductsSync();
 
-    // =========================================================================
-    // NEW: Instantly applies the exact cost calculation locally
-    // =========================================================================
     @Query("UPDATE products SET quantity = :newQty, costPrice = :newCost WHERE productId = :productId")
     void updateQuantityAndCost(String productId, double newQty, double newCost);
+
 }

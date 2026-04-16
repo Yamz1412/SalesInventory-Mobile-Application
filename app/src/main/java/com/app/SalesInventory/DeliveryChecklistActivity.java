@@ -115,12 +115,42 @@ public class DeliveryChecklistActivity extends BaseActivity {
 
     private void processSelectedItems() {
         List<StagedItem> itemsToProcess = new ArrayList<>();
+        boolean hasPartial = false;
+        StringBuilder partialWarning = new StringBuilder("The following items are incomplete:\n\n");
+
         for (StagedItem item : stagedItemsList) {
-            if (item.isSelected) itemsToProcess.add(item);
+            if (item.isSelected) {
+                itemsToProcess.add(item);
+
+                // FIXED: Check if they are trying to move a partial delivery!
+                if (item.expectedQuantity > 0 && item.quantity < item.expectedQuantity) {
+                    hasPartial = true;
+                    partialWarning.append("• ").append(item.productName)
+                            .append("\n  (Expected: ").append(item.expectedQuantity)
+                            .append(", Arrived: ").append(item.quantity).append(")\n\n");
+                }
+            }
         }
 
         if (itemsToProcess.isEmpty()) return;
 
+        // FIXED: Show the Warning Popup if incomplete!
+        if (hasPartial) {
+            partialWarning.append("Do you still want to proceed and move these to inventory?");
+            new AlertDialog.Builder(this)
+                    .setTitle("Partial Delivery Warning")
+                    .setMessage(partialWarning.toString())
+                    .setPositiveButton("Proceed", (dialog, which) -> executeInventoryMove(itemsToProcess))
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        } else {
+            // If everything is complete, move it immediately
+            executeInventoryMove(itemsToProcess);
+        }
+    }
+
+    // --- NEW: We extracted the actual moving logic into its own method ---
+    private void executeInventoryMove(List<StagedItem> itemsToProcess) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setCancelable(false);
         builder.setView(new android.widget.ProgressBar(this));
@@ -132,19 +162,15 @@ public class DeliveryChecklistActivity extends BaseActivity {
         int[] processedCount = {0};
 
         for (StagedItem item : itemsToProcess) {
-            // Null safety for productId
             String safeProductId = item.productId != null ? item.productId : "unknown";
 
             productRepository.getProductById(safeProductId, new ProductRepository.OnProductFetchedListener() {
                 @Override
                 public void onProductFetched(Product p) {
-                    // CRITICAL FIX: Ensure all updates run safely on the Main UI Thread
                     runOnUiThread(() -> {
-                        // Safe fallback to prevent Division By Zero Math Crash
                         double qtyToProcess = item.quantity > 0 ? item.quantity : 1.0;
 
                         if (p != null) {
-                            // Product EXISTS -> Add to Stock
                             double convertedQty = calculateConvertedQuantity(qtyToProcess, item.unit, p.getUnit(), p.getPiecesPerUnit());
                             double newQty = p.getQuantity() + convertedQty;
 
@@ -154,14 +180,14 @@ public class DeliveryChecklistActivity extends BaseActivity {
                             productRepository.updateProductQuantityAndCost(p.getProductId(), newQty, newCostPerUnit, null);
                             if (item.dbKey != null) stagingRef.child(item.dbKey).removeValue();
                         } else {
-                            // Product DOES NOT EXIST -> Send to Registration Queue
                             Bundle b = new Bundle();
                             b.putString("productName", item.productName);
                             b.putDouble("quantity", qtyToProcess);
                             b.putDouble("costPrice", item.unitPrice);
                             b.putString("unit", item.unit);
+                            b.putString("stagedItemKey", item.dbKey);
+
                             registrationQueue.add(b);
-                            if (item.dbKey != null) stagingRef.child(item.dbKey).removeValue();
                         }
 
                         processedCount[0]++;
@@ -175,6 +201,15 @@ public class DeliveryChecklistActivity extends BaseActivity {
                 @Override
                 public void onError(String error) {
                     runOnUiThread(() -> {
+                        Bundle b = new Bundle();
+                        b.putString("productName", item.productName);
+                        b.putDouble("quantity", item.quantity > 0 ? item.quantity : 1.0);
+                        b.putDouble("costPrice", item.unitPrice);
+                        b.putString("unit", item.unit);
+                        b.putString("stagedItemKey", item.dbKey);
+
+                        registrationQueue.add(b);
+
                         processedCount[0]++;
                         if (processedCount[0] == itemsToProcess.size()) {
                             if (loadingDialog.isShowing()) loadingDialog.dismiss();
@@ -231,7 +266,8 @@ public class DeliveryChecklistActivity extends BaseActivity {
         public String dbKey;
         public String productId;
         public String productName;
-        public double quantity; // CRITICAL FIX: Changed to match Firebase PO database
+        public double quantity;
+        public double expectedQuantity;
         public double unitPrice;
         public String unit;
         public boolean isSelected = false;
@@ -251,34 +287,53 @@ public class DeliveryChecklistActivity extends BaseActivity {
         public void onBindViewHolder(@NonNull VH holder, int position) {
             StagedItem item = stagedItemsList.get(position);
             holder.tvItemName.setText(item.productName);
-
-            // FIX: Now uses item.quantity
             holder.tvItemDetails.setText("Qty: " + item.quantity + " " + item.unit + " | Cost: ₱" + item.unitPrice);
 
-            // Unbind listener so scrolling doesn't mess up checkboxes
             holder.cbItemSelect.setOnCheckedChangeListener(null);
             holder.cbItemSelect.setChecked(item.isSelected);
-
             holder.cbItemSelect.setOnCheckedChangeListener((btn, isChecked) -> {
                 item.isSelected = isChecked;
                 updateSelectedCount();
             });
 
-            // Fast-check if product exists to update UI label
-            productRepository.getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
+            // FIXED: Immediately tag as new if there is no valid ID
+            if (item.productId == null || item.productId.trim().isEmpty() || item.productId.equals("unknown")) {
+                holder.tvItemStatus.setText("New Item: Will require registration");
+                holder.tvItemStatus.setTextColor(Color.parseColor("#D32F2F")); // Red
+                return;
+            }
+
+            final String fetchId = item.productId;
+            holder.tvItemStatus.setTag(fetchId);
+            holder.tvItemStatus.setText("Checking status...");
+            holder.tvItemStatus.setTextColor(Color.GRAY);
+
+            productRepository.getProductById(fetchId, new ProductRepository.OnProductFetchedListener() {
                 @Override
                 public void onProductFetched(Product p) {
-                    runOnUiThread(() -> {
-                        if (p != null) {
-                            holder.tvItemStatus.setText("Registered: Will add stock");
-                            holder.tvItemStatus.setTextColor(Color.parseColor("#2E7D32")); // Green
-                        } else {
+                    DeliveryChecklistActivity.this.runOnUiThread(() -> {
+                        // FIXED: Only apply the text if this row is STILL showing the original item
+                        if (holder.tvItemStatus.getTag() != null && holder.tvItemStatus.getTag().equals(fetchId)) {
+                            if (p != null) {
+                                holder.tvItemStatus.setText("Registered: Will add stock");
+                                holder.tvItemStatus.setTextColor(Color.parseColor("#2E7D32")); // Green
+                            } else {
+                                holder.tvItemStatus.setText("New Item: Will require registration");
+                                holder.tvItemStatus.setTextColor(Color.parseColor("#D32F2F")); // Red
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void onError(String e) {
+                    DeliveryChecklistActivity.this.runOnUiThread(() -> {
+                        if (holder.tvItemStatus.getTag() != null && holder.tvItemStatus.getTag().equals(fetchId)) {
                             holder.tvItemStatus.setText("New Item: Will require registration");
                             holder.tvItemStatus.setTextColor(Color.parseColor("#D32F2F")); // Red
                         }
                     });
                 }
-                @Override public void onError(String e) {}
             });
         }
 

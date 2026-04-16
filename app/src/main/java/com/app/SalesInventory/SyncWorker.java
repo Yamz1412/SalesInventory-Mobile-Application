@@ -84,6 +84,9 @@ public class SyncWorker extends Worker {
                 sale.setPrice(item.unitPrice);
                 sale.setTotalPrice(item.lineTotal);
                 sale.setPaymentMethod(order.paymentMethod);
+                sale.setTotalCost(item.totalCost); // Crucial for Gross Profit
+                sale.setDiscountAmount(item.discountAmount); // Crucial for Net Sales
+                sale.setExtraDetails(item.extraDetails);
                 sale.setDate(order.orderDate);
                 sale.setTimestamp(order.orderDate);
                 sale.setDeliveryStatus(order.deliveryStatus);
@@ -104,36 +107,36 @@ public class SyncWorker extends Worker {
         String walletDocId = order.paymentMethod.toLowerCase().contains("gcash") ? "GCASH" : "CASH";
         DocumentReference walletRef = firestore.collection("users").document(ownerId).collection("wallets").document(walletDocId);
 
-        // Update Wallet Balance
-        firestore.runTransaction(transaction -> {
-            DocumentSnapshot snapshot = transaction.get(walletRef);
-            double newBal = order.totalAmount;
-            if(snapshot.exists() && snapshot.getDouble("balance") != null) {
-                newBal += snapshot.getDouble("balance");
-            }
-            Map<String, Object> w = new HashMap<>();
-            w.put("balance", newBal);
-            w.put("name", walletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
-            transaction.set(walletRef, w, com.google.firebase.firestore.SetOptions.merge());
-            return null;
-        });
+        Map<String, Object> w = new HashMap<>();
+        w.put("balance", com.google.firebase.firestore.FieldValue.increment(order.totalAmount));
+        w.put("name", walletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
 
-        // Update Active Shift Totals
+        try {
+            Tasks.await(walletRef.set(w, com.google.firebase.firestore.SetOptions.merge()));
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to update wallet in background", e);
+        }
+
+        // 2. Force the thread to WAIT for the Shift update to finish
         Task<com.google.firebase.firestore.QuerySnapshot> shiftTask = firestore.collection("users").document(ownerId).collection("shifts")
                 .whereEqualTo("status", "ACTIVE").get();
         try {
             com.google.firebase.firestore.QuerySnapshot shiftSnap = Tasks.await(shiftTask);
             if(!shiftSnap.isEmpty()) {
                 DocumentSnapshot shiftDoc = shiftSnap.getDocuments().get(0);
-                double currentCash = shiftDoc.getDouble("cashSales") != null ? shiftDoc.getDouble("cashSales") : 0.0;
-                double currentEPay = shiftDoc.getDouble("ePaymentSales") != null ? shiftDoc.getDouble("ePaymentSales") : 0.0;
+
+                Map<String, Object> shiftUpdates = new HashMap<>();
                 if(order.paymentMethod.equalsIgnoreCase("Cash")) {
-                    shiftDoc.getReference().update("cashSales", currentCash + order.totalAmount);
+                    shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(order.totalAmount));
                 } else {
-                    shiftDoc.getReference().update("ePaymentSales", currentEPay + order.totalAmount);
+                    shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(order.totalAmount));
                 }
+
+                Tasks.await(shiftDoc.getReference().set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge()));
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to update shift in background", e);
+        }
     }
     private void pullFromFirestore() {
         try {
@@ -273,7 +276,12 @@ public class SyncWorker extends Worker {
                 java.util.Iterator<String> keys = obj.keys();
                 while (keys.hasNext()) {
                     String key = keys.next();
-                    map.put(key, obj.get(key));
+                    Object val = obj.get(key);
+                    if (val == org.json.JSONObject.NULL) {
+                        map.put(key, null);
+                    } else {
+                        map.put(key, val);
+                    }
                 }
                 list.add(map);
             }

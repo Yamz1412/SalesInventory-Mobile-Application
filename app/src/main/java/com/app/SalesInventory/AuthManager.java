@@ -6,12 +6,11 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.functions.FirebaseFunctions;
-import com.google.firebase.functions.HttpsCallableResult;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -75,8 +74,13 @@ public class AuthManager {
     }
 
     public boolean isCurrentUserSubAdmin() {
-        return cachedRole != null && cachedRole.equalsIgnoreCase("Sub-Admin");
+        if (cachedRole == null) return false;
+        String r = cachedRole.trim();
+        return r.equalsIgnoreCase("Sub-Admin") ||
+                r.equalsIgnoreCase("Sub Admin") ||
+                r.equalsIgnoreCase("Subadmin");
     }
+
     public boolean hasManagerAccess() {
         return isCurrentUserAdmin() || isCurrentUserSubAdmin();
     }
@@ -89,30 +93,26 @@ public class AuthManager {
 
     public void init(Application app) {
         this.application = app;
+        // NEW: INSTANT SYNCHRONOUS ROUTING
+        // Ensures the app knows exactly whose database to look at (Admin vs Staff) the second it opens!
+        android.content.SharedPreferences prefs = app.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE);
+        String cachedOwner = prefs.getString("business_owner_routing", null);
+        if (cachedOwner != null && !cachedOwner.isEmpty()) {
+            FirestoreManager.getInstance().setBusinessOwnerId(cachedOwner);
+        }
     }
 
-    // =========================================================
-    // NEW: Centralized method to ensure data always loads on login
-    // =========================================================
-    // Replace this method inside AuthManager.java
     private void triggerDataSync() {
-        android.util.Log.d("SalesInventory_SYNC", "==== TRIGGERING DATA SYNC (AuthManager) ====");
         try {
-            android.util.Log.d("SalesInventory_SYNC", "Restarting FirestoreSyncListener...");
             FirestoreSyncListener.getInstance().restartAllListeners();
-
             if (application != null) {
-                android.util.Log.d("SalesInventory_SYNC", "Refreshing SalesRepository data...");
                 SalesRepository.getInstance(application).reloadAllData();
-                android.util.Log.d("SalesInventory_SYNC", "Starting ProductRemoteSyncer listening...");
                 new ProductRemoteSyncer(application).startListening();
             } else {
-                android.util.Log.d("SalesInventory_SYNC", "SalesRepository reloaded (Staff Mode)...");
                 SalesRepository.getInstance().reloadAllData();
             }
-            android.util.Log.d("SalesInventory_SYNC", "==== SYNC TRIGGER COMPLETE ====");
         } catch (Exception e) {
-            android.util.Log.e("SalesInventory_SYNC", "ERROR triggering data sync", e);
+            e.printStackTrace();
         }
     }
 
@@ -164,9 +164,13 @@ public class AuthManager {
                 cachedIsAdmin = true;
                 cachedIsApproved = true;
                 cachedRole = "Admin";
-                FirestoreManager.getInstance().setBusinessOwnerId(uid);
 
-                // FIX: Trigger data download
+                FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                if (application != null) {
+                    application.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit().putString("business_owner_routing", uid).apply();
+                }
+
                 triggerDataSync();
 
                 Map<String, Object> fixData = new HashMap<>();
@@ -199,7 +203,7 @@ public class AuthManager {
         else if (approvedObj instanceof String) approved = "true".equalsIgnoreCase((String) approvedObj);
 
         cachedRole = (role != null) ? role.trim() : "Staff";
-        cachedIsAdmin = "Admin".equalsIgnoreCase(cachedRole);
+        cachedIsAdmin = "Admin".equalsIgnoreCase(cachedRole) || "Owner".equalsIgnoreCase(cachedRole) || "BusinessOwner".equalsIgnoreCase(cachedRole);
 
         if (cachedIsAdmin) approved = true;
         cachedIsApproved = approved;
@@ -211,10 +215,13 @@ public class AuthManager {
             FirestoreManager.getInstance().setBusinessOwnerId(uid);
         }
 
-        // FIX: Trigger data download
-        triggerDataSync();
+        if (application != null) {
+            application.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                    .edit().putString("business_owner_routing", FirestoreManager.getInstance().getBusinessOwnerId()).apply();
+        }
 
-        callback.onComplete(cachedIsAdmin && cachedIsApproved);
+        triggerDataSync();
+        callback.onComplete(cachedIsAdmin || cachedIsApproved);
     }
 
     public void isCurrentUserAdminAsync(@NonNull final SimpleCallback callback) {
@@ -238,9 +245,13 @@ public class AuthManager {
                 cachedRole = "Admin";
                 cachedIsAdmin = true;
                 cachedIsApproved = true;
-                FirestoreManager.getInstance().setBusinessOwnerId(uid);
 
-                // FIX: Trigger data download
+                FirestoreManager.getInstance().setBusinessOwnerId(uid);
+                if (application != null) {
+                    application.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit().putString("business_owner_routing", uid).apply();
+                }
+
                 triggerDataSync();
 
                 Map<String, Object> fixData = new HashMap<>();
@@ -280,13 +291,16 @@ public class AuthManager {
                     } else {
                         FirestoreManager.getInstance().setBusinessOwnerId(uid);
                     }
+
+                    if (application != null) {
+                        application.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                                .edit().putString("business_owner_routing", FirestoreManager.getInstance().getBusinessOwnerId()).apply();
+                    }
                 } else {
                     FirestoreManager.getInstance().setBusinessOwnerId(uid);
                 }
 
-                // FIX: Trigger data download
                 triggerDataSync();
-
                 callback.onComplete(resolvedRole);
             });
         });
@@ -364,93 +378,16 @@ public class AuthManager {
         });
     }
 
-    public void approveUser(String uid, SimpleCallback callback) {
-        fStore.collection("users").document(uid).update("approved", true)
-                .addOnCompleteListener(task -> {
-                    if (callback != null) callback.onComplete(task.isSuccessful());
-                });
-    }
-
-    public void promoteToAdmin(String uid, final SimpleCallback callback) {
-        fStore.collection("users").document(uid).get().addOnCompleteListener(task -> {
-            if (!task.isSuccessful() || task.getResult() == null) {
-                callback.onComplete(false);
-                return;
-            }
-            DocumentSnapshot doc = task.getResult();
-            String email = doc.getString("email");
-            if (email == null) email = doc.getString("Email");
-            String name = doc.getString("name");
-            if (name == null) name = doc.getString("Name");
-            String phone = null;
-            if (doc.contains("phone")) phone = doc.getString("phone");
-            if (phone == null && doc.contains("Phone")) phone = doc.getString("Phone");
-            Long createdAt = null;
-            if (doc.contains("createdAt")) {
-                Object c = doc.get("createdAt");
-                if (c instanceof Number) createdAt = ((Number) c).longValue();
-            }
-            Map<String, Object> adminData = new HashMap<>();
-            adminData.put("uid", uid);
-            adminData.put("email", email != null ? email : "");
-            adminData.put("name", name != null ? name : "");
-            if (phone != null) adminData.put("phone", phone);
-            adminData.put("role", "Admin");
-            adminData.put("approved", true);
-            if (createdAt != null) adminData.put("createdAt", createdAt);
-            callAdminUpdateUser(uid, true, "Admin", true, success -> {
-                if (!success) {
-                    callback.onComplete(false);
-                    return;
-                }
-                fStore.collection("admin").document(uid).set(adminData, com.google.firebase.firestore.SetOptions.merge()).addOnCompleteListener(setTask -> {
-                    if (!setTask.isSuccessful()) {
-                        callback.onComplete(false);
-                        return;
-                    }
-                    Map<String, Object> updates = new HashMap<>();
-                    updates.put("role", "Admin");
-                    updates.put("approved", true);
-                    fStore.collection("users").document(uid).set(updates, com.google.firebase.firestore.SetOptions.merge()).addOnCompleteListener(upd -> callback.onComplete(upd.isSuccessful()));
-                });
-            });
-        });
-    }
-
-    public void demoteAdmin(String uid, final SimpleCallback callback) {
-        callAdminUpdateUser(uid, true, "Staff", false, success -> {
-            if (!success) {
-                callback.onComplete(false);
-                return;
-            }
-            fStore.collection("admin").document(uid).delete().addOnCompleteListener(task -> {
-                if (!task.isSuccessful()) {
-                    callback.onComplete(false);
-                    return;
-                }
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("role", "Staff");
-                updates.put("approved", true);
-                fStore.collection("users").document(uid).update(updates).addOnCompleteListener(upd -> callback.onComplete(upd.isSuccessful()));
-            });
-        });
-    }
-
-    // NEW: Flexible Promotion/Demotion System
     public void changeUserRole(String uid, String newRole, final SimpleCallback callback) {
         Map<String, Object> updates = new HashMap<>();
         updates.put("role", newRole);
-        updates.put("approved", true); // Ensure they stay approved when role changes
+        updates.put("approved", true);
 
-        // Update the database
         fStore.collection("users").document(uid).update(updates).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
-                // If they are demoted to Staff or Sub-Admin, make sure they are removed from the super-admin collection
                 if (!newRole.equalsIgnoreCase("Admin")) {
                     fStore.collection("admin").document(uid).delete();
                 }
-
-                // Sync with Firebase Cloud Functions
                 callAdminUpdateUser(uid, true, newRole, newRole.equalsIgnoreCase("Admin"), success -> {
                     callback.onComplete(true);
                 });
@@ -460,51 +397,71 @@ public class AuthManager {
         });
     }
 
-    // =========================================================
-    // AUTOMATED SHIFT MANAGEMENT (REVISION 3)
-    // =========================================================
     private String activeShiftId = null;
 
     public void startAutomatedShift(String cashierName) {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         String uid = getCurrentUserId();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (uid == null || ownerId == null) return;
 
-        fStore.collection("SystemSettings").document(ownerId).get().addOnSuccessListener(doc -> {
-            boolean autoShift = true; // Default to true if not set
-            if (doc.exists() && doc.contains("autoShiftEnabled")) {
-                Boolean val = doc.getBoolean("autoShiftEnabled");
-                if (val != null) autoShift = val;
-            }
+        FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("shifts")
+                .whereEqualTo("cashierId", uid)
+                .whereEqualTo("active", true)
+                .get().addOnSuccessListener(query -> {
+                    if (query.isEmpty()) {
+                        DocumentReference newShiftRef = FirebaseFirestore.getInstance()
+                                .collection("users").document(ownerId).collection("shifts").document();
 
-            if (autoShift) {
-                activeShiftId = "SHIFT_" + System.currentTimeMillis();
-                Shift newShift = new Shift();
-                newShift.setShiftId(activeShiftId);
-                newShift.setCashierId(uid);
-                newShift.setCashierName(cashierName != null ? cashierName : "Staff");
-                newShift.setStartTime(System.currentTimeMillis());
-                newShift.setActive(true);
-                newShift.setLocked(false);
-                newShift.setStatus("Ongoing");
+                        Shift shift = new Shift();
+                        shift.setShiftId(newShiftRef.getId());
+                        shift.setCashierId(uid);
+                        shift.setCashierName(cashierName);
+                        shift.setStartTime(System.currentTimeMillis());
+                        shift.setActive(true);
+                        shift.setStatus("ACTIVE");
 
-                fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).set(newShift.toMap());
-            }
-        });
+                        newShiftRef.set(shift.toMap());
+
+                        // FIXED: Save the ID so Lock/Unlock records work!
+                        activeShiftId = newShiftRef.getId();
+                    } else {
+                        // FIXED: If they reopened the app, remember their current active shift!
+                        activeShiftId = query.getDocuments().get(0).getId();
+                    }
+                });
     }
 
     public void endAutomatedShift() {
-        if (activeShiftId == null) return;
+        String uid = getCurrentUserId();
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId != null) {
-            Map<String, Object> updates = new HashMap<>();
-            updates.put("active", false);
-            updates.put("endTime", System.currentTimeMillis());
-            updates.put("status", "Completed");
-            fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).update(updates);
-        }
-        activeShiftId = null;
+        if (uid == null || ownerId == null) return;
+
+        FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("shifts")
+                .whereEqualTo("cashierId", uid)
+                .whereEqualTo("active", true)
+                .get().addOnSuccessListener(query -> {
+                    if (!query.isEmpty()) {
+                        DocumentSnapshot doc = query.getDocuments().get(0);
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("active", false);
+                        updates.put("status", "CLOSED");
+                        updates.put("endTime", System.currentTimeMillis());
+
+                        // If they logged out while on break, auto-end the break
+                        List<Long> locks = (List<Long>) doc.get("lockTimes");
+                        List<Long> unlocks = (List<Long>) doc.get("unlockTimes");
+                        if (locks != null && unlocks != null && locks.size() > unlocks.size()) {
+                            unlocks.add(System.currentTimeMillis());
+                            updates.put("unlockTimes", unlocks);
+                            updates.put("locked", false);
+                        }
+
+                        doc.getReference().update(updates);
+                    }
+                });
     }
+
+
 
     public void logShiftLock(boolean isLocking) {
         if (activeShiftId == null) return;
@@ -534,7 +491,6 @@ public class AuthManager {
 
         FirestoreManager.getInstance().clearCachedIds();
 
-        // FIX: Hard reset singletons to prevent stale data leaking between accounts
         try { ProductRepository.resetInstance(); } catch (Exception ignored) {}
         try { SalesRepository.resetInstance(); } catch (Exception ignored) {}
         try { FirestoreSyncListener.getInstance().reset(); } catch (Exception ignored) {}

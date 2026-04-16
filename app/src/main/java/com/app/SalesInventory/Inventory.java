@@ -71,13 +71,15 @@ public class Inventory extends BaseActivity {
     private com.google.firebase.firestore.ListenerRegistration archiveListener;
 
     private com.google.android.material.switchmaterial.SwitchMaterial switchShowOutOfStock;
-    private boolean showOutOfStock = false;
+    private boolean showOutOfStock = true;
 
     private ActionMode actionMode;
 
     private ActionMode.Callback actionModeCallback = new ActionMode.Callback() {
         @Override
         public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            if (isReadOnly) return false;
+
             menu.add(0, 1, 0, "Edit").setIcon(android.R.drawable.ic_menu_edit).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
             menu.add(0, 2, 0, "Delete").setIcon(android.R.drawable.ic_menu_delete).setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
             return true;
@@ -159,6 +161,8 @@ public class Inventory extends BaseActivity {
 
         switchShowOutOfStock = findViewById(R.id.switchShowOutOfStock);
         if (switchShowOutOfStock != null) {
+            switchShowOutOfStock.setChecked(false);
+            showOutOfStock = false;
             switchShowOutOfStock.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 showOutOfStock = isChecked;
                 applyFilters();
@@ -198,8 +202,8 @@ public class Inventory extends BaseActivity {
         productsRecyclerView.setAdapter(productAdapter);
 
         authManager.refreshCurrentUserStatus(success -> runOnUiThread(() -> {
-            boolean isRealAdmin = authManager.isCurrentUserAdmin();
-            isReadOnly = !isRealAdmin;
+            boolean hasAccess = authManager.hasManagerAccess();
+            isReadOnly = !hasAccess;
 
             if (productAdapter != null) productAdapter.setReadOnly(isReadOnly);
 
@@ -460,15 +464,6 @@ public class Inventory extends BaseActivity {
             try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch(Exception e){}
             searchEditText.setTextColor(isDark ? Color.WHITE : Color.BLACK);
             searchEditText.setHintTextColor(Color.GRAY);
-
-            searchEditText.setFilters(new android.text.InputFilter[]{
-                    (source, start, end, dest, dstart, dend) -> {
-                        if (source.toString().matches("^[a-zA-Z\\s]*$")) {
-                            return null;
-                        }
-                        return source.toString().replaceAll("[^a-zA-Z\\s]", "");
-                    }
-            });
         }
 
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
@@ -554,20 +549,24 @@ public class Inventory extends BaseActivity {
             String filterCatNorm = normalizeCategoryName(cat);
             String filterLineNorm = normalizeCategoryName(line);
 
-            boolean matchesCategory = filterCatNorm.equals("all") || pCatNorm.equals(filterCatNorm);
-            boolean matchesProductLine = filterLineNorm.equals("alllines") || filterLineNorm.equals("all") || pLineNorm.equals(filterLineNorm);
+            boolean isCatAll = filterCatNorm.equals("all") || filterCatNorm.equals("alllines") || filterCatNorm.isEmpty();
+            boolean isLineAll = filterLineNorm.equals("alllines") || filterLineNorm.equals("all") || filterLineNorm.isEmpty();
+
+            boolean matchesCategory = isCatAll || pCatNorm.equals(filterCatNorm);
+            boolean matchesProductLine = isLineAll || pLineNorm.equals(filterLineNorm);
 
             if (matchesSearch && matchesCategory && matchesProductLine) {
 
-                // FIX: Out of stock logic works logically now
-                if (!showOutOfStock && p.getQuantity() <= 0) {
-                    continue; // Hide items with no stock when switch is OFF
+                if (showOutOfStock) {
+                    if (p.getQuantity() > 0) continue;
+                } else {
+                    if (!showLowStockOnly && p.getQuantity() <= 0) continue;
                 }
 
                 if (showLowStockOnly && (!p.isCriticalStock() && !p.isLowStock())) continue;
 
                 if (showNearExpiryOnly) {
-                    long expiry = p.getExpiryDate();
+                    long expiry = p.getExpiryDate() != null ? p.getExpiryDate().getTime() : 0L;
                     if (expiry <= 0) continue;
                     long days = (expiry - System.currentTimeMillis()) / (24L * 60L * 60L * 1000L);
                     if (days > 7) continue;
@@ -588,8 +587,9 @@ public class Inventory extends BaseActivity {
                 case "Stock: Low to High":
                     return Double.compare(p1.getQuantity(), p2.getQuantity());
                 case "Earliest Expiry":
-                    long e1 = p1.getExpiryDate() <= 0 ? Long.MAX_VALUE : p1.getExpiryDate();
-                    long e2 = p2.getExpiryDate() <= 0 ? Long.MAX_VALUE : p2.getExpiryDate();
+                    long e1 = (p1.getExpiryDate() == null || p1.getExpiryDate().getTime() <= 0) ? Long.MAX_VALUE : p1.getExpiryDate().getTime();
+                    long e2 = (p2.getExpiryDate() == null || p2.getExpiryDate().getTime() <= 0) ? Long.MAX_VALUE : p2.getExpiryDate().getTime();
+
                     return Long.compare(e1, e2);
                 case "Recently Added":
                     return Long.compare(p2.getDateAdded(), p1.getDateAdded());

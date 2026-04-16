@@ -15,17 +15,16 @@ public class CartManager {
         public int quantity; // The number of "drinks/items" ordered
         public double stock; // The amount of raw inventory left (now supports decimals)
         public String size;
-        public String addon;
-        public String excludedIngredients; // NEW FIELD
-
-        public CartItem(String productId, String productName, double unitPrice, int quantity, double stock, String size, String addon, String excludedIngredients) {
-            this.productId = productId;
+        public String extraDetails;
+        public String excludedIngredients;
+        public String itemNote = ""; // NEW: Prevents note collision for Sugar/BOM deductions
+        public CartItem(String productId, String productName, double unitPrice, int quantity, double stock, String size, String extraDetails, String excludedIngredients) {            this.productId = productId;
             this.productName = productName;
             this.unitPrice = unitPrice;
             this.quantity = quantity;
             this.stock = stock;
             this.size = size;
-            this.addon = addon;
+            this.extraDetails = extraDetails;
             this.excludedIngredients = excludedIngredients; // ASSIGN NEW FIELD
         }
 
@@ -57,7 +56,7 @@ public class CartManager {
         for (CartItem item : items) {
             boolean sameId = item.productId.equals(productId);
             boolean sameSize = (item.size == null && size == null) || (item.size != null && item.size.equals(size));
-            boolean sameAddon = (item.addon == null && addon == null) || (item.addon != null && item.addon.equals(addon));
+            boolean sameAddon = (item.extraDetails == null && addon == null) || (item.extraDetails != null && item.extraDetails.equals(addon));
             boolean sameExclusions = (item.excludedIngredients == null && excludedIngredients == null) ||
                     (item.excludedIngredients != null && item.excludedIngredients.equals(excludedIngredients));
 
@@ -76,7 +75,7 @@ public class CartManager {
         while (iterator.hasNext()) {
             CartItem item = iterator.next();
             boolean sameSize = (item.size == null && size == null) || (item.size != null && item.size.equals(size));
-            boolean sameAddon = (item.addon == null && addon == null) || (item.addon != null && item.addon.equals(addon));
+            boolean sameAddon = (item.extraDetails == null && addon == null) || (item.extraDetails != null && item.extraDetails.equals(addon));
 
             if (item.productId.equals(productId) && sameSize && sameAddon) {
                 if (quantity <= 0) {
@@ -91,6 +90,10 @@ public class CartManager {
             }
         }
         return false;
+    }
+
+    public synchronized void removeItem(CartItem exactItem) {
+        items.remove(exactItem);
     }
 
     public synchronized void removeItemById(String productId) {

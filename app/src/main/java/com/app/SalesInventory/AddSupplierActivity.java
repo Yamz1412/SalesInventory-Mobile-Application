@@ -328,10 +328,27 @@ public class AddSupplierActivity extends BaseActivity {
 
                             if (existingByName.containsKey(lowerName)) {
                                 String productId = existingByName.get(lowerName);
+
+                                // 1. Update Cloud
                                 com.google.firebase.firestore.FirebaseFirestore.getInstance()
                                         .collection("users").document(finalAdminId)
                                         .collection("products").document(productId)
                                         .update("costPrice", row.cost, "supplier", supplierName);
+
+                                productRepository.getProductById(productId, new ProductRepository.OnProductFetchedListener() {
+                                    @Override
+                                    public void onProductFetched(Product p) {
+                                        if (p != null) {
+                                            p.setCostPrice(row.cost);
+                                            p.setSupplier(supplierName);
+                                            productRepository.updateProduct(p, "", new ProductRepository.OnProductUpdatedListener() {
+                                                @Override public void onProductUpdated() {}
+                                                @Override public void onError(String e) {}
+                                            });
+                                        }
+                                    }
+                                    @Override public void onError(String error) {}
+                                });
                             } else {
                                 Product newProduct = new Product();
                                 String newId = java.util.UUID.randomUUID().toString();

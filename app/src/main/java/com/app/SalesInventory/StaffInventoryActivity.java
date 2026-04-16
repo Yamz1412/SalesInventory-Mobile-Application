@@ -2,8 +2,9 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ProgressBar;
-import android.widget.SearchView;
+import android.widget.SearchView; // FIX: Changed to standard widget to match XML
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,7 +25,7 @@ public class StaffInventoryActivity extends AppCompatActivity {
     private RecyclerView rv;
     private ProgressBar progressBar;
     private TextView emptyStateTV;
-    private SearchView searchView;
+    private SearchView searchView; // FIX: Changed to standard widget
     private Spinner spinnerCategoryFilter;
     private ProductRemoteSyncer productRemoteSyncer;
     private String currentOwnerAdminId;
@@ -35,6 +36,16 @@ public class StaffInventoryActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_inventory);
         rv = findViewById(R.id.productsRecyclerView);
+        View btnAddProduct = findViewById(R.id.btn_add_product);
+        View btnAdjustStock = findViewById(R.id.btn_adjust_stock);
+        View btnArchive = findViewById(R.id.btn_archive);
+        View layoutArchiveContainer = findViewById(R.id.layout_archive_container);
+
+        if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
+        if (btnAdjustStock != null) btnAdjustStock.setVisibility(View.GONE);
+        if (btnArchive != null) btnArchive.setVisibility(View.GONE);
+        if (layoutArchiveContainer != null) layoutArchiveContainer.setVisibility(View.GONE);
+
         progressBar = findViewById(R.id.progressBar);
         emptyStateTV = findViewById(R.id.emptyStateTV);
         searchView = findViewById(R.id.searchView);
@@ -50,8 +61,6 @@ public class StaffInventoryActivity extends AppCompatActivity {
             if (ownerAdminId != null && !ownerAdminId.isEmpty()) {
                 currentOwnerAdminId = ownerAdminId;
                 productRemoteSyncer = new ProductRemoteSyncer((Application) getApplicationContext());
-
-                // UPDATED: Changed to startListening()
                 productRemoteSyncer.startListening();
             }
         });
@@ -74,21 +83,29 @@ public class StaffInventoryActivity extends AppCompatActivity {
     private final StaffDataManager.ProductListener productsListener = new StaffDataManager.ProductListener() {
         @Override
         public void onProducts(List<Map<String, Object>> products) {
-            List<Product> list = new ArrayList<>();
-            if (products != null) {
-                for (Map<String, Object> m : products) {
-                    list.add(Product.fromMap(m));
-                }
-            }
-            currentProducts = list;
             runOnUiThread(() -> {
-                progressBar.setVisibility(android.view.View.GONE);
-                if (list.isEmpty()) {
-                    emptyStateTV.setVisibility(android.view.View.VISIBLE);
-                } else {
-                    emptyStateTV.setVisibility(android.view.View.GONE);
+                if (progressBar != null) progressBar.setVisibility(android.view.View.GONE);
+                currentProducts.clear();
+                List<Product> list = new ArrayList<>();
+
+                for (Map<String, Object> map : products) {
+                    Product p = Product.fromMap(map);
+
+                    boolean isSalesProduct = "Menu".equalsIgnoreCase(p.getProductType()) ||
+                            "finished".equalsIgnoreCase(p.getProductType());
+
+                    if (!isSalesProduct) {
+                        currentProducts.add(p);
+                        list.add(p);
+                    }
                 }
-                adapter.updateProducts(list);
+
+                if (emptyStateTV != null) {
+                    emptyStateTV.setVisibility(list.isEmpty() ? android.view.View.VISIBLE : android.view.View.GONE);
+                }
+                if (adapter != null) {
+                    adapter.updateProducts(list);
+                }
             });
         }
 
@@ -122,8 +139,6 @@ public class StaffInventoryActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (staffDataManager != null) staffDataManager.stopAll();
-
-        // UPDATED: Changed to stopListening()
         if (productRemoteSyncer != null) productRemoteSyncer.stopListening();
     }
 }

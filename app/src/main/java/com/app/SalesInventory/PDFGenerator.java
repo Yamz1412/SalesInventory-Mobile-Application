@@ -22,6 +22,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class PDFGenerator {
 
@@ -320,109 +321,138 @@ public class PDFGenerator {
         document.close();
     }
 
+    // 1. UPDATED ACCOUNTING REPORT (Includes Tax Breakdown, Best Sellers & Promos)
     public void generateAccountingReportPDF(File file, String dateRange, String businessName,
                                             double grossSales, double discounts, double netSales,
-                                            double cogs, double grossProfit, double opex, double netIncome,
+                                            double cogs, double grossProfit, Map<String, Double> operatingExpensesList, double opex, double taxAmount, double netIncome,
                                             double cashSales, double gcashSales, int transactions, double inventoryValue,
-                                            List<Reports.ReportItem> items) throws Exception {
+                                            List<Reports.ReportItem> items, List<Reports.BestSellerItem> bestSellers,
+                                            String preparedBy) throws Exception {
 
         PdfWriter writer = new PdfWriter(new FileOutputStream(file));
         PdfDocument pdf = new PdfDocument(writer);
         Document document = new Document(pdf);
 
-        // 1. ACCOUNTING 3-LINE HEADER
-        document.add(new Paragraph(businessName.toUpperCase())
-                .setFont(boldFont)
-                .setFontSize(18)
-                .setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph(businessName.toUpperCase()).setFont(boldFont).setFontSize(18).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("Income Statement & Financial Report").setFont(boldFont).setFontSize(14).setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("For the Period: " + dateRange).setFontSize(10).setFontColor(ColorConstants.DARK_GRAY).setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
 
-        document.add(new Paragraph("Income Statement & Financial Report")
-                .setFont(boldFont)
-                .setFontSize(14)
-                .setTextAlignment(TextAlignment.CENTER));
-
-        document.add(new Paragraph("For the Period: " + dateRange)
-                .setFontSize(10)
-                .setFontColor(ColorConstants.DARK_GRAY)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setMarginBottom(20));
-
-        // 2. ACCOUNTING FINANCIAL FORMAT TABLE (No borders, right-aligned numbers)
+        // --- FINANCIAL SUMMARY TABLE ---
         Table isTable = new Table(UnitValue.createPercentArray(new float[]{4, 1.5f})).useAllAvailableWidth();
         isTable.setMarginBottom(20);
-
-        // Revenue Section
         isTable.addCell(createNoBorderCell("Revenue", true, false));
         isTable.addCell(createNoBorderCell("", true, true));
-
         isTable.addCell(createNoBorderCell("    Gross Sales", false, false));
         isTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "₱ %,.2f", grossSales), false, true));
-
-        isTable.addCell(createNoBorderCell("    Less: Sales Discounts", false, false));
+        isTable.addCell(createNoBorderCell("    Less: Sales Discounts (Promos)", false, false));
         isTable.addCell(createBottomBorderCell(String.format(Locale.getDefault(), "%,.2f", discounts), false));
-
         isTable.addCell(createNoBorderCell("Net Sales", true, false));
         isTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "%,.2f", netSales), true, true));
 
         isTable.addCell(createNoBorderCell("\nCost of Goods Sold", true, false));
         isTable.addCell(createNoBorderCell("", true, true));
-
         isTable.addCell(createNoBorderCell("    Total Cost of Products Sold", false, false));
         isTable.addCell(createBottomBorderCell(String.format(Locale.getDefault(), "%,.2f", cogs), false));
-
         isTable.addCell(createNoBorderCell("Gross Profit", true, false));
         isTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "%,.2f", grossProfit), true, true));
 
         isTable.addCell(createNoBorderCell("\nOperating Expenses", true, false));
         isTable.addCell(createNoBorderCell("", true, true));
-
+        if (operatingExpensesList != null && !operatingExpensesList.isEmpty()) {
+            for (Map.Entry<String, Double> entry : operatingExpensesList.entrySet()) {
+                isTable.addCell(createNoBorderCell("    " + entry.getKey(), false, false));
+                isTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "%,.2f", entry.getValue()), false, true));
+            }
+        }
         isTable.addCell(createNoBorderCell("    Total Operating Expenses", false, false));
         isTable.addCell(createBottomBorderCell(String.format(Locale.getDefault(), "%,.2f", opex), false));
 
+        // --- NEW: DEDICATED TAX ROW ---
+        if (taxAmount > 0) {
+            isTable.addCell(createNoBorderCell("\nTaxes & Duties", true, false));
+            isTable.addCell(createNoBorderCell("", true, true));
+            isTable.addCell(createNoBorderCell("    Tax / VAT Payable", false, false));
+            isTable.addCell(createBottomBorderCell(String.format(Locale.getDefault(), "%,.2f", taxAmount), false));
+        }
+
         isTable.addCell(createNoBorderCell("NET INCOME", true, false).setFontSize(14));
         isTable.addCell(createDoubleBottomBorderCell(String.format(Locale.getDefault(), "₱ %,.2f", netIncome), true).setFontSize(14));
-
         document.add(isTable);
 
-        // 3. CASH & ASSET SUMMARY
-        document.add(new Paragraph("Asset & Operations Summary").setFont(boldFont).setFontSize(12).setFontColor(ColorConstants.DARK_GRAY));
+        // --- ASSETS ---
+        document.add(new Paragraph("Asset Summary").setFont(boldFont).setFontSize(12).setFontColor(ColorConstants.DARK_GRAY));
         Table assetTable = new Table(UnitValue.createPercentArray(new float[]{3f, 1f})).useAllAvailableWidth();
         assetTable.addCell(createNoBorderCell("Total Physical Cash", false, false));
         assetTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "₱ %,.2f", cashSales), false, true));
-
         assetTable.addCell(createNoBorderCell("Total GCash", false, false));
         assetTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "₱ %,.2f", gcashSales), false, true));
-
         assetTable.addCell(createNoBorderCell("Remaining Inventory Value", false, false));
         assetTable.addCell(createNoBorderCell(String.format(Locale.getDefault(), "₱ %,.2f", inventoryValue), false, true));
-
-        assetTable.addCell(createNoBorderCell("Total Transactions Completed", false, false));
-        assetTable.addCell(createNoBorderCell(String.valueOf(transactions), false, true));
-
         document.add(assetTable);
         document.add(new Paragraph("\n"));
 
-        // 4. TRANSACTION BREAKDOWN
-        document.add(new Paragraph("Transaction Breakdown").setFont(boldFont).setFontSize(12));
-        Table transTable = new Table(UnitValue.createPercentArray(new float[]{2.5f, 2f, 1f, 1.5f})).useAllAvailableWidth();
-        transTable.addHeaderCell(createHeaderCell("Item / Details"));
-        transTable.addHeaderCell(createHeaderCell("Date / Payment Type"));
-        transTable.addHeaderCell(createHeaderCell("Quantity"));
-        transTable.addHeaderCell(createHeaderCell("Net Revenue"));
+        // --- TOP PERFORMING PRODUCTS (BEST SELLERS) ---
+        if (bestSellers != null && !bestSellers.isEmpty()) {
+            document.add(new Paragraph("Top Performing Products").setFont(boldFont).setFontSize(12));
+            Table bsTable = new Table(UnitValue.createPercentArray(new float[]{1f, 3f, 1.5f, 1.5f})).useAllAvailableWidth();
+            bsTable.addHeaderCell(createHeaderCell("Rank"));
+            bsTable.addHeaderCell(createHeaderCell("Product Name"));
+            bsTable.addHeaderCell(createHeaderCell("Qty Sold"));
+            bsTable.addHeaderCell(createHeaderCell("Total Revenue"));
 
-        for (Reports.ReportItem item : items) {
-            String itemText = item.name;
-            if (item.details != null && !item.details.isEmpty()) itemText += "\n" + item.details;
-            if (item.discount > 0) itemText += "\nDisc: -P" + String.format("%.2f", item.discount);
-
-            transTable.addCell(new Cell().add(new Paragraph(itemText).setFontSize(9)));
-            transTable.addCell(new Cell().add(new Paragraph(item.date).setFontSize(9)));
-            transTable.addCell(new Cell().add(new Paragraph(item.quantity).setFontSize(9).setTextAlignment(TextAlignment.CENTER)));
-            transTable.addCell(new Cell().add(new Paragraph(item.amount).setFontSize(9).setTextAlignment(TextAlignment.RIGHT)));
+            int limit = Math.min(bestSellers.size(), 10);
+            for (int i = 0; i < limit; i++) {
+                Reports.BestSellerItem bs = bestSellers.get(i);
+                bsTable.addCell(new Cell().add(new Paragraph(String.valueOf(i + 1)).setTextAlignment(TextAlignment.CENTER).setFontSize(9)));
+                bsTable.addCell(new Cell().add(new Paragraph(bs.productName).setFontSize(9)));
+                bsTable.addCell(new Cell().add(new Paragraph(String.valueOf(bs.quantitySold)).setTextAlignment(TextAlignment.CENTER).setFontSize(9)));
+                bsTable.addCell(new Cell().add(new Paragraph(String.format(Locale.getDefault(), "₱%,.2f", bs.totalRevenue)).setTextAlignment(TextAlignment.RIGHT).setFontSize(9)));
+            }
+            document.add(bsTable);
+            document.add(new Paragraph("\n"));
         }
 
-        document.add(transTable);
-        document.add(new Paragraph("\nReport generated by: Sales Inventory System").setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
+        // --- TRANSACTION BREAKDOWN ---
+        if (items != null && !items.isEmpty()) {
+            document.add(new Paragraph("Transaction & Promotions Breakdown").setFont(boldFont).setFontSize(12));
+            Table transTable = new Table(UnitValue.createPercentArray(new float[]{3f, 2f, 1f, 1.5f})).useAllAvailableWidth();
+            transTable.addHeaderCell(createHeaderCell("Item & Promo Details"));
+            transTable.addHeaderCell(createHeaderCell("Date / Payment"));
+            transTable.addHeaderCell(createHeaderCell("Qty"));
+            transTable.addHeaderCell(createHeaderCell("Net Paid"));
+
+            for (Reports.ReportItem item : items) {
+                String itemText = item.name;
+                if (item.details != null && !item.details.isEmpty()) itemText += "\n" + item.details;
+
+                if (item.discount > 0) {
+                    itemText += "\nDiscount Applied: -₱" + String.format(Locale.getDefault(), "%.2f", item.discount);
+                }
+
+                Cell detailsCell = new Cell().add(new Paragraph(itemText).setFontSize(9));
+                if (item.discount > 0) detailsCell.setBackgroundColor(ColorConstants.LIGHT_GRAY);
+
+                transTable.addCell(detailsCell);
+                transTable.addCell(new Cell().add(new Paragraph(item.date).setFontSize(9)));
+                transTable.addCell(new Cell().add(new Paragraph(item.quantity).setFontSize(9).setTextAlignment(TextAlignment.CENTER)));
+                transTable.addCell(new Cell().add(new Paragraph(item.amount).setFontSize(9).setTextAlignment(TextAlignment.RIGHT)));
+            }
+            document.add(transTable);
+        }
+
+        // --- CONCLUSION & FOOTER ---
+        document.add(new Paragraph("\nExecutive Conclusion").setFont(boldFont).setFontSize(12).setMarginTop(10));
+        String trend = netIncome >= 0 ? "profitable" : "operating at a loss";
+        String conclusion = String.format(Locale.getDefault(),
+                "During this period, the business was %s, generating a Net Income of ₱%,.2f. " +
+                        "Total discounts amounted to ₱%,.2f, and total tax provisions were ₱%,.2f. " +
+                        "A total of %d transactions were completed.",
+                trend, netIncome, discounts, taxAmount, transactions);
+
+        document.add(new Paragraph(conclusion).setFontSize(10).setTextAlignment(TextAlignment.JUSTIFIED));
+
+        document.add(new Paragraph("\n\nPrepared by: " + preparedBy + "\nDate Generated: " + dateFormat.format(new Date()))
+                .setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
         document.close();
     }
 
@@ -486,7 +516,7 @@ public class PDFGenerator {
         document.close();
     }
 
-    public void generateOperationsAndReceivingReportPDF(File dest, String dateRange, String bizName, String pos, String returns, String damages) throws Exception {
+    public void generateOperationsAndReceivingReportPDF(File dest, String dateRange, String bizName, String pos, String returns, String damages, String preparedBy) throws Exception {
         PdfWriter writer = new PdfWriter(new FileOutputStream(dest));
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
@@ -504,6 +534,8 @@ public class PDFGenerator {
         document.add(new Paragraph("\nRECORDED DAMAGES / LOSSES").setFont(boldFont).setFontSize(12).setBackgroundColor(ColorConstants.LIGHT_GRAY));
         document.add(new Paragraph(damages).setFontSize(10));
 
+        document.add(new Paragraph("\n\nPrepared by: " + preparedBy + "\nDate Generated: " + dateFormat.format(new Date()))
+                .setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
         document.close();
     }
 
@@ -540,7 +572,7 @@ public class PDFGenerator {
     }
 
     // 6. NEW: SALES RECEIPT PDF (For Automated Cloud/Local Save)
-    public void generateReceiptPDF(File dest, String bizName, String orderId, String receiptContent) throws Exception {
+    public void generateReceiptPDF(File dest, String bizName, String orderId, String receiptContent, String preparedBy) throws Exception {
         PdfWriter writer = new PdfWriter(new FileOutputStream(dest));
         PdfDocument pdfDoc = new PdfDocument(writer);
         Document document = new Document(pdfDoc);
@@ -554,16 +586,13 @@ public class PDFGenerator {
                 .setFontFamily("Courier")
                 .setTextAlignment(TextAlignment.LEFT);
         document.add(content);
-
-        document.add(new Paragraph("\nThank you for your business!").setFontSize(10).setTextAlignment(TextAlignment.CENTER).setFont(italicFont));
-
+        document.add(new Paragraph("\nPrepared by: " + preparedBy + "\nDate: " + dateFormat.format(new Date()))
+                .setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFont(italicFont));
+        document.add(new Paragraph("Thank you for your business!").setFontSize(10).setTextAlignment(TextAlignment.CENTER).setFont(italicFont));
         document.close();
     }
 
-    // ==========================================================
-    // NEW: INVENTORY MASTER REPORT
-    // ==========================================================
-    public void generateInventoryMasterPDF(File file, String businessName, List<Product> inventory, double totalValue) throws Exception {
+    public void generateInventoryMasterPDF(File file, String businessName, List<Product> inventory, double totalValue, String preparedBy) throws Exception {
         PdfWriter writer = new PdfWriter(new FileOutputStream(file));
         PdfDocument pdf = new PdfDocument(writer);
         Document document = new Document(pdf);
@@ -593,6 +622,28 @@ public class PDFGenerator {
 
         document.add(table);
         document.add(new Paragraph("\nReport generated by: Sales Inventory System").setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
+
+        // FIXED: Fetch the active user's details directly from Firebase Auth
+        String adminName = preparedBy;
+        String adminEmail = "";
+
+        com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            // Grab the active account email
+            if (currentUser.getEmail() != null && !currentUser.getEmail().isEmpty()) {
+                adminEmail = " (" + currentUser.getEmail() + ")";
+            }
+
+            // Attempt to grab the Display Name if they set one up during registration
+            if (currentUser.getDisplayName() != null && !currentUser.getDisplayName().isEmpty()) {
+                adminName = currentUser.getDisplayName();
+            }
+        }
+
+        String finalPreparedBy = adminName + adminEmail;
+
+        document.add(new Paragraph("\n\nPrepared by: " + finalPreparedBy + "\nDate Generated: " + dateFormat.format(new Date()))
+                .setFontSize(9).setTextAlignment(TextAlignment.CENTER).setFontColor(ColorConstants.GRAY));
         document.close();
     }
 }

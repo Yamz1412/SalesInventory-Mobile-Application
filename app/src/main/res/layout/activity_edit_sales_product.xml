@@ -140,21 +140,29 @@
                     android:orientation="horizontal"
                     android:baselineAligned="false"
                     android:weightSum="4">
+
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Recipe" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Recipe" android:textSize="11sp" android:textColor="?attr/colorOnSurface"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchBOM" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                        <TextView android:id="@+id/tvRecipeSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None" android:textSize="9sp" android:gravity="center" android:textColor="?attr/colorOnBackground" android:padding="4dp" android:background="?attr/selectableItemBackground" />
                     </LinearLayout>
+
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sizes" android:textSize="11sp" android:textColor="?attr/colorOnSurface"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchSizes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                        <TextView android:id="@+id/tvSizesSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None" android:textSize="9sp" android:gravity="center" android:textColor="?attr/colorOnBackground" android:padding="4dp" android:background="?attr/selectableItemBackground" />
                     </LinearLayout>
+
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Add-ons" android:textSize="11sp" android:textColor="?attr/colorOnSurface"/>
                         <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchAddons" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                        <TextView android:id="@+id/tvAddonsSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="None" android:textSize="9sp" android:gravity="center" android:textColor="?attr/colorOnBackground" android:padding="4dp" android:background="?attr/selectableItemBackground" />
                     </LinearLayout>
+
                     <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sugar" android:textSize="12sp" android:textColor="?attr/colorOnSurface"/>
-                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchNotes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Sugar" android:textSize="11sp" android:textColor="?attr/colorOnSurface"/>
+                        <com.google.android.material.switchmaterial.SwitchMaterial android:id="@+id/switchEnableSugar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="false" />
+                        <TextView android:id="@+id/tvSugarSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Off" android:textSize="9sp" android:gravity="center" android:textColor="?attr/colorOnBackground" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>

@@ -5,50 +5,60 @@
     android:orientation="vertical"
     android:gravity="center"
     android:padding="30dp"
-    android:background="?android:colorBackground"
-    >
+    android:background="?android:colorBackground">
 
     <ImageView
-        android:id="@+id/imageView"
+        android:id="@+id/ivSplashLogo"
         android:layout_width="200dp"
         android:layout_height="200dp"
         android:src="@drawable/logo"
-        android:layout_marginBottom="10dp"/>
+        android:layout_marginBottom="10dp"
+        android:alpha="0"
+        android:translationY="-50dp"/>
 
     <TextView
+        android:id="@+id/tvSplashTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Sales &amp; Inventory Management"
         android:textAlignment="center"
-        android:paddingBottom="100dp"
         android:textSize="32sp"
         android:textStyle="bold"
         android:textColor="?attr/colorOnBackground"
-        android:layout_marginBottom="10dp"/>
+        android:layout_marginBottom="100dp"
+        android:alpha="0"
+        android:translationY="-20dp"/>
 
-    <Button
-        android:id="@+id/SignInFirstBtn"
+    <LinearLayout
+        android:id="@+id/layoutButtons"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="Sign In"
-        android:onClick="OpenSingIn"
-        android:textColor="@color/LightBlue"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        style="@style/CustomButton"
-        android:backgroundTint="@color/colorPrimary"
-        android:layout_marginBottom="16dp"/>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:alpha="0"
+        android:translationY="50dp">
 
-    <Button
-        android:id="@+id/SingUpFirstBtn"
-        android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="Create Account"
-        android:onClick="OpenSingUp"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="?attr/colorOnBackground"
-        style="@style/CustomButtonOutlined"
-        android:background="@drawable/edite_round"
-        android:backgroundTint="?attr/colorPrimary" />
+        <Button
+            android:id="@+id/SignInFirstBtn"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Sign In"
+            android:onClick="OpenSingIn"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            style="@style/CustomButton"
+            android:backgroundTint="?attr/colorPrimary"
+            android:layout_marginBottom="16dp"/>
+
+        <Button
+            android:id="@+id/SingUpFirstBtn"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:text="Create Account"
+            android:onClick="OpenSingUp"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            style="@style/CustomButtonOutlined"
+            android:layout_marginBottom="16dp"/>
+    </LinearLayout>
 </LinearLayout>

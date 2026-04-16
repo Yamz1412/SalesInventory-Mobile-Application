@@ -32,7 +32,8 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     private List<Product> masterProducts = new ArrayList<>();
     private List<Alert> displayAlerts = new ArrayList<>();
     private List<Product> displayProducts = new ArrayList<>();
-
+    private java.util.Set<String> selectedIds = new java.util.HashSet<>();
+    private boolean isSelectionMode = false;
     private final OnNotificationClickListener listener;
     private final Context context;
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
@@ -51,21 +52,33 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         this.masterProducts.clear();
         if (newAlerts != null) this.masterAlerts.addAll(newAlerts);
         if (newProducts != null) this.masterProducts.addAll(newProducts);
-        filter("All Notifications");
-
+        // FIXED: Changed to "All" to perfectly match your MainActivity dropdown!
+        filter("All");
     }
 
     public void filter(String category) {
         displayAlerts.clear();
         displayProducts.clear();
 
-        if (category.equals("All Notifications")) {
-            displayAlerts.addAll(masterAlerts);
+        if (category.equals("All") || category.equals("All Notifications")) {
+            for (Alert alert : masterAlerts) {
+                Product p = findProductForAlert(alert);
+                String type = alert.getType() != null ? alert.getType().toUpperCase() : "";
+
+                if (p != null && p.isFinishedProduct() && type.contains("STOCK")) {
+                    continue;
+                }
+                displayAlerts.add(alert);
+            }
+
             long now = System.currentTimeMillis();
             for (Product p : masterProducts) {
-                if (p != null && p.isActive() && p.getExpiryDate() > 0) {
-                    long diffMillis = p.getExpiryDate() - now;
+                if (p != null && p.isActive() && p.getExpiryDate() != null && !p.isFinishedProduct()) {
+                    // FIXED: Handle ExpiryDate as a Date object safely
+                    long expiryTime = p.getExpiryDate().getTime();
+                    long diffMillis = expiryTime - now;
                     long days = diffMillis / (24L * 60L * 60L * 1000L);
+
                     if (diffMillis <= 0 || days <= 7) {
                         displayProducts.add(p);
                     }
@@ -73,7 +86,13 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             }
         } else {
             for (Alert alert : masterAlerts) {
+                Product p = findProductForAlert(alert);
                 String type = alert.getType() != null ? alert.getType().toLowerCase() : "";
+
+                if (p != null && p.isFinishedProduct() && type.contains("stock")) {
+                    continue;
+                }
+
                 if (category.equals("Low Stock") && (type.contains("low") || type.contains("stock"))) {
                     displayAlerts.add(alert);
                 } else if (category.equals("Expiration") && type.contains("expir")) {
@@ -88,9 +107,12 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             if (category.equals("Expiration")) {
                 long now = System.currentTimeMillis();
                 for (Product p : masterProducts) {
-                    if (p != null && p.isActive() && p.getExpiryDate() > 0) {
-                        long diffMillis = p.getExpiryDate() - now;
+                    if (p != null && p.isActive() && p.getExpiryDate() != null && !p.isFinishedProduct()) {
+                        // FIXED: Handle ExpiryDate as a Date object safely
+                        long expiryTime = p.getExpiryDate().getTime();
+                        long diffMillis = expiryTime - now;
                         long days = diffMillis / (24L * 60L * 60L * 1000L);
+
                         if (diffMillis <= 0 || days <= 7) {
                             displayProducts.add(p);
                         }
@@ -99,6 +121,23 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             }
         }
         notifyDataSetChanged();
+    }
+
+    public void toggleSelection(String alertId) {
+        if (selectedIds.contains(alertId)) selectedIds.remove(alertId);
+        else selectedIds.add(alertId);
+        isSelectionMode = !selectedIds.isEmpty();
+        notifyDataSetChanged();
+    }
+
+    public void clearSelection() {
+        selectedIds.clear();
+        isSelectionMode = false;
+        notifyDataSetChanged();
+    }
+
+    public java.util.Set<String> getSelectedIds() {
+        return selectedIds;
     }
 
     private Product findProductForAlert(Alert alert) {
@@ -204,19 +243,14 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         return "General";
     }
 
-    // ==========================================
-    // VIEW HOLDER 1: DEFAULT NOTIFICATION
-    // ==========================================
     public class DefaultViewHolder extends RecyclerView.ViewHolder {
         ImageView imgIcon;
-        View iconContainer;
         TextView tvTitle, tvMessage, tvTime;
         View viewUnreadDot;
 
         public DefaultViewHolder(@NonNull View itemView) {
             super(itemView);
             imgIcon = itemView.findViewById(R.id.img_icon);
-            iconContainer = itemView.findViewById(R.id.icon_container);
             tvTitle = itemView.findViewById(R.id.tv_title);
             tvMessage = itemView.findViewById(R.id.tv_message);
             tvTime = itemView.findViewById(R.id.tv_time);
@@ -224,39 +258,35 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         public void bind(final Alert alert) {
-            String type = alert.getType() != null ? alert.getType() : "Notification";
-            tvTitle.setText(getFriendlyTitle(type));
-
-            // Clean old messages
-            String msg = alert.getMessage() != null ? alert.getMessage() : "";
-            msg = msg.replaceAll("\\(Qty:.*Floor:.*\\)", "").trim();
-            tvMessage.setText(msg);
+            tvTitle.setText(getFriendlyTitle(alert.getType()));
+            tvMessage.setText(alert.getMessage());
 
             long now = System.currentTimeMillis();
             long timestamp = alert.getTimestamp() <= 0 ? now : alert.getTimestamp();
-            if (tvTime != null) tvTime.setText(DateUtils.getRelativeTimeSpanString(timestamp, now, DateUtils.MINUTE_IN_MILLIS));
+            tvTime.setText(DateUtils.getRelativeTimeSpanString(timestamp, now, DateUtils.MINUTE_IN_MILLIS));
 
-            if (!alert.isRead()) {
-                if (viewUnreadDot != null) viewUnreadDot.setVisibility(View.VISIBLE);
-                tvTitle.setTypeface(null, Typeface.BOLD);
+            viewUnreadDot.setVisibility(alert.isRead() ? View.GONE : View.VISIBLE);
+            tvTitle.setTypeface(null, alert.isRead() ? Typeface.NORMAL : Typeface.BOLD);
+
+            // Selection Logic
+            if (selectedIds.contains(alert.getId())) {
+                itemView.setBackgroundColor(Color.parseColor("#33888888"));
             } else {
-                if (viewUnreadDot != null) viewUnreadDot.setVisibility(View.GONE);
-                tvTitle.setTypeface(null, Typeface.NORMAL);
+                itemView.setBackgroundColor(Color.TRANSPARENT);
             }
 
-            if (imgIcon != null) {
-                imgIcon.setColorFilter(Color.parseColor("#6200EE"));
-                if (type.equals("PO_RECEIVED")) imgIcon.setColorFilter(Color.parseColor("#4CAF50"));
-            }
+            itemView.setOnLongClickListener(v -> { toggleSelection(alert.getId()); return true; });
 
-            String exactCategory = determineCategory(alert.getType());
-            itemView.setOnClickListener(v -> listener.onNotificationClick(alert, null, exactCategory));
+            itemView.setOnClickListener(v -> {
+                if (isSelectionMode) {
+                    toggleSelection(alert.getId());
+                } else if (listener != null) {
+                    listener.onNotificationClick(alert, null, determineCategory(alert.getType()));
+                }
+            });
         }
     }
 
-    // ==========================================
-    // VIEW HOLDER 2: LOW STOCK ITEM
-    // ==========================================
     public class LowStockViewHolder extends RecyclerView.ViewHolder {
         ImageView ivProductImage;
         TextView tvProductName, tvCategory, tvStockInfo, tvCurrentStock;
@@ -270,53 +300,48 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             tvCurrentStock = itemView.findViewById(R.id.tvCurrentStock);
         }
 
-        public void bind(Alert alert, Product p) {
-            boolean isCritical = alert.getType().contains("CRITICAL") || alert.getType().contains("FLOOR");
+        public void bind(Alert alert, Product product) {
+            if (product != null) {
+                tvProductName.setText(product.getProductName());
+                tvCategory.setText(product.getCategoryName());
 
-            // Apply solid Red or Orange backgrounds
-            if (isCritical) {
-                ((CardView) itemView).setCardBackgroundColor(Color.parseColor("#D32F2F")); // Solid Red
-            } else {
-                ((CardView) itemView).setCardBackgroundColor(Color.parseColor("#F57C00")); // Solid Orange
+                String qtyStr = (product.getQuantity() % 1 == 0) ?
+                        String.valueOf((long)product.getQuantity()) : String.valueOf(product.getQuantity());
+                tvCurrentStock.setText(qtyStr + " " + (product.getUnit() != null ? product.getUnit() : "pcs"));
+
+                tvStockInfo.setText("Reorder: " + product.getReorderLevel() + " | Critical: " + product.getCriticalLevel());
+
+                String img = (product.getImageUrl() != null && !product.getImageUrl().isEmpty()) ?
+                        product.getImageUrl() : product.getImagePath();
+                if (img != null && !img.isEmpty()) {
+                    Glide.with(context).load(img).placeholder(R.drawable.ic_image_placeholder).centerCrop().into(ivProductImage);
+                } else {
+                    ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+                }
             }
 
-            // Force ALL text to pure white so it is perfectly readable!
-            tvProductName.setTextColor(Color.WHITE);
-            tvCategory.setTextColor(Color.WHITE);
-            tvStockInfo.setTextColor(Color.WHITE);
-            tvCurrentStock.setTextColor(Color.WHITE);
-
-            if (p != null) {
-                tvProductName.setText(p.getProductName() != null ? p.getProductName() : "Unknown");
-                tvCategory.setText(getFriendlyTitle(alert.getType()));
-                tvCurrentStock.setText(String.valueOf(p.getQuantity()));
-
-                // Clean short text without QTY/FLOOR junk
-                String levelStr = isCritical ? "Critical Level" : "Reorder Level";
-                tvStockInfo.setText(p.getQuantity() + " left (" + levelStr + ")");
-
-                String img = p.getImageUrl() != null && !p.getImageUrl().isEmpty() ? p.getImageUrl() : p.getImagePath();
-                if (img != null && !img.isEmpty()) Glide.with(context).load(img).placeholder(R.drawable.ic_image_placeholder).centerCrop().into(ivProductImage);
-                else ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+            // Selection & Click Logic
+            if (alert != null && selectedIds.contains(alert.getId())) {
+                itemView.setBackgroundColor(Color.parseColor("#33888888"));
             } else {
-                String cleanMsg = alert.getMessage() != null ? alert.getMessage() : "";
-                cleanMsg = cleanMsg.replaceAll("\\(Qty:.*Floor:.*\\)", "").trim();
-                tvProductName.setText(cleanMsg);
-
-                tvCategory.setText(getFriendlyTitle(alert.getType()));
-                tvStockInfo.setText("Tap to view details");
-                tvCurrentStock.setText("!");
-                ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
+                itemView.setBackgroundColor(Color.TRANSPARENT);
             }
 
-            String exactCategory = determineCategory(alert.getType());
-            itemView.setOnClickListener(v -> listener.onNotificationClick(alert, p, exactCategory));
+            itemView.setOnLongClickListener(v -> {
+                if (alert != null) { toggleSelection(alert.getId()); return true; }
+                return false;
+            });
+
+            itemView.setOnClickListener(v -> {
+                if (isSelectionMode && alert != null) {
+                    toggleSelection(alert.getId());
+                } else if (listener != null) {
+                    listener.onNotificationClick(alert, product, determineCategory(alert != null ? alert.getType() : ""));
+                }
+            });
         }
     }
 
-    // ==========================================
-    // VIEW HOLDER 3: NEAR EXPIRY ITEM
-    // ==========================================
     public class NearExpiryViewHolder extends RecyclerView.ViewHolder {
         ImageView ivProductImage, ivStatusIcon;
         TextView tvProductName, tvCategory, tvExpiryDate, tvDaysRemaining, tvStatusLabel;
@@ -338,17 +363,38 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             if (p != null) {
                 populateProductData(p);
             } else {
-                String cleanMsg = alert.getMessage() != null ? alert.getMessage() : "";
+                String cleanMsg = alert != null && alert.getMessage() != null ? alert.getMessage() : "";
                 tvProductName.setText(cleanMsg);
-                tvCategory.setText(getFriendlyTitle(alert.getType()));
+                tvCategory.setText(alert != null ? getFriendlyTitle(alert.getType()) : "Expiration");
                 tvExpiryDate.setText("Tap to view details");
                 tvDaysRemaining.setText("");
                 tvStatusLabel.setText("!");
                 ivProductImage.setImageResource(R.drawable.ic_image_placeholder);
             }
 
-            String exactCategory = determineCategory(alert.getType());
-            itemView.setOnClickListener(v -> listener.onNotificationClick(alert, p, exactCategory));
+            String exactCategory = alert != null ? determineCategory(alert.getType()) : "Expiration";
+
+            if (alert != null && selectedIds.contains(alert.getId())) {
+                itemView.setBackgroundColor(Color.parseColor("#33888888"));
+            } else {
+                ((CardView) itemView).setCardBackgroundColor(Color.parseColor("#D32F2F"));
+            }
+
+            itemView.setOnLongClickListener(v -> {
+                if (alert != null) {
+                    toggleSelection(alert.getId());
+                    return true;
+                }
+                return false;
+            });
+
+            itemView.setOnClickListener(v -> {
+                if (isSelectionMode && alert != null) {
+                    toggleSelection(alert.getId());
+                } else {
+                    if (listener != null) listener.onNotificationClick(alert, p, exactCategory);
+                }
+            });
         }
 
         public void bindProductOnly(Product p) {
@@ -358,9 +404,8 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         private void applyExpiryStyling() {
-            ((CardView) itemView).setCardBackgroundColor(Color.parseColor("#D32F2F")); // Solid Red
+            ((CardView) itemView).setCardBackgroundColor(Color.parseColor("#D32F2F"));
 
-            // Force ALL text to pure white
             tvProductName.setTextColor(Color.WHITE);
             tvCategory.setTextColor(Color.WHITE);
             tvExpiryDate.setTextColor(Color.WHITE);
@@ -370,10 +415,11 @@ public class NotificationAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         private void populateProductData(Product p) {
+            if (p == null) return;
             tvProductName.setText(p.getProductName() != null ? p.getProductName() : "Unknown");
             tvCategory.setText(p.getCategoryName() != null ? p.getCategoryName() : "No Category");
 
-            long expiry = p.getExpiryDate();
+            long expiry = (p.getExpiryDate() != null) ? p.getExpiryDate().getTime() : 0L;
             if (expiry > 0) {
                 tvExpiryDate.setText("Expires: " + dateFormat.format(new Date(expiry)));
                 long diff = expiry - System.currentTimeMillis();
