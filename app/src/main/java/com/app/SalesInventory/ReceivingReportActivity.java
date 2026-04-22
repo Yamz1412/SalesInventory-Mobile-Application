@@ -13,6 +13,13 @@ import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.HashSet;
+import java.util.TimeZone;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -125,19 +132,53 @@ public class ReceivingReportActivity extends BaseActivity {
 
     private void setupFilters() {
         btnDateFilter.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth, 0, 0, 0);
-                filterStartDate = calendar.getTimeInMillis();
 
-                calendar.set(year, month, dayOfMonth, 23, 59, 59);
-                filterEndDate = calendar.getTimeInMillis();
+            // 1. Extract exact dates that have data
+            HashSet<Long> validDates = new HashSet<>();
+            Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+            for (ReceivedItemRecord item : masterItemList) { // NOTE: Use 'masterList' if pasting into DeliveryReport
+                utcCal.setTimeInMillis(item.date);
+                // Reset time to midnight UTC (Required by MaterialDatePicker)
+                utcCal.set(Calendar.HOUR_OF_DAY, 0);
+                utcCal.set(Calendar.MINUTE, 0);
+                utcCal.set(Calendar.SECOND, 0);
+                utcCal.set(Calendar.MILLISECOND, 0);
+                validDates.add(utcCal.getTimeInMillis());
+            }
+
+            // 2. Attach our custom Validator
+            CalendarConstraints.Builder constraintsBuilder = new CalendarConstraints.Builder();
+            constraintsBuilder.setValidator(new AvailableDateValidator(validDates));
+
+            // 3. Build the beautiful Material Date Picker
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("Select Report Date")
+                    .setCalendarConstraints(constraintsBuilder.build())
+                    .setTheme(R.style.CustomCalendarTheme)
+                    .build();
+
+            // 4. Handle the user's selection
+            datePicker.addOnPositiveButtonClickListener(selection -> {
+                Calendar selectedCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                selectedCal.setTimeInMillis(selection);
+
+                Calendar localCal = Calendar.getInstance();
+                localCal.set(selectedCal.get(Calendar.YEAR), selectedCal.get(Calendar.MONTH), selectedCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+                filterStartDate = localCal.getTimeInMillis();
+
+                localCal.set(Calendar.HOUR_OF_DAY, 23);
+                localCal.set(Calendar.MINUTE, 59);
+                localCal.set(Calendar.SECOND, 59);
+                filterEndDate = localCal.getTimeInMillis();
 
                 SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
-                btnDateFilter.setText(sdf.format(calendar.getTime()));
+                btnDateFilter.setText(sdf.format(localCal.getTime()));
 
                 applyFilters();
-            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+            });
+
+            datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
         });
 
         btnDateFilter.setOnLongClickListener(v -> {
@@ -318,5 +359,45 @@ public class ReceivingReportActivity extends BaseActivity {
                 tvQtyReceived = itemView.findViewById(R.id.tvQtyReceived);
             }
         }
+    }
+
+    public static class AvailableDateValidator implements CalendarConstraints.DateValidator {
+        private final HashSet<Long> availableDates;
+
+        public AvailableDateValidator(HashSet<Long> availableDates) {
+            this.availableDates = availableDates;
+        }
+
+        protected AvailableDateValidator(Parcel in) {
+            availableDates = (HashSet<Long>) in.readSerializable();
+        }
+
+        @Override
+        public boolean isValid(long date) {
+            // If there's no data at all, disable everything
+            if (availableDates == null || availableDates.isEmpty()) return false;
+
+            // Only make the date clickable if it exists in our data list
+            return availableDates.contains(date);
+        }
+
+        @Override
+        public int describeContents() { return 0; }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeSerializable(availableDates);
+        }
+
+        public static final Parcelable.Creator<AvailableDateValidator> CREATOR = new Parcelable.Creator<AvailableDateValidator>() {
+            @Override
+            public AvailableDateValidator createFromParcel(Parcel in) {
+                return new AvailableDateValidator(in);
+            }
+            @Override
+            public AvailableDateValidator[] newArray(int size) {
+                return new AvailableDateValidator[size];
+            }
+        };
     }
 }

@@ -4,7 +4,8 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="?android:colorBackground">
+    android:background="?attr/colorSurface"
+    >
 
     <TextView
         android:layout_width="match_parent"
@@ -27,6 +28,7 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="48dp"
+            android:backgroundTint="?attr/colorControlHighlight"
             android:background="@drawable/edite_round"
             android:layout_marginEnd="4dp"/>
 
@@ -36,7 +38,9 @@
             android:layout_weight="1"
             android:layout_height="48dp"
             android:hint="Search Order/Inv ID"
+            android:textColorHint="?attr/colorOnBackground"
             android:textSize="14sp"
+            android:backgroundTint="?attr/colorControlHighlight"
             android:background="@drawable/edite_round"
             android:paddingHorizontal="12dp"
             android:layout_marginStart="4dp"
@@ -46,7 +50,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="150dp"
-        android:background="#F5F5F5"
+        android:background="?attr/colorControlHighlight"
         android:padding="8dp"
         android:layout_marginBottom="12dp">
         <TextView
@@ -54,7 +58,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Select a time filter or search to view transactions..."
-            android:textColor="#555555"/>
+            android:textColor="?attr/colorOnBackground"
+            />
     </ScrollView>
 
     <TextView
@@ -62,6 +67,7 @@
         android:layout_height="wrap_content"
         android:text="Reason for Refund"
         android:textStyle="bold"
+        android:textColor="?attr/colorOnBackground"
         android:layout_marginBottom="4dp"/>
 
     <Spinner
@@ -69,6 +75,7 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorControlHighlight"
         android:layout_marginBottom="8dp"/>
 
     <EditText
@@ -77,6 +84,8 @@
         android:layout_height="wrap_content"
         android:hint="Specific reason or notes (Optional)"
         android:textSize="14sp"
+        android:textColorHint="?attr/colorOnBackground"
+        android:backgroundTint="?attr/colorControlHighlight"
         android:background="@drawable/edite_round"
         android:padding="12dp"
         android:minLines="2"
@@ -90,9 +99,12 @@
 
         <Button
             android:id="@+id/btnCancelRefund"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+            style="@style/CustomButtonOutlined"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="?attr/colorSurface"
             android:layout_width="0dp"
             android:layout_weight="1"
+            android:layout_marginRight="15dp"
             android:layout_height="wrap_content"
             android:text="Cancel"/>
 
@@ -102,6 +114,9 @@
             android:layout_weight="1"
             android:layout_height="wrap_content"
             android:text="CONFIRM REFUND"
+            android:paddingLeft="15dp"
+            style="@style/CustomButtonOutlined"
+            android:textColor="@color/white"
             android:backgroundTint="@color/errorRed"
             android:enabled="false"/>
     </LinearLayout>

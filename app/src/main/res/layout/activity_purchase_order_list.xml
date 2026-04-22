@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?android:colorBackground">
+    android:background="?attr/colorSurface">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -40,6 +40,8 @@
             android:text="New PO"
             android:textSize="10sp"
             app:cornerRadius="6dp"
+            android:textColor="?attr/colorOnBackground"
+            android:backgroundTint="?attr/colorSurface"
             style="@style/CustomButtonOutlined"/>
 
         <com.google.android.material.button.MaterialButton
@@ -50,10 +52,10 @@
             android:layout_marginHorizontal="2dp"
             android:text="Suppliers"
             android:textSize="10sp"
-            android:textColor="@android:color/white"
-            app:backgroundTint="#4CAF50"
             app:cornerRadius="6dp"
-            style="@style/CustomButtonOutlined"/>
+            android:textColor="?attr/colorOnBackground"
+            android:backgroundTint="?attr/colorSurface"
+            style="@style/CustomButtonOutlined"            />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnReturnProduct"
@@ -82,8 +84,8 @@
                 android:layout_height="wrap_content"
                 android:text="Checklist"
                 android:textSize="10sp"
-                app:backgroundTint="#FF9800"
-                android:textColor="@android:color/white"
+                app:backgroundTint="?attr/colorPrimary"
+                android:textColor="?attr/colorSurface"
                 app:cornerRadius="6dp"
                 style="@style/CustomButtonOutlined"/>
 
@@ -142,6 +144,7 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewPurchaseOrders"
+        android:background="?attr/colorSurface"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"

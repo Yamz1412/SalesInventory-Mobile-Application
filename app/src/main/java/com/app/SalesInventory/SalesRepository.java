@@ -78,7 +78,7 @@ public class SalesRepository {
 
     private void loadOverallRevenue() {
         if (monthlyRevenueListener != null) monthlyRevenueListener.remove();
-        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+        if (!firestoreManager.hasValidUser()) return;
 
         monthlyRevenueListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .addSnapshotListener(MetadataChanges.INCLUDE, (snapshot, error) -> {
@@ -87,7 +87,15 @@ public class SalesRepository {
                     if (snapshot != null) {
                         for (DocumentSnapshot document : snapshot.getDocuments()) {
                             Sales sale = createSalesFromSnapshot(document);
-                            if (sale != null) total += sale.getTotalPrice();
+                            if (sale != null) {
+                                // CRITICAL FIX: Ignore Refunds and Voids
+                                boolean isRefunded = "REFUNDED".equalsIgnoreCase(sale.getStatus()) ||
+                                        "VOIDED".equalsIgnoreCase(sale.getStatus()) ||
+                                        (sale.getPaymentMethod() != null && sale.getPaymentMethod().toUpperCase().contains("REFUNDED"));
+                                if (!isRefunded) {
+                                    total += sale.getTotalPrice();
+                                }
+                            }
                         }
                     }
                     totalMonthlyRevenue.postValue(total);
@@ -114,12 +122,15 @@ public class SalesRepository {
 
     private void loadAllSales() {
         if (allSalesListener != null) allSalesListener.remove();
-        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+        if (!firestoreManager.hasValidUser()) return;
 
         allSalesListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .addSnapshotListener(MetadataChanges.INCLUDE, (snapshot, error) -> {
-                    if (error != null) return;
+                    if (error != null) {
+                        Log.e(TAG, "Error loading all sales", error);
+                        return;
+                    }
                     if (snapshot != null) {
                         List<Sales> salesList = new ArrayList<>();
                         for (DocumentSnapshot document : snapshot.getDocuments()) {
@@ -129,7 +140,9 @@ public class SalesRepository {
                                     sale.setId(document.getId());
                                     salesList.add(sale);
                                 }
-                            } catch (Exception e) {}
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing sale document", e);
+                            }
                         }
                         allSales.postValue(salesList);
                     }
@@ -140,7 +153,7 @@ public class SalesRepository {
         long startOfDay = getStartOfDay();
         long endOfDay = getEndOfDay();
         if (todaySalesListener != null) todaySalesListener.remove();
-        if (!firestoreManager.hasValidUser()) return; // FIX: Prevent "unknown" crash
+        if (!firestoreManager.hasValidUser()) return;
 
         todaySalesListener = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath())
                 .whereGreaterThanOrEqualTo("timestamp", startOfDay)
@@ -152,7 +165,15 @@ public class SalesRepository {
                         for (DocumentSnapshot document : snapshot.getDocuments()) {
                             try {
                                 Sales sale = createSalesFromSnapshot(document);
-                                if (sale != null) total += sale.getTotalPrice();
+                                if (sale != null) {
+                                    // CRITICAL FIX: Ignore Refunds and Voids
+                                    boolean isRefunded = "REFUNDED".equalsIgnoreCase(sale.getStatus()) ||
+                                            "VOIDED".equalsIgnoreCase(sale.getStatus()) ||
+                                            (sale.getPaymentMethod() != null && sale.getPaymentMethod().toUpperCase().contains("REFUNDED"));
+                                    if (!isRefunded) {
+                                        total += sale.getTotalPrice();
+                                    }
+                                }
                             } catch (Exception e) {}
                         }
                     }
@@ -201,116 +222,90 @@ public class SalesRepository {
     }
 
     public void voidSale(Sales sale, OnSaleVoidedListener listener) {
-        String ownerId = firestoreManager.getBusinessOwnerId();
-        if (ownerId == null || sale.getId() == null) {
-            if (listener != null) listener.onError("Invalid user or sale ID");
-            return;
-        }
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null) return;
+        FirebaseFirestore db = FirestoreManager.getInstance().getDb();
 
-        // 1. Queue the Void Status (Works Offline)
-        firestoreManager.getDb().collection("users")
-                .document(ownerId)
-                .collection("sales")
-                .document(sale.getId())
-                .update("status", "VOIDED")
-                .addOnSuccessListener(aVoid -> {
+        // 1. Update status (Firebase handles offline caching automatically)
+        db.collection("users").document(ownerId).collection("sales").document(sale.getId()).update("status", "VOIDED");
 
-                    // 2. Restore Inventory Locally (Works Offline)
-                    ProductRepository pr = SalesInventoryApplication.getProductRepository();
-                    pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
-                        @Override
-                        public void onProductFetched(Product p) {
-                            if (p != null) {
-                                double newQty = p.getQuantity() + sale.getQuantity();
-                                pr.updateProductQuantity(p.getProductId(), newQty, null);
-                            }
-                        }
-                        @Override public void onError(String error) {}
-                    });
+        // 2. Restore Inventory Locally IMMEDIATELY
+        ProductRepository pr = SalesInventoryApplication.getProductRepository();
+        pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
+            @Override
+            public void onProductFetched(Product p) {
+                if (p != null) {
+                    double newQty = p.getQuantity() + sale.getQuantity();
+                    pr.updateProductQuantity(p.getProductId(), newQty, null);
+                }
+            }
+            @Override public void onError(String error) {}
+        });
 
-                    // 3. Refund Wallet Balance safely without a Transaction (Works Offline)
-                    String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
-                    DocumentReference walletRef = firestoreManager.getDb().collection("users")
-                            .document(ownerId).collection("wallets").document(walletId);
+        // 3. Refund Wallet Balance safely
+        String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
+        DocumentReference walletRef = db.collection("users").document(ownerId).collection("wallets").document(walletId);
 
-                    walletRef.get().addOnSuccessListener(snap -> {
-                        if (snap.exists() && snap.getDouble("balance") != null) {
-                            double currentBal = snap.getDouble("balance");
-                            walletRef.update("balance", currentBal - sale.getTotalPrice());
-                        }
-                    });
+        Map<String, Object> walletUpdates = new HashMap<>();
+        walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+        walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
 
-                    if (listener != null) listener.onSuccess();
-                })
-                .addOnFailureListener(e -> {
-                    if (listener != null) listener.onError(e.getMessage());
-                });
+        // 4. INSTANT UI UPDATE
+        if (listener != null) listener.onSuccess();
     }
 
     public void processRefund(Sales sale, boolean restockItems, OnSaleVoidedListener listener) {
-        String ownerId = firestoreManager.getBusinessOwnerId();
-        if (ownerId == null || sale.getId() == null) {
-            if (listener != null) listener.onError("Invalid user or sale ID");
-            return;
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null) return;
+        FirebaseFirestore db = FirestoreManager.getInstance().getDb();
+
+        // 1. Mark Sale as REFUNDED
+        db.collection("users").document(ownerId).collection("sales").document(sale.getId()).update("status", "REFUNDED");
+
+        // 2. Restore Inventory Locally IMMEDIATELY
+        if (restockItems) {
+            ProductRepository pr = SalesInventoryApplication.getProductRepository();
+            pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
+                @Override
+                public void onProductFetched(Product p) {
+                    if (p != null) {
+                        double newQty = p.getQuantity() + sale.getQuantity();
+                        pr.updateProductQuantity(p.getProductId(), newQty, null);
+                    }
+                }
+                @Override public void onError(String error) {}
+            });
         }
 
-        FirebaseFirestore db = firestoreManager.getDb();
+        // 3. Deduct from Wallet
+        String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
+        DocumentReference walletRef = db.collection("users").document(ownerId).collection("wallets").document(walletId);
 
-        // 1. Mark Sale as REFUNDED (Works Offline)
-        db.collection("users")
-                .document(ownerId)
-                .collection("sales")
-                .document(sale.getId())
-                .update("status", "REFUNDED")
-                .addOnSuccessListener(aVoid -> {
+        Map<String, Object> walletUpdates = new HashMap<>();
+        walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+        walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
 
-                    // 2. Optional: Restore Inventory Locally (Works Offline)
-                    if (restockItems) {
-                        ProductRepository pr = SalesInventoryApplication.getProductRepository();
-                        pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
-                            @Override
-                            public void onProductFetched(Product p) {
-                                if (p != null) {
-                                    double newQty = p.getQuantity() + sale.getQuantity();
-                                    pr.updateProductQuantity(p.getProductId(), newQty, null);
-                                }
-                            }
-                            @Override public void onError(String error) {}
-                        });
+        // 4. Deduct from Active Shift
+        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        db.collection("users").document(ownerId).collection("shifts")
+                .whereEqualTo("status", "ACTIVE")
+                .whereEqualTo("cashierId", currentUserId)
+                .get()
+                .addOnSuccessListener(shiftSnapshot -> {
+                    if (!shiftSnapshot.isEmpty()) {
+                        DocumentReference shiftRef = shiftSnapshot.getDocuments().get(0).getReference();
+                        Map<String, Object> shiftUpdates = new HashMap<>();
+                        if (walletId.equals("CASH")) {
+                            shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+                        } else {
+                            shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
+                        }
+                        shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
                     }
-
-                    // 3. Deduct from Wallet (Offline-Safe using FieldValue)
-                    String walletId = (sale.getPaymentMethod() != null && sale.getPaymentMethod().toLowerCase().contains("gcash")) ? "GCASH" : "CASH";
-                    DocumentReference walletRef = db.collection("users").document(ownerId).collection("wallets").document(walletId);
-
-                    Map<String, Object> walletUpdates = new HashMap<>();
-                    walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
-                    walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
-
-                    // 4. Deduct from Active Shift (Offline-Safe using FieldValue)
-                    String currentUserId = AuthManager.getInstance().getCurrentUserId();
-                    db.collection("users").document(ownerId).collection("shifts")
-                            .whereEqualTo("status", "ACTIVE")
-                            .whereEqualTo("cashierId", currentUserId)
-                            .get()
-                            .addOnSuccessListener(shiftSnapshot -> {
-                                if (!shiftSnapshot.isEmpty()) {
-                                    DocumentReference shiftRef = shiftSnapshot.getDocuments().get(0).getReference();
-                                    Map<String, Object> shiftUpdates = new HashMap<>();
-                                    if (walletId.equals("CASH")) {
-                                        shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
-                                    } else {
-                                        shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
-                                    }
-                                    shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
-                                }
-                            });
-
-                    if (listener != null) listener.onSuccess();
-                })
-                .addOnFailureListener(e -> {
-                    if (listener != null) listener.onError(e.getMessage());
                 });
+
+        // 5. INSTANT UI UPDATE
+        if (listener != null) listener.onSuccess();
     }
 
     public interface OnSaleAddedListener {
@@ -352,22 +347,35 @@ public class SalesRepository {
         return map;
     }
 
-    // Standard Add Sale (No Inventory Deduction)
     public void addSale(Sales sale, OnSaleAddedListener listener) {
-        if (!AuthManager.getInstance().isCurrentUserApproved()) {
-            listener.onError("User not approved");
-            return;
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
         }
 
-        Map<String, Object> map = createSaleDataMap(sale);
+        FirebaseFirestore db = FirestoreManager.getInstance().getDb();
 
-        DocumentReference ref = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).document();
-        String saleId = ref.getId();
-        sale.setId(saleId);
+        // 1. Create the document reference FIRST so we can get a valid ID
+        DocumentReference saleRef = db.collection("users").document(ownerId).collection("sales").document();
+        sale.setId(saleRef.getId()); // CRITICAL: This fixes the Refund bug!
 
-        ref.set(map)
-                .addOnSuccessListener(aVoid -> { if (listener != null) listener.onSaleAdded(saleId); })
-                .addOnFailureListener(e -> { if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to add sale"); });
+        // 2. Fire and Forget to Firebase (If offline, Firebase safely caches this automatically!)
+        saleRef.set(sale);
+
+        // 3. Deduct stock instantly in the UI so the cashier doesn't have to wait
+        ProductRepository pr = SalesInventoryApplication.getProductRepository();
+        pr.getProductById(sale.getProductId(), new ProductRepository.OnProductFetchedListener() {
+            @Override
+            public void onProductFetched(Product p) {
+                if (p != null) {
+                    pr.updateProductQuantity(p.getProductId(), p.getQuantity() - sale.getQuantity(), null);
+                }
+            }
+            @Override public void onError(String error) {}
+        });
+
+        // 4. Instantly unblock the POS
+        if (listener != null) listener.onSaleAdded(saleRef.getId());
     }
 
     public void processSaleWithInventoryDeduction(Sales sale, List<RecipeItem> ingredientsUsed, OnSaleAddedListener listener) {
@@ -376,41 +384,54 @@ public class SalesRepository {
             return;
         }
 
-        DocumentReference newSaleRef = firestoreManager.getDb().collection(firestoreManager.getUserSalesPath()).document();
-        String saleId = newSaleRef.getId();
-        sale.setId(saleId);
-        Map<String, Object> saleMap = createSaleDataMap(sale);
+        // 1. Create Offline Entities
+        SalesOrderEntity orderEntity = new SalesOrderEntity();
+        orderEntity.orderNumber = sale.getOrderId() != null ? sale.getOrderId() : "ORD-" + System.currentTimeMillis();
+        orderEntity.orderDate = sale.getDate() > 0 ? sale.getDate() : System.currentTimeMillis();
+        orderEntity.totalAmount = sale.getTotalPrice();
+        orderEntity.paymentMethod = sale.getPaymentMethod() != null ? sale.getPaymentMethod() : "CASH";
+        orderEntity.deliveryStatus = sale.getDeliveryStatus() != null ? sale.getDeliveryStatus() : "";
+        orderEntity.remoteId = ""; // Will be processed by SyncWorker
 
-        // We use a WriteBatch because it caches perfectly offline and syncs when internet returns
-        com.google.firebase.firestore.WriteBatch batch = firestoreManager.getDb().batch();
-        batch.set(newSaleRef, saleMap);
+        SalesOrderItemEntity itemEntity = new SalesOrderItemEntity();
+        itemEntity.productId = sale.getProductId();
+        itemEntity.productName = sale.getProductName();
+        itemEntity.quantity = sale.getQuantity();
+        itemEntity.unitPrice = sale.getPrice();
+        itemEntity.lineTotal = sale.getTotalPrice();
+        itemEntity.totalCost = sale.getTotalCost();
+        itemEntity.discountAmount = sale.getDiscountAmount();
+        itemEntity.extraDetails = sale.getExtraDetails();
 
-        // Execute the sale save
-        batch.commit().addOnSuccessListener(aVoid -> {
+        List<SalesOrderItemEntity> items = new ArrayList<>();
+        items.add(itemEntity);
 
-            // Deduct the ingredients locally using your offline-first repository
-            if (ingredientsUsed != null && !ingredientsUsed.isEmpty()) {
-                ProductRepository pr = SalesInventoryApplication.getProductRepository();
-                for (RecipeItem ingredient : ingredientsUsed) {
-                    pr.getProductById(ingredient.getRawMaterialId(), new ProductRepository.OnProductFetchedListener() {
-                        @Override
-                        public void onProductFetched(Product p) {
-                            if (p != null) {
-                                double totalDeduction = ingredient.getQuantityRequired() * sale.getQuantity();
-                                double newStock = p.getQuantity() - totalDeduction;
-                                // Save the new stock locally (will trigger auto-sync to cloud)
-                                pr.updateProductQuantity(p.getProductId(), newStock, null);
+        // 2. Save directly to Room Local Database first! (Instantly unblocks the POS)
+        saveOrderOfflineFirst(orderEntity, items, new OnSaleAddedListener() {
+            @Override
+            public void onSaleAdded(String saleId) {
+                // 3. Deduct stock instantly in UI
+                if (ingredientsUsed != null && !ingredientsUsed.isEmpty()) {
+                    ProductRepository pr = SalesInventoryApplication.getProductRepository();
+                    for (RecipeItem ingredient : ingredientsUsed) {
+                        pr.getProductById(ingredient.getRawMaterialId(), new ProductRepository.OnProductFetchedListener() {
+                            @Override
+                            public void onProductFetched(Product p) {
+                                if (p != null) {
+                                    double totalDeduction = ingredient.getQuantityRequired() * sale.getQuantity();
+                                    pr.updateProductQuantity(p.getProductId(), p.getQuantity() - totalDeduction, null);
+                                }
                             }
-                        }
-                        @Override public void onError(String error) {}
-                    });
+                            @Override public void onError(String error) {}
+                        });
+                    }
                 }
+                if (listener != null) listener.onSaleAdded(saleId);
             }
-            if (listener != null) listener.onSaleAdded(saleId);
-
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Batch failed: ", e);
-            if (listener != null) listener.onError(e.getMessage() != null ? e.getMessage() : "Failed to process sale");
+            @Override
+            public void onError(String error) {
+                if (listener != null) listener.onError(error);
+            }
         });
     }
 

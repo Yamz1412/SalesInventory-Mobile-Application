@@ -56,7 +56,11 @@ public class AddSupplierActivity extends BaseActivity {
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Add Supplier");
+            getSupportActionBar().setSubtitle("Register a new vendor and establish their catalog");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         suppliersRef = FirebaseDatabase.getInstance().getReference("Suppliers");
         productRepository = SalesInventoryApplication.getProductRepository();
@@ -360,7 +364,7 @@ public class AddSupplierActivity extends BaseActivity {
 
                                 newProduct.setProductId(newId);
                                 newProduct.setProductName(row.name);
-                                newProduct.setQuantity(row.qty);
+                                newProduct.setQuantity(0);
                                 newProduct.setCostPrice(row.cost);
                                 newProduct.setSellingPrice(row.cost * 1.5);
                                 newProduct.setUnit(row.unit);

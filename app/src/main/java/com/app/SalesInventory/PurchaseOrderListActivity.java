@@ -343,6 +343,13 @@ public class PurchaseOrderListActivity extends BaseActivity  {
 
     private void loadPurchaseOrders() {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+
+        if (ownerId == null) return; // Failsafe
+
         poRef.orderByChild("ownerAdminId").equalTo(ownerId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {

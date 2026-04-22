@@ -31,21 +31,11 @@ public class AppFirebaseMessagingService extends FirebaseMessagingService {
 
         if ((title == null || title.isEmpty()) && remoteMessage.getNotification() != null) {
             RemoteMessage.Notification n = remoteMessage.getNotification();
-            title = n.getTitle() != null ? n.getTitle() : "";
-            body = n.getBody() != null ? n.getBody() : "";
+            title = n.getTitle() != null ? n.getTitle() : "Stock Alert";
+            body = n.getBody() != null ? n.getBody() : "A product requires your attention.";
         }
 
-        // Show notification via helper to keep behavior consistent with local alerts
-        try {
-            NotificationHelper.showNotification(
-                    getApplicationContext(),
-                    (title == null || title.isEmpty()) ? "Alert" : title,
-                    (body == null ? "" : body),
-                    alertId
-            );
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to show notification", e);
-        }
+        NotificationHelper.showNotification(getApplicationContext(), title, body, alertId);
     }
 
     @Override

@@ -52,33 +52,31 @@ public class BackupManager {
         }
     }
 
-    // 2. NEW: AUTOMATED DAILY OVERWRITE BACKUP
+    // 5. NEW: SILENT AUTOMATED BACKUP
     public static boolean createAutomatedBackup(Context context) {
         AppDatabase.closeDatabase();
-        File dbFile = getDatabaseFile(context);
 
+        File dbFile = getDatabaseFile(context);
         if (dbFile == null || !dbFile.exists()) return false;
 
-        // Saves to the app's internal Documents folder so it overwrites safely
-        File backupDir = new File(context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "SalesInventory_AutoBackups");
+        // Save to the app's private external folder (Safe from accidental user deletion)
+        File backupDir = new File(context.getExternalFilesDir(null), "backups");
         if (!backupDir.exists()) backupDir.mkdirs();
 
-        File autoBackupFile = new File(backupDir, "AutoBackup_24hr.db");
+        File backupFile = new File(backupDir, "nightly_backup.db");
 
-        // The 'false' parameter ensures it overwrites yesterday's file
         try (FileInputStream in = new FileInputStream(dbFile);
-             FileOutputStream out = new FileOutputStream(autoBackupFile, false)) {
+             FileOutputStream out = new FileOutputStream(backupFile)) {
 
             byte[] buffer = new byte[8192];
             int len;
             while ((len = in.read(buffer)) > 0) {
                 out.write(buffer, 0, len);
             }
-            out.flush();
-            AppDatabase.getInstance(context);
+            Log.d(TAG, "Nightly backup saved successfully at: " + backupFile.getAbsolutePath());
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "Auto-Backup failed", e);
+            Log.e(TAG, "Automated backup failed", e);
             return false;
         }
     }

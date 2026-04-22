@@ -104,7 +104,10 @@ public class SyncWorker extends Worker {
     }
 
     private void updateRemoteWalletAndShift(SalesOrderEntity order, String ownerId) {
-        String walletDocId = order.paymentMethod.toLowerCase().contains("gcash") ? "GCASH" : "CASH";
+        // Safe check for null payment methods
+        String pMethod = order.paymentMethod != null ? order.paymentMethod : "CASH";
+        String walletDocId = pMethod.toLowerCase().contains("gcash") ? "GCASH" : "CASH";
+
         DocumentReference walletRef = firestore.collection("users").document(ownerId).collection("wallets").document(walletDocId);
 
         Map<String, Object> w = new HashMap<>();
@@ -126,7 +129,7 @@ public class SyncWorker extends Worker {
                 DocumentSnapshot shiftDoc = shiftSnap.getDocuments().get(0);
 
                 Map<String, Object> shiftUpdates = new HashMap<>();
-                if(order.paymentMethod.equalsIgnoreCase("Cash")) {
+                if(walletDocId.equals("CASH")) {
                     shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(order.totalAmount));
                 } else {
                     shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(order.totalAmount));

@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="?android:colorBackground">
+    android:background="?attr/colorSurface"
+    >
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -39,7 +40,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="📊 Master Summary Dashboard"
-                    android:textColor="?attr/colorOnPrimary"
+                    android:textColor="?attr/colorSurface"
                     android:textSize="20sp"
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp" />
@@ -49,7 +50,7 @@
                     android:layout_height="wrap_content"
                     android:text="View consolidated Stock Value, Movement, Adjustments, and Deliveries in one place. Export the Complete Master PDF here."
                     android:textSize="14sp"
-                    android:textColor="?attr/colorOnPrimary"
+                    android:textColor="?attr/colorSurface"
                     android:alpha="0.8"
                     android:layout_marginBottom="16dp" />
 
@@ -59,7 +60,7 @@
                     android:layout_height="wrap_content"
                     android:text="Open Master Dashboard"
                     android:textColor="?attr/colorPrimary"
-                    app:backgroundTint="?attr/colorOnPrimary"
+                    app:backgroundTint="?attr/colorSurface"
                     android:textStyle="bold" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -85,7 +86,7 @@
             <Button android:id="@+id/btnFmiSmi" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="FMI / SMI" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
             <Button android:id="@+id/btnReceivingReport" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="Receiving" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
             <Button android:id="@+id/btnAdjustmentSummary" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="Adjustments" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-            <Button android:id="@+id/btnDeliveryReport" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="Deliveries" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+            <Button android:id="@+id/btnStockMovementReport" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_columnWeight="1" android:text="Stock Movement" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
         </GridLayout>
     </LinearLayout>

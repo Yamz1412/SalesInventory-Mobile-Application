@@ -29,13 +29,16 @@ public class LowStockItemsActivity extends BaseActivity {
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Low Stock Items");
+            getSupportActionBar().setSubtitle("Monitors products falling below assigned reorder thresholds");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
         recyclerView = findViewById(R.id.recyclerViewLowStock);
         progressBar = findViewById(R.id.progressBar);
         tvNoData = findViewById(R.id.tvNoData);
-        tvTotalLowStock = findViewById(R.id.tvTotalLowStock);
+        if (tvNoData != null) {
+            tvNoData.setText("All stock levels are healthy. Products requiring immediate restock will appear here.");
+        }        tvTotalLowStock = findViewById(R.id.tvTotalLowStock);
 
         productRepository = ProductRepository.getInstance((Application) getApplicationContext());
         adapter = new LowStockItemsAdapter(this, lowStockList, productRepository);

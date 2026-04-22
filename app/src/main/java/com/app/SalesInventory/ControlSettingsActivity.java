@@ -3,6 +3,7 @@ package com.app.SalesInventory;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.Toast;
@@ -66,6 +67,27 @@ public class ControlSettingsActivity extends BaseActivity {
         setupBusinessTierPresets();
         setupTaxSpinner();
         loadCurrentSettings();
+
+        if (!AuthManager.getInstance().isCurrentUserAdmin()) {
+
+            // 1. Hide Pricing Section
+            if (etDefaultMarkup != null && etDefaultMarkup.getParent() instanceof View) {
+                ((View) etDefaultMarkup.getParent()).setVisibility(View.GONE); // Hides the Input container
+            }
+            if (spinnerBusinessType != null) spinnerBusinessType.setVisibility(View.GONE);
+            if (btnSavePricing != null) btnSavePricing.setVisibility(View.GONE);
+
+            // 2. Hide Tax Section
+            if (etTaxRate != null && etTaxRate.getParent() instanceof View) {
+                ((View) etTaxRate.getParent()).setVisibility(View.GONE); // Hides the Input container
+            }
+            if (switchEnableTax != null) switchEnableTax.setVisibility(View.GONE);
+            if (spinnerTaxType != null) spinnerTaxType.setVisibility(View.GONE);
+            if (btnSaveTax != null) btnSaveTax.setVisibility(View.GONE);
+
+            // 3. Hide Staff Attendance Button
+            if (btnViewAttendanceLogs != null) btnViewAttendanceLogs.setVisibility(View.GONE);
+        }
 
         btnSavePricing.setOnClickListener(v -> {
             if (isPricingLocked) togglePricingLock(false);

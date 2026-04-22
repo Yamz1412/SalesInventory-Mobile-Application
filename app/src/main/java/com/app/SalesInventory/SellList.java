@@ -207,7 +207,6 @@ public class SellList extends BaseActivity {
             });
         }
 
-        // FIXED: Click Listener Syntax Error resolved!
         sellAdapter = new SellAdapter(this, filteredProducts, masterInventory, new SellAdapter.OnProductClickListener() {
             @Override
             public void onProductClick(Product product, int maxServings) {
@@ -735,11 +734,11 @@ public class SellList extends BaseActivity {
 
     private void showRefundDialog() {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_refund, null);
-        AlertDialog dialog = new AlertDialog.Builder(this).setView(view).create();
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this).setView(view).create();
         if (dialog.getWindow() != null)
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
-        Spinner spinnerTime = view.findViewById(R.id.spinnerTimeFilter);
+        Spinner spinnerTransaction = view.findViewById(R.id.spinnerTimeFilter); // Repurposed for Transaction IDs!
         EditText etOrderId = view.findViewById(R.id.etRefundOrderId);
         TextView tvDetails = view.findViewById(R.id.tvRefundOrderDetails);
         Spinner spinnerReason = view.findViewById(R.id.spinnerRefundReason);
@@ -748,153 +747,149 @@ public class SellList extends BaseActivity {
         Button btnConfirm = view.findViewById(R.id.btnConfirmRefund);
 
         boolean isDark = false;
-        try {
-            isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
-        } catch (Exception e) {
-        }
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
         int textColor = isDark ? Color.WHITE : Color.BLACK;
 
-        if (etOrderId != null) etOrderId.setTextColor(textColor);
-        if (tvDetails != null) tvDetails.setTextColor(textColor);
-        if (etSpecificReason != null) etSpecificReason.setTextColor(textColor);
+        // Hide the old search box and text details
+        if (etOrderId != null) etOrderId.setVisibility(View.GONE);
+        if (tvDetails != null) tvDetails.setVisibility(View.GONE);
+        LinearLayout cbContainer = new LinearLayout(this);
+        cbContainer.setOrientation(LinearLayout.VERTICAL);
 
-        String[] times = {"Today", "Yesterday", "Last 7 Days", "All Time"};
-        ArrayAdapter<String> timeAdapter = getAdaptiveAdapter(times);
-        if (spinnerTime != null) spinnerTime.setAdapter(timeAdapter);
-
-        String[] reasons = {
-                "Spoiled / Bad Quality",
-                "Wrong Order Prepared",
-                "Customer Changed Mind",
-                "Spilled / Dropped",
-                "Other (Specify below)"
-        };
-        ArrayAdapter<String> reasonAdapter = getAdaptiveAdapter(reasons);
-        if (spinnerReason != null) spinnerReason.setAdapter(reasonAdapter);
-
-        final List<Sales> foundSalesList = new ArrayList<>();
-        final double[] totalRefundAmount = {0.0};
-
-        Runnable fetchAndFilterSales = () -> {
-            if (etOrderId == null || spinnerTime == null) return;
-            String searchTxt = etOrderId.getText().toString().trim().toLowerCase();
-            String selectedTime = spinnerTime.getSelectedItem().toString();
-
-            long now = System.currentTimeMillis();
-            long oneDay = 24L * 60 * 60 * 1000L;
-            long timeThreshold = 0;
-
-            if (selectedTime.equals("Today")) timeThreshold = now - oneDay;
-            else if (selectedTime.equals("Yesterday")) timeThreshold = now - (2 * oneDay);
-            else if (selectedTime.equals("Last 7 Days")) timeThreshold = now - (7 * oneDay);
-
-            long finalTimeThreshold = timeThreshold;
-
-            SalesInventoryApplication.getSalesRepository().getAllSales().observe(this, salesList -> {
-                foundSalesList.clear();
-                totalRefundAmount[0] = 0;
-                StringBuilder details = new StringBuilder();
-
-                for (Sales s : salesList) {
-                    if (s.getPaymentMethod() != null && s.getPaymentMethod().contains("REFUNDED"))
-                        continue;
-
-                    boolean matchesTime = (selectedTime.equals("All Time")) ||
-                            (selectedTime.equals("Yesterday") && s.getTimestamp() >= finalTimeThreshold && s.getTimestamp() < (now - oneDay)) ||
-                            (!selectedTime.equals("Yesterday") && s.getTimestamp() >= finalTimeThreshold);
-
-                    boolean matchesSearch = searchTxt.isEmpty() ||
-                            (s.getOrderId() != null && s.getOrderId().toLowerCase().contains(searchTxt)) ||
-                            (s.getProductName() != null && s.getProductName().toLowerCase().contains(searchTxt));
-
-                    if (matchesTime && matchesSearch) {
-                        foundSalesList.add(s);
-                        totalRefundAmount[0] += s.getTotalPrice();
-
-                        SimpleDateFormat sdf = new SimpleDateFormat("MM/dd hh:mm a", Locale.getDefault());
-                        details.append("[").append(sdf.format(new Date(s.getTimestamp()))).append("] ")
-                                .append(s.getQuantity()).append("x ").append(s.getProductName())
-                                .append("\n   ID: ").append(s.getOrderId().substring(0, 8).toUpperCase())
-                                .append(" | ₱").append(s.getTotalPrice()).append("\n\n");
-                    }
-                }
-
-                if (foundSalesList.isEmpty()) {
-                    if (tvDetails != null) tvDetails.setText("No transactions found for the selected filters.");
-                    if (btnConfirm != null) btnConfirm.setEnabled(false);
-                } else {
-                    details.append("========================\nTOTAL ELIGIBLE REFUND: ₱").append(totalRefundAmount[0]);
-                    if (tvDetails != null) tvDetails.setText(details.toString());
-                    if (btnConfirm != null) btnConfirm.setEnabled(true);
-                }
-            });
-        };
-
-        if (spinnerTime != null) {
-            spinnerTime.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                    fetchAndFilterSales.run();
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> p) {
-                }
-            });
+        if (tvDetails != null && tvDetails.getParent() != null) {
+            ViewGroup parentLayout = (ViewGroup) tvDetails.getParent();
+            parentLayout.removeView(tvDetails);
+            parentLayout.addView(cbContainer);
         }
 
-        if (etOrderId != null) {
-            etOrderId.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                }
+        if (etSpecificReason != null) etSpecificReason.setTextColor(textColor);
 
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    fetchAndFilterSales.run();
-                }
+        String[] reasons = { "Spoiled / Bad Quality", "Wrong Order Prepared", "Customer Changed Mind", "Spilled / Dropped", "Other (Specify below)" };
+        if (spinnerReason != null) spinnerReason.setAdapter(getAdaptiveAdapter(reasons));
 
+        // Get Sales Synchronously (Prevents infinite reload loops when dialog is open)
+        List<Sales> currentSales = SalesInventoryApplication.getSalesRepository().getAllSales().getValue();
+        if (currentSales == null) currentSales = new ArrayList<>();
+
+        Map<String, List<Sales>> groupedSales = new java.util.LinkedHashMap<>();
+        List<String> transactionDisplayList = new ArrayList<>();
+        List<String> transactionIds = new ArrayList<>();
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, hh:mm a", Locale.US);
+        long now = System.currentTimeMillis();
+
+        // Group sales by their Order ID (Transaction ID)
+        for (Sales s : currentSales) {
+            if (s.getPaymentMethod() != null && (s.getPaymentMethod().contains("REFUNDED") || "VOIDED".equals(s.getStatus()))) continue;
+            if (now - s.getTimestamp() > 7 * 24 * 60 * 60 * 1000L) continue; // Only show last 7 days
+
+            String oId = s.getOrderId() != null && !s.getOrderId().isEmpty() ? s.getOrderId() : "UNKNOWN";
+            if (!groupedSales.containsKey(oId)) {
+                groupedSales.put(oId, new ArrayList<>());
+            }
+            groupedSales.get(oId).add(s);
+        }
+
+        for (Map.Entry<String, List<Sales>> entry : groupedSales.entrySet()) {
+            double total = 0;
+            long time = 0;
+            for(Sales s : entry.getValue()) {
+                total += s.getTotalPrice();
+                time = s.getTimestamp();
+            }
+            String shortId = entry.getKey().length() >= 8 ? entry.getKey().substring(0, 8).toUpperCase() : entry.getKey();
+            String display = "ID: " + shortId + " | ₱" + String.format(Locale.US, "%.2f", total) + " | " + sdf.format(new Date(time));
+            transactionDisplayList.add(display);
+            transactionIds.add(entry.getKey());
+        }
+
+        if (transactionDisplayList.isEmpty()) {
+            transactionDisplayList.add("No recent refundable transactions");
+            if (btnConfirm != null) btnConfirm.setEnabled(false);
+        } else {
+            if (btnConfirm != null) btnConfirm.setEnabled(true);
+        }
+
+        if (spinnerTransaction != null) {
+            spinnerTransaction.setAdapter(getAdaptiveAdapter(transactionDisplayList.toArray(new String[0])));
+
+            List<android.widget.CheckBox> activeCheckBoxes = new ArrayList<>();
+            List<Sales> activeCheckableSales = new ArrayList<>();
+
+            // When a Transaction ID is selected, generate checkboxes for its items
+            spinnerTransaction.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
-                public void afterTextChanged(Editable s) {
+                public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                    cbContainer.removeAllViews();
+                    activeCheckBoxes.clear();
+                    activeCheckableSales.clear();
+
+                    if (transactionIds.isEmpty()) return;
+
+                    String selectedOrderId = transactionIds.get(pos);
+                    List<Sales> itemsInOrder = groupedSales.get(selectedOrderId);
+
+                    for(Sales s : itemsInOrder) {
+                        android.widget.CheckBox cb = new android.widget.CheckBox(SellList.this);
+                        cb.setText(s.getQuantity() + "x " + s.getProductName() + " - ₱" + String.format(Locale.US, "%.2f", s.getTotalPrice()));
+                        cb.setTextColor(textColor);
+                        cb.setChecked(true); // Default to selected
+                        cbContainer.addView(cb);
+
+                        activeCheckBoxes.add(cb);
+                        activeCheckableSales.add(s);
+                    }
                 }
+                @Override public void onNothingSelected(AdapterView<?> p) {}
             });
+
+            if (btnConfirm != null) {
+                btnConfirm.setOnClickListener(v -> {
+                    List<Sales> itemsToRefund = new ArrayList<>();
+
+                    // Collect only the items the user left checked!
+                    for(int i = 0; i < activeCheckBoxes.size(); i++) {
+                        if (activeCheckBoxes.get(i).isChecked()) {
+                            itemsToRefund.add(activeCheckableSales.get(i));
+                        }
+                    }
+
+                    if (itemsToRefund.isEmpty()) {
+                        Toast.makeText(SellList.this, "Please check at least one item to refund.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String selectedReason = spinnerReason != null ? spinnerReason.getSelectedItem().toString() : "";
+                    String specificNotes = etSpecificReason != null ? etSpecificReason.getText().toString().trim() : "";
+                    String finalReason = selectedReason + (specificNotes.isEmpty() ? "" : " - " + specificNotes);
+
+                    String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+                    if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+
+                    // Process refunds only for the selected items
+                    for (Sales sale : itemsToRefund) {
+                        sale.setPaymentMethod("REFUNDED: " + finalReason);
+                        SalesInventoryApplication.getSalesRepository().processRefund(sale, true, new SalesRepository.OnSaleVoidedListener() {
+                            @Override public void onSuccess() {}
+                            @Override public void onError(String error) {}
+                        });
+
+                        Map<String, Object> refundLog = new HashMap<>();
+                        refundLog.put("orderId", sale.getOrderId());
+                        refundLog.put("productName", sale.getProductName());
+                        refundLog.put("amount", sale.getTotalPrice());
+                        refundLog.put("reason", finalReason);
+                        refundLog.put("timestamp", System.currentTimeMillis());
+                        com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("refund_logs").add(refundLog);
+                    }
+
+                    Toast.makeText(SellList.this, "Refund Processed: " + finalReason, Toast.LENGTH_LONG).show();
+                    dialog.dismiss();
+                });
+            }
         }
 
         if (btnCancel != null) btnCancel.setOnClickListener(v -> dialog.dismiss());
-
-        if (btnConfirm != null) {
-            btnConfirm.setOnClickListener(v -> {
-                String selectedReason = spinnerReason != null ? spinnerReason.getSelectedItem().toString() : "";
-                String specificNotes = etSpecificReason != null ? etSpecificReason.getText().toString().trim() : "";
-                String finalReason = selectedReason + (specificNotes.isEmpty() ? "" : " - " + specificNotes);
-
-                String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-                if (ownerId == null || ownerId.isEmpty())
-                    ownerId = AuthManager.getInstance().getCurrentUserId();
-
-                for (Sales sale : foundSalesList) {
-                    // Update the local object for the UI
-                    sale.setPaymentMethod("REFUNDED: " + finalReason);
-                    SalesInventoryApplication.getSalesRepository().processRefund(sale, true, new SalesRepository.OnSaleVoidedListener() {
-                        @Override public void onSuccess() {}
-                        @Override public void onError(String error) {}
-                    });
-
-                    // 2. Keep your excellent custom refund logging
-                    Map<String, Object> refundLog = new HashMap<>();
-                    refundLog.put("orderId", sale.getOrderId());
-                    refundLog.put("productName", sale.getProductName());
-                    refundLog.put("amount", sale.getTotalPrice());
-                    refundLog.put("reason", finalReason);
-                    refundLog.put("timestamp", System.currentTimeMillis());
-                    FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("refund_logs").add(refundLog);
-                }
-
-                Toast.makeText(this, "Refund Processed: " + finalReason, Toast.LENGTH_LONG).show();
-                dialog.dismiss();
-            });
-        }
-
         dialog.show();
     }
 
@@ -1092,8 +1087,19 @@ public class SellList extends BaseActivity {
         if (switchShowPromos != null && switchShowPromos.isChecked()) {
             filteredProducts.clear();
             filteredProducts.addAll(promoPseudoProducts);
-            if (sellAdapter != null) sellAdapter.filterList(filteredProducts, masterInventory);
-            return;
+
+            android.os.Parcelable rvState = null;
+            if (sellListView != null && sellListView.getLayoutManager() != null) {
+                rvState = sellListView.getLayoutManager().onSaveInstanceState();
+            }
+
+            if (sellAdapter != null) {
+                sellAdapter.filterList(filteredProducts, masterInventory);
+            }
+
+            if (sellListView != null && sellListView.getLayoutManager() != null && rvState != null) {
+                sellListView.getLayoutManager().onRestoreInstanceState(rvState);
+            }            return;
         }
 
         Collections.sort(filteredProducts, (p1, p2) -> {
@@ -1185,14 +1191,35 @@ public class SellList extends BaseActivity {
         }
 
         LinearLayout layoutSizesContainer = view.findViewById(R.id.layoutSizes);
-        RadioGroup rgSizes = view.findViewById(R.id.rgSizes);
+        ViewGroup parentLayout = (ViewGroup) layoutSizesContainer.getParent();
 
+        // 1. CRITICAL SCROLL FIX: Keeps buttons on screen!
+        if (parentLayout != null) {
+            ViewGroup grandParent = (ViewGroup) parentLayout.getParent();
+            if (grandParent instanceof LinearLayout && !(grandParent instanceof android.widget.ScrollView)) {
+                int index = grandParent.indexOfChild(parentLayout);
+                grandParent.removeView(parentLayout);
+
+                android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+                // Weight 1 pushes the Confirm/Cancel buttons to the bottom securely
+                LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f);
+                scrollView.setLayoutParams(scrollParams);
+
+                parentLayout.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+                scrollView.addView(parentLayout);
+                grandParent.addView(scrollView, index);
+            }
+        }
+
+        RadioGroup rgSizes = view.findViewById(R.id.rgSizes);
         LinearLayout layoutAddonsContainer = view.findViewById(R.id.layoutAddons);
         LinearLayout containerAddonsList = view.findViewById(R.id.containerAddons);
         LinearLayout layoutSugarContainer = view.findViewById(R.id.layoutSugar);
-        LinearLayout parentScrollLayout = (LinearLayout) layoutSizesContainer.getParent();
 
-        // --- NEW CODE: ADD THE OUT OF STOCK WARNING ---
+        // --- OUT OF STOCK WARNING ---
         if (maxBaseServings <= 0) {
             String missingReason = getMissingIngredientReason(product);
             TextView tvWarning = new TextView(this);
@@ -1202,10 +1229,11 @@ public class SellList extends BaseActivity {
             tvWarning.setTextSize(15f);
             tvWarning.setPadding(0, 0, 0, 16);
 
-            if (parentScrollLayout != null) {
-                parentScrollLayout.addView(tvWarning, 0); // Inserts the text at the very top of the list!
+            if (parentLayout != null) {
+                parentLayout.addView(tvWarning, 0); // Inserts the text at the very top of the list!
             }
         }
+
         if (layoutSizesContainer != null) layoutSizesContainer.setVisibility(View.GONE);
         if (rgSizes != null) rgSizes.removeAllViews();
         if (layoutAddonsContainer != null) layoutAddonsContainer.setVisibility(View.GONE);
@@ -1246,7 +1274,7 @@ public class SellList extends BaseActivity {
             if (!sList.isEmpty()) {
                 if (layoutSizesContainer != null) layoutSizesContainer.setVisibility(View.VISIBLE);
                 boolean isFirstAvailableSizeSelected = false;
-                Set<String> addedSizes = new HashSet<>();
+                java.util.Set<String> addedSizes = new java.util.HashSet<>();
 
                 for (int i = 0; i < sList.size(); i++) {
                     Object obj = sList.get(i);
@@ -1324,7 +1352,7 @@ public class SellList extends BaseActivity {
             List<?> aList = (List<?>) addonsObj;
             if (!aList.isEmpty()) {
                 if (layoutAddonsContainer != null) layoutAddonsContainer.setVisibility(View.VISIBLE);
-                Set<String> addedAddons = new HashSet<>();
+                java.util.Set<String> addedAddons = new java.util.HashSet<>();
 
                 for (Object obj : aList) {
                     if (obj instanceof Map) {
@@ -1379,7 +1407,7 @@ public class SellList extends BaseActivity {
             }
         }
 
-        // 4. Render Sugar
+        // 4. RESTORED: Sugar rendered as Dropdown Spinners
         final String[] selectedNoteText = {""};
         Object notesObj = product.getNotesList();
         if (notesObj instanceof List) {
@@ -1410,7 +1438,7 @@ public class SellList extends BaseActivity {
                     layoutSugarContainer.addView(lblTitle);
 
                     Spinner sugarSpinner = new Spinner(this);
-                    List<String> sugarNames = new ArrayList<>();
+                    java.util.List<String> sugarNames = new java.util.ArrayList<>();
                     for (Product p : masterInventory) {
                         if (p.getProductName() != null) {
                             String n = p.getProductName().toLowerCase();
@@ -1433,7 +1461,7 @@ public class SellList extends BaseActivity {
                     layoutSugarContainer.addView(sugarSpinner);
 
                     Spinner levelSpinner = new Spinner(this);
-                    List<String> levels = java.util.Arrays.asList(
+                    java.util.List<String> levels = java.util.Arrays.asList(
                             "100% (Full Sugar)", "75% (Less Sugar)", "50% (Half Sugar)",
                             "25% (Quarter Sugar)", "0% (No Sugar)"
                     );
@@ -1470,7 +1498,7 @@ public class SellList extends BaseActivity {
                 tvIngredientsTitle.setPadding(0, 24, 0, 8);
                 missingIngredientViews.add(tvIngredientsTitle);
 
-                Set<String> addedIngredients = new HashSet<>();
+                java.util.Set<String> addedIngredients = new java.util.HashSet<>();
 
                 for (Object obj : bList) {
                     if (obj instanceof Map) {
@@ -1528,9 +1556,9 @@ public class SellList extends BaseActivity {
                     }
                 }
 
-                if (hasMissingIngredients && parentScrollLayout != null) {
+                if (hasMissingIngredients && parentLayout != null) {
                     for (View v : missingIngredientViews) {
-                        parentScrollLayout.addView(v);
+                        parentLayout.addView(v);
                     }
                 }
             }
@@ -1571,6 +1599,7 @@ public class SellList extends BaseActivity {
                     extrasBuilder.append(cb.getText().toString().replaceAll(" \\(\\+₱.*\\)", "")).append(", ");
             }
 
+            // Restore the Spinner data reader logic
             if (!selectedNoteText[0].isEmpty()) extrasBuilder.append(selectedNoteText[0]);
 
             for (String key : dynamicNoteViews.keySet()) {

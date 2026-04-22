@@ -7,6 +7,13 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.HashSet;
+import java.util.TimeZone;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -51,10 +58,15 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Adjustment Summary");
+            getSupportActionBar().setSubtitle("Tracks inventory discrepancies, damages, and corrections");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentOwnerId == null || currentOwnerId.isEmpty()) {
+            currentOwnerId = AuthManager.getInstance().getCurrentUserId();
+        }
+
         adjustmentRef = FirebaseDatabase.getInstance().getReference("StockAdjustments");
 
         initializeViews();
@@ -64,15 +76,20 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
             if (products != null) {
                 currentInventory.clear();
                 currentInventory.addAll(products);
-                loadAdjustments();
+                applyFilterAndGroup();
             }
         });
+        loadAdjustments();
     }
 
     private void initializeViews() {
         tvTotalItems = findViewById(R.id.tvTotalAdjustedItems);
         tvTotalLoss = findViewById(R.id.tvTotalLossValue);
         tvNoData = findViewById(R.id.tvNoData);
+        if (tvNoData != null) {
+            tvNoData.setText("No adjustments found for this date. Manual corrections, damages, and stock additions will appear here.");
+        }
+
         btnDateFilter = findViewById(R.id.btnDateFilter);
         progressBar = findViewById(R.id.progressBar);
         recyclerViewReport = findViewById(R.id.recyclerViewReport);
@@ -84,33 +101,58 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
     private void setupFilters() {
         btnDateFilter.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth, 0, 0, 0);
-                filterStartDate = calendar.getTimeInMillis();
+            HashSet<Long> validDates = new HashSet<>();
+            Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
-                calendar.set(year, month, dayOfMonth, 23, 59, 59);
-                filterEndDate = calendar.getTimeInMillis();
+            for (StockAdjustment adj : masterAdjustmentList) {
+                utcCal.setTimeInMillis(adj.getTimestamp());
+                utcCal.set(Calendar.HOUR_OF_DAY, 0); utcCal.set(Calendar.MINUTE, 0);
+                utcCal.set(Calendar.SECOND, 0); utcCal.set(Calendar.MILLISECOND, 0);
+                validDates.add(utcCal.getTimeInMillis());
+            }
+
+            CalendarConstraints.Builder constraintsBuilder = new CalendarConstraints.Builder();
+            constraintsBuilder.setValidator(new DeliveryReportActivity.AvailableDateValidator(validDates));
+
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("Select Adjustment Date")
+                    .setCalendarConstraints(constraintsBuilder.build())
+                    .setTheme(R.style.CustomCalendarTheme)
+                    .build();
+
+            datePicker.addOnPositiveButtonClickListener(selection -> {
+                Calendar selectedCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                selectedCal.setTimeInMillis(selection);
+                Calendar localCal = Calendar.getInstance();
+                localCal.set(selectedCal.get(Calendar.YEAR), selectedCal.get(Calendar.MONTH), selectedCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+                filterStartDate = localCal.getTimeInMillis();
+                localCal.set(Calendar.HOUR_OF_DAY, 23); localCal.set(Calendar.MINUTE, 59); localCal.set(Calendar.SECOND, 59);
+                filterEndDate = localCal.getTimeInMillis();
 
                 SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
-                btnDateFilter.setText("Filter: " + sdf.format(calendar.getTime()));
-
+                btnDateFilter.setText("Filter: " + sdf.format(localCal.getTime()));
                 applyFilterAndGroup();
-            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+            });
+            datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
         });
 
         btnDateFilter.setOnLongClickListener(v -> {
-            filterStartDate = 0;
-            filterEndDate = System.currentTimeMillis();
+            filterStartDate = 0; filterEndDate = System.currentTimeMillis();
             btnDateFilter.setText("Filter by Date: All Time");
             applyFilterAndGroup();
             return true;
         });
     }
 
+    private ValueEventListener adjustmentListener;
+
     private void loadAdjustments() {
         progressBar.setVisibility(View.VISIBLE);
-        adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        if (adjustmentListener != null) {
+            adjustmentRef.removeEventListener(adjustmentListener);
+        }
+
+        adjustmentListener = adjustmentRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 masterAdjustmentList.clear();
@@ -135,6 +177,7 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
     }
 
     private void applyFilterAndGroup() {
+        if (masterAdjustmentList == null) return;
         Map<String, AdjustmentSummaryReport> groupMap = new HashMap<>();
 
         double overallLossValue = 0.0;
@@ -144,8 +187,12 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
             if (filterStartDate == 0 || (adjDate >= filterStartDate && adjDate <= filterEndDate)) {
 
+                // CRITICAL FIX: If Product ID is missing in Firebase, fallback to Product Name!
                 String pId = adj.getProductId();
-                if (pId == null) continue;
+                if (pId == null || pId.isEmpty()) {
+                    pId = adj.getProductName();
+                }
+                if (pId == null || pId.isEmpty()) continue;
 
                 AdjustmentSummaryReport report = groupMap.get(pId);
                 if (report == null) {
@@ -154,22 +201,30 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
                 }
 
                 double qty = adj.getQuantityAdjusted();
-                if ("Add Stock".equalsIgnoreCase(adj.getAdjustmentType())) {
-                    report.addAddition(qty);
+                String type = adj.getAdjustmentType() != null ? adj.getAdjustmentType() : "";
+
+                // CRITICAL FIX: Safely detect Additions vs Removals even if the Type text varies
+                if (qty > 0 || type.toLowerCase().contains("add") || type.equalsIgnoreCase("Addition")) {
+                    report.addAddition(Math.abs(qty));
                 } else {
                     double absQty = Math.abs(qty);
                     report.addRemoval(absQty);
 
+                    // Calculate total financial loss based on cost price
                     double unitCost = 0.0;
                     for (Product p : currentInventory) {
-                        if (p.getProductId().equals(pId)) {
-                            unitCost = p.getQuantity() > 0 ? (p.getCostPrice() / p.getQuantity()) : 0.0;
+                        String invId = p.getProductId() != null ? p.getProductId() : p.getProductName();
+                        if (invId != null && invId.equals(pId)) {
+                            unitCost = p.getCostPrice();
                             break;
                         }
                     }
                     overallLossValue += (absQty * unitCost);
                 }
-                report.addReason(adj.getReason());
+
+                String reason = adj.getReason();
+                if (reason == null || reason.isEmpty()) reason = type;
+                report.addReason(reason);
             }
         }
 
@@ -177,18 +232,17 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         summaryList.addAll(groupMap.values());
         Collections.sort(summaryList, (r1, r2) -> r1.getProductName().compareToIgnoreCase(r2.getProductName()));
 
-        tvTotalItems.setText(String.valueOf(summaryList.size()));
-        tvTotalLoss.setText(String.format(Locale.US, "₱%,.2f", overallLossValue));
-
-        progressBar.setVisibility(View.GONE);
+        if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(summaryList.size()));
+        if (tvTotalLoss != null) tvTotalLoss.setText(String.format(Locale.US, "₱%,.2f", overallLossValue));
+        if (progressBar != null) progressBar.setVisibility(View.GONE);
 
         if (summaryList.isEmpty()) {
-            tvNoData.setVisibility(View.VISIBLE);
-            recyclerViewReport.setVisibility(View.GONE);
+            if (tvNoData != null) tvNoData.setVisibility(View.VISIBLE);
+            if (recyclerViewReport != null) recyclerViewReport.setVisibility(View.GONE);
         } else {
-            tvNoData.setVisibility(View.GONE);
-            recyclerViewReport.setVisibility(View.VISIBLE);
-            adapter.notifyDataSetChanged();
+            if (tvNoData != null) tvNoData.setVisibility(View.GONE);
+            if (recyclerViewReport != null) recyclerViewReport.setVisibility(View.VISIBLE);
+            if (adapter != null) adapter.notifyDataSetChanged();
         }
     }
 

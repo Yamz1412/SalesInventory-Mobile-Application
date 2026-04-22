@@ -78,7 +78,45 @@ public class BusinessSetupActivity extends BaseActivity {
             imagePickerLauncher.launch(Intent.createChooser(intent, "Select Logo"));
         });
 
+        // CRITICAL FIX: Fetch and display existing data if the user is editing their profile
+        loadExistingProfile();
+
         btnSaveBusiness.setOnClickListener(v -> saveBusinessProfile());
+    }
+
+    private void loadExistingProfile() {
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        if (user == null) return;
+
+        setLoading(true); // Locks the screen briefly so the user can't save while loading
+
+        firestore.collection("users").document(user.getUid()).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    setLoading(false);
+                    if (documentSnapshot.exists()) {
+                        String name = documentSnapshot.getString("businessName");
+                        String addr = documentSnapshot.getString("address");
+                        String lndmk = documentSnapshot.getString("landmark");
+                        String logoUrl = documentSnapshot.getString("businessLogoUrl");
+
+                        // Only fill the boxes if the data actually exists (Leaves it empty for new users!)
+                        if (name != null) etBusinessName.setText(name);
+                        if (addr != null) etAddress.setText(addr);
+                        if (lndmk != null) etLandmark.setText(lndmk);
+
+                        // Load the existing logo
+                        if (logoUrl != null && !logoUrl.isEmpty() && !isDestroyed() && !isFinishing()) {
+                            Glide.with(this)
+                                    .load(logoUrl)
+                                    .circleCrop()
+                                    .into(ivBusinessLogo);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    setLoading(false);
+                    Toast.makeText(this, "Failed to load profile data", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void saveBusinessProfile() {

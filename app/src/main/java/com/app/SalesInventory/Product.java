@@ -177,36 +177,71 @@ public class Product {
     public String getSupplier()                              { return supplier == null ? "" : supplier; }
     public void   setSupplier(String supplier)               { this.supplier = supplier; }
 
-    @com.google.firebase.firestore.PropertyName("dateAdded")
-    public Date getDateAddedAsDate()                         { return dateAdded; }
-    @com.google.firebase.firestore.PropertyName("dateAdded")
-    public void setDateAddedAsDate(Date date)                { this.dateAdded = date; }
+    // ==============================================================================
+    // APP SPECIFIC METHODS (Hidden from Firebase to prevent compile errors)
+    // ==============================================================================
 
-    @Exclude public long getDateAdded()                      { return dateAdded != null ? dateAdded.getTime() : 0L; }
-    @Exclude public void setDateAdded(long millis)           { this.dateAdded = (millis > 0) ? new Date(millis) : null; }
+    @com.google.firebase.firestore.Exclude
+    public Date getDateAddedAsDate() { return dateAdded; }
 
+    @com.google.firebase.firestore.Exclude
+    public void setDateAddedAsDate(Date date) { this.dateAdded = date; }
+
+    @com.google.firebase.firestore.Exclude
+    public long getDateAdded() { return dateAdded != null ? dateAdded.getTime() : 0L; }
+
+    @com.google.firebase.firestore.Exclude
+    public void setDateAdded(long millis) { this.dateAdded = (millis > 0) ? new Date(millis) : null; }
+
+    @com.google.firebase.firestore.Exclude
+    public Date getExpiryDateAsDate() { return expiryDate; }
+
+    @com.google.firebase.firestore.Exclude
+    public void setExpiryDateAsDate(Date expiryDate) { this.expiryDate = expiryDate; }
+
+    @com.google.firebase.firestore.Exclude
+    public Date getExpiryDate() { return expiryDate; }
+
+    @com.google.firebase.firestore.Exclude
+    public void setExpiryDate(long millis) { this.expiryDate = (millis > 0) ? new Date(millis) : null; }
+
+    // ==============================================================================
+    // FIREBASE SPECIFIC METHODS (Safely converts Longs and Timestamps automatically)
+    // ==============================================================================
+
+    @com.google.firebase.firestore.PropertyName("dateAdded")
+    public Object getFirebaseDateAdded() { return dateAdded; }
+
+    @com.google.firebase.firestore.PropertyName("dateAdded")
+    public void setFirebaseDateAdded(Object raw) {
+        if (raw instanceof Long) {
+            this.dateAdded = new Date((Long) raw);
+        } else if (raw instanceof Date) {
+            this.dateAdded = (Date) raw;
+        } else if (raw instanceof com.google.firebase.Timestamp) {
+            this.dateAdded = ((com.google.firebase.Timestamp) raw).toDate();
+        } else {
+            this.dateAdded = null;
+        }
+    }
 
     @com.google.firebase.firestore.PropertyName("expiryDate")
-    public Date getExpiryDateAsDate() {
-        return expiryDate;
-    }
+    public Object getFirebaseExpiryDate() { return expiryDate; }
 
     @com.google.firebase.firestore.PropertyName("expiryDate")
-    public void setExpiryDateAsDate(Date expiryDate) {
-        this.expiryDate = expiryDate;
+    public void setFirebaseExpiryDate(Object raw) {
+        if (raw instanceof Long) {
+            this.expiryDate = new Date((Long) raw);
+        } else if (raw instanceof Date) {
+            this.expiryDate = (Date) raw;
+        } else if (raw instanceof com.google.firebase.Timestamp) {
+            this.expiryDate = ((com.google.firebase.Timestamp) raw).toDate();
+        } else {
+            this.expiryDate = null;
+        }
     }
 
-    // This is the method your NotificationAdapter relies on
-    @Exclude
-    public java.util.Date getExpiryDate() {
-        return expiryDate;
-    }
 
-    @Exclude
-    public void setExpiryDate(long millis) {
-        this.expiryDate = (millis > 0) ? new Date(millis) : null;
-    }
-    // -----------------------------------------------------------------
     @com.google.firebase.firestore.PropertyName("isActive")
     public boolean getIsActive()                             { return isActive; }
     @com.google.firebase.firestore.PropertyName("isActive")

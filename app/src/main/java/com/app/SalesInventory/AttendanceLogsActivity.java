@@ -13,6 +13,13 @@ import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.HashSet;
+import java.util.TimeZone;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -61,10 +68,20 @@ public class AttendanceLogsActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_attendance_logs);
 
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Attendance Logs");
+            getSupportActionBar().setSubtitle("Monitors daily staff shifts, locked breaks, and total hours");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+
         fStore = FirebaseFirestore.getInstance();
 
         rvAttendanceLogs = findViewById(R.id.rvAttendanceLogs);
         tvNoLogs = findViewById(R.id.tvNoLogs);
+        if (tvNoLogs != null) {
+            tvNoLogs.setText("No attendance records for this date. Staff time-ins, time-outs, and breaks will be logged here.");
+        }
+
         progressBar = findViewById(R.id.progressBar);
         layoutAdminFilters = findViewById(R.id.layoutAdminFilters);
         btnFilterDate = findViewById(R.id.btnFilterDate);
@@ -106,14 +123,25 @@ public class AttendanceLogsActivity extends BaseActivity {
     }
 
     private void showDatePicker() {
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(selectedDateMillis);
-        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-            cal.set(year, month, dayOfMonth);
-            selectedDateMillis = cal.getTimeInMillis();
+        MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText("Select Shift Date")
+                .setSelection(selectedDateMillis)
+                .setTheme(R.style.CustomCalendarTheme)
+                .build();
+
+        datePicker.addOnPositiveButtonClickListener(selection -> {
+            Calendar selectedCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+            selectedCal.setTimeInMillis(selection);
+
+            Calendar localCal = Calendar.getInstance();
+            localCal.set(selectedCal.get(Calendar.YEAR), selectedCal.get(Calendar.MONTH), selectedCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+
+            selectedDateMillis = localCal.getTimeInMillis();
             updateDateButtonText();
             loadRealtimeLogs(selectedDateMillis);
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+        });
+
+        datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
     }
 
     // ====================================================================================

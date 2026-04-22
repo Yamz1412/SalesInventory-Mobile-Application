@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="20dp"
-    android:background="@android:color/white">
+    android:background="?attr/colorSurface"
+    >
 
     <TextView
         android:layout_width="match_parent"
@@ -16,73 +17,114 @@
         android:layout_marginBottom="16dp"
         android:gravity="center" />
 
-    <ScrollView
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:orientation="vertical">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Products Sold &amp; Current Stock"
-                android:textStyle="bold"
-                android:textColor="@color/black"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
+            android:text="Products Sold &amp; Current Stock"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="#F5F5F5"
+            android:padding="8dp"
+            android:layout_marginBottom="12dp">
             <TextView
                 android:id="@+id/tvDetailedProducts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="#444444"
-                android:textSize="14sp"
-                android:layout_marginBottom="20dp"/>
+                android:textSize="13sp"/>
+        </ScrollView>
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Damages &amp; Stock Deductions"
-                android:textStyle="bold"
-                android:textColor="@color/black"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Damages &amp; Deductions"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="#FFF0F0"
+            android:padding="8dp"
+            android:layout_marginBottom="12dp">
             <TextView
                 android:id="@+id/tvDetailedDamages"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="No damages recorded."
                 android:textColor="#D32F2F"
-                android:textSize="14sp"
-                android:layout_marginBottom="20dp"/>
+                android:textSize="13sp"/>
+        </ScrollView>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Refunds &amp; Voids"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="#FFF3E0"
+            android:padding="8dp"
+            android:layout_marginBottom="12dp">
             <TextView
+                android:id="@+id/tvDetailedRefunds"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Missing / Partial Deliveries (PO)"
-                android:textStyle="bold"
-                android:textColor="@color/black"
-                android:textSize="16sp"
-                android:layout_marginBottom="8dp"/>
+                android:text="No refunds recorded."
+                android:textColor="#E65100"
+                android:textSize="13sp"/>
+        </ScrollView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Missing / Partial Deliveries"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnBackground"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="#F3E5F5"
+            android:padding="8dp">
             <TextView
                 android:id="@+id/tvDetailedPOs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="No partial deliveries."
-                android:textColor="#F57C00"
-                android:textSize="14sp"
-                android:layout_marginBottom="16dp"/>
-        </LinearLayout>
-    </ScrollView>
+                android:textColor="#8E24AA"
+                android:textSize="13sp"/>
+        </ScrollView>
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnCloseDetailed"
         android:layout_width="match_parent"
         android:layout_height="55dp"
         android:text="Close Report"
+        android:textColor="?attr/colorPrimary"
+        android:backgroundTint="?attr/colorSurface"
         android:layout_marginTop="10dp"
-        style="@style/Widget.MaterialComponents.Button.TextButton" />
+        style="@style/CustomButtonOutlined" />
 </LinearLayout>

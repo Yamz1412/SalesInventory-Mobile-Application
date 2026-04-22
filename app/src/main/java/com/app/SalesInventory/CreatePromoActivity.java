@@ -90,6 +90,8 @@ public class CreatePromoActivity extends BaseActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Create Promo");
+            getSupportActionBar().setSubtitle("Apply temporary discounts and campaign rules to active products");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 

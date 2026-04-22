@@ -52,7 +52,6 @@ import java.util.Map;
 public class EditProduct extends BaseActivity {
 
     private ImageButton btnEditPhoto;
-    // Removed lowStockET, changed quantityET and etPiecesPerUnit to match the new XML
     private TextInputEditText productNameET, costPriceET, expiryDateET, quantityET, etPiecesPerUnit;
     private AutoCompleteTextView productLineET, productTypeET;
     private MaterialButton updateBtn, cancelBtn; // Updated to MaterialButton
@@ -195,11 +194,19 @@ public class EditProduct extends BaseActivity {
                         productNameET.setText(p.getProductName());
                         productTypeET.setText(p.getCategoryName());
                         productLineET.setText(p.getProductLine());
-                        costPriceET.setText(String.valueOf(p.getCostPrice()));
-                        quantityET.setText(String.valueOf(p.getQuantity()));
 
-                        // We removed lowStockET, so we don't load it anymore.
-                        // The UI alerts will auto-calculate based on quantity.
+                        double rawCost = p.getCostPrice();
+                        if (rawCost % 1 == 0) {
+                            costPriceET.setText(String.valueOf((long) rawCost));
+                        } else {
+                            costPriceET.setText(String.format(Locale.US, "%.4f", rawCost).replaceAll("0*$", "").replaceAll("\\.$", ""));
+                        }
+                        double qty = p.getQuantity();
+                        if (qty % 1 == 0) {
+                            quantityET.setText(String.valueOf((long) qty));
+                        } else {
+                            quantityET.setText(String.valueOf(qty));
+                        }
 
                         if (p.getExpiryDate() != null && p.getExpiryDate().getTime() > 0) {
                             expiryCalendar.setTimeInMillis(p.getExpiryDate().getTime());

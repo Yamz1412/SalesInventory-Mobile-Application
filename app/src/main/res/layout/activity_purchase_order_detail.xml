@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?android:colorBackground">
+    android:background="?attr/colorSurface">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -46,28 +46,29 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="?attr/colorSurface"
                     android:orientation="vertical"
                     android:padding="16dp">
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="PO Number" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvPONumber" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PO-123" android:textSize="16sp" android:textStyle="bold" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="PO Number" android:textColor="?attr/colorOnBackground" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvPONumber" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PO-123" android:textSize="16sp" android:textStyle="bold" android:textColor="?attr/colorOnBackground"/>
                     </LinearLayout>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Supplier" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvSupplier" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Supplier" android:textSize="14sp" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Supplier" android:textColor="?attr/colorOnBackground" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvSupplier" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Supplier" android:textSize="14sp" android:textColor="?attr/colorOnBackground"/>
                     </LinearLayout>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Date" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
-                        <TextView android:id="@+id/tvDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Date" android:textSize="14sp" android:textColor="?attr/colorOnSurface"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Date" android:textColor="?attr/colorOnBackground" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:id="@+id/tvDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Date" android:textSize="14sp" android:textColor="?attr/colorOnBackground"/>
                     </LinearLayout>
 
                     <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#40888888" android:layout_marginVertical="12dp"/>
 
                     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Current Status" android:textColor="?attr/colorOnSurface" android:alpha="0.7" android:textSize="12sp"/>
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Current Status" android:textColor="?attr/colorOnBackground" android:alpha="0.7" android:textSize="12sp"/>
                         <com.google.android.material.card.MaterialCardView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"

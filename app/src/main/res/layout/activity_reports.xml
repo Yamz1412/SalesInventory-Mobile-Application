@@ -308,6 +308,18 @@
                     android:textColor="?attr/colorOnBackground"
                     android:layout_marginBottom="8dp" />
 
+                <TextView
+                    android:id="@+id/tvNoData"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="No sales recorded for this period. Completed transactions and daily revenue will appear here."
+                    android:textAlignment="center"
+                    android:paddingTop="32dp"
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnBackground"
+                    android:alpha="0.6"
+                    android:visibility="gone" />
+
                 <ListView
                     android:id="@+id/ReportsListView"
                     android:layout_width="match_parent"

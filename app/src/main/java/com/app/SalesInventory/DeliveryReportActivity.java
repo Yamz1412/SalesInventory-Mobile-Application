@@ -4,6 +4,13 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.HashSet;
+import java.util.TimeZone;
+
 import android.app.DatePickerDialog;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -104,17 +111,52 @@ public class DeliveryReportActivity extends BaseActivity {
 
     private void setupFilters() {
         btnDateFilter.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth, 0, 0, 0);
-                filterStartDate = calendar.getTimeInMillis();
 
-                calendar.set(year, month, dayOfMonth, 23, 59, 59);
-                filterEndDate = calendar.getTimeInMillis();
+            // 1. Extract exact dates that have delivery data
+            HashSet<Long> validDates = new HashSet<>();
+            Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
-                btnDateFilter.setText(filterFormat.format(calendar.getTime()));
+            for (DeliveryItemRecord item : masterList) {
+                if (item.date > 0) {
+                    utcCal.setTimeInMillis(item.date);
+                    utcCal.set(Calendar.HOUR_OF_DAY, 0);
+                    utcCal.set(Calendar.MINUTE, 0);
+                    utcCal.set(Calendar.SECOND, 0);
+                    utcCal.set(Calendar.MILLISECOND, 0);
+                    validDates.add(utcCal.getTimeInMillis());
+                }
+            }
+
+            // 2. Attach the custom Validator
+            CalendarConstraints.Builder constraintsBuilder = new CalendarConstraints.Builder();
+            constraintsBuilder.setValidator(new AvailableDateValidator(validDates));
+
+            // 3. Build the Material Date Picker
+            MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("Select Delivery Date")
+                    .setCalendarConstraints(constraintsBuilder.build())
+                    .setTheme(R.style.CustomCalendarTheme)
+                    .build();
+
+            // 4. Handle the user's selection
+            datePicker.addOnPositiveButtonClickListener(selection -> {
+                Calendar selectedCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                selectedCal.setTimeInMillis(selection);
+
+                Calendar localCal = Calendar.getInstance();
+                localCal.set(selectedCal.get(Calendar.YEAR), selectedCal.get(Calendar.MONTH), selectedCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+                filterStartDate = localCal.getTimeInMillis();
+
+                localCal.set(Calendar.HOUR_OF_DAY, 23);
+                localCal.set(Calendar.MINUTE, 59);
+                localCal.set(Calendar.SECOND, 59);
+                filterEndDate = localCal.getTimeInMillis();
+
+                btnDateFilter.setText(filterFormat.format(localCal.getTime()));
                 applyFilters();
-            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+            });
+
+            datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
         });
 
         btnDateFilter.setOnLongClickListener(v -> {
@@ -125,6 +167,7 @@ public class DeliveryReportActivity extends BaseActivity {
             return true;
         });
 
+        // Setup the Status Spinner
         String[] statuses = {"All Statuses", "Pending", "Delivered", "Cancelled"};
         ArrayAdapter<String> statusAdapter = getAdaptiveAdapter(statuses);
         spinnerStatus.setAdapter(statusAdapter);
@@ -335,5 +378,38 @@ public class DeliveryReportActivity extends BaseActivity {
                 btnMarkDelivered = itemView.findViewById(R.id.btnMarkDelivered);
             }
         }
+    }
+
+    public static class AvailableDateValidator implements CalendarConstraints.DateValidator {
+        private final HashSet<Long> availableDates;
+
+        public AvailableDateValidator(HashSet<Long> availableDates) {
+            this.availableDates = availableDates;
+        }
+
+        protected AvailableDateValidator(Parcel in) {
+            availableDates = (HashSet<Long>) in.readSerializable();
+        }
+
+        @Override
+        public boolean isValid(long date) {
+            if (availableDates == null || availableDates.isEmpty()) return false;
+            return availableDates.contains(date);
+        }
+
+        @Override
+        public int describeContents() { return 0; }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeSerializable(availableDates);
+        }
+
+        public static final Parcelable.Creator<AvailableDateValidator> CREATOR = new Parcelable.Creator<AvailableDateValidator>() {
+            @Override
+            public AvailableDateValidator createFromParcel(Parcel in) { return new AvailableDateValidator(in); }
+            @Override
+            public AvailableDateValidator[] newArray(int size) { return new AvailableDateValidator[size]; }
+        };
     }
 }

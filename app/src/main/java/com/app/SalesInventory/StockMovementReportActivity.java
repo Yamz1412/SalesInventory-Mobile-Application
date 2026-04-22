@@ -4,6 +4,13 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import android.os.Parcel;
+import android.os.Parcelable;
+import java.util.HashSet;
+import java.util.TimeZone;
+
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.content.pm.PackageManager;
@@ -142,26 +149,57 @@ public class StockMovementReportActivity extends BaseActivity {
 
     private void setupFilters() {
         btnDateFilter.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-                calendar.set(year, month, dayOfMonth, 0, 0, 0);
-                filterStartDate = calendar.getTimeInMillis();
+            // We temporarily fetch the available dates directly from Firebase to build the calendar
+            FirebaseDatabase.getInstance().getReference("Sales").addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    HashSet<Long> validDates = new HashSet<>();
+                    Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
-                calendar.set(year, month, dayOfMonth, 23, 59, 59);
-                filterEndDate = calendar.getTimeInMillis();
+                    for (DataSnapshot ds : snapshot.getChildren()) {
+                        Long ts = ds.child("timestamp").getValue(Long.class);
+                        if (ts != null) {
+                            utcCal.setTimeInMillis(ts);
+                            utcCal.set(Calendar.HOUR_OF_DAY, 0); utcCal.set(Calendar.MINUTE, 0);
+                            utcCal.set(Calendar.SECOND, 0); utcCal.set(Calendar.MILLISECOND, 0);
+                            validDates.add(utcCal.getTimeInMillis());
+                        }
+                    }
 
-                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
-                btnDateFilter.setText(sdf.format(calendar.getTime()));
+                    CalendarConstraints.Builder constraintsBuilder = new CalendarConstraints.Builder();
+                    if (!validDates.isEmpty()) constraintsBuilder.setValidator(new AvailableDateValidator(validDates));
 
-                applyFilters();
-            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show();
+                    MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                            .setTitleText("Select Movement Date")
+                            .setCalendarConstraints(constraintsBuilder.build())
+                            .setTheme(R.style.CustomCalendarTheme)
+                            .build();
+
+                    datePicker.addOnPositiveButtonClickListener(selection -> {
+                        Calendar selectedCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                        selectedCal.setTimeInMillis(selection);
+                        Calendar localCal = Calendar.getInstance();
+                        localCal.set(selectedCal.get(Calendar.YEAR), selectedCal.get(Calendar.MONTH), selectedCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0);
+                        filterStartDate = localCal.getTimeInMillis();
+                        localCal.set(Calendar.HOUR_OF_DAY, 23); localCal.set(Calendar.MINUTE, 59); localCal.set(Calendar.SECOND, 59);
+                        filterEndDate = localCal.getTimeInMillis();
+
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+                        btnDateFilter.setText(sdf.format(localCal.getTime()));
+
+                        // CRITICAL FIX: We must completely reload the data so the math recalculates!
+                        loadData();
+                    });
+                    datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
+                }
+                @Override public void onCancelled(@NonNull DatabaseError error) {}
+            });
         });
 
         btnDateFilter.setOnLongClickListener(v -> {
-            filterStartDate = 0;
-            filterEndDate = System.currentTimeMillis();
+            filterStartDate = 0; filterEndDate = System.currentTimeMillis();
             btnDateFilter.setText("All Time");
-            applyFilters();
+            loadData(); // CRITICAL FIX
             return true;
         });
     }
@@ -216,6 +254,11 @@ public class StockMovementReportActivity extends BaseActivity {
             if (sales != null) {
                 for (Sales s : sales) {
                     if (s == null || s.getProductId() == null) continue;
+
+                    // CRITICAL FIX: Identify if the sale was refunded or voided
+                    boolean isRefunded = s.getPaymentMethod() != null && s.getPaymentMethod().contains("REFUNDED");
+                    boolean isVoided = "VOIDED".equals(s.getStatus());
+                    if (isRefunded || isVoided) continue;
 
                     Long ts = s.getTimestamp();
                     long saleDate = (ts != null && ts > 0) ? ts : s.getDate();
@@ -334,6 +377,19 @@ public class StockMovementReportActivity extends BaseActivity {
         } catch (Exception e) {
             Toast.makeText(this, "Failed to generate PDF", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public static class AvailableDateValidator implements CalendarConstraints.DateValidator {
+        private final HashSet<Long> availableDates;
+        public AvailableDateValidator(HashSet<Long> availableDates) { this.availableDates = availableDates; }
+        protected AvailableDateValidator(Parcel in) { availableDates = (HashSet<Long>) in.readSerializable(); }
+        @Override public boolean isValid(long date) { return availableDates != null && availableDates.contains(date); }
+        @Override public int describeContents() { return 0; }
+        @Override public void writeToParcel(Parcel dest, int flags) { dest.writeSerializable(availableDates); }
+        public static final Parcelable.Creator<AvailableDateValidator> CREATOR = new Parcelable.Creator<AvailableDateValidator>() {
+            @Override public AvailableDateValidator createFromParcel(Parcel in) { return new AvailableDateValidator(in); }
+            @Override public AvailableDateValidator[] newArray(int size) { return new AvailableDateValidator[size]; }
+        };
     }
 
     @Override

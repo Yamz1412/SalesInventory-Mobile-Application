@@ -60,7 +60,11 @@ public class ReturnProductActivity extends BaseActivity {
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Return Product");
+            getSupportActionBar().setSubtitle("Process defective items back to supplier to deduct current stock");
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         productRepository = SalesInventoryApplication.getProductRepository();
 

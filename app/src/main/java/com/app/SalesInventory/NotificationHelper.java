@@ -48,6 +48,23 @@ public class NotificationHelper {
         if (nm != null) nm.notify((int) System.currentTimeMillis(), nb.build());
     }
 
+    // --- ADDED METHOD: Cloud Trigger ---
+    public static void sendCloudAlertToAdmins(String ownerId, String title, String message, String productId) {
+        if (ownerId == null || ownerId.isEmpty()) return;
+
+        java.util.Map<String, Object> alert = new java.util.HashMap<>();
+        alert.put("title", title);
+        alert.put("body", message);
+        alert.put("alertId", productId);
+        alert.put("timestamp", com.google.firebase.firestore.FieldValue.serverTimestamp());
+        alert.put("read", false);
+
+        // Writing to this collection allows Firebase Cloud Messaging to dispatch to the Admin's phone
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(ownerId)
+                .collection("PushAlerts").add(alert);
+    }
+
     // --- ADDED METHOD ---
     public static void clearAllNotifications(Context ctx) {
         if (ctx == null) return;

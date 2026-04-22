@@ -60,6 +60,7 @@ import java.util.Set;
 
 public class Reports extends BaseActivity {
 
+    private StringBuilder detailedRefundsStr = new StringBuilder();
     private static final int REQUEST_WRITE_STORAGE = 1001;
     private static final String TAG = "ReportsActivity";
 
@@ -74,7 +75,7 @@ public class Reports extends BaseActivity {
     // Income Statement UI
     private TextView tvISBusinessName, tvISDateRange;
     private TextView tvISGrossSales, tvISDiscounts, tvISNetSales;
-    private TextView tvISCogs, tvISGrossProfit, tvISOpex, tvISNetIncome;
+    private TextView tvISCogs, tvISGrossProfit, tvISOpex, tvISNetIncome, tvNoData;
     private LinearLayout containerISExpenses;
 
     private Calendar startCalendar = Calendar.getInstance();
@@ -136,8 +137,9 @@ public class Reports extends BaseActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Sales Reports");
+            getSupportActionBar().setSubtitle("Comprehensive overview of gross revenue, discounts, and net sales");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
         }
 
         currentOwnerId = FirestoreManager.getInstance().getBusinessOwnerId();
@@ -149,6 +151,11 @@ public class Reports extends BaseActivity {
                     if (doc.getString("role") != null) currentUserRole = doc.getString("role");
                 }
             });
+        }
+
+        tvNoData = findViewById(R.id.tvNoData);
+        if (tvNoData != null) {
+            tvNoData.setText("No sales recorded for this period. Completed transactions and daily revenue will appear here.");
         }
 
         productRepository = SalesInventoryApplication.getProductRepository();
@@ -164,7 +171,9 @@ public class Reports extends BaseActivity {
         btnInventoryReport = findViewById(R.id.btnInventoryReport);
         btnPOReport = findViewById(R.id.btnPOReport);
         btnOperatingExpenses = findViewById(R.id.btnOperatingExpenses);
-        reportsListView = findViewById(R.id.ReportsListView);
+        ListView listView = findViewById(R.id.ReportsListView);
+        TextView tvNoData = findViewById(R.id.tvNoData);
+        listView.setEmptyView(tvNoData);
 
         tvOverviewBestSeller = findViewById(R.id.tvOverviewBestSeller);
         tvOverviewPayment = findViewById(R.id.tvOverviewPayment);
@@ -182,7 +191,7 @@ public class Reports extends BaseActivity {
         tvISNetIncome    = findViewById(R.id.tvISNetIncome);
 
         adapter = new ReportAdapter(this, allReportItems);
-        reportsListView.setAdapter(adapter);
+        listView.setAdapter(adapter);
 
         setupDateFilterSpinner();
 
@@ -547,6 +556,7 @@ public class Reports extends BaseActivity {
         allReportItems.clear();
         bestSellersList.clear();
         detailedProductsStr.setLength(0);
+        detailedRefundsStr.setLength(0);
 
         currentNetSales = 0; currentTotalCOGS = 0; currentTotalDiscounts = 0;
         currentCashSales = 0; currentGcashSales = 0;
@@ -561,6 +571,18 @@ public class Reports extends BaseActivity {
         for (Sales s : allSalesList) {
             long ts = s.getTimestamp() > 0 ? s.getTimestamp() : s.getDate();
             if (ts >= startMillis && ts <= endMillis) {
+
+                String status = s.getStatus() != null ? s.getStatus().toUpperCase() : "";
+                String paymentTypeForCheck = s.getPaymentMethod() != null ? s.getPaymentMethod().toUpperCase() : "";
+                if (status.equals("REFUNDED") || status.equals("VOIDED") || paymentTypeForCheck.contains("REFUNDED")) {
+                    String rName = s.getProductName() != null ? s.getProductName() : "Unknown Product";
+                    detailedRefundsStr.append("• ").append(rName)
+                            .append("\n  Status: ").append(status.isEmpty() ? "REFUNDED" : status)
+                            .append("\n  Amount: ₱").append(String.format(Locale.US, "%,.2f", Math.abs(s.getTotalPrice())))
+                            .append("\n  Date: ").append(timeFormat.format(new Date(ts))).append("\n\n");
+                    continue;
+                }
+
                 String orderId = s.getOrderId();
                 if (orderId != null && !orderId.isEmpty()) uniqueOrderIds.add(orderId);
                 else fallbackTxCount++;
@@ -592,14 +614,16 @@ public class Reports extends BaseActivity {
 
                                     for (Product raw : currentInventory) {
                                         if (materialName != null && materialName.equalsIgnoreCase(raw.getProductName())) {
-                                            recipeCost += (raw.getCostPrice() * qtyUsed);
+                                            double rawUnitCost = raw.getCostPrice();
+                                            recipeCost += (rawUnitCost * qtyUsed);
                                             break;
                                         }
                                     }
                                 }
                                 cost = recipeCost * s.getQuantity();
                             } else {
-                                cost = p.getCostPrice() * s.getQuantity();
+                                double pUnitCost = p.getCostPrice();
+                                cost = pUnitCost * s.getQuantity();
                             }
                             break;
                         }
@@ -647,6 +671,7 @@ public class Reports extends BaseActivity {
                 BestSellerItem bsItem = bsMap.get(displayName);
                 bsItem.quantitySold += s.getQuantity(); bsItem.totalRevenue += netPrice; bsItem.totalCost += cost;
             }
+            if (detailedRefundsStr.length() == 0) detailedRefundsStr.append("No refunds recorded.\n");
         }
 
         bestSellersList.addAll(bsMap.values());
@@ -853,28 +878,49 @@ public class Reports extends BaseActivity {
         List<String> sortedCategories = new ArrayList<>();
         Map<String, DetailedProductReport> allProductsMap = new HashMap<>();
 
-        for (Product p : currentInventory) {
-            if (p != null && p.getProductName() != null && !"Menu".equals(p.getProductType())) {
-                String catName = p.getCategoryName() != null && !p.getCategoryName().isEmpty() ? p.getCategoryName() : "Uncategorized";
-                allProductsMap.put(p.getProductName(), new DetailedProductReport(p.getProductName(), catName, p.getQuantity()));
-            }
-        }
-
+        // 1. CRITICAL FIX: Only loop through items that were ACTUALLY sold during this period
         for (BestSellerItem b : bestSellersList) {
-            if (allProductsMap.containsKey(b.productName)) {
-                DetailedProductReport dp = allProductsMap.get(b.productName);
-                dp.quantitySold = b.quantitySold;
-                dp.totalRevenue = b.totalRevenue;
-                dp.totalCost = b.totalCost;
-            } else {
-                DetailedProductReport dp = new DetailedProductReport(b.productName, "Deleted Products", 0);
-                dp.quantitySold = b.quantitySold;
-                dp.totalRevenue = b.totalRevenue;
-                dp.totalCost = b.totalCost;
-                allProductsMap.put(b.productName, dp);
+
+            // Find the matching product in the current inventory to get its category, stock, and recipe
+            Product matchedProduct = null;
+            for (Product p : currentInventory) {
+                if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(b.productName)) {
+                    matchedProduct = p;
+                    break;
+                }
             }
+
+            String catName = (matchedProduct != null && matchedProduct.getCategoryName() != null && !matchedProduct.getCategoryName().isEmpty())
+                    ? matchedProduct.getCategoryName() : "Uncategorized";
+            double stockLeft = matchedProduct != null ? matchedProduct.getQuantity() : 0;
+
+            DetailedProductReport dp = new DetailedProductReport(b.productName, catName, stockLeft);
+            dp.quantitySold = b.quantitySold;
+            dp.totalRevenue = b.totalRevenue;
+            dp.totalCost = b.totalCost;
+
+            // 2. CRITICAL FIX: Calculate and format the Recipe / Raw Materials deducted!
+            if (matchedProduct != null && "Menu".equalsIgnoreCase(matchedProduct.getProductType()) && matchedProduct.getBomList() != null && !matchedProduct.getBomList().isEmpty()) {
+                StringBuilder recipeStr = new StringBuilder();
+                for (Map<String, Object> bomItem : matchedProduct.getBomList()) {
+                    String matName = (String) bomItem.get("materialName");
+                    String unit = (String) bomItem.get("unit");
+                    if (unit == null) unit = "";
+
+                    double qtyUsedPerItem = 0.0;
+                    try { qtyUsedPerItem = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+
+                    // Multiply the recipe requirement by the total amount sold
+                    double totalMatDeducted = qtyUsedPerItem * b.quantitySold;
+                    recipeStr.append("    - ").append(matName).append(": ").append(String.format(Locale.US, "%.2f", totalMatDeducted)).append(" ").append(unit).append("\n");
+                }
+                dp.recipeDetails = recipeStr.toString();
+            }
+
+            allProductsMap.put(b.productName, dp);
         }
 
+        // Group the dynamically created sold products by Category
         for (DetailedProductReport dp : allProductsMap.values()) {
             if (!sortedCategories.contains(dp.category)) sortedCategories.add(dp.category);
             if (!catGrouped.containsKey(dp.category)) catGrouped.put(dp.category, new ArrayList<>());
@@ -889,10 +935,14 @@ public class Reports extends BaseActivity {
 
             for (DetailedProductReport dp : catItems) {
                 detailedProductsStr.append("• ").append(dp.productName).append("\n");
-                detailedProductsStr.append("  Sold: ").append(dp.quantitySold)
-                        .append(" | Stock Left: ").append(dp.stockLeft).append("\n");
-                detailedProductsStr.append("  Revenue: ₱").append(String.format(Locale.US, "%,.2f", dp.totalRevenue))
-                        .append(" | Total Cost: ₱").append(String.format(Locale.US, "%,.2f", dp.totalCost)).append("\n\n");
+                detailedProductsStr.append("  Sold: ").append(dp.quantitySold).append(" | Stock Left: ").append(dp.stockLeft).append("\n");
+                detailedProductsStr.append("  Revenue: ₱").append(String.format(Locale.US, "%,.2f", dp.totalRevenue)).append(" | Total Cost: ₱").append(String.format(Locale.US, "%,.2f", dp.totalCost)).append("\n");
+
+                // Print the recipe deductions if they exist
+                if (dp.recipeDetails != null && !dp.recipeDetails.isEmpty()) {
+                    detailedProductsStr.append("  Recipe Ingredients Deducted:\n").append(dp.recipeDetails);
+                }
+                detailedProductsStr.append("\n");
             }
         }
     }
@@ -1089,11 +1139,13 @@ public class Reports extends BaseActivity {
 
         TextView tvProducts = dialogView.findViewById(R.id.tvDetailedProducts);
         TextView tvDamages = dialogView.findViewById(R.id.tvDetailedDamages);
+        TextView tvRefunds = dialogView.findViewById(R.id.tvDetailedRefunds);
         TextView tvPOs = dialogView.findViewById(R.id.tvDetailedPOs);
         Button btnClose = dialogView.findViewById(R.id.btnCloseDetailed);
 
         tvProducts.setText(detailedProductsStr.length() > 0 ? detailedProductsStr.toString() : "No products sold.");
         tvDamages.setText(detailedDamagesStr.toString());
+        tvRefunds.setText(detailedRefundsStr.toString());
         tvPOs.setText(detailedPOsStr.toString());
 
         btnClose.setOnClickListener(v -> dialog.dismiss());
@@ -1158,9 +1210,13 @@ public class Reports extends BaseActivity {
                         tempPdfFile, businessName, currentInventory, currentInventoryValue, preparedBy
                 );
             } else if (reportTypeIndex == 2) {
+                String combinedDamagesAndRefunds = detailedDamagesStr.toString()
+                        + "\n\n=== REFUNDS & VOIDS ===\n\n"
+                        + detailedRefundsStr.toString();
+
                 generator.generateOperationsAndReceivingReportPDF(
                         tempPdfFile, dateRange, businessName,
-                        detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), detailedDamagesStr.toString(),
+                        detailedPOFullStr.toString(), detailedReturnsFullStr.toString(), combinedDamagesAndRefunds,
                         preparedBy
                 );
             }
@@ -1254,6 +1310,8 @@ public class Reports extends BaseActivity {
         public int quantitySold = 0;
         public double totalRevenue = 0.0, totalCost = 0.0;
         public double stockLeft = 0;
+        public String recipeDetails = ""; // NEW: Added this to hold the recipe string!
+
         public DetailedProductReport(String pn, String cat, double sLeft) {
             productName = pn;
             category = cat;

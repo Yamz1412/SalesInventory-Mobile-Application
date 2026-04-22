@@ -140,8 +140,11 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
 
         toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null)
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("Create Purchase Order");
+            getSupportActionBar().setSubtitle("Draft official orders; stock will not update until delivered");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         poRef = FirebaseDatabase.getInstance().getReference("PurchaseOrders");
         suppliersRef = FirebaseDatabase.getInstance().getReference("Suppliers");
@@ -278,15 +281,9 @@ public class CreatePurchaseOrderActivity extends BaseActivity {
         if (tvName != null) tvName.setTextColor(textColor);
         if (etQty != null) { etQty.setTextColor(textColor); etQty.setHintTextColor(Color.GRAY); }
         if (etCost != null) { etCost.setTextColor(textColor); etCost.setHintTextColor(Color.GRAY); }
-
         tvName.setText(product.getProductName());
-
         double defaultCost = product.getCostPrice();
-        if (product.getQuantity() > 0) {
-            defaultCost = product.getCostPrice() / product.getQuantity();
-        }
         etCost.setText(String.format(Locale.US, "%.2f", defaultCost));
-
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnAdd.setOnClickListener(v -> {

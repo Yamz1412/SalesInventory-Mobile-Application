@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 public class InventoryReportsActivity extends BaseActivity  {
 
     private Button btnFmiSmi, btnAdjustmentSummary, btnMasterSummary;
-    private Button btnDeliveryReport, btnReceivingReport;
+    private Button btnStockMovementReport, btnReceivingReport;
 
     private DatabaseReference adjustmentRef;
 
@@ -59,7 +59,7 @@ public class InventoryReportsActivity extends BaseActivity  {
     private void initializeViews() {
         btnFmiSmi = findViewById(R.id.btnFmiSmi);
         btnAdjustmentSummary = findViewById(R.id.btnAdjustmentSummary);
-        btnDeliveryReport = findViewById(R.id.btnDeliveryReport);
+        btnStockMovementReport = findViewById(R.id.btnStockMovementReport);
         btnReceivingReport = findViewById(R.id.btnReceivingReport);
         btnMasterSummary = findViewById(R.id.btnMasterSummary);
 
@@ -85,9 +85,31 @@ public class InventoryReportsActivity extends BaseActivity  {
     private void setupClickListeners() {
         btnFmiSmi.setOnClickListener(v -> startActivity(new android.content.Intent(this, FmiSmiReportActivity.class)));
         btnAdjustmentSummary.setOnClickListener(v -> startActivity(new android.content.Intent(this, AdjustmentSummaryReportActivity.class)));
-        btnReceivingReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, ReceivingReportActivity.class)));
-        btnDeliveryReport.setOnClickListener(v -> startActivity(new android.content.Intent(this, DeliveryReportActivity.class)));
         btnMasterSummary.setOnClickListener(v -> startActivity(new Intent(this, InventoryMasterSummaryActivity.class)));
+
+        if (btnStockMovementReport != null) {
+            btnStockMovementReport.setOnClickListener(v ->
+                    startActivity(new Intent(InventoryReportsActivity.this, StockMovementReportActivity.class))
+            );
+        }
+
+        // 2. Mix Receiving & Deliveries into a single Chooser Dialog
+        if (btnReceivingReport != null) {
+            btnReceivingReport.setOnClickListener(v -> {
+                String[] options = {"📦 Receiving Report (From Suppliers)", "🚚 Delivery Report (To Customers)"};
+
+                new androidx.appcompat.app.AlertDialog.Builder(InventoryReportsActivity.this)
+                        .setTitle("Select Report Type")
+                        .setItems(options, (dialog, which) -> {
+                            if (which == 0) {
+                                startActivity(new Intent(InventoryReportsActivity.this, ReceivingReportActivity.class));
+                            } else {
+                                startActivity(new Intent(InventoryReportsActivity.this, DeliveryReportActivity.class));
+                            }
+                        })
+                        .show();
+            });
+        }
     }
 
     private void exportAllReportsPdf() {

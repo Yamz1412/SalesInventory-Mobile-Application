@@ -85,8 +85,12 @@ public class Profile extends BaseActivity {
             navigateToLogin();
             return;
         }
-
         setupAvatarPicker();
+
+        if (!AuthManager.getInstance().isCurrentUserAdmin()) {
+            if (btnEditBusiness != null) btnEditBusiness.setVisibility(View.GONE);
+            if (btnResetData != null) btnResetData.setVisibility(View.GONE);
+        }
 
         btnEditProfile.setOnClickListener(v -> {
             Intent intent = new Intent(Profile.this, EditProfil.class);
@@ -320,36 +324,45 @@ public class Profile extends BaseActivity {
     }
 
     private void performActualLogout() {
-        String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+        String currentUid = fAuth.getUid();
 
         if (currentUid != null) {
-            SalesInventoryApplication.logAttendance("SHIFT_END");
-            com.google.firebase.database.FirebaseDatabase.getInstance().getReference("UsersStatus")
-                    .child(currentUid)
-                    .setValue("offline");
-            executeFinalSignOut();
-        } else {
-            executeFinalSignOut();
+            try {
+                // Try to log attendance and update status, but don't let it crash the logout!
+                SalesInventoryApplication.logAttendance("SHIFT_END");
+                FirebaseDatabase.getInstance().getReference("UsersStatus")
+                        .child(currentUid)
+                        .setValue("offline");
+            } catch (Exception e) {
+                Log.e("Profile", "Pre-logout tracking failed safely: " + e.getMessage());
+            }
         }
+
+        // GUARANTEE the sign-out executes
+        executeFinalSignOut();
     }
 
     private void executeFinalSignOut() {
-        // Use your existing AuthManager cleanup method
-        if (AuthManager.getInstance() != null) {
-            AuthManager.getInstance().signOutAndCleanup(() -> {
-                // This block runs AFTER the AuthManager finishes wiping local data and signing out
-                Intent intent = new Intent(Profile.this, SignInActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(intent);
-                finish();
-            });
-        } else {
-            // Fallback if AuthManager is null
-            com.google.firebase.auth.FirebaseAuth.getInstance().signOut();
-            Intent intent = new Intent(Profile.this, SignInActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            startActivity(intent);
-            finish();
+        try {
+            // 1. Immediately kill the SyncWorker so it releases the database lock
+            androidx.work.WorkManager.getInstance(this).cancelAllWork();
+
+            // 2. Tell AuthManager to clean up in the background (but DO NOT WAIT for it)
+            if (AuthManager.getInstance() != null) {
+                new Thread(() -> {
+                    try {
+                        AuthManager.getInstance().signOutAndCleanup(() -> {});
+                    } catch (Exception ignored) {}
+                }).start();
+            }
+
+            fAuth.signOut();
+            navigateToLogin();
+
+        } catch (Exception e) {
+            Log.e("Profile", "Logout error: " + e.getMessage());
+            fAuth.signOut();
+            navigateToLogin();
         }
     }
 

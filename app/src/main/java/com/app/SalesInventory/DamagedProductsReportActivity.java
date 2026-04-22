@@ -53,6 +53,7 @@ public class  DamagedProductsReportActivity extends BaseActivity {
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Damaged / Spoiled Report");
+            getSupportActionBar().setSubtitle("Tracks items removed from inventory due to damage or spoilage");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -76,6 +77,10 @@ public class  DamagedProductsReportActivity extends BaseActivity {
         tvTotalItems = findViewById(R.id.tvTotalDamagedItems);
         tvTotalLoss = findViewById(R.id.tvTotalLossValue);
         tvNoData = findViewById(R.id.tvNoData);
+        if (tvNoData != null) {
+            tvNoData.setText("No damaged products reported for this date. Spoilage and breakage logs will appear here.");
+        }
+
         btnDateFilter = findViewById(R.id.btnDateFilter);
         spinnerProductLine = findViewById(R.id.spinnerProductLine);
         progressBar = findViewById(R.id.progressBar);

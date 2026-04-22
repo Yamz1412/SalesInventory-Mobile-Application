@@ -87,16 +87,21 @@ public class SettingsActivity extends BaseActivity {
         authManager.refreshCurrentUserStatus(success -> {
             runOnUiThread(() -> {
                 if (authManager.isCurrentUserAdmin()) {
-                    tvAdminTitle.setVisibility(View.VISIBLE);
-                    cardAdmin.setVisibility(View.VISIBLE);
+                    if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.VISIBLE);
+                    if (cardAdmin != null) cardAdmin.setVisibility(View.VISIBLE);
                 } else {
-                    tvAdminTitle.setVisibility(View.GONE);
-                    cardAdmin.setVisibility(View.GONE);
+                    if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.GONE);
+                    if (cardAdmin != null) cardAdmin.setVisibility(View.GONE);
+
+                    // CRITICAL FIX: Explicitly hide administration tools from Staff/Sub-Admins!
+                    if (btnBackup != null) btnBackup.setVisibility(View.GONE);
+                    if (btnRestore != null) btnRestore.setVisibility(View.GONE);
+                    if (btnClearCache != null) btnClearCache.setVisibility(View.GONE);
+                    if (switchAutoBackup != null) switchAutoBackup.setVisibility(View.GONE);
                 }
             });
         });
     }
-
     private void loadSavedPreferences() {
         ThemeManager.Theme currentTheme = ThemeManager.getInstance(this).getCurrentTheme();
         if ("dark".equalsIgnoreCase(currentTheme.name)) {

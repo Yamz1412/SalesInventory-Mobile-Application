@@ -159,6 +159,7 @@ public class MainActivity extends BaseActivity {
         setupSalesObserver();
         setupCharts();
         setupClickListeners();
+        scheduleNightlyBackup();
 
         listenForFactoryReset();
 
@@ -504,6 +505,11 @@ public class MainActivity extends BaseActivity {
         double totalCost = 0.0;
 
         for (Sales sale : cachedSalesList) {
+            String status = sale.getStatus() != null ? sale.getStatus().toUpperCase() : "";
+            if (status.equals("VOIDED") || status.equals("REFUNDED")) {
+                continue;
+            }
+
             long ts = sale.getTimestamp() > 0 ? sale.getTimestamp() : sale.getDate();
             if (ts >= startTime) {
                 totalSales += sale.getTotalPrice();
@@ -967,6 +973,23 @@ public class MainActivity extends BaseActivity {
         if (badgeManager != null) {
             badgeManager.stop();
         }
+    }
+
+    private void scheduleNightlyBackup() {
+        // Run once every 24 hours
+        androidx.work.PeriodicWorkRequest backupRequest =
+                new androidx.work.PeriodicWorkRequest.Builder(AutoBackupWorker.class, 24, java.util.concurrent.TimeUnit.HOURS)
+                        .setConstraints(new androidx.work.Constraints.Builder()
+                                .setRequiresCharging(true) // Only backup when plugged in at night
+                                .setRequiresStorageNotLow(true)
+                                .build())
+                        .build();
+
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "NightlyBackup",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP, // Keep the schedule even after restart
+                backupRequest
+        );
     }
 
     private void updateOnlineStatus(boolean isOnline) {

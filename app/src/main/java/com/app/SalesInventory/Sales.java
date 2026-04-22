@@ -1,5 +1,7 @@
 package com.app.SalesInventory;
 
+import com.google.firebase.firestore.Exclude;
+import com.google.firebase.firestore.PropertyName;
 import com.google.firebase.firestore.ServerTimestamp;
 import java.util.Date;
 
@@ -19,15 +21,18 @@ public class Sales {
     private String excludedIngredients;
 
     @ServerTimestamp
+    @PropertyName("date")
     private Date date;
 
     @ServerTimestamp
+    @PropertyName("timestamp")
     private Date timestamp;
 
     private String deliveryType;
     private String deliveryStatus;
 
     @ServerTimestamp
+    @PropertyName("deliveryDate")
     private Date deliveryDate;
 
     private String deliveryName;
@@ -72,47 +77,11 @@ public class Sales {
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
 
-    public long getDate() {
-        return date != null ? date.getTime() : 0L;
-    }
-
-    public void setDate(long date) {
-        this.date = (date > 0) ? new Date(date) : null;
-    }
-
-    public void setDate(Date date) {
-        this.date = date;
-    }
-
-    public long getTimestamp() {
-        return timestamp != null ? timestamp.getTime() : 0L;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = (timestamp > 0) ? new Date(timestamp) : null;
-    }
-
-    public void setTimestamp(Date timestamp) {
-        this.timestamp = timestamp;
-    }
-
     public String getDeliveryType() { return deliveryType; }
     public void setDeliveryType(String deliveryType) { this.deliveryType = deliveryType; }
 
     public String getDeliveryStatus() { return deliveryStatus; }
     public void setDeliveryStatus(String deliveryStatus) { this.deliveryStatus = deliveryStatus; }
-
-    public long getDeliveryDate() {
-        return deliveryDate != null ? deliveryDate.getTime() : 0L;
-    }
-
-    public void setDeliveryDate(long deliveryDate) {
-        this.deliveryDate = (deliveryDate > 0) ? new Date(deliveryDate) : null;
-    }
-
-    public void setDeliveryDate(Date deliveryDate) {
-        this.deliveryDate = deliveryDate;
-    }
 
     public String getDeliveryName() { return deliveryName; }
     public void setDeliveryName(String deliveryName) { this.deliveryName = deliveryName; }
@@ -132,4 +101,60 @@ public class Sales {
     public String getExcludedIngredients() { return excludedIngredients != null ? excludedIngredients : ""; }
     public void setExcludedIngredients(String excludedIngredients) { this.excludedIngredients = excludedIngredients; }
 
+    // ====================================================================
+    // FIREBASE SPECIFIC GETTERS & SETTERS (Uses exact Date object)
+    // ====================================================================
+
+    @PropertyName("date")
+    public Date getFirebaseDate() { return date; }
+
+    @PropertyName("date")
+    public void setFirebaseDate(Date date) { this.date = date; }
+
+    @PropertyName("timestamp")
+    public Date getFirebaseTimestamp() { return timestamp; }
+
+    @PropertyName("timestamp")
+    public void setFirebaseTimestamp(Date timestamp) { this.timestamp = timestamp; }
+
+    @PropertyName("deliveryDate")
+    public Date getFirebaseDeliveryDate() { return deliveryDate; }
+
+    @PropertyName("deliveryDate")
+    public void setFirebaseDeliveryDate(Date deliveryDate) { this.deliveryDate = deliveryDate; }
+
+
+    // ====================================================================
+    // APP SPECIFIC GETTERS & SETTERS (Hidden from Firebase to avoid crashes)
+    // ====================================================================
+
+    @Exclude
+    public long getDate() {
+        return date != null ? date.getTime() : 0L;
+    }
+
+    @Exclude
+    public void setDate(long date) {
+        this.date = (date > 0) ? new Date(date) : null;
+    }
+
+    @Exclude
+    public long getTimestamp() {
+        return timestamp != null ? timestamp.getTime() : 0L;
+    }
+
+    @Exclude
+    public void setTimestamp(long timestamp) {
+        this.timestamp = (timestamp > 0) ? new Date(timestamp) : null;
+    }
+
+    @Exclude
+    public long getDeliveryDate() {
+        return deliveryDate != null ? deliveryDate.getTime() : 0L;
+    }
+
+    @Exclude
+    public void setDeliveryDate(long deliveryDate) {
+        this.deliveryDate = (deliveryDate > 0) ? new Date(deliveryDate) : null;
+    }
 }

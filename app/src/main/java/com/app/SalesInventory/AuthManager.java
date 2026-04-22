@@ -402,7 +402,9 @@ public class AuthManager {
     public void startAutomatedShift(String cashierName) {
         String uid = getCurrentUserId();
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (uid == null || ownerId == null) return;
+
+        // CRITICAL FIX: Ensure uid and ownerId are not empty strings!
+        if (uid == null || uid.isEmpty() || ownerId == null || ownerId.isEmpty()) return;
 
         FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("shifts")
                 .whereEqualTo("cashierId", uid)
@@ -421,11 +423,8 @@ public class AuthManager {
                         shift.setStatus("ACTIVE");
 
                         newShiftRef.set(shift.toMap());
-
-                        // FIXED: Save the ID so Lock/Unlock records work!
                         activeShiftId = newShiftRef.getId();
                     } else {
-                        // FIXED: If they reopened the app, remember their current active shift!
                         activeShiftId = query.getDocuments().get(0).getId();
                     }
                 });
@@ -434,7 +433,9 @@ public class AuthManager {
     public void endAutomatedShift() {
         String uid = getCurrentUserId();
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (uid == null || ownerId == null) return;
+
+        // CRITICAL FIX: Ensure uid and ownerId are not empty strings!
+        if (uid == null || uid.isEmpty() || ownerId == null || ownerId.isEmpty()) return;
 
         FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("shifts")
                 .whereEqualTo("cashierId", uid)
@@ -447,7 +448,6 @@ public class AuthManager {
                         updates.put("status", "CLOSED");
                         updates.put("endTime", System.currentTimeMillis());
 
-                        // If they logged out while on break, auto-end the break
                         List<Long> locks = (List<Long>) doc.get("lockTimes");
                         List<Long> unlocks = (List<Long>) doc.get("unlockTimes");
                         if (locks != null && unlocks != null && locks.size() > unlocks.size()) {
@@ -455,18 +455,17 @@ public class AuthManager {
                             updates.put("unlockTimes", unlocks);
                             updates.put("locked", false);
                         }
-
                         doc.getReference().update(updates);
                     }
                 });
     }
 
-
-
     public void logShiftLock(boolean isLocking) {
         if (activeShiftId == null) return;
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (ownerId == null) return;
+
+        // CRITICAL FIX: Ensure ownerId is not an empty string
+        if (ownerId == null || ownerId.isEmpty()) return;
 
         String arrayField = isLocking ? "lockTimes" : "unlockTimes";
 
@@ -483,8 +482,10 @@ public class AuthManager {
         endAutomatedShift();
 
         if (application != null) {
-            ProductRepository.getInstance(application).clearLocalData();
-            SalesRepository.getInstance(application).clearData();
+            // CRITICAL FIX: Wrap these aggressive cleaners in try-catch blocks so they don't
+            // trigger "Connection is closed" SQL exceptions that crash the logout process!
+            try { ProductRepository.getInstance(application).clearLocalData(); } catch (Exception ignored) {}
+            try { SalesRepository.getInstance(application).clearData(); } catch (Exception ignored) {}
             try { DashboardRepository.getInstance().clearData(); } catch (Exception ignored) {}
             try { new ProductRemoteSyncer(application).stopListening(); } catch (Exception ignored) {}
         }
@@ -502,9 +503,13 @@ public class AuthManager {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             String token = null;
             if (task.isSuccessful()) token = task.getResult();
-            if (uid != null && token != null && !token.isEmpty()) {
-                fStore.collection("users").document(uid).collection("devices").document(token).delete();
+
+            if (uid != null && !uid.isEmpty() && token != null && !token.isEmpty()) {
+                try {
+                    fStore.collection("users").document(uid).collection("devices").document(token).delete();
+                } catch (Exception ignored) {}
             }
+
             if (owner != null && !owner.isEmpty()) {
                 FirebaseMessaging.getInstance().unsubscribeFromTopic("owner_" + owner).addOnCompleteListener(unsubTask -> {
                     FirebaseAuth.getInstance().signOut();

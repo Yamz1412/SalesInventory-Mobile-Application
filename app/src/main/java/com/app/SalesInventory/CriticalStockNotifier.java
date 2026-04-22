@@ -40,14 +40,20 @@ public class CriticalStockNotifier {
 
         if (product.getCriticalLevel() > 0 && qty <= product.getCriticalLevel()) {
             alertTitle = "🚨 CRITICAL STOCK ALERT";
-            alertMessage = "Product \"" + name + "\" has hit the Minimum Critical Level!\n\nCurrent quantity: " + qtyDisplay + "\n\nYou must restock immediately to avoid stockouts.";
+            alertMessage = "Product \"" + name + "\" has dropped to CRITICAL levels.\n\nCurrent quantity: " + qtyDisplay + "\n\nImmediate restock is required to prevent out-of-stock scenarios.";
         } else if (product.getReorderLevel() > 0 && qty <= product.getReorderLevel()) {
             alertTitle = "⚠️ LOW STOCK (REORDER)";
             alertMessage = "Product \"" + name + "\" has reached the Safety Reorder Point.\n\nCurrent quantity: " + qtyDisplay + "\n\nPlease prepare to order more from your supplier.";
         } else {
-            // If it's not actually low, don't show the dialog
             return;
         }
+        NotificationHelper.showNotification(activity.getApplicationContext(), alertTitle, alertMessage, productId);
+
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) {
+            ownerId = AuthManager.getInstance().getCurrentUserId();
+        }
+        NotificationHelper.sendCloudAlertToAdmins(ownerId, alertTitle, alertMessage, productId);
 
         final String finalAlertTitle = alertTitle;
         final String finalAlertMessage = alertMessage;

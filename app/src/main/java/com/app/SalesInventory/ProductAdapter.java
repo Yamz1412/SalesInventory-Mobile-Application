@@ -135,19 +135,14 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
 
         holder.name.setText(p.getProductName() != null ? p.getProductName() : "Unnamed");
 
-        // =======================================================
-        // FIX: HIDE SELL PRICE IF IT IS 0.00
-        // =======================================================
         if (p.getSellingPrice() > 0) {
-            // Show both Cost and Sell if there is a selling price
-            holder.costPriceText.setText(String.format(Locale.US, "Cost: ₱%,.2f | Sell: ₱%,.2f", p.getCostPrice(), p.getSellingPrice()));
+            // Show both Cost and Sell, stacked cleanly on top of each other
+            holder.costPriceText.setText(String.format(Locale.US, "Cost: ₱%,.2f\nSell: ₱%,.2f", p.getCostPrice(), p.getSellingPrice()));
         } else {
             // Show ONLY Cost if selling price is 0
             holder.costPriceText.setText(String.format(Locale.US, "Cost: ₱%,.2f", p.getCostPrice()));
         }
-        // =======================================================
 
-        // --- NEW: Visual feedback for selection ---
         if (isSelectionMode) {
             if (selectedIds.contains(p.getProductId())) {
                 holder.itemView.setBackgroundColor(Color.parseColor("#E0F7FA")); // Light blue highlight
@@ -157,7 +152,6 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
         } else {
             holder.itemView.setBackgroundColor(Color.TRANSPARENT);
         }
-        // ------------------------------------------
 
         String currentQtyStr = (p.getQuantity() % 1 == 0) ? String.valueOf((long) p.getQuantity()) : String.valueOf(p.getQuantity());
         String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";

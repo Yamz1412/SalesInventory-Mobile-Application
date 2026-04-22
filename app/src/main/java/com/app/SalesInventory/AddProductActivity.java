@@ -610,10 +610,9 @@ public class AddProductActivity extends BaseActivity {
                 int ppu = mat.getPiecesPerUnit() > 0 ? mat.getPiecesPerUnit() : 1;
                 String invUnit = mat.getUnit() != null ? mat.getUnit() : "pcs";
                 Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(mat.getQuantity(), invUnit, bUnit, ppu);
-                double convertedInvQty = (double) conversion[0];
                 String newInvUnit = (String) conversion[1];
                 double deductionAmount = UnitConverterUtil.calculateDeductionAmount(bQty, newInvUnit, bUnit, ppu);
-                double unitCost = mat.getCostPrice() / convertedInvQty;
+                double unitCost = mat.getCostPrice();
                 totalCost += (deductionAmount * unitCost);
             }
         }
@@ -1391,12 +1390,23 @@ public class AddProductActivity extends BaseActivity {
                         productTypeET.setText(p.getCategoryName());
                         productLineET.setText(p.getProductLine());
 
-                        // Force update of cost and trigger auto markup
-                        costPriceET.setText(String.valueOf(p.getCostPrice()));
+                        double rawCost = p.getCostPrice();
+                        if (rawCost % 1 == 0) {
+                            costPriceET.setText(String.valueOf((long) rawCost));
+                        } else {
+                            costPriceET.setText(String.format(Locale.US, "%.4f", rawCost).replaceAll("0*$", "").replaceAll("\\.$", ""));
+                        }
                         if(usePercentageMarkup) calculateSellingPrice();
                         else sellingPriceET.setText(String.valueOf(p.getSellingPrice()));
 
-                        if (quantityET != null) quantityET.setText(String.valueOf(p.getQuantity()));
+                        if (quantityET != null) {
+                            double qty = p.getQuantity();
+                            if (qty % 1 == 0) {
+                                quantityET.setText(String.valueOf((long) qty));
+                            } else {
+                                quantityET.setText(String.valueOf(qty));
+                            }
+                        }
 
                         if (p.getExpiryDate() != null && p.getExpiryDate().getTime() > 0) {
                             expiryCalendar.setTimeInMillis(p.getExpiryDate().getTime());

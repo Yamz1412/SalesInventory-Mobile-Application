@@ -47,7 +47,8 @@ public class DeliveryChecklistActivity extends BaseActivity {
         setContentView(R.layout.activity_delivery_checklist);
 
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Product Checking");
+            getSupportActionBar().setTitle("Delivery Checklist");
+            getSupportActionBar().setSubtitle("Verify physical items received to update live, on-hand stock");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -173,9 +174,7 @@ public class DeliveryChecklistActivity extends BaseActivity {
                         if (p != null) {
                             double convertedQty = calculateConvertedQuantity(qtyToProcess, item.unit, p.getUnit(), p.getPiecesPerUnit());
                             double newQty = p.getQuantity() + convertedQty;
-
-                            double conversionRatio = convertedQty / qtyToProcess;
-                            double newCostPerUnit = conversionRatio > 0 ? (item.unitPrice / conversionRatio) : item.unitPrice;
+                            double newCostPerUnit = item.unitPrice;
 
                             productRepository.updateProductQuantityAndCost(p.getProductId(), newQty, newCostPerUnit, null);
                             if (item.dbKey != null) stagingRef.child(item.dbKey).removeValue();

@@ -34,7 +34,7 @@ public class StockValueReportActivity extends BaseActivity  {
     private Button btnExportPDF, btnExportCSV;
     private StockValueReportAdapter adapter;
     private List<StockValueReport> reportList;
-    private DatabaseReference productRef;
+    private ProductRepository productRepository;
     private ReportExportUtil exportUtil;
     private PDFGenerator pdfGenerator;
     private static final int PERMISSION_REQUEST_CODE = 100;
@@ -46,6 +46,7 @@ public class StockValueReportActivity extends BaseActivity  {
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Stock Value Report");
+            getSupportActionBar().setSubtitle("Monitors financial capital currently tied up in active inventory");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -58,6 +59,10 @@ public class StockValueReportActivity extends BaseActivity  {
         recyclerViewReport = findViewById(R.id.recyclerViewReport);
         progressBar = findViewById(R.id.progressBar);
         tvNoData = findViewById(R.id.tvNoData);
+        if (tvNoData != null) {
+            tvNoData.setText("Your inventory is currently empty. Add products to begin monitoring your capital investments.");
+        }
+
         tvTotalInventoryValue = findViewById(R.id.tvTotalInventoryValue);
         tvTotalCostValue = findViewById(R.id.tvTotalCostValue);
         tvTotalProfitValue = findViewById(R.id.tvTotalProfitValue);
@@ -65,7 +70,7 @@ public class StockValueReportActivity extends BaseActivity  {
         btnExportCSV = findViewById(R.id.btnExportCSV);
 
         reportList = new ArrayList<>();
-        productRef = FirebaseDatabase.getInstance().getReference("Product");
+        productRepository = SalesInventoryApplication.getProductRepository();
         exportUtil = new ReportExportUtil(this);
 
         try {
@@ -90,17 +95,17 @@ public class StockValueReportActivity extends BaseActivity  {
         progressBar.setVisibility(View.VISIBLE);
         tvNoData.setVisibility(View.GONE);
 
-        productRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                reportList.clear();
-                double totalCostValue = 0;
-                double totalSellingValue = 0;
-                double totalProfit = 0;
+        // FIXED: Using observe() makes this screen 100% Real-Time and Offline-capable!
+        productRepository.getAllProducts().observe(this, products -> {
+            reportList.clear();
+            double totalCostValue = 0;
+            double totalSellingValue = 0;
+            double totalProfit = 0;
 
-                for (DataSnapshot dataSnapshot : snapshot.getChildren()) {
-                    Product product = dataSnapshot.getValue(Product.class);
-                    if (product != null && product.isActive()) {
+            if (products != null) {
+                for (Product product : products) {
+                    // FIXED: Filter out "Menu" items so we don't double-count raw materials vs finished goods
+                    if (product != null && product.isActive() && !"Menu".equalsIgnoreCase(product.getProductType())) {
                         StockValueReport report = new StockValueReport(
                                 product.getProductId(),
                                 product.getProductName(),
@@ -115,9 +120,8 @@ public class StockValueReportActivity extends BaseActivity  {
                         );
                         reportList.add(report);
 
-                        // FIX: Cost Price is already the Total Value.
-                        // Selling Price is per unit, so we multiply Selling Price by Quantity.
-                        double itemTotalCost = product.getCostPrice();
+                        // ACCURACY FIX: Both Cost and Selling Price MUST be multiplied by Quantity!
+                        double itemTotalCost = product.getCostPrice() * product.getQuantity();
                         double itemTotalSelling = product.getSellingPrice() * product.getQuantity();
                         double itemProfit = itemTotalSelling - itemTotalCost;
 
@@ -126,41 +130,33 @@ public class StockValueReportActivity extends BaseActivity  {
                         totalProfit += itemProfit;
                     }
                 }
-
-                // Safely sort by profitability
-                Collections.sort(reportList, (a, b) -> {
-                    double profitA = (a.getSellingPrice() * a.getQuantity()) - a.getCostPrice();
-                    double profitB = (b.getSellingPrice() * b.getQuantity()) - b.getCostPrice();
-                    return Double.compare(profitB, profitA);
-                });
-
-                progressBar.setVisibility(View.GONE);
-
-                if (reportList.isEmpty()) {
-                    tvNoData.setVisibility(View.VISIBLE);
-                    recyclerViewReport.setVisibility(View.GONE);
-                    btnExportPDF.setEnabled(false);
-                    btnExportCSV.setEnabled(false);
-                } else {
-                    tvNoData.setVisibility(View.GONE);
-                    recyclerViewReport.setVisibility(View.VISIBLE);
-                    btnExportPDF.setEnabled(true);
-                    btnExportCSV.setEnabled(true);
-
-                    tvTotalCostValue.setText("₱" + String.format("%.2f", totalCostValue));
-                    tvTotalInventoryValue.setText("₱" + String.format("%.2f", totalSellingValue));
-                    tvTotalProfitValue.setText("₱" + String.format("%.2f", totalProfit));
-
-                    adapter.notifyDataSetChanged();
-                }
             }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                progressBar.setVisibility(View.GONE);
-                Toast.makeText(StockValueReportActivity.this,
-                        "Error loading report: " + error.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+            // Safely sort by profitability
+            Collections.sort(reportList, (a, b) -> {
+                double profitA = (a.getSellingPrice() * a.getQuantity()) - (a.getCostPrice() * a.getQuantity());
+                double profitB = (b.getSellingPrice() * b.getQuantity()) - (b.getCostPrice() * b.getQuantity());
+                return Double.compare(profitB, profitA);
+            });
+
+            progressBar.setVisibility(View.GONE);
+
+            if (reportList.isEmpty()) {
+                tvNoData.setVisibility(View.VISIBLE);
+                recyclerViewReport.setVisibility(View.GONE);
+                btnExportPDF.setEnabled(false);
+                btnExportCSV.setEnabled(false);
+            } else {
+                tvNoData.setVisibility(View.GONE);
+                recyclerViewReport.setVisibility(View.VISIBLE);
+                btnExportPDF.setEnabled(true);
+                btnExportCSV.setEnabled(true);
+
+                tvTotalCostValue.setText("₱" + String.format(java.util.Locale.US, "%.2f", totalCostValue));
+                tvTotalInventoryValue.setText("₱" + String.format(java.util.Locale.US, "%.2f", totalSellingValue));
+                tvTotalProfitValue.setText("₱" + String.format(java.util.Locale.US, "%.2f", totalProfit));
+
+                adapter.notifyDataSetChanged();
             }
         });
     }

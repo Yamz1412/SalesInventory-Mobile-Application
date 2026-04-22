@@ -37,7 +37,8 @@
                 android:layout_height="wrap_content"
                 android:text="₱0.00 / Unit"
                 android:textSize="13sp"
-                android:textColor="#757575"/>
+                android:textColor="?attr/colorOnBackground"
+                />
 
             <TextView
                 android:id="@+id/tvExpiryDate"
@@ -62,8 +63,9 @@
             android:hint="Rcv Today"
             android:inputType="number"
             android:textAlignment="center"
+            android:textColorHint="?attr/colorOnBackground"
             android:background="@drawable/edite_round"
-            android:backgroundTint="#F5F5F5"
+            android:backgroundTint="?attr/colorControlHighlight"
             android:padding="10dp"
             android:textSize="14sp"
             android:layout_marginEnd="8dp"/>

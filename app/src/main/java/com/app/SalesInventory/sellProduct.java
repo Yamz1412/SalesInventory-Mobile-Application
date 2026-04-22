@@ -596,10 +596,9 @@ public class sellProduct extends BaseActivity {
                 TextView tvLineTotal = convertView.findViewById(R.id.tvCartLineTotal);
                 ImageButton btnRemove = convertView.findViewById(R.id.btnRemoveItem);
 
-                // NEW: Plus and Minus Buttons
                 ImageButton btnMinus  = convertView.findViewById(R.id.btnCartMinus);
                 ImageButton btnPlus   = convertView.findViewById(R.id.btnCartPlus);
-                EditText etNote = convertView.findViewById(R.id.etCartNote);
+                android.widget.EditText etNote = convertView.findViewById(R.id.etCartNote);
 
                 btnRemove.setOnClickListener(v -> {
                     cartManager.removeItem(item);
@@ -607,7 +606,6 @@ public class sellProduct extends BaseActivity {
                     calculateTotalFromCart();
                 });
 
-                // NEW: Minus Button Logic with Warning
                 if (btnMinus != null) {
                     btnMinus.setOnClickListener(v -> {
                         if (item.quantity > 1) {
@@ -615,7 +613,6 @@ public class sellProduct extends BaseActivity {
                             updateCartUI();
                             calculateTotalFromCart();
                         } else {
-                            // Warn the user before erasing the order
                             new AlertDialog.Builder(sellProduct.this)
                                     .setTitle("Remove Order")
                                     .setMessage("Are you sure you want to remove " + item.productName + " from the order?")
@@ -630,7 +627,6 @@ public class sellProduct extends BaseActivity {
                     });
                 }
 
-                // NEW: Plus Button Logic (With Limit 10 & Stock Check)
                 if (btnPlus != null) {
                     btnPlus.setOnClickListener(v -> {
                         if (item.quantity >= 10) {
@@ -663,30 +659,22 @@ public class sellProduct extends BaseActivity {
                     tvDetails.setVisibility(View.GONE);
                 }
 
-                // Updated: Remove the "x" since it's now a counter
                 tvQty.setText(String.valueOf(item.quantity));
                 tvLineTotal.setText("₱" + String.format(Locale.US, "%,.2f", item.getLineTotal()));
 
                 if (etNote != null) {
-                    if (etNote.getTag() instanceof TextWatcher) {
-                        etNote.removeTextChangedListener((TextWatcher) etNote.getTag());
-                    }
-
                     // Load the note directly from the isolated item
                     if (item.itemNote == null || item.itemNote.trim().isEmpty()) {
                         item.itemNote = "0% Sugar";
                     }
                     etNote.setText(item.itemNote);
 
-                    TextWatcher watcher = new TextWatcher() {
-                        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                        @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                        @Override public void afterTextChanged(Editable s) {
-                            item.itemNote = s.toString(); // Save directly to the item instance!
-                        }
-                    };
-                    etNote.addTextChangedListener(watcher);
-                    etNote.setTag(watcher);
+                    // CRITICAL FIX: Permanently lock the text box so it acts like a normal label
+                    etNote.setFocusable(false);
+                    etNote.setFocusableInTouchMode(false);
+                    etNote.setClickable(false);
+                    etNote.setCursorVisible(false);
+                    etNote.setBackgroundResource(android.R.color.transparent);
                 }
                 return convertView;
             }
@@ -694,6 +682,16 @@ public class sellProduct extends BaseActivity {
 
         if (cartListView != null) {
             cartListView.setAdapter(freshAdapter);
+            cartListView.setOnTouchListener((v, event) -> {
+                int action = event.getAction();
+                if (action == android.view.MotionEvent.ACTION_DOWN || action == android.view.MotionEvent.ACTION_MOVE) {
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                } else if (action == android.view.MotionEvent.ACTION_UP || action == android.view.MotionEvent.ACTION_CANCEL) {
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                }
+
+                return false;
+            });
         }
     }
 
@@ -1391,41 +1389,86 @@ public class sellProduct extends BaseActivity {
             double finalMQty = material.getQuantity() - utilDeductAmt;
             if (finalMQty < 0) finalMQty = 0;
 
-            // CRITICAL FIX: Prevent Division by Zero (NaN Corruption)
-            double unitCost = 0.0;
-            if (material.getQuantity() > 0) {
-                unitCost = material.getCostPrice() / material.getQuantity();
-            }
-
-            // 3. Pro-rate the cost value
-            double deductedCost = utilDeductAmt * unitCost;
-            double newTotalCost = Math.max(0.0, material.getCostPrice() - deductedCost);
-
-            // 4. Update Database
-            productRepository.updateProductQuantityAndCost(material.getProductId(), finalMQty, newTotalCost, null);
+            // CRITICAL FIX: We ONLY update the quantity in the database!
+            // We DO NOT recalculate or shrink the Cost Price. The Supplier's Pack Cost must remain constant!
+            productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
 
             material.setQuantity(finalMQty);
-            material.setCostPrice(newTotalCost);
 
         } catch (Exception e) {
             double finalMQty = material.getQuantity() - deductAmt;
             if (finalMQty < 0) finalMQty = 0;
 
-            // CRITICAL FIX: Prevent Division by Zero in fallback block
-            double unitCost = 0.0;
-            if (material.getQuantity() > 0) {
-                unitCost = material.getCostPrice() / material.getQuantity();
-            }
-            double newTotalCost = Math.max(0.0, material.getCostPrice() - (deductAmt * unitCost));
-
-            productRepository.updateProductQuantityAndCost(material.getProductId(), finalMQty, newTotalCost, null);
+            // CRITICAL FIX FOR FALLBACK: Only update the quantity here as well!
+            productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
 
             material.setQuantity(finalMQty);
-            material.setCostPrice(newTotalCost);
         }
     }
 
     private void updateCashManagementWallet(String paymentMethod, double amount, String orderId) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) return;
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        String walletDocId = "CASH";
+        String methodLower = paymentMethod.toLowerCase();
+
+        if (methodLower.contains("gcash")) {
+            walletDocId = "GCASH";
+        }
+
+        DocumentReference walletRef = db.collection("users")
+                .document(ownerId)
+                .collection("wallets")
+                .document(walletDocId);
+
+        String finalWalletDocId = walletDocId;
+
+        // 1. Use FieldValue.increment() for offline-safe atomic wallet updates
+        Map<String, Object> walletUpdates = new HashMap<>();
+        walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(amount));
+        walletUpdates.put("name", finalWalletDocId.equals("CASH") ? "Cash on Hand" : "GCash");
+        walletUpdates.put("type", finalWalletDocId.equals("CASH") ? "Physical Cash" : "E-Wallet");
+
+        walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
+
+        // 2. Add Transaction Log (Safely caches offline)
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy - hh:mm a", java.util.Locale.getDefault());
+        Map<String, Object> transLog = new HashMap<>();
+        transLog.put("title", "Sale: Order " + orderId.substring(0, 8).toUpperCase());
+        transLog.put("date", sdf.format(new java.util.Date()));
+        transLog.put("amount", amount);
+        transLog.put("isIncome", true);
+        transLog.put("timestamp", System.currentTimeMillis());
+
+        db.collection("users").document(ownerId).collection("cash_transactions").add(transLog);
+
+        // 3. Update the Active Shift safely
+        String currentUserId = AuthManager.getInstance().getCurrentUserId();
+        db.collection("users").document(ownerId).collection("shifts")
+                .whereEqualTo("status", "ACTIVE")
+                .whereEqualTo("cashierId", currentUserId)
+                .get()
+                .addOnSuccessListener(shiftSnapshot -> {
+                    if (!shiftSnapshot.isEmpty()) {
+                        DocumentReference shiftRef = shiftSnapshot.getDocuments().get(0).getReference();
+
+                        Map<String, Object> shiftUpdates = new HashMap<>();
+                        if (paymentMethod.equalsIgnoreCase("Cash")) {
+                            shiftUpdates.put("cashSales", com.google.firebase.firestore.FieldValue.increment(finalTotal));
+                        } else {
+                            shiftUpdates.put("ePaymentSales", com.google.firebase.firestore.FieldValue.increment(finalTotal));
+                        }
+
+                        // Updates the shift totals instantly, even if the internet is down
+                        shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
+                    }
+                });
+    }
+
+    /*private void updateCashManagementWallet(String paymentMethod, double amount, String orderId) {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (ownerId == null || ownerId.isEmpty()) return;
 
@@ -1485,7 +1528,7 @@ public class sellProduct extends BaseActivity {
                         shiftRef.set(shiftUpdates, com.google.firebase.firestore.SetOptions.merge());
                     }
                 });
-    }
+    }*/
 
     private void handleSaveError(String msg) {
         runOnUiThread(() -> {

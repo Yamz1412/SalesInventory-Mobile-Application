@@ -46,6 +46,8 @@ public class FmiSmiReportActivity extends BaseActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle("FMI / SMI Report");
+            getSupportActionBar().setSubtitle("Analyzes sales velocity for fast and slow-moving products");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
