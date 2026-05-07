@@ -130,24 +130,6 @@ public class MainActivity extends BaseActivity {
             }
         }
 
-        String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
-        if (currentUid != null) {
-            DatabaseReference userStatusRef = FirebaseDatabase.getInstance().getReference("UsersStatus").child(currentUid);
-            DatabaseReference connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected");
-
-            connectedRef.addValueEventListener(new com.google.firebase.database.ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
-                    Boolean connected = snapshot.getValue(Boolean.class);
-                    if (connected != null && connected) {
-                        userStatusRef.onDisconnect().setValue("offline");
-                        userStatusRef.setValue("online");
-                    }
-                }
-                @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
-            });
-        }
-
         productRepository = SalesInventoryApplication.getProductRepository();
         salesRepository = SalesRepository.getInstance(getApplication());
         productRepository.runExpirySweep();
@@ -422,28 +404,30 @@ public class MainActivity extends BaseActivity {
             // Show Financial Charts
             if (salesTrendChart != null) salesTrendChart.setVisibility(View.VISIBLE);
             if (topProductsChart != null) topProductsChart.setVisibility(View.VISIBLE);
+
+            // Only true Admins can manage users. Sub-Admins get View.GONE.
+            if (btnManageUsers != null) {
+                btnManageUsers.setVisibility(isAdminFlag ? View.VISIBLE : View.GONE);
+            }
         } else {
             // --- STAFF VIEW RESTRICTIONS ---
-            // Allow POS and Inventory
             if (btnCreateSale != null) btnCreateSale.setVisibility(View.VISIBLE);
             if (btnInventory != null) btnInventory.setVisibility(View.VISIBLE);
 
-            // Hide restricted features from Staff
             if (btnAddProduct != null) btnAddProduct.setVisibility(View.GONE);
             if (btnCreatePO != null) btnCreatePO.setVisibility(View.GONE);
             if (btnViewReports != null) btnViewReports.setVisibility(View.GONE);
 
-            // FIXED: Un-hide the Financial Charts so Staff can see the analytics dashboard
+            // Staff definitely cannot manage users
+            if (btnManageUsers != null) btnManageUsers.setVisibility(View.GONE);
+
             if (salesTrendChart != null) salesTrendChart.setVisibility(View.VISIBLE);
             if (topProductsChart != null) topProductsChart.setVisibility(View.VISIBLE);
 
-            // Hide the Add Product FAB menu
             if (dimOverlay != null) dimOverlay.setVisibility(View.GONE);
             if (layoutFabMenu != null) layoutFabMenu.setVisibility(View.GONE);
             isFabOpen = false;
         }
-
-        if (btnManageUsers != null) btnManageUsers.setVisibility(isAdminFlag ? View.VISIBLE : View.GONE);
 
         arrangeQuickActions();
     }
@@ -752,12 +736,11 @@ public class MainActivity extends BaseActivity {
         }
 
         if (btnManageUsers != null) btnManageUsers.setOnClickListener(v -> {
-            // Keep this strictly as isAdminFlag so Sub-Admins cannot fire people!
-            if (isAdminFlag) authManager.isCurrentUserAdminAsync(success -> runOnUiThread(() -> {
-                if (success) startActivity(new Intent(MainActivity.this, AdminStaffList.class));
-                else Toast.makeText(MainActivity.this, "Admin access required", Toast.LENGTH_LONG).show();
-            }));
-            else Toast.makeText(this, "Admin access required", Toast.LENGTH_SHORT).show();
+            if (isManagerFlag) {
+                startActivity(new Intent(MainActivity.this, AdminStaffList.class));
+            } else {
+                Toast.makeText(this, "Manager access required", Toast.LENGTH_SHORT).show();
+            }
         });
         if (swipeRefresh != null) swipeRefresh.setOnRefreshListener(this::loadDashboardData);
     }
@@ -943,29 +926,35 @@ public class MainActivity extends BaseActivity {
         bottomSheetDialog.show();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+     @Override
+     protected void onResume() {
+         super.onResume();
 
-        if (badgeManager != null) {
-            badgeManager.start();
-        }
+         if (badgeManager != null) {
+             badgeManager.start();
+         }
 
-        Intent intent = getIntent();
-        if (intent != null && intent.hasExtra("IMPERSONATE_STAFF_NAME")) {
-            isImpersonating = true;
-            String staffName = intent.getStringExtra("IMPERSONATE_STAFF_NAME");
-            if (layoutImpersonationBanner != null) {
-                layoutImpersonationBanner.setVisibility(View.VISIBLE);
-                tvImpersonationText.setText("👀 Viewing layout as: " + staffName);
-            }
-        }
+         Intent intent = getIntent();
+         if (intent != null && intent.hasExtra("IMPERSONATE_STAFF_NAME")) {
+             isImpersonating = true;
+             String staffName = intent.getStringExtra("IMPERSONATE_STAFF_NAME");
+             if (layoutImpersonationBanner != null) {
+                 layoutImpersonationBanner.setVisibility(View.VISIBLE);
+                 tvImpersonationText.setText("👀 Viewing layout as: " + staffName);
+             }
+         }
 
-        resolveUserRoleAndConfigureUI();
-        loadDashboardData();
+         resolveUserRoleAndConfigureUI();
+         loadDashboardData();
+         loadBusinessProfile();
 
-        loadBusinessProfile();
-    }
+         try {
+             SyncScheduler.enqueueImmediateSync(getApplicationContext());
+         } catch (Exception e) {
+             e.printStackTrace();
+         }
+     }
+
 
     @Override
     protected void onPause() {
@@ -1015,5 +1004,23 @@ public class MainActivity extends BaseActivity {
         } catch (Exception ignored) {}
 
         super.onDestroy();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull android.os.Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (layoutLockScreen != null) {
+            outState.putBoolean("IS_SYSTEM_LOCKED", layoutLockScreen.getVisibility() == android.view.View.VISIBLE);
+        }
+    }
+
+    @Override
+    protected void onRestoreInstanceState(@NonNull android.os.Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if (savedInstanceState.getBoolean("IS_SYSTEM_LOCKED", false)) {
+            if (layoutLockScreen != null) {
+                layoutLockScreen.setVisibility(android.view.View.VISIBLE);
+            }
+        }
     }
 }

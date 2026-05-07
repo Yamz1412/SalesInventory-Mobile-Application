@@ -153,9 +153,32 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             holder.itemView.setBackgroundColor(Color.TRANSPARENT);
         }
 
-        String currentQtyStr = (p.getQuantity() % 1 == 0) ? String.valueOf((long) p.getQuantity()) : String.valueOf(p.getQuantity());
         String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";
-        holder.stockText.setText("Stock: " + currentQtyStr + " " + unitStr);
+        String lowerUnit = unitStr.toLowerCase().trim();
+
+        // Detect if the item is a continuous metric unit
+        boolean isMetric = lowerUnit.equals("kg") || lowerUnit.equals("g") || lowerUnit.equals("l") || lowerUnit.equals("ml") || lowerUnit.equals("oz");
+        int ppu = p.getPiecesPerUnit();
+
+        if (ppu > 1 && !isMetric) {
+            // For discrete physical packages (boxes, packs)
+            long totalPieces = Math.round(p.getQuantity() * ppu);
+            long mainUnits = totalPieces / ppu;
+            long subUnits = totalPieces % ppu;
+            String subUnitName = p.getSalesUnit() != null ? p.getSalesUnit() : "pcs";
+
+            if (subUnits == 0) {
+                holder.stockText.setText(mainUnits + " " + unitStr); // e.g., "50 packs"
+            } else if (mainUnits == 0) {
+                holder.stockText.setText(subUnits + " " + subUnitName); // e.g., "48 pcs"
+            } else {
+                holder.stockText.setText(mainUnits + " " + unitStr + " & " + subUnits + " " + subUnitName); // e.g., "49 packs & 48 pcs"
+            }
+        } else {
+            // For continuous metrics (L, kg) or simple single items
+            java.text.DecimalFormat df = new java.text.DecimalFormat("#.###");
+            holder.stockText.setText(df.format(p.getQuantity()) + " " + unitStr); // e.g., "4.9 L"
+        }
 
         boolean isLowStock = p.getQuantity() <= p.getReorderLevel();
         holder.stockText.setTextColor(isLowStock ? Color.RED : Color.parseColor("#4CAF50")); // Green if ok
@@ -218,10 +241,33 @@ public class ProductAdapter extends RecyclerView.Adapter<ProductAdapter.VH> {
             return;
         }
 
+        // Clean formatting for the manual + / - buttons
+        newStock = Math.round(newStock * 1000.0) / 1000.0;
         p.setQuantity(newStock);
-        String updatedQtyStr = (newStock % 1 == 0) ? String.valueOf((long) newStock) : String.valueOf(newStock);
+
+        // --- SMART SUB-UNIT DISPLAY LOGIC ---
         String unitStr = p.getUnit() != null ? p.getUnit() : "pcs";
-        holder.stockText.setText("Stock: " + updatedQtyStr + " " + unitStr);
+        String lowerUnit = unitStr.toLowerCase().trim();
+        boolean isMetric = lowerUnit.equals("kg") || lowerUnit.equals("g") || lowerUnit.equals("l") || lowerUnit.equals("ml") || lowerUnit.equals("oz");
+        int ppu = p.getPiecesPerUnit();
+
+        if (ppu > 1 && !isMetric) {
+            long totalPieces = Math.round(newStock * ppu);
+            long mainUnits = totalPieces / ppu;
+            long subUnits = totalPieces % ppu;
+            String subUnitName = p.getSalesUnit() != null ? p.getSalesUnit() : "pcs";
+
+            if (subUnits == 0) {
+                holder.stockText.setText(mainUnits + " " + unitStr);
+            } else if (mainUnits == 0) {
+                holder.stockText.setText(subUnits + " " + subUnitName);
+            } else {
+                holder.stockText.setText(mainUnits + " " + unitStr + " & " + subUnits + " " + subUnitName);
+            }
+        } else {
+            java.text.DecimalFormat df = new java.text.DecimalFormat("#.###");
+            holder.stockText.setText(df.format(newStock) + " " + unitStr);
+        }
 
         boolean isLowStock = newStock <= p.getReorderLevel();
         holder.stockText.setTextColor(isLowStock ? Color.RED : Color.parseColor("#4CAF50"));

@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
-    app:cardCornerRadius="8dp"
-    app:cardElevation="4dp">
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="6dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/backgroundColor"
         android:padding="16dp">
 
         <LinearLayout
@@ -20,121 +22,51 @@
             android:orientation="horizontal"
             android:layout_marginBottom="12dp">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvProductName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvProductName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Product Name"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/textColorPrimary" />
-
-                <TextView
-                    android:id="@+id/tvCategory"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Category"
-                    android:textSize="12sp"
-                    android:textColor="@color/textColorSecondary"
-                    android:layout_marginTop="4dp" />
-
-            </LinearLayout>
+                android:text="Product Name"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/tvStatus"
+                android:id="@+id/tvCategory"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="✓ NORMAL"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="@color/colorPrimary"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp" />
-
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvQuantity"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Qty: 100 units"
-            android:textSize="13sp"
-            android:textColor="@color/textColorPrimary"
-            android:layout_marginBottom="8dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="#F5F5F5"
-            android:padding="8dp"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:id="@+id/tvCeiling"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Max: 0"
-                android:textSize="11sp"
-                android:textColor="?attr/colorPrimary"
-                android:gravity="center" />
-
-            <TextView
-                android:id="@+id/tvReorder"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Reorder: 0"
-                android:textSize="11sp"
-                android:textColor="#F57C00"
-                android:gravity="center" />
-
-            <TextView
-                android:id="@+id/tvCritical"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Critical: 0"
-                android:textSize="11sp"
-                android:textColor="#D32F2F"
-                android:gravity="center" />
+                android:text="Category"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:alpha="0.7" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:layout_marginBottom="6dp">
 
             <TextView
                 android:id="@+id/tvCostValue"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Cost: ₱1,000.00"
-                android:textSize="12sp"
-                android:textColor="@color/textColorSecondary" />
+                android:text="Cost: ₱0.00"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp" />
 
             <TextView
                 android:id="@+id/tvSellingValue"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Selling: ₱1,500.00"
-                android:textSize="12sp"
-                android:textColor="@color/successGreen"
-                android:textStyle="bold"
-                android:gravity="end"/>
-
+                android:gravity="end"
+                android:text="Selling: ₱0.00"
+                android:textColor="#4CAF50"
+                android:textSize="14sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <LinearLayout
@@ -147,23 +79,22 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Profit: ₱500.00"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:textColor="@color/colorAccent" />
+                android:text="Profit: ₱0.00"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvMargin"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Margin: 33.33%"
-                android:textSize="12sp"
-                android:textColor="@color/colorPrimary"
-                android:gravity="end" />
-
+                android:gravity="end"
+                android:text="Margin: 0.00%"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="14sp"
+                android:alpha="0.8" />
         </LinearLayout>
 
     </LinearLayout>
-
 </androidx.cardview.widget.CardView>

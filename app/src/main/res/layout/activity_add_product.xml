@@ -305,52 +305,14 @@
                 android:textColor="?attr/colorPrimary"
                 android:layout_marginBottom="12dp"/>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:weightSum="2"
-                android:layout_marginBottom="12dp">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/CustomTextInputLayout"
-                    android:id="@+id/layoutCostPrice"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/costPriceET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Cost Price" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/CustomTextInputLayout"
-                    android:id="@+id/layoutSellingPrice"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/sellingPriceET"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="numberDecimal"
-                        android:textColor="?attr/colorOnBackground"
-                        android:hint="Selling Price" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-
+            <!-- MOVED UP: Inventory Inputs (Qty, Expiry) & Stock Alerts -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:baselineAligned="false"
-                android:weightSum="3">
+                android:weightSum="3"
+                android:layout_marginBottom="12dp">
 
                 <LinearLayout
                     android:id="@+id/layoutInventoryInputs"
@@ -501,6 +463,46 @@
                             android:layout_marginTop="8dp"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+
+            <!-- MOVED DOWN: Cost Price & Selling Price -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:id="@+id/layoutCostPrice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/costPriceET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Cost Price" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/CustomTextInputLayout"
+                    android:id="@+id/layoutSellingPrice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/sellingPriceET"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="numberDecimal"
+                        android:textColor="?attr/colorOnBackground"
+                        android:hint="Selling Price" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
         </LinearLayout>
 

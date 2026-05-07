@@ -149,11 +149,10 @@ public class SellAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (holder instanceof NormalVH) {
             NormalVH normalHolder = (NormalVH) holder;
             normalHolder.name.setText(p.getProductName());
-            double displayPrice = p.getSellingPrice();
-            if (p.isPromo() && p.getPromoPrice() > 0) {
-                displayPrice = p.getPromoPrice();
-            }
-            normalHolder.price.setText("₱" + String.format(Locale.US, "%.2f", displayPrice));
+
+            // FIX: We rely ONLY on our new method. It handles everything!
+            double displayPrice = p.getActiveSellingPrice();
+            normalHolder.price.setText(String.format(Locale.US, "₱%,.2f", displayPrice));
 
             if(normalHolder.code != null) normalHolder.code.setVisibility(View.GONE);
 
@@ -225,14 +224,12 @@ public class SellAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             String promoName = (p.getPromoName() != null && !p.getPromoName().isEmpty()) ? p.getPromoName() : p.getProductName();
             promoHolder.tvPromoName.setText(promoName);
 
-            // Set the Discount text
             promoHolder.tvPromoDiscountBadge.setText("PROMO");
 
             if (p.isTemporaryPromo() && p.getPromoEndDate() > 0) {
-                // Format the long timestamp into a readable date string for the UI
                 SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
                 String formattedDate = sdf.format(new Date(p.getPromoEndDate()));
-                promoHolder.tvPromoValidity.setText("Valid until " + formattedDate);
+                promoHolder.tvPromoValidity.setText("Ends on " + formattedDate);
             } else {
                 promoHolder.tvPromoValidity.setText("Ongoing Promo");
             }
@@ -241,9 +238,11 @@ public class SellAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             if (!isMenuProduct || !p.isActive() || maxServings <= 0) {
                 promoHolder.cardView.setAlpha(0.5f);
                 promoHolder.tvPromoDiscountBadge.setText("UNAVAILABLE");
-                promoHolder.tvPromoDiscountBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#D32F2F")));
+                promoHolder.tvPromoDiscountBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#D32F2F"))); // Red
             } else {
                 promoHolder.cardView.setAlpha(1.0f);
+                promoHolder.tvPromoDiscountBadge.setText("PROMO");
+                promoHolder.tvPromoDiscountBadge.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#FF9800"))); // Orange Promo Color (Change hex if needed)
             }
 
             if (isSelectionMode && selectedIds.contains(currentId)) {

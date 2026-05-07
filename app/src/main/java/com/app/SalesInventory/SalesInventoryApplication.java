@@ -2,7 +2,6 @@ package com.app.SalesInventory;
 
 import android.app.Application;
 
-// Add these imports
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.appcheck.FirebaseAppCheck;
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory;
@@ -11,8 +10,15 @@ import androidx.lifecycle.DefaultLifecycleObserver;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.ProcessLifecycleOwner;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -37,27 +43,30 @@ public class SalesInventoryApplication extends Application {
                 PlayIntegrityAppCheckProviderFactory.getInstance()
         );
 
+        // --- 1. START GLOBAL PRESENCE TRACKER ---
+        setupGlobalPresence();
+
+        // --- 2. START BACKGROUND / FOREGROUND TRACKER ---
         ProcessLifecycleOwner.get().getLifecycle().addObserver(new DefaultLifecycleObserver() {
             @Override
             public void onStart(@NonNull LifecycleOwner owner) {
-                // App is opened or unlocked -> End Break
+                // App is opened or unlocked -> End Break & Go Online
                 if (AuthManager.getInstance().getCurrentUserId() != null) {
                     logAttendance("BREAK_END");
+                    updateOnlineStatus(true);
                 }
             }
 
             @Override
             public void onStop(@NonNull LifecycleOwner owner) {
-                // App is minimized, screen locked, or swiped away -> Start Break
+                // App is minimized, screen locked, or swiped away -> Start Break & Go Offline
                 if (AuthManager.getInstance().getCurrentUserId() != null) {
                     logAttendance("BREAK_START");
+                    updateOnlineStatus(false);
                 }
             }
         });
-        // -------------------------------------------------------------------------
 
-
-        // 3. Initialize your local repositories
         productRepository = ProductRepository.getInstance(this);
         productRemoteSyncer = new ProductRemoteSyncer(this);
         salesRepository = SalesRepository.getInstance(this);
@@ -69,63 +78,87 @@ public class SalesInventoryApplication extends Application {
         SyncScheduler.schedulePeriodicSync(this);
     }
 
-    public static SalesInventoryApplication getInstance() {
-        return instance;
-    }
+    public static SalesInventoryApplication getInstance() { return instance; }
+    public static ProductRepository getProductRepository() { return instance.productRepository; }
+    public static ProductRemoteSyncer getProductRemoteSyncer() { return instance.productRemoteSyncer; }
+    public static SalesRepository getSalesRepository() { return instance.salesRepository; }
 
-    public static ProductRepository getProductRepository() {
-        return instance.productRepository;
-    }
+    private void setupGlobalPresence() {
+        FirebaseAuth.getInstance().addAuthStateListener(firebaseAuth -> {
+            FirebaseUser user = firebaseAuth.getCurrentUser();
+            if (user != null) {
+                String uid = user.getUid();
+                DatabaseReference statusRef = FirebaseDatabase.getInstance().getReference("UsersStatus").child(uid);
+                DatabaseReference connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected");
 
-    public static ProductRemoteSyncer getProductRemoteSyncer() {
-        return instance.productRemoteSyncer;
-    }
+                connectedRef.addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        boolean connected = Boolean.TRUE.equals(snapshot.getValue(Boolean.class));
+                        if (connected) {
+                            // RTDB Disconnect rules
+                            statusRef.child("status").onDisconnect().setValue("offline");
+                            statusRef.child("lastActive").onDisconnect().setValue(System.currentTimeMillis());
 
-    public static SalesRepository getSalesRepository() {
-        return instance.salesRepository;
-    }
+                            // Set to online immediately upon connection
+                            statusRef.child("status").setValue("online");
+                            statusRef.child("lastActive").setValue(System.currentTimeMillis());
 
-    // --- NEW: Centralized Real-Time Attendance Logger ---
-    public static void logAttendance(String action) {
-        String userId = AuthManager.getInstance().getCurrentUserId();
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (userId == null || ownerId == null) return;
-
-        com.google.firebase.firestore.CollectionReference attendanceRef = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                .collection("users").document(ownerId)
-                .collection("attendance");
-
-        // Find the open shift for this user
-        attendanceRef.whereEqualTo("staffId", userId)
-                .whereIn("status", java.util.Arrays.asList("ACTIVE", "ON_BREAK"))
-                .get().addOnSuccessListener(querySnapshot -> {
-
-                    if (!querySnapshot.isEmpty()) {
-                        com.google.firebase.firestore.DocumentSnapshot doc = querySnapshot.getDocuments().get(0);
-                        String docId = doc.getId();
-                        java.util.Map<String, Object> updates = new java.util.HashMap<>();
-
-                        long now = System.currentTimeMillis();
-
-                        if (action.equals("TIME_OUT")) {
-                            updates.put("endTime", now);
-                            updates.put("status", "COMPLETED");
-                        } else if (action.equals("BREAK_START")) {
-                            updates.put("currentBreakStart", now);
-                            updates.put("status", "ON_BREAK");
-                        } else if (action.equals("BREAK_END")) {
-                            long breakStart = doc.getLong("currentBreakStart") != null ? doc.getLong("currentBreakStart") : now;
-                            long totalBreak = doc.getLong("totalBreakTime") != null ? doc.getLong("totalBreakTime") : 0;
-
-                            long newBreakDurationMins = (now - breakStart) / (60 * 1000);
-
-                            updates.put("totalBreakTime", totalBreak + newBreakDurationMins);
-                            updates.put("currentBreakStart", 0);
-                            updates.put("status", "ACTIVE");
+                            // CRITICAL FIX: Also update Firestore so the AdminStaffList sees it!
+                            FirebaseFirestore.getInstance().collection("users").document(uid)
+                                    .update("isOnline", true, "lastActive", System.currentTimeMillis());
                         }
-
-                        attendanceRef.document(docId).update(updates);
                     }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {}
                 });
+            }
+        });
+    }
+
+    public static void logAttendance(String status) {
+        String uid = AuthManager.getInstance().getCurrentUserId();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (uid == null || ownerId == null || uid.isEmpty() || ownerId.isEmpty()) return;
+
+        long now = System.currentTimeMillis();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        String dateKey = sdf.format(new Date(now));
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+        // CRITICAL FIX 1: Write to AttendanceLogs so AttendanceLogsActivity can read it!
+        Map<String, Object> logEntry = new HashMap<>();
+        logEntry.put("userId", uid);
+        logEntry.put("status", status); // "BREAK_START" or "BREAK_END"
+        logEntry.put("timestamp", now);
+
+        db.collection("AttendanceLogs").document(ownerId).collection(dateKey).add(logEntry);
+
+        // CRITICAL FIX 2: Trigger AuthManager to lock/unlock the specific shift document
+        if (status.equals("BREAK_START")) {
+            AuthManager.getInstance().logShiftLock(true);
+        } else if (status.equals("BREAK_END")) {
+            AuthManager.getInstance().logShiftLock(false);
+        }
+    }
+
+    public static void updateOnlineStatus(boolean isOnline) {
+        String uid = AuthManager.getInstance().getCurrentUserId();
+        if (uid != null && !uid.isEmpty()) {
+            long now = System.currentTimeMillis();
+
+            // Update Realtime Database
+            DatabaseReference statusRef = FirebaseDatabase.getInstance().getReference("UsersStatus").child(uid);
+            statusRef.child("status").setValue(isOnline ? "online" : "offline");
+            statusRef.child("lastActive").setValue(now);
+
+            // Safely update Firestore using merge to prevent missing-field crashes
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("isOnline", isOnline);
+            updates.put("lastActive", now);
+            FirebaseFirestore.getInstance().collection("users").document(uid)
+                    .set(updates, com.google.firebase.firestore.SetOptions.merge());
+        }
     }
 }

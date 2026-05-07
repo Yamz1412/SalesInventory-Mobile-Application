@@ -14,6 +14,7 @@
         android:layout_height="40dp"
         android:layout_weight="1.4"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorSurface"
         android:layout_marginEnd="4dp"/>
 
     <EditText
@@ -25,6 +26,9 @@
         android:textSize="12sp"
         android:inputType="numberDecimal"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorSurface"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textColorHint="?android:attr/textColorSecondary"
         android:padding="8dp"
         android:layout_marginEnd="4dp"/>
 
@@ -37,6 +41,9 @@
         android:textSize="12sp"
         android:inputType="numberDecimal"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorSurface"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textColorHint="?android:attr/textColorSecondary"
         android:padding="8dp"
         android:layout_marginEnd="4dp"/>
 
@@ -46,6 +53,7 @@
         android:layout_height="40dp"
         android:layout_weight="1.1"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorSurface"
         android:layout_marginEnd="4dp"/>
 
     <ImageButton
@@ -54,5 +62,5 @@
         android:layout_height="32dp"
         android:src="@android:drawable/ic_menu_delete"
         android:background="?attr/selectableItemBackgroundBorderless"
-        app:tint="@color/errorRed"/>
+        app:tint="#F44336"/>
 </LinearLayout>

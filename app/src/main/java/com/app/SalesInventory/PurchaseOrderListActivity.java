@@ -277,6 +277,7 @@ public class PurchaseOrderListActivity extends BaseActivity  {
         List<POItem> items4 = new ArrayList<>();
         items4.add(new POItem("MOCK-P7", "Fresh Whole Milk", 50, 95.0, "L"));
         items4.get(0).setReceivedQuantity(50);
+
         items4.add(new POItem("MOCK-P8", "Oat Milk", 20, 180.0, "L"));
         items4.get(1).setReceivedQuantity(20);
         PurchaseOrder po4 = new PurchaseOrder("MOCK-PO-4", "PO-MOCK-1004", "Daily Dairy Suppliers", "09193334444", PurchaseOrder.STATUS_COMPLETED, now - (20 * oneDay), 8350.0, items4);
@@ -342,29 +343,37 @@ public class PurchaseOrderListActivity extends BaseActivity  {
     }
 
     private void loadPurchaseOrders() {
-        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        String currentAuthId = com.google.firebase.auth.FirebaseAuth.getInstance().getUid();
+        if (currentAuthId == null) return;
 
-        if (ownerId == null || ownerId.isEmpty()) {
-            ownerId = AuthManager.getInstance().getCurrentUserId();
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (AuthManager.getInstance().isCurrentUserAdmin() || ownerId == null || ownerId.isEmpty()) {
+            ownerId = currentAuthId;
         }
 
-        if (ownerId == null) return; // Failsafe
+        final String finalOwnerId = ownerId;
 
-        poRef.orderByChild("ownerAdminId").equalTo(ownerId).addValueEventListener(new ValueEventListener() {
+        poRef.orderByChild("ownerAdminId").equalTo(finalOwnerId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                fullList.clear();
+                fullList.clear(); // Completely wipe the list to prevent ghost items
+
                 for (DataSnapshot ds : snapshot.getChildren()) {
                     PurchaseOrder po = ds.getValue(PurchaseOrder.class);
                     if (po != null) {
-                        po.setId(ds.getKey());
-                        fullList.add(po);
+                        if (finalOwnerId.equals(po.getOwnerAdminId())) {
+                            po.setId(ds.getKey());
+                            fullList.add(po);
+                        }
                     }
                 }
                 applyFiltersAndSort();
             }
+
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {}
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(PurchaseOrderListActivity.this, "Error fetching orders", Toast.LENGTH_SHORT).show();
+            }
         });
     }
 

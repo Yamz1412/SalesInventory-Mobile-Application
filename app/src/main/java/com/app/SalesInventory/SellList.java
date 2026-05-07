@@ -97,6 +97,8 @@ public class SellList extends BaseActivity {
     private com.google.android.material.switchmaterial.SwitchMaterial switchShowPromos;
     private List<Product> promoPseudoProducts = new ArrayList<>();
     private Map<String, List<String>> promoProductIdsMap = new HashMap<>();
+    private Map<String, String> promoDiscountTypeMap = new HashMap<>();
+    private Map<String, Double> promoDiscountValueMap = new HashMap<>();
 
     // Flexible Handling toggle
     private boolean isFlexibleHandlingEnabled = true;
@@ -214,7 +216,7 @@ public class SellList extends BaseActivity {
                     showPromoProductsDialog(product);
                     return;
                 }
-                showProductOptionsDialog(product, maxServings);
+                showProductOptionsDialog(product, maxServings, null, null, 0.0);
             }
         }, selectedIds -> {
 
@@ -416,6 +418,11 @@ public class SellList extends BaseActivity {
                 p.setQuantity(9999);
                 promoPseudoProducts.add(p);
 
+                String dType = pObj.optString("discountType", "Percentage");
+                double dVal = pObj.optDouble("discountValue", 0.0);
+                promoDiscountTypeMap.put(p.getProductId(), dType);
+                promoDiscountValueMap.put(p.getProductId(), dVal);
+
                 List<String> ids = new ArrayList<>();
                 if (mappingObj.has(p.getProductId())) {
                     org.json.JSONArray idsArr = mappingObj.getJSONArray(p.getProductId());
@@ -444,13 +451,23 @@ public class SellList extends BaseActivity {
                             String endDate = doc.getString("endDate");
                             Boolean isTemp = doc.getBoolean("isTemporary");
 
+                            String discountType = doc.getString("discountType");
+                            Double discountValue = doc.getDouble("discountValue");
+                            if (discountValue == null) discountValue = 0.0;
+
                             long endDateTimestamp = 0;
                             if (endDate != null && !endDate.isEmpty()) {
-                                try {
-                                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-                                    Date date = sdf.parse(endDate);
-                                    if (date != null) endDateTimestamp = date.getTime();
-                                } catch (Exception ex) { }
+                                String[] formats = {"yyyy-MM-dd", "MMM dd, yyyy", "MM/dd/yyyy"};
+                                for (String format : formats) {
+                                    try {
+                                        SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.US);
+                                        Date date = sdf.parse(endDate);
+                                        if (date != null) {
+                                            endDateTimestamp = date.getTime();
+                                            break; // Successfully parsed!
+                                        }
+                                    } catch (Exception ignored) {}
+                                }
                             }
 
                             List<String> productIds = new ArrayList<>();
@@ -472,6 +489,8 @@ public class SellList extends BaseActivity {
 
                             promoPseudoProducts.add(p);
                             promoProductIdsMap.put(p.getProductId(), productIds);
+                            promoDiscountTypeMap.put(p.getProductId(), discountType != null ? discountType : "Percentage");
+                            promoDiscountValueMap.put(p.getProductId(), discountValue);
 
                             // Save securely to JSON for the offline cache
                             try {
@@ -480,6 +499,8 @@ public class SellList extends BaseActivity {
                                 pObj.put("promoName", promoName);
                                 pObj.put("isTemp", p.isTemporaryPromo());
                                 pObj.put("endDateTimestamp", p.getPromoEndDate());
+                                pObj.put("discountType", discountType);
+                                pObj.put("discountValue", discountValue);
                                 savePromosArr.put(pObj);
 
                                 org.json.JSONArray idsArr = new org.json.JSONArray();
@@ -538,14 +559,16 @@ public class SellList extends BaseActivity {
         androidx.recyclerview.widget.RecyclerView rv = view.findViewById(R.id.rvPromoProducts);
         rv.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(this, 3));
 
+        String dType = promoDiscountTypeMap.get(promo.getProductId());
+        Double dVal = promoDiscountValueMap.get(promo.getProductId());
+
         SellAdapter promoDialogAdapter = new SellAdapter(this, specificPromoProducts, masterInventory, (p, maxServ) -> {
             dialog.dismiss();
 
             if (p.getQuantity() <= 0 && maxServ <= 0 && !isFlexibleHandlingEnabled) {
                 Toast.makeText(SellList.this, "Out of stock! Cannot add to cart.", Toast.LENGTH_SHORT).show();
             } else {
-                // Allows the user to open the dialog and uncheck missing ingredients!
-                showProductOptionsDialog(p, maxServ);
+                showProductOptionsDialog(p, maxServ, promo.getPromoName(), dType, dVal != null ? dVal : 0.0);
             }
         }, null, isFlexibleHandlingEnabled);
 
@@ -719,10 +742,12 @@ public class SellList extends BaseActivity {
 
                             if (!hasStarted || hasExpired) {
                                 isActivelyPromoted = false; // Promo expired, return to normal menu
+                                product.setPromo(false); // Dynamically revert in UI
                             }
                         }
                     }
-                    if (isVisibleOnMenu && !isActivelyPromoted) {
+
+                    if (isVisibleOnMenu) {
                         allMenuProducts.add(product);
                     }
                 }
@@ -1087,6 +1112,17 @@ public class SellList extends BaseActivity {
         if (switchShowPromos != null && switchShowPromos.isChecked()) {
             filteredProducts.clear();
             filteredProducts.addAll(promoPseudoProducts);
+            for (Product p : allMenuProducts) {
+                if (p.isPromo()) {
+                    boolean exists = false;
+                    for (Product pseudo : promoPseudoProducts) {
+                        if (pseudo.getProductId().equals(p.getProductId())) {
+                            exists = true; break;
+                        }
+                    }
+                    if (!exists) filteredProducts.add(p);
+                }
+            }
 
             android.os.Parcelable rvState = null;
             if (sellListView != null && sellListView.getLayoutManager() != null) {
@@ -1149,7 +1185,7 @@ public class SellList extends BaseActivity {
         if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "₱%.2f", total));
     }
 
-    private void showProductOptionsDialog(Product product, int maxBaseServings) {
+    private void showProductOptionsDialog(Product product, int maxBaseServings, String appliedPromoName, String discountType, double discountValue) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_product_options, null);
         androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this).setView(view).create();
         if (dialog.getWindow() != null)
@@ -1246,17 +1282,16 @@ public class SellList extends BaseActivity {
         String safeName = product.getProductName() != null ? product.getProductName() : "Unnamed Product";
         if (tvName != null) tvName.setText(safeName);
 
-        double activeBasePrice = product.getSellingPrice();
-        if (product.isPromo() && product.getPromoPrice() > 0) {
-            long currentTime = System.currentTimeMillis();
-            boolean isPromoValid = true;
-            if (product.isTemporaryPromo()) {
-                long endTimeMillis = product.getPromoEndDate();
-                boolean hasStarted = product.getPromoStartDate() == 0 || currentTime >= product.getPromoStartDate();
-                boolean hasExpired = endTimeMillis > 0 && currentTime > (endTimeMillis + 86400000);
-                if (!hasStarted || hasExpired) isPromoValid = false;
+        double activeBasePrice = product.getActiveSellingPrice();
+
+        if (appliedPromoName != null && discountValue > 0) {
+            if ("Percentage".equalsIgnoreCase(discountType) || "Percent".equalsIgnoreCase(discountType)) {
+                activeBasePrice = activeBasePrice - (activeBasePrice * (discountValue / 100.0));
+            } else {
+                activeBasePrice = activeBasePrice - discountValue;
             }
-            if (isPromoValid) activeBasePrice = product.getPromoPrice();
+            if (activeBasePrice < 0) activeBasePrice = 0;
+            activeBasePrice = Math.round(activeBasePrice);
         }
 
         if (tvPrice != null) tvPrice.setText(String.format(Locale.US, "₱%.2f", activeBasePrice));
@@ -1628,6 +1663,11 @@ public class SellList extends BaseActivity {
                     extrasBuilder.setLength(extrasBuilder.length() - 1);
                 }
                 extrasBuilder.append(") ");
+            }
+
+            if (appliedPromoName != null && !appliedPromoName.isEmpty()) {
+                if (extrasBuilder.length() > 0 && !extrasBuilder.toString().endsWith(" ")) extrasBuilder.append(" ");
+                extrasBuilder.append("[").append(appliedPromoName).append(" Applied]");
             }
 
             String extraDetails = extrasBuilder.toString().trim();

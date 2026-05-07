@@ -3,8 +3,11 @@ package com.app.SalesInventory;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.google.android.material.datepicker.CalendarConstraints;
@@ -50,6 +53,8 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
+    private Spinner spinnerTypeFilter;
+    private String currentTypeFilter = "All Reports";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,6 +98,22 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         btnDateFilter = findViewById(R.id.btnDateFilter);
         progressBar = findViewById(R.id.progressBar);
         recyclerViewReport = findViewById(R.id.recyclerViewReport);
+
+        spinnerTypeFilter = findViewById(R.id.spinnerTypeFilter);
+        if (spinnerTypeFilter != null) {
+            String[] types = {"All Reports", "Additions Only", "Deductions Only"};
+            ArrayAdapter<String> spinAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, types);
+            spinnerTypeFilter.setAdapter(spinAdapter);
+
+            spinnerTypeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    currentTypeFilter = types[position];
+                    applyFilterAndGroup();
+                }
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
+        }
 
         recyclerViewReport.setLayoutManager(new LinearLayoutManager(this));
         adapter = new AdjustmentSummaryAdapter(summaryList);
@@ -179,7 +200,6 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
     private void applyFilterAndGroup() {
         if (masterAdjustmentList == null) return;
         Map<String, AdjustmentSummaryReport> groupMap = new HashMap<>();
-
         double overallLossValue = 0.0;
 
         for (StockAdjustment adj : masterAdjustmentList) {
@@ -187,11 +207,15 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
 
             if (filterStartDate == 0 || (adjDate >= filterStartDate && adjDate <= filterEndDate)) {
 
-                // CRITICAL FIX: If Product ID is missing in Firebase, fallback to Product Name!
+                String type = adj.getAdjustmentType() != null ? adj.getAdjustmentType() : "";
+                boolean isDeduction = type.toLowerCase().contains("deduct") || type.toLowerCase().contains("remove") || type.equalsIgnoreCase("Deduction");
+
+                // CRITICAL FIX: Ignore records that don't match the selected Spinner Filter
+                if (currentTypeFilter.equals("Additions Only") && isDeduction) continue;
+                if (currentTypeFilter.equals("Deductions Only") && !isDeduction) continue;
+
                 String pId = adj.getProductId();
-                if (pId == null || pId.isEmpty()) {
-                    pId = adj.getProductName();
-                }
+                if (pId == null || pId.isEmpty()) pId = adj.getProductName();
                 if (pId == null || pId.isEmpty()) continue;
 
                 AdjustmentSummaryReport report = groupMap.get(pId);
@@ -201,16 +225,11 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
                 }
 
                 double qty = adj.getQuantityAdjusted();
-                String type = adj.getAdjustmentType() != null ? adj.getAdjustmentType() : "";
 
-                // CRITICAL FIX: Safely detect Additions vs Removals even if the Type text varies
-                if (qty > 0 || type.toLowerCase().contains("add") || type.equalsIgnoreCase("Addition")) {
-                    report.addAddition(Math.abs(qty));
-                } else {
+                if (isDeduction) {
                     double absQty = Math.abs(qty);
                     report.addRemoval(absQty);
 
-                    // Calculate total financial loss based on cost price
                     double unitCost = 0.0;
                     for (Product p : currentInventory) {
                         String invId = p.getProductId() != null ? p.getProductId() : p.getProductName();
@@ -220,6 +239,8 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
                         }
                     }
                     overallLossValue += (absQty * unitCost);
+                } else {
+                    report.addAddition(Math.abs(qty));
                 }
 
                 String reason = adj.getReason();
@@ -229,7 +250,14 @@ public class AdjustmentSummaryReportActivity extends BaseActivity {
         }
 
         summaryList.clear();
-        summaryList.addAll(groupMap.values());
+
+        // Remove items from the list if the filter stripped away all of their additions/deductions
+        for (AdjustmentSummaryReport report : groupMap.values()) {
+            if (report.getAdditions() > 0 || report.getRemovals() > 0) {
+                summaryList.add(report);
+            }
+        }
+
         Collections.sort(summaryList, (r1, r2) -> r1.getProductName().compareToIgnoreCase(r2.getProductName()));
 
         if (tvTotalItems != null) tvTotalItems.setText(String.valueOf(summaryList.size()));

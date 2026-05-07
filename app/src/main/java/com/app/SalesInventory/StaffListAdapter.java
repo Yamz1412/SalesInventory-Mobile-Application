@@ -68,6 +68,42 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
         holder.tvRole.setText(role != null ? role : "Staff");
         holder.itemView.setSelected(position == selected);
 
+        String targetUid = extract(ai, "id", "getId");
+        if (targetUid == null) targetUid = extract(ai, "uid", "getUid");
+
+        // --- FETCH LAST LOGIN & ONLINE STATUS ---
+        if (targetUid != null) {
+            com.google.firebase.database.FirebaseDatabase.getInstance()
+                    .getReference("UsersStatus").child(targetUid)
+                    .addValueEventListener(new com.google.firebase.database.ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                            String status = snapshot.child("status").getValue(String.class);
+                            Long lastActive = snapshot.child("lastActive").getValue(Long.class);
+
+                            // 1. Update Online/Offline Indicator
+                            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
+                            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                            if ("online".equals(status)) {
+                                gd.setColor(android.graphics.Color.parseColor("#4CAF50")); // Green
+                            } else {
+                                gd.setColor(android.graphics.Color.parseColor("#F44336")); // Red
+                            }
+                            holder.statusIndicator.setBackground(gd);
+
+                            // 2. Update Last Login Time
+                            if (lastActive != null && lastActive > 0) {
+
+                                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy hh:mm a", java.util.Locale.getDefault());
+                                holder.tvLastLogin.setText("Last Activity: " + sdf.format(new java.util.Date(lastActive)));
+                            } else {
+                                holder.tvLastLogin.setText("Last Activity: Never");
+                            }
+                        }
+                        @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+                    });
+        }
+
         holder.itemView.setOnClickListener(v -> {
             int old = selected;
             selected = holder.getAdapterPosition();
@@ -75,76 +111,35 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
             notifyItemChanged(selected);
         });
 
-        holder.itemView.setOnLongClickListener(v -> {
-            int old = selected;
-            selected = holder.getAdapterPosition();
-            notifyItemChanged(old);
-            notifyItemChanged(selected);
-
-            if (ai instanceof AdminUserItem && longClickListener != null) {
-                AdminUserItem staff = (AdminUserItem) ai;
-                return longClickListener.onItemLongClick(position, staff);
-            }
-            return false;
-        });
-
-        // --- START ONLINE/OFFLINE DOT LOGIC ---
-        View statusIndicator = holder.itemView.findViewById(R.id.statusIndicator);
-        statusIndicator.setVisibility(View.VISIBLE);
-
-        // Extract the user's ID (assuming the getter is getId or getUid)
-        String targetUid = extract(ai, "id", "getId");
-        if (targetUid == null) targetUid = extract(ai, "uid", "getUid");
-
-        if (targetUid != null) {
-            com.google.firebase.database.FirebaseDatabase.getInstance()
-                    .getReference("UsersStatus").child(targetUid)
-                    .addValueEventListener(new com.google.firebase.database.ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
-                            String status = snapshot.getValue(String.class);
-                            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-                            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-
-                            // Green if online, Red if offline or null
-                            if ("online".equals(status)) {
-                                gd.setColor(android.graphics.Color.parseColor("#4CAF50")); // Green
-                            } else {
-                                gd.setColor(android.graphics.Color.parseColor("#F44336")); // Red
-                            }
-                            statusIndicator.setBackground(gd);
-                        }
-                        @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
-                    });
-        } else {
-            // Default to gray if no ID is found
-            android.graphics.drawable.GradientDrawable gd = new android.graphics.drawable.GradientDrawable();
-            gd.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-            gd.setColor(android.graphics.Color.GRAY);
-            statusIndicator.setBackground(gd);
-        }
-        // --- END ONLINE/OFFLINE DOT LOGIC ---
-
-        // Hook up the View As button
         Button btnViewAs = holder.itemView.findViewById(R.id.btnViewAs);
         if (btnViewAs != null) {
-            // Hide the button if the user is looking at another Admin
             if ("Admin".equalsIgnoreCase(role) || "Owner".equalsIgnoreCase(role)) {
                 btnViewAs.setVisibility(View.GONE);
             } else {
                 btnViewAs.setVisibility(View.VISIBLE);
-
-                // Need effectively final copy for lambda
                 final String finalName = name != null ? name : "Staff";
-
                 btnViewAs.setOnClickListener(v -> {
-                    // Launch MainActivity in Impersonation Mode
                     Intent intent = new Intent(ctx, MainActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.putExtra("IMPERSONATE_STAFF_NAME", finalName);
                     ctx.startActivity(intent);
                 });
             }
+        }
+    }
+
+    static class Holder extends RecyclerView.ViewHolder {
+        TextView tvName, tvEmail, tvPhone, tvRole, tvLastLogin;
+        View statusIndicator;
+
+        Holder(@NonNull View v) {
+            super(v);
+            tvName = v.findViewById(R.id.tvStaffName);
+            tvEmail = v.findViewById(R.id.tvStaffEmail);
+            tvPhone = v.findViewById(R.id.tvStaffPhone);
+            tvRole = v.findViewById(R.id.tvStaffRole);
+            tvLastLogin = v.findViewById(R.id.tvStaffLastLogin); // This matches the XML update we made
+            statusIndicator = v.findViewById(R.id.statusIndicator);
         }
     }
 
@@ -167,19 +162,5 @@ public class StaffListAdapter extends RecyclerView.Adapter<StaffListAdapter.Hold
     @Override
     public int getItemCount() {
         return items.size();
-    }
-
-    static class Holder extends RecyclerView.ViewHolder {
-        TextView tvName;
-        TextView tvEmail;
-        TextView tvPhone;
-        TextView tvRole;
-        Holder(@NonNull View v) {
-            super(v);
-            tvName = v.findViewById(R.id.tvStaffName);
-            tvEmail = v.findViewById(R.id.tvStaffEmail);
-            tvPhone = v.findViewById(R.id.tvStaffPhone);
-            tvRole = v.findViewById(R.id.tvStaffRole);
-        }
     }
 }

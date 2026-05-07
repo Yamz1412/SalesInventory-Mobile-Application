@@ -20,6 +20,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -203,7 +204,7 @@ public class DashboardRepository {
                         RecentActivity activity = new RecentActivity(
                                 sale.getId(),
                                 "Sale: " + sale.getProductName(),
-                                "Qty: " + sale.getQuantity() + " | ₱" + String.format("%,.2f", sale.getTotalPrice()),
+                                "Qty: " + sale.getQuantity() + "   •   Total: ₱" + String.format(Locale.US, "%,.2f", sale.getTotalPrice()),
                                 "SALE",
                                 "COMPLETED",
                                 ts

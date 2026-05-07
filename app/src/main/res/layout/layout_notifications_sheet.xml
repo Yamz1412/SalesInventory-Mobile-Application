@@ -53,6 +53,7 @@
         android:layout_marginHorizontal="20dp"
         android:layout_marginBottom="12dp"
         android:background="@drawable/edite_round"
+        android:backgroundTint="?attr/colorSurface"
         android:paddingHorizontal="12dp" />
 
     <View
@@ -91,5 +92,4 @@
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:paddingBottom="50dp"/>
-
 </LinearLayout>

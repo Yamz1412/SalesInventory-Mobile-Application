@@ -92,12 +92,11 @@ public class ReturnProductActivity extends BaseActivity {
         btnCancelReturn.setOnClickListener(v -> finish());
     }
 
-    // ================================================================
-    // FIX: Adaptive Adapters for Dropdowns and Spinners
-    // ================================================================
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
-        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        final int textColor = isDark ? Color.WHITE : Color.BLACK;
+        final int bgColor = isDark ? Color.parseColor("#2C2C2C") : Color.WHITE;
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
@@ -111,6 +110,7 @@ public class ReturnProductActivity extends BaseActivity {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
+                view.setBackgroundColor(bgColor);
                 ((TextView) view).setTextColor(textColor);
                 return view;
             }
@@ -120,14 +120,17 @@ public class ReturnProductActivity extends BaseActivity {
     }
 
     private ArrayAdapter<String> getAdaptiveDropdownAdapter(List<String> items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
-        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        final int textColor = isDark ? Color.WHITE : Color.BLACK;
+        final int bgColor = isDark ? Color.parseColor("#2C2C2C") : Color.WHITE;
 
         return new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
             @NonNull
             @Override
             public View getView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
+                view.setBackgroundColor(bgColor);
                 ((TextView) view).setTextColor(textColor);
                 return view;
             }
@@ -137,13 +140,11 @@ public class ReturnProductActivity extends BaseActivity {
     private void setupAdapters() {
         supplierAdapter = getAdaptiveDropdownAdapter(supplierNames);
         actvReturnSupplier.setAdapter(supplierAdapter);
-        // FIXED: Prevent keyboard from popping up and blocking the dropdown
         actvReturnSupplier.setInputType(android.text.InputType.TYPE_NULL);
 
         List<String> reasons = Arrays.asList("Damaged / Defective", "Expired", "Wrong Item Delivered", "Excess Quantity");
         reasonAdapter = getAdaptiveDropdownAdapter(reasons);
         actvReturnReason.setAdapter(reasonAdapter);
-        // FIXED: Prevent keyboard from popping up and blocking the dropdown
         actvReturnReason.setInputType(android.text.InputType.TYPE_NULL);
 
         productAdapter = getAdaptiveDropdownAdapter(filteredProductNames);

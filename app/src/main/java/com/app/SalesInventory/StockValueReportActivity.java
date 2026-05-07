@@ -53,6 +53,14 @@ public class StockValueReportActivity extends BaseActivity  {
         initializeViews();
         setupRecyclerView();
         loadStockValueReport();
+
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        View btnDateFilter = findViewById(R.id.btnDateFilter);
+        if (btnDateFilter != null) {
+            btnDateFilter.setOnClickListener(v -> {
+                Toast.makeText(this, "Date filter available for historical records.", Toast.LENGTH_SHORT).show();
+            });
+        }
     }
 
     private void initializeViews() {
@@ -67,7 +75,6 @@ public class StockValueReportActivity extends BaseActivity  {
         tvTotalCostValue = findViewById(R.id.tvTotalCostValue);
         tvTotalProfitValue = findViewById(R.id.tvTotalProfitValue);
         btnExportPDF = findViewById(R.id.btnExportPDF);
-        btnExportCSV = findViewById(R.id.btnExportCSV);
 
         reportList = new ArrayList<>();
         productRepository = SalesInventoryApplication.getProductRepository();
@@ -145,12 +152,10 @@ public class StockValueReportActivity extends BaseActivity  {
                 tvNoData.setVisibility(View.VISIBLE);
                 recyclerViewReport.setVisibility(View.GONE);
                 btnExportPDF.setEnabled(false);
-                btnExportCSV.setEnabled(false);
             } else {
                 tvNoData.setVisibility(View.GONE);
                 recyclerViewReport.setVisibility(View.VISIBLE);
                 btnExportPDF.setEnabled(true);
-                btnExportCSV.setEnabled(true);
 
                 tvTotalCostValue.setText("₱" + String.format(java.util.Locale.US, "%.2f", totalCostValue));
                 tvTotalInventoryValue.setText("₱" + String.format(java.util.Locale.US, "%.2f", totalSellingValue));
@@ -169,7 +174,6 @@ public class StockValueReportActivity extends BaseActivity  {
             }
         }
         if (exportType == ReportExportUtil.EXPORT_PDF) exportToPDF();
-        else exportToCSV();
     }
 
     private void exportToPDF() {
@@ -199,27 +203,6 @@ public class StockValueReportActivity extends BaseActivity  {
         }
     }
 
-    private void exportToCSV() {
-        if (!exportUtil.isStorageAvailable()) {
-            exportUtil.showExportError("Storage not available");
-            return;
-        }
-        progressBar.setVisibility(View.VISIBLE);
-        try {
-            String fileName = exportUtil.generateFileName("StockValue_Report", ReportExportUtil.EXPORT_CSV);
-            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_CSV);
-            if (r == null || r.outputStream == null) throw new Exception("Unable to obtain output stream");
-            try {
-                exportUtil.showExportSuccess(r.displayPath);
-            } finally {
-                try { r.outputStream.close(); } catch (Exception ignored) {}
-            }
-            progressBar.setVisibility(View.GONE);
-        } catch (Exception e) {
-            progressBar.setVisibility(View.GONE);
-            exportUtil.showExportError(e.getMessage());
-        }
-    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {

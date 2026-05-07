@@ -63,7 +63,7 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
 
     private String currentOwnerId;
     private ValueEventListener adjustmentsListener;
-
+    private androidx.activity.result.ActivityResultLauncher<android.content.Intent> exportPdfLauncher;
     // Filters
     private long filterStartDate = 0;
     private long filterEndDate = System.currentTimeMillis();
@@ -85,17 +85,131 @@ public class InventoryMasterSummaryActivity extends BaseActivity {
         setupDateFilter();
         loadLocalData();
 
-        btnExportMasterPDF.setOnClickListener(v -> {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-                    return;
+        // CRITICAL FIX: Initialize the "Save As" File Picker Launcher
+        exportPdfLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                        android.net.Uri uri = result.getData().getData();
+                        if (uri != null) {
+                            generateAndWritePdfToUri(uri);
+                        }
+                    } else {
+                        Toast.makeText(this, "Export cancelled", Toast.LENGTH_SHORT).show();
+                    }
                 }
-            }
-            exportMasterReportPdf();
+        );
+
+        btnExportMasterPDF.setOnClickListener(v -> {
+            // Using ACTION_CREATE_DOCUMENT does not require WRITE_EXTERNAL_STORAGE permissions!
+            launchSaveAsIntent();
         });
     }
 
+    private void launchSaveAsIntent() {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(new java.util.Date());
+        String fileName = "Inventory_Master_Report_" + timeStamp + ".pdf";
+
+        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+        intent.setType("application/pdf");
+        intent.putExtra(android.content.Intent.EXTRA_TITLE, fileName);
+
+        exportPdfLauncher.launch(intent);
+    }
+
+    private void generateAndWritePdfToUri(android.net.Uri uri) {
+        Toast.makeText(this, "Generating Filtered Master PDF...", Toast.LENGTH_SHORT).show();
+
+        // Use the filtered sets instead of raw data
+        Map<String, Integer> soldMap = new HashMap<>();
+        final int[] totalSoldHolder = new int[1];
+
+        for (Sales s : filteredSales) {
+            String pid = s.getProductId();
+            double q = s.getQuantity();
+            if (pid != null) {
+                soldMap.put(pid, soldMap.getOrDefault(pid, 0) + (int) q);
+                totalSoldHolder[0] += q;
+            }
+        }
+
+        Map<String, Integer> receivedMap = new HashMap<>();
+        Map<String, Integer> adjustedMap = new HashMap<>();
+        final int[] totalReceivedHolder = new int[1];
+        final int[] totalAdjustedHolder = new int[1];
+
+        for (DataSnapshot ads : filteredAdjustments) {
+            String pid = ads.child("productId").getValue(String.class);
+            Double qty = ads.child("quantityAdjusted").getValue(Double.class);
+            String type = ads.child("adjustmentType").getValue(String.class);
+
+            if (pid == null || qty == null) continue;
+
+            if ("Add Stock".equals(type)) {
+                receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + qty.intValue());
+                totalReceivedHolder[0] += qty;
+            } else {
+                adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + qty.intValue());
+                totalAdjustedHolder[0] += qty;
+            }
+        }
+
+        try {
+            List<StockValueReport> valueReports = new ArrayList<>();
+            List<StockMovementReport> movementReports = new ArrayList<>();
+            List<AdjustmentSummaryData> adjustmentSummaries = new ArrayList<>();
+
+            for (Product p : cachedProducts) {
+                if ("Menu".equalsIgnoreCase(p.getProductType())) continue;
+
+                // Current Valuation
+                StockValueReport vr = new StockValueReport(
+                        p.getProductId(), p.getProductName(), p.getCategoryName(),
+                        p.getQuantity(), p.getCostPrice(), p.getSellingPrice(),
+                        p.getReorderLevel(), p.getCriticalLevel(), p.getCeilingLevel(), p.getFloorLevel()
+                );
+                valueReports.add(vr);
+
+                // Filtered Movements
+                int rec = receivedMap.getOrDefault(p.getProductId(), 0);
+                int sold = soldMap.getOrDefault(p.getProductId(), 0);
+                int adj = adjustedMap.getOrDefault(p.getProductId(), 0);
+
+                StockMovementReport mr = new StockMovementReport(
+                        p.getProductId(), p.getProductName(), p.getCategoryName(),
+                        p.getQuantity(), rec, sold, adj, p.getQuantity(), System.currentTimeMillis()
+                );
+                mr.calculateOpening();
+                movementReports.add(mr);
+
+                AdjustmentSummaryData asd = new AdjustmentSummaryData(p.getProductId(), p.getProductName());
+                asd.setTotalAdditions(rec);
+                asd.setTotalRemovals(adj);
+                asd.setTotalAdjustments(rec + adj);
+                adjustmentSummaries.add(asd);
+            }
+
+            exportExecutor.execute(() -> {
+                try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+                    if (outputStream == null) throw new Exception("Unable to create export stream");
+
+                    PDFGenerator generator = new PDFGenerator(InventoryMasterSummaryActivity.this);
+                    generator.generateCombinedInventoryReportPDF(
+                            outputStream, valueReports, movementReports, adjustmentSummaries,
+                            totalReceivedHolder[0], totalSoldHolder[0], totalAdjustedHolder[0]
+                    );
+
+                    runOnUiThread(() -> Toast.makeText(this, "Export Saved Successfully to Selected Folder!", Toast.LENGTH_LONG).show());
+                } catch (Exception e) {
+                    runOnUiThread(() -> Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                }
+            });
+        } catch (Exception e) {
+            Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+    
     private void initializeViews() {
         tvTotalValue = findViewById(R.id.tvTotalValue);
         tvTotalSold = findViewById(R.id.tvTotalSold);

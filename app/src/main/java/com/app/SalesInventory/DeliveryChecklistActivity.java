@@ -165,6 +165,27 @@ public class DeliveryChecklistActivity extends BaseActivity {
         for (StagedItem item : itemsToProcess) {
             String safeProductId = item.productId != null ? item.productId : "unknown";
 
+            // CRITICAL FIX: If the item is marked unknown/new, immediately queue it for registration!
+            if (safeProductId.equals("unknown") || safeProductId.trim().isEmpty()) {
+                runOnUiThread(() -> {
+                    Bundle b = new Bundle();
+                    b.putString("productName", item.productName);
+                    b.putDouble("quantity", item.quantity > 0 ? item.quantity : 1.0);
+                    b.putDouble("costPrice", item.unitPrice);
+                    b.putString("unit", item.unit);
+                    b.putString("stagedItemKey", item.dbKey);
+                    registrationQueue.add(b);
+
+                    processedCount[0]++;
+                    if (processedCount[0] == itemsToProcess.size()) {
+                        if (loadingDialog.isShowing()) loadingDialog.dismiss();
+                        finalizeProcess(registrationQueue);
+                    }
+                });
+                continue; // Skip the database call completely!
+            }
+
+            // Otherwise, process normal registered items
             productRepository.getProductById(safeProductId, new ProductRepository.OnProductFetchedListener() {
                 @Override
                 public void onProductFetched(Product p) {

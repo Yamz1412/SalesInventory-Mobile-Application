@@ -1,15 +1,13 @@
 package com.app.SalesInventory;
 
-import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-
 import java.util.List;
+import java.util.Locale;
 
 public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdapter.ViewHolder> {
 
@@ -34,38 +32,37 @@ public class StockMovementAdapter extends RecyclerView.Adapter<StockMovementAdap
         holder.tvProductName.setText(report.getProductName());
         holder.tvCategory.setText(report.getCategory());
 
-        holder.tvOpeningStock.setText(formatQuantity(report.getOpeningStock()));
-        holder.tvClosingStock.setText(formatQuantity(report.getClosingStock()));
-
+        // Format quantities properly
         holder.tvReceived.setText("IN: +" + formatQuantity(report.getReceived()));
-        holder.tvSold.setText("SOLD: -" + report.getSold());
-        holder.tvAdjusted.setText("ADJ: -" + formatQuantity(report.getAdjusted()));
+        holder.tvSold.setText("SOLD: -" + formatQuantity(report.getSold()));
+
+        // Adjustments can be positive or negative, so we format it smartly
+        String adjPrefix = report.getAdjusted() >= 0 ? "ADJ: +" : "ADJ: ";
+        holder.tvAdjusted.setText(adjPrefix + formatQuantity(report.getAdjusted()));
     }
 
     private String formatQuantity(double value) {
         if (value % 1 == 0) {
             return String.valueOf((long) value);
         }
-        return String.format(java.util.Locale.US, "%.2f", value);
+        return String.format(Locale.US, "%.2f", value);
     }
 
     @Override
     public int getItemCount() {
-        return reportList.size();
+        return reportList == null ? 0 : reportList.size();
     }
 
     public class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvProductName, tvCategory, tvOpeningStock, tvReceived, tvSold, tvAdjusted, tvClosingStock;
+        TextView tvProductName, tvCategory, tvReceived, tvSold, tvAdjusted;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             tvProductName = itemView.findViewById(R.id.tvProductName);
             tvCategory = itemView.findViewById(R.id.tvCategory);
-            tvOpeningStock = itemView.findViewById(R.id.tvOpeningStock);
             tvReceived = itemView.findViewById(R.id.tvReceived);
             tvSold = itemView.findViewById(R.id.tvSold);
             tvAdjusted = itemView.findViewById(R.id.tvAdjusted);
-            tvClosingStock = itemView.findViewById(R.id.tvClosingStock);
         }
     }
 }

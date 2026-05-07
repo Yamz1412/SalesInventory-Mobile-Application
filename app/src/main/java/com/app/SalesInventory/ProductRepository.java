@@ -380,58 +380,6 @@ public class ProductRepository {
         });
     }
 
-    public void cleanupDuplicates(OnCleanupListener listener) {
-        syncExecutor.execute(() -> {
-            List<ProductEntity> all = productDao.getAllProductsSync();
-            if (all == null) {
-                if (listener != null) listener.onCleanupComplete(0);
-                return;
-            }
-
-            Map<String, List<ProductEntity>> map = new HashMap<>();
-            for (ProductEntity p : all) {
-                if (!p.isActive) continue;
-                String name = p.productName != null ? p.productName.trim().toLowerCase() : "";
-                if (name.isEmpty()) continue;
-
-                if (!map.containsKey(name)) map.put(name, new ArrayList<>());
-                map.get(name).add(p);
-            }
-
-            int deletedCount = 0;
-            long now = System.currentTimeMillis();
-
-            for (List<ProductEntity> duplicates : map.values()) {
-                if (duplicates.size() > 1) {
-                    Collections.sort(duplicates, (p1, p2) -> {
-                        boolean p1HasId = p1.productId != null && !p1.productId.isEmpty();
-                        boolean p2HasId = p2.productId != null && !p2.productId.isEmpty();
-                        if (p1HasId && !p2HasId) return -1;
-                        if (!p1HasId && p2HasId) return 1;
-
-                        if (p1.quantity > p2.quantity) return -1;
-                        if (p2.quantity > p1.quantity) return 1;
-
-                        return Long.compare(p2.lastUpdated, p1.lastUpdated);
-                    });
-
-                    for (int i = 1; i < duplicates.size(); i++) {
-                        ProductEntity toDelete = duplicates.get(i);
-                        archiveEntityLocally(toDelete);
-                        toDelete.isActive = false;
-                        toDelete.lastUpdated = now;
-                        toDelete.syncState = "DELETE_PENDING";
-                        productDao.update(toDelete);
-                        deletedCount++;
-                    }
-                }
-            }
-
-            if (deletedCount > 0) SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
-            if (listener != null) listener.onCleanupComplete(deletedCount);
-        });
-    }
-
     public void deleteProduct(String productId, OnProductDeletedListener listener) {
         syncExecutor.execute(() -> {
             if (!AuthManager.getInstance().isCurrentUserAdmin()) {
@@ -556,13 +504,14 @@ public class ProductRepository {
                     double clamped = Math.max(0.0, newQuantity);
                     if (clamped > 99999) clamped = 99999.0;
 
-                    // FIX: ONLY override threshold levels if they haven't been manually set!
                     if (!"Menu".equalsIgnoreCase(existing.productType)) {
                         if (existing.ceilingLevel <= 0) existing.ceilingLevel = (int) Math.max(10, Math.ceil(clamped * 2.0));
                         if (existing.reorderLevel <= 0) existing.reorderLevel = (int) Math.max(1, Math.ceil(clamped * 0.20));
                         if (existing.criticalLevel <= 0) existing.criticalLevel = (int) Math.max(1, Math.ceil(clamped * 0.05));
                         if (existing.floorLevel <= 0) existing.floorLevel = 1;
                     }
+
+                    double quantityDifference = clamped - oldQuantity;
 
                     existing.quantity = clamped;
                     if (newCostPrice >= 0) {
@@ -574,15 +523,19 @@ public class ProductRepository {
                     productDao.update(existing);
 
                     if (productId != null && !productId.startsWith("local:")) {
+                        Map<String, Object> cloudUpdates = new HashMap<>();
+                        cloudUpdates.put("quantity", com.google.firebase.firestore.FieldValue.increment(quantityDifference));
+                        cloudUpdates.put("reorderLevel", existing.reorderLevel);
+                        cloudUpdates.put("criticalLevel", existing.criticalLevel);
+
+                        if (newCostPrice >= 0) {
+                            cloudUpdates.put("costPrice", existing.costPrice);
+                        }
+
                         FirebaseFirestore.getInstance()
                                 .collection(FirestoreManager.getInstance().getUserProductsPath())
                                 .document(productId)
-                                .update(
-                                        "quantity", existing.quantity,
-                                        "costPrice", existing.costPrice,
-                                        "reorderLevel", existing.reorderLevel,
-                                        "criticalLevel", existing.criticalLevel
-                                );
+                                .update(cloudUpdates);
                     } else {
                         SyncScheduler.enqueueImmediateSync(application.getApplicationContext());
                     }
@@ -684,11 +637,21 @@ public class ProductRepository {
 
     public void runExpirySweep() {
         syncExecutor.execute(() -> {
-            List<ProductEntity> entities = productDao.getAllProductsSync();
-            if (entities == null) return;
-            for (ProductEntity e : entities) {
-                checkExpiryForEntity(e);
-                checkFloorForEntity(e);
+            try {
+                // CRITICAL FIX: Ensure database is open before sweeping
+                if (db == null || !db.isOpen()) return;
+
+                List<ProductEntity> entities = productDao.getAllProductsSync();
+                if (entities == null) return;
+
+                for (ProductEntity e : entities) {
+                    checkExpiryForEntity(e);
+                    checkFloorForEntity(e);
+                }
+            } catch (IllegalStateException | android.database.SQLException e) {
+                Log.e("ProductRepo", "Database closed during expiry sweep.");
+            } catch (Exception e) {
+                Log.e("ProductRepo", "Error in expiry sweep: " + e.getMessage());
             }
         });
     }
@@ -912,6 +875,9 @@ public class ProductRepository {
         if (p == null || p.getProductId() == null) return;
         syncExecutor.execute(() -> {
             try {
+                // CRITICAL FIX: Safe exit if connection closed
+                if (db == null || !db.isOpen()) return;
+
                 ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
                 long now = System.currentTimeMillis();
 
@@ -944,6 +910,8 @@ public class ProductRepository {
                     newEntity.lastUpdated = now;
                     productDao.insert(newEntity);
                 }
+            } catch (IllegalStateException | android.database.SQLException e) {
+                Log.e("ProductRepo", "Database closed during upsertFromRemote.");
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1210,49 +1178,62 @@ public class ProductRepository {
         }
     }
 
-    // ==============================================================================
-    // CRITICAL FIX: Saves hundreds of products in a single database transaction!
-    // This stops the UI from freezing and redrawing itself repeatedly.
-    // ==============================================================================
     public void upsertFromRemoteBulk(List<Product> products) {
+        if (products == null || products.isEmpty()) return;
+
         syncExecutor.execute(() -> {
-            // Run inside a single Transaction so LiveData only triggers ONE time at the very end
-            db.runInTransaction(() -> {
-                long now = System.currentTimeMillis();
-                List<ProductEntity> allLocal = productDao.getAllProductsSync();
+            try {
+                // CRITICAL SAFETY CHECK: Exit if DB is null, closed, or closing
+                if (db == null || !db.isOpen()) {
+                    Log.w("ProductRepo", "Database is closed. Aborting bulk upsert.");
+                    return;
+                }
 
-                for (Product p : products) {
-                    if (p == null || p.getProductId() == null) continue;
+                db.runInTransaction(() -> {
+                    // SECONDARY SAFETY CHECK: Ensure connection didn't close between threads
+                    if (!db.isOpen()) return;
 
-                    ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
+                    long now = System.currentTimeMillis();
+                    List<ProductEntity> allLocal = productDao.getAllProductsSync();
 
-                    if (existing == null && allLocal != null) {
-                        for (ProductEntity e : allLocal) {
-                            if (e.productName != null && p.getProductName() != null &&
-                                    e.productName.trim().equalsIgnoreCase(p.getProductName().trim())) {
-                                existing = e;
-                                break;
+                    for (Product p : products) {
+                        if (p == null || p.getProductId() == null) continue;
+
+                        ProductEntity existing = productDao.getByProductIdSync(p.getProductId());
+
+                        if (existing == null && allLocal != null) {
+                            for (ProductEntity e : allLocal) {
+                                if (e.productName != null && p.getProductName() != null &&
+                                        e.productName.trim().equalsIgnoreCase(p.getProductName().trim())) {
+                                    existing = e;
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if (existing != null) {
-                        if ("PENDING".equalsIgnoreCase(existing.syncState) || "DELETE_PENDING".equalsIgnoreCase(existing.syncState)) {
-                            continue; // Don't overwrite local changes that haven't uploaded yet
+                        if (existing != null) {
+                            if ("PENDING".equalsIgnoreCase(existing.syncState) || "DELETE_PENDING".equalsIgnoreCase(existing.syncState)) {
+                                continue;
+                            }
+                            ProductEntity updated = mapProductToEntity(p);
+                            updated.localId = existing.localId;
+                            updated.syncState = "SYNCED";
+                            updated.lastUpdated = now;
+                            productDao.update(updated);
+                        } else {
+                            ProductEntity newEntity = mapProductToEntity(p);
+                            newEntity.syncState = "SYNCED";
+                            newEntity.lastUpdated = now;
+                            productDao.insert(newEntity);
                         }
-                        ProductEntity updated = mapProductToEntity(p);
-                        updated.localId = existing.localId;
-                        updated.syncState = "SYNCED";
-                        updated.lastUpdated = now;
-                        productDao.update(updated);
-                    } else {
-                        ProductEntity newEntity = mapProductToEntity(p);
-                        newEntity.syncState = "SYNCED";
-                        newEntity.lastUpdated = now;
-                        productDao.insert(newEntity);
                     }
-                }
-            });
+                });
+            } catch (IllegalStateException | android.database.SQLException e) {
+                // Gracefully catch closure errors instead of crashing the process
+                Log.e("ProductRepo", "Transaction failed - DB likely closed: " + e.getMessage());
+            } catch (Exception e) {
+                Log.e("ProductRepo", "Error in bulk upsert: " + e.getMessage());
+            }
         });
     }
 

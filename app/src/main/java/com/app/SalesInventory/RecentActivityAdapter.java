@@ -82,9 +82,10 @@ public class RecentActivityAdapter extends RecyclerView.Adapter<RecentActivityAd
             } else if (diff < 3600000) {
                 return (diff / 60000) + " minutes ago";
             } else if (diff < 86400000) {
-                return (diff / 3600000) + " hours ago";
+                long hours = diff / 3600000;
+                return hours <= 1 ? "1 hour ago" : hours + " hours ago";
             } else {
-                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault());
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy  hh:mm a", Locale.getDefault());
                 return sdf.format(new Date(timestamp));
             }
         }

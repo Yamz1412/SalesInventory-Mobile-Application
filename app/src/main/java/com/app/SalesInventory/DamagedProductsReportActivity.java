@@ -207,8 +207,9 @@ public class  DamagedProductsReportActivity extends BaseActivity {
 
                 String reason = adj.getReason() != null ? adj.getReason().toLowerCase() : "";
 
-                if ("Remove Stock".equalsIgnoreCase(adj.getAdjustmentType()) &&
-                        (reason.contains("damage") || reason.contains("spoil") || reason.contains("expire") || reason.contains("waste"))) {
+                // FIX 1: Look for "DEDUCTION" exactly as it is saved in StockAdjustmentActivity
+                if ("DEDUCTION".equalsIgnoreCase(adj.getAdjustmentType()) &&
+                        (reason.contains("damage") || reason.contains("spoil") || reason.contains("expire") || reason.contains("waste") || reason.contains("lost"))) {
 
                     double qtyLost = Math.abs(adj.getQuantityAdjusted());
                     double unitCost = 0.0;
@@ -216,7 +217,8 @@ public class  DamagedProductsReportActivity extends BaseActivity {
 
                     for (Product p : currentInventory) {
                         if (p.getProductId().equals(adj.getProductId())) {
-                            unitCost = p.getQuantity() > 0 ? (p.getCostPrice() / p.getQuantity()) : 0.0;
+                            // FIX 2: Just use the exact Cost Price. Do NOT divide by p.getQuantity()!
+                            unitCost = p.getCostPrice();
                             productLine = p.getProductLine() != null ? p.getProductLine() : "";
                             break;
                         }

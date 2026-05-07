@@ -6,6 +6,7 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.functions.FirebaseFunctions;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -403,14 +404,54 @@ public class AuthManager {
         String uid = getCurrentUserId();
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
 
-        // CRITICAL FIX: Ensure uid and ownerId are not empty strings!
         if (uid == null || uid.isEmpty() || ownerId == null || ownerId.isEmpty()) return;
 
         FirebaseFirestore.getInstance().collection("users").document(ownerId).collection("shifts")
                 .whereEqualTo("cashierId", uid)
                 .whereEqualTo("active", true)
                 .get().addOnSuccessListener(query -> {
-                    if (query.isEmpty()) {
+                    boolean createNew = true;
+
+                    if (!query.isEmpty()) {
+                        DocumentSnapshot doc = query.getDocuments().get(0);
+                        Long startTime = doc.getLong("startTime");
+
+                        // Check if the active shift is ACTUALLY from today
+                        if (startTime != null && android.text.format.DateUtils.isToday(startTime)) {
+                            // Valid shift for today, resume it!
+                            activeShiftId = doc.getId();
+                            createNew = false;
+
+                            // Ensure UI is corrected to unlocked since they just opened the app
+                            Map<String, Object> updates = new HashMap<>();
+                            updates.put("locked", false);
+
+                            // Balance the arrays if it was stuck on break
+                            List<Long> locks = (List<Long>) doc.get("lockTimes");
+                            List<Long> unlocks = (List<Long>) doc.get("unlockTimes");
+                            if (locks != null && unlocks != null && locks.size() > unlocks.size()) {
+                                updates.put("unlockTimes", com.google.firebase.firestore.FieldValue.arrayUnion(System.currentTimeMillis()));
+                            }
+                            doc.getReference().update(updates);
+
+                        } else {
+                            // Old ghost shift from a previous day! Close it out.
+                            Map<String, Object> closeUpdates = new HashMap<>();
+                            closeUpdates.put("active", false);
+                            closeUpdates.put("locked", false);
+                            closeUpdates.put("status", "CLOSED");
+                            closeUpdates.put("endTime", System.currentTimeMillis());
+
+                            List<Long> locks = (List<Long>) doc.get("lockTimes");
+                            List<Long> unlocks = (List<Long>) doc.get("unlockTimes");
+                            if (locks != null && unlocks != null && locks.size() > unlocks.size()) {
+                                closeUpdates.put("unlockTimes", com.google.firebase.firestore.FieldValue.arrayUnion(System.currentTimeMillis()));
+                            }
+                            doc.getReference().update(closeUpdates);
+                        }
+                    }
+
+                    if (createNew) {
                         DocumentReference newShiftRef = FirebaseFirestore.getInstance()
                                 .collection("users").document(ownerId).collection("shifts").document();
 
@@ -421,11 +462,10 @@ public class AuthManager {
                         shift.setStartTime(System.currentTimeMillis());
                         shift.setActive(true);
                         shift.setStatus("ACTIVE");
+                        shift.setLocked(false);
 
                         newShiftRef.set(shift.toMap());
                         activeShiftId = newShiftRef.getId();
-                    } else {
-                        activeShiftId = query.getDocuments().get(0).getId();
                     }
                 });
     }
@@ -461,29 +501,68 @@ public class AuthManager {
     }
 
     public void logShiftLock(boolean isLocking) {
-        if (activeShiftId == null) return;
+        String uid = getCurrentUserId();
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
 
-        // CRITICAL FIX: Ensure ownerId is not an empty string
-        if (ownerId == null || ownerId.isEmpty()) return;
+        if (uid == null || uid.isEmpty() || ownerId == null || ownerId.isEmpty()) return;
 
+        if (activeShiftId != null) {
+            executeLockUpdate(ownerId, activeShiftId, isLocking);
+        } else {
+            fStore.collection("users").document(ownerId).collection("shifts")
+                    .whereEqualTo("cashierId", uid)
+                    .whereEqualTo("active", true)
+                    .get().addOnSuccessListener(query -> {
+                        if (!query.isEmpty()) {
+                            activeShiftId = query.getDocuments().get(0).getId();
+                            executeLockUpdate(ownerId, activeShiftId, isLocking);
+                        }
+                    });
+        }
+    }
+
+    private void executeLockUpdate(String ownerId, String shiftId, boolean isLocking) {
         String arrayField = isLocking ? "lockTimes" : "unlockTimes";
-
         Map<String, Object> updates = new HashMap<>();
         updates.put("locked", isLocking);
         updates.put(arrayField, com.google.firebase.firestore.FieldValue.arrayUnion(System.currentTimeMillis()));
 
-        fStore.collection("shifts").document(ownerId).collection("records").document(activeShiftId).update(updates);
+        fStore.collection("users").document(ownerId)
+                .collection("shifts").document(shiftId)
+                .update(updates);
     }
 
     public void signOutAndCleanup(final Runnable onComplete) {
         final String uid = getCurrentUserId();
         final String owner = FirestoreManager.getInstance().getBusinessOwnerId();
+
+        // CRITICAL FIX: Explicitly set offline in Firestore BEFORE wiping the auth session
+        if (uid != null && !uid.isEmpty()) {
+            long now = System.currentTimeMillis();
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("isOnline", false);
+            updates.put("lastActive", now);
+            fStore.collection("users").document(uid).set(updates, SetOptions.merge());
+
+            FirebaseDatabase.getInstance().getReference("UsersStatus").child(uid).child("status").setValue("offline");
+            FirebaseDatabase.getInstance().getReference("UsersStatus").child(uid).child("lastActive").setValue(now);
+        }
+
         endAutomatedShift();
 
         if (application != null) {
-            // CRITICAL FIX: Wrap these aggressive cleaners in try-catch blocks so they don't
-            // trigger "Connection is closed" SQL exceptions that crash the logout process!
+            java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+                try { AppDatabase.getInstance(application).clearAllTables(); } catch (Exception ignored) {}
+            });
+
+            application.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .remove("business_owner_routing")
+                    .remove("user_id")
+                    .remove("business_owner")
+                    .remove("user_role")
+                    .apply();
+
             try { ProductRepository.getInstance(application).clearLocalData(); } catch (Exception ignored) {}
             try { SalesRepository.getInstance(application).clearData(); } catch (Exception ignored) {}
             try { DashboardRepository.getInstance().clearData(); } catch (Exception ignored) {}
@@ -491,6 +570,7 @@ public class AuthManager {
         }
 
         FirestoreManager.getInstance().clearCachedIds();
+        FirestoreManager.resetInstance();
 
         try { ProductRepository.resetInstance(); } catch (Exception ignored) {}
         try { SalesRepository.resetInstance(); } catch (Exception ignored) {}

@@ -46,6 +46,8 @@ import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -408,15 +410,18 @@ public class sellProduct extends BaseActivity {
             if (!loadingDialog.isShowing()) loadingDialog.show();
 
             if (newQrImageUri != null) {
+                // IMAGES: Require internet to generate the secure Cloud URL
                 String path = "payment_qrs/" + UUID.randomUUID().toString() + ".jpg";
                 StorageReference ref = FirebaseStorage.getInstance().getReference(path);
                 ref.putFile(newQrImageUri).addOnSuccessListener(taskSnapshot -> ref.getDownloadUrl().addOnSuccessListener(uri -> {
                     savePaymentDetailsToFirestore(method, name, number, uri.toString(), dialog);
                 })).addOnFailureListener(e -> {
-                    if (loadingDialog.isShowing()) loadingDialog.dismiss();
-                    Toast.makeText(this, "Upload failed", Toast.LENGTH_SHORT).show();
+                    if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+                    // CRITICAL FIX: Graceful offline failure for image uploads
+                    Toast.makeText(this, "QR Image upload requires internet. Please try again when online.", Toast.LENGTH_LONG).show();
                 });
             } else {
+                // TEXT ONLY: Can be saved fully offline!
                 savePaymentDetailsToFirestore(method, name, number, "", dialog);
             }
         });
@@ -434,16 +439,16 @@ public class sellProduct extends BaseActivity {
         Map<String, Object> update = new HashMap<>();
         update.put(method, details);
 
+        if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+        if (dialog != null) dialog.dismiss();
+
         FirebaseFirestore.getInstance()
                 .collection("users").document(ownerId)
                 .collection("settings").document("payment_methods")
-                .set(update, com.google.firebase.firestore.SetOptions.merge())
-                .addOnSuccessListener(aVoid -> {
-                    if (loadingDialog.isShowing()) loadingDialog.dismiss();
-                    dialog.dismiss();
-                    loadPaymentMethodDetails(method);
-                    Toast.makeText(this, "Details Saved", Toast.LENGTH_SHORT).show();
-                });
+                .set(update, com.google.firebase.firestore.SetOptions.merge());
+
+        loadPaymentMethodDetails(method);
+        Toast.makeText(this, "Details Saved (Will sync automatically)", Toast.LENGTH_SHORT).show();
     }
 
     @android.annotation.SuppressLint("MissingPermission")
@@ -745,6 +750,120 @@ public class sellProduct extends BaseActivity {
         }
     }
 
+    // LIVE CART VALIDATION (DEEP RAW MATERIAL SCANNER)
+    private boolean validateLiveStock() {
+        boolean hasGhostItems = false;
+        StringBuilder errorMsg = new StringBuilder("Cannot complete sale. The following items went out of stock:\n\n");
+
+        // 1. Map to accumulate total raw materials required by this entire cart
+        Map<String, Double> totalRawNeeded = new HashMap<>();
+
+        for (CartManager.CartItem cartItem : cartManager.getItems()) {
+            Product liveProduct = null;
+            for (Product p : cachedInventoryList) {
+                if (p.getProductId().equals(cartItem.productId)) {
+                    liveProduct = p;
+                    break;
+                }
+            }
+
+            if (liveProduct != null) {
+                boolean hasRecipe = (liveProduct.getBomList() != null && !liveProduct.getBomList().isEmpty()) ||
+                        (liveProduct.getUnifiedVariations() != null && !liveProduct.getUnifiedVariations().isEmpty());
+
+                if (!hasRecipe) {
+                    // Direct retail product
+                    if (liveProduct.getQuantity() < cartItem.quantity) {
+                        hasGhostItems = true;
+                        errorMsg.append("- ").append(liveProduct.getProductName())
+                                .append(" (Only ").append((int) liveProduct.getQuantity()).append(" left)\n");
+                        cartItem.quantity = (int) liveProduct.getQuantity();
+                        cartItem.stock = liveProduct.getQuantity();
+                    }
+                } else {
+                    // Accumulate raw materials needed for this menu item
+                    List<Map<String, Object>> activeRecipe = liveProduct.getBomList();
+                    if (activeRecipe != null) {
+                        for (Map<String, Object> bomItem : activeRecipe) {
+                            String rawName = (String) bomItem.get("materialName");
+                            if (rawName == null) rawName = (String) bomItem.get("rawMaterialName");
+                            if (rawName == null) continue;
+
+                            // Check exclusions
+                            if (cartItem.excludedIngredients != null && cartItem.excludedIngredients.contains(rawName)) continue;
+
+                            double reqQty = 0;
+                            try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception ignored) {}
+                            if (reqQty == 0) {
+                                try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+                            }
+
+                            String reqUnit = (String) bomItem.get("unit");
+
+                            // Find the raw material in inventory to do accurate math
+                            Product rawMaterial = null;
+                            for (Product p : cachedInventoryList) {
+                                if (p.getProductName() != null && p.getProductName().trim().equalsIgnoreCase(rawName.trim())) {
+                                    rawMaterial = p;
+                                    break;
+                                }
+                            }
+
+                            if (rawMaterial != null) {
+                                int ppu = rawMaterial.getPiecesPerUnit() > 0 ? rawMaterial.getPiecesPerUnit() : 1;
+                                String invUnit = rawMaterial.getUnit() != null ? rawMaterial.getUnit().toLowerCase().trim() : "pcs";
+                                double deduction = UnitConverterUtil.calculateDeductionAmount(reqQty, invUnit, reqUnit, ppu);
+
+                                totalRawNeeded.put(rawMaterial.getProductId(), totalRawNeeded.getOrDefault(rawMaterial.getProductId(), 0.0) + (deduction * cartItem.quantity));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Validate accumulated raw materials against live stock
+        for (Map.Entry<String, Double> entry : totalRawNeeded.entrySet()) {
+            Product rawProduct = null;
+            for (Product p : cachedInventoryList) {
+                if (p.getProductId().equals(entry.getKey())) {
+                    rawProduct = p;
+                    break;
+                }
+            }
+            if (rawProduct != null && rawProduct.getQuantity() < entry.getValue()) {
+                hasGhostItems = true;
+                errorMsg.append("- ").append(rawProduct.getProductName())
+                        .append(" is insufficient for this cart. (Need: ")
+                        .append(Math.round(entry.getValue() * 100.0) / 100.0)
+                        .append(", Have: ").append(Math.round(rawProduct.getQuantity() * 100.0) / 100.0).append(")\n");
+            }
+        }
+
+        if (hasGhostItems) {
+            // Clean up cart: safely remove any items that dropped entirely to 0
+            java.util.Iterator<CartManager.CartItem> iterator = cartManager.getItems().iterator();
+            while (iterator.hasNext()) {
+                if (iterator.next().quantity <= 0) iterator.remove();
+            }
+
+            if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+
+            new AlertDialog.Builder(this)
+                    .setTitle("⚠️ Inventory Insufficient!")
+                    .setMessage(errorMsg.toString() + "\nPlease adjust your cart quantities.")
+                    .setPositiveButton("OK", (d, w) -> {
+                        updateCartUI();
+                        calculateTotalFromCart();
+                    })
+                    .show();
+
+            return false;
+        }
+
+        return true;
+    }
+
     private void setPaymentSections(boolean isCash) {
         if (isCash) {
             layoutCashSection.setVisibility(View.VISIBLE);
@@ -991,6 +1110,10 @@ public class sellProduct extends BaseActivity {
                 return;
             }
             paymentDetails = method + (refNum.isEmpty() ? "" : " (Ref: " + refNum + ")");
+
+        }
+        if (!validateLiveStock()) {
+            return;
         }
 
         String orderId = java.util.UUID.randomUUID().toString();
@@ -1013,7 +1136,8 @@ public class sellProduct extends BaseActivity {
         if (index >= items.size()) {
             runOnUiThread(() -> {
                 if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
-                saveSale(paymentMethod, isDelivery, dName, dPhone, dAddr, dPay, enrichedNames, orderId);
+                // CRITICAL FIX 1: Do NOT save to the database yet! Show the Preview Dialog first.
+                showReceiptPreviewDialog(paymentMethod, isDelivery, dName, dPhone, dAddr, dPay, enrichedNames, orderId);
             });
             return;
         }
@@ -1030,10 +1154,128 @@ public class sellProduct extends BaseActivity {
         fetchCartItemDetails(index + 1, items, enrichedNames, orderId, paymentMethod, isDelivery, dName, dPhone, dAddr, dPay);
     }
 
-    private void saveSale(String paymentMethod, boolean isDelivery, String dName, String dPhone,
-                          String dAddr, String dPay, Map<String, String> enrichedNames, String orderId) {
+    // CRITICAL FIX 2: A new method that shows the Receipt BEFORE saving to Firebase
+    private void showReceiptPreviewDialog(String paymentMethod, boolean isDelivery, String dName, String dPhone,
+                                          String dAddr, String dPay, Map<String, String> enrichedNames, String orderId) {
 
-        runOnUiThread(() -> { if (loadingDialog != null && !loadingDialog.isShowing()) loadingDialog.show(); });
+        // 1. Pre-build the Receipt Text for the database/printer
+        StringBuilder receiptText = new StringBuilder();
+        receiptText.append("Order ID: ").append(orderId.substring(0, 8).toUpperCase()).append("\n");
+        receiptText.append("Date: ").append(new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault()).format(new java.util.Date())).append("\n\n");
+
+        for (CartManager.CartItem item : cartManager.getItems()) {
+            receiptText.append(item.quantity).append("x ").append(item.productName)
+                    .append("   ₱").append(String.format(Locale.US, "%,.2f", item.getLineTotal())).append("\n");
+
+            if (item.size != null && !item.size.isEmpty()) receiptText.append("    Size: ").append(item.size).append("\n");
+            if (item.extraDetails != null && !item.extraDetails.isEmpty()) receiptText.append("    Mods: ").append(item.extraDetails).append("\n");
+
+            String note = cartNotes.get(item.productId);
+            if (note != null && !note.trim().isEmpty()) receiptText.append("    Note: ").append(note).append("\n");
+
+            if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
+                String[] missingItems = item.excludedIngredients.split(",");
+                for (String missing : missingItems) {
+                    if (!missing.trim().isEmpty()) receiptText.append("    *** NO ").append(missing.trim().toUpperCase()).append(" ***\n");
+                }
+            }
+            receiptText.append("\n");
+        }
+        receiptText.append("-------------------\n");
+        receiptText.append("TOTAL: ₱").append(String.format(Locale.US, "%,.2f", finalTotal)).append("\n");
+        receiptText.append("PAYMENT: ").append(paymentMethod).append("\n");
+
+        // 2. Build the Visual Dialog UI
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_receipt, null);
+        AlertDialog receiptDialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .setCancelable(false)
+                .create();
+
+        LinearLayout rootLayout = dialogView.findViewById(R.id.layoutReceiptRoot);
+        TextView tvBusinessName = dialogView.findViewById(R.id.tvReceiptBusinessName);
+        ImageView ivBusinessLogo = dialogView.findViewById(R.id.ivReceiptBusinessLogo);
+        TextView tvOrderId = dialogView.findViewById(R.id.tvReceiptOrderId);
+        TextView tvDate = dialogView.findViewById(R.id.tvReceiptDateTime);
+        LinearLayout lvReceiptItems = dialogView.findViewById(R.id.lvReceiptItems);
+        TextView tvTotal = dialogView.findViewById(R.id.tvReceiptTotal);
+        TextView tvPaymentMethodStr = dialogView.findViewById(R.id.tvReceiptPaymentMethod);
+        View layoutChange = dialogView.findViewById(R.id.layoutReceiptChange);
+        TextView tvReceiptChange = dialogView.findViewById(R.id.tvReceiptChange);
+        Button btnPrint = dialogView.findViewById(R.id.btnPrintReceipt);
+        Button btnFinalizeSale = dialogView.findViewById(R.id.btnFinalizeSale);
+        Button btnCancelReceipt = dialogView.findViewById(R.id.btnCancelReceipt);
+
+        // Safe Cancel: Closes the dialog. Nothing was ever saved to Firebase!
+        btnCancelReceipt.setOnClickListener(v -> receiptDialog.dismiss());
+
+        if (tvBusinessName != null) tvBusinessName.setText(cachedBusinessName);
+        if (ivBusinessLogo != null && cachedBusinessLogoUrl != null && !cachedBusinessLogoUrl.isEmpty()) {
+            ivBusinessLogo.setVisibility(View.VISIBLE);
+            Glide.with(this).load(cachedBusinessLogoUrl).into(ivBusinessLogo);
+        }
+
+        if (tvOrderId != null) tvOrderId.setText("Order ID: #" + orderId.substring(0, 8).toUpperCase());
+        if (tvDate != null) tvDate.setText(new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()));
+        if (tvTotal != null) tvTotal.setText(String.format(Locale.US, "₱%,.2f", finalTotal));
+        if (tvPaymentMethodStr != null) tvPaymentMethodStr.setText(paymentMethod);
+
+        if (lvReceiptItems != null) {
+            lvReceiptItems.removeAllViews();
+            for (CartManager.CartItem item : cartManager.getItems()) {
+                TextView tv = new TextView(this);
+                String sizeInfo = (item.size != null && !item.size.isEmpty()) ? "\n  Size: " + item.size : "";
+                String modInfo = (item.extraDetails != null && !item.extraDetails.isEmpty()) ? "\n  Mods: " + item.extraDetails : "";
+                String nameWithDetails = item.productName + sizeInfo + modInfo;
+
+                String cNote = cartNotes.get(item.productId);
+                if (cNote != null && !cNote.trim().isEmpty()) nameWithDetails += "\n  Note: " + cNote;
+                if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
+                    for (String missing : item.excludedIngredients.split(",")) {
+                        if (!missing.trim().isEmpty()) nameWithDetails += "\n  *** NO " + missing.trim().toUpperCase() + " ***";
+                    }
+                }
+                tv.setText(item.quantity + "x " + nameWithDetails + " - " + String.format(Locale.US, "₱%,.2f", item.getLineTotal()));
+                tv.setPadding(0, 0, 0, 16);
+                lvReceiptItems.addView(tv);
+            }
+        }
+
+        if ("Cash".equals(selectedPaymentMethod) || paymentMethod.startsWith("Cash")) {
+            if (layoutChange != null) layoutChange.setVisibility(View.VISIBLE);
+            try {
+                String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
+                double cashGiven = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
+                if (tvReceiptChange != null) tvReceiptChange.setText(String.format(Locale.US, "₱%,.2f", (cashGiven - finalTotal)));
+            } catch (Exception e) {}
+        } else {
+            if (layoutChange != null) layoutChange.setVisibility(View.GONE);
+        }
+
+        if (btnPrint != null) {
+            if (isBluetoothPrinterConnected()) {
+                btnPrint.setVisibility(View.VISIBLE);
+                btnPrint.setOnClickListener(v -> ReceiptPrinterManager.printReceipt(sellProduct.this, orderId, receiptText.toString()));
+            } else {
+                btnPrint.setVisibility(View.GONE);
+            }
+        }
+
+        // CRITICAL FIX 3: Push the transaction to Firebase ONLY when Finalize is clicked!
+        if (btnFinalizeSale != null) {
+            btnFinalizeSale.setOnClickListener(v -> {
+                if (loadingDialog != null && !loadingDialog.isShowing()) loadingDialog.show();
+                btnFinalizeSale.setEnabled(false); // Prevent double-clicking
+                saveSale(paymentMethod, isDelivery, dName, dPhone, dAddr, dPay, enrichedNames, orderId, receiptText.toString(), rootLayout, receiptDialog);
+            });
+        }
+
+        if (receiptDialog.getWindow() != null) receiptDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        receiptDialog.show();
+    }
+
+    private void saveSale(String paymentMethod, boolean isDelivery, String dName, String dPhone,
+                          String dAddr, String dPay, Map<String, String> enrichedNames, String orderId, String receiptText, LinearLayout rootLayout, AlertDialog receiptDialog) {
 
         List<CartManager.CartItem> items = new ArrayList<>(cartManager.getItems());
         if (items.isEmpty()) {
@@ -1043,8 +1285,6 @@ public class sellProduct extends BaseActivity {
 
         double subtotal = cartManager.getSubtotal();
         long now = System.currentTimeMillis();
-
-        int[] savedCount = {0};
 
         for (CartManager.CartItem item : items) {
 
@@ -1117,7 +1357,6 @@ public class sellProduct extends BaseActivity {
                         String matName = (String) bomItem.get("rawMaterialName");
                         if (matName == null) matName = (String) bomItem.get("materialName");
 
-                        // SAFE EXCLUSION CHECK (Prevents deducting unchecked items)
                         String uniqueKey = rawId != null ? rawId : matName;
                         if (uniqueKey != null && excluded.contains(uniqueKey)) {
                             continue;
@@ -1129,7 +1368,7 @@ public class sellProduct extends BaseActivity {
                             try { bQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
                         }
 
-                        String note = item.itemNote; // FIXED: Use the isolated item note
+                        String note = item.itemNote;
                         if (note != null && matName != null) {
                             String noteLower = note.toLowerCase();
                             String materialLower = matName.toLowerCase();
@@ -1147,7 +1386,6 @@ public class sellProduct extends BaseActivity {
                         }
                     }
                 }
-                // =======================================================================================
 
                 if (p.getSizesList() != null && item.size != null && !item.size.isEmpty()) {
                     for (Map<String, Object> sizeItem : p.getSizesList()) {
@@ -1185,182 +1423,26 @@ public class sellProduct extends BaseActivity {
                 @Override public void onError(String error) {}
             });
         }
-        finalizeSaleCompletion(paymentMethod, orderId, enrichedNames);
+        finalizeSaleCompletion(paymentMethod, orderId, receiptText, rootLayout, receiptDialog);
     }
 
-    private void finalizeSaleCompletion(String paymentMethod, String orderId, Map<String, String> enrichedNames) {
+    private void finalizeSaleCompletion(String paymentMethod, String orderId, String receiptText, LinearLayout rootLayout, AlertDialog receiptDialog) {
         updateCashManagementWallet(paymentMethod, finalTotal, orderId);
 
-        for (CartManager.CartItem item : cartManager.getItems()) {
-            SalesInventoryApplication.getProductRepository().getProductById(item.productId, new ProductRepository.OnProductFetchedListener() {
-                @Override
-                public void onProductFetched(Product p) {
-                    if (p != null) {
-                        if (p.getCriticalLevel() > 0 && p.getQuantity() <= p.getCriticalLevel()) {
-                            NotificationHelper.showNotification(sellProduct.this,
-                                    "🚨 Critical Stock: " + p.getProductName(),
-                                    "Only " + p.getQuantity() + " left in stock!",
-                                    p.getProductId());
-                        }
-                    }
-                }
-
-                @Override
-                public void onError(String error) {
-                }
-            });
-        }
-
-        StringBuilder receiptText = new StringBuilder();
-        receiptText.append("Order ID: ").append(orderId.substring(0, 8).toUpperCase()).append("\n");
-        receiptText.append("Date: ").append(new java.text.SimpleDateFormat("MMM dd, yyyy HH:mm", java.util.Locale.getDefault()).format(new java.util.Date())).append("\n\n");
-
-        for (CartManager.CartItem item : cartManager.getItems()) {
-            receiptText.append(item.quantity).append("x ").append(item.productName)
-                    .append("   ₱").append(String.format(Locale.US, "%,.2f", item.getLineTotal())).append("\n");
-
-            if (item.size != null && !item.size.isEmpty()) {
-                receiptText.append("    Size: ").append(item.size).append("\n");
-            }
-
-            if (item.extraDetails != null && !item.extraDetails.isEmpty()) {
-                receiptText.append("    Mods: ").append(item.extraDetails).append("\n");
-            }
-
-            String note = cartNotes.get(item.productId);
-            if (note != null && !note.trim().isEmpty()) {
-                receiptText.append("    Note: ").append(note).append("\n");
-            }
-
-            // SIR TAN'S REQUIREMENT: Boldly print Missing/Excluded Ingredients
-            if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
-                String[] missingItems = item.excludedIngredients.split(",");
-                for (String missing : missingItems) {
-                    if (!missing.trim().isEmpty()) {
-                        receiptText.append("    *** NO ").append(missing.trim().toUpperCase()).append(" ***\n");
-                    }
-                }
-            }
-            receiptText.append("\n"); // Space between items
-        }
-
-        receiptText.append("-------------------\n");
-        receiptText.append("TOTAL: ₱").append(String.format(Locale.US, "%,.2f", finalTotal)).append("\n");
-        receiptText.append("PAYMENT: ").append(paymentMethod).append("\n");
-
         try {
-            ReceiptStorageManager.generateAndSaveReceipt(this, orderId, receiptText.toString());
+            ReceiptStorageManager.generateAndSaveReceipt(this, orderId, receiptText);
         } catch (Exception e) {
             e.printStackTrace();
         }
+
         runOnUiThread(() -> {
             if (loadingDialog != null) loadingDialog.dismiss();
-
-            View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_receipt, null);
-            AlertDialog receiptDialog = new AlertDialog.Builder(this)
-                    .setView(dialogView)
-                    .setCancelable(false)
-                    .create();
-
-            LinearLayout rootLayout = dialogView.findViewById(R.id.layoutReceiptRoot);
-            TextView tvBusinessName = dialogView.findViewById(R.id.tvReceiptBusinessName);
-            ImageView ivBusinessLogo = dialogView.findViewById(R.id.ivReceiptBusinessLogo);
-            TextView tvOrderId = dialogView.findViewById(R.id.tvReceiptOrderId);
-            TextView tvDate = dialogView.findViewById(R.id.tvReceiptDateTime);
-
-            // FIX: Changed to LinearLayout to prevent addView() crash
-            LinearLayout lvReceiptItems = dialogView.findViewById(R.id.lvReceiptItems);
-
-            TextView tvTotal = dialogView.findViewById(R.id.tvReceiptTotal);
-            TextView tvPaymentMethodStr = dialogView.findViewById(R.id.tvReceiptPaymentMethod);
-            View layoutChange = dialogView.findViewById(R.id.layoutReceiptChange);
-            TextView tvReceiptChange = dialogView.findViewById(R.id.tvReceiptChange);
-            Button btnPrint = dialogView.findViewById(R.id.btnPrintReceipt);
-            Button btnFinalizeSale = dialogView.findViewById(R.id.btnFinalizeSale);
-
-            if (tvBusinessName != null) tvBusinessName.setText(cachedBusinessName);
-            if (ivBusinessLogo != null && cachedBusinessLogoUrl != null && !cachedBusinessLogoUrl.isEmpty()) {
-                ivBusinessLogo.setVisibility(View.VISIBLE);
-                Glide.with(this).load(cachedBusinessLogoUrl).into(ivBusinessLogo);
-            }
-
-            if (tvOrderId != null)
-                tvOrderId.setText("Order ID: #" + orderId.substring(0, 8).toUpperCase());
-            if (tvDate != null)
-                tvDate.setText(new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(new Date()));
-
-            if (tvTotal != null) tvTotal.setText(String.format(Locale.US, "₱%,.2f", finalTotal));
-            if (tvPaymentMethodStr != null) tvPaymentMethodStr.setText(paymentMethod);
-
-            // 2. Build the Digital UI List
-            if (lvReceiptItems != null) {
-                lvReceiptItems.removeAllViews();
-                for (CartManager.CartItem item : cartManager.getItems()) {
-                    TextView tv = new TextView(this);
-
-                    String sizeInfo = (item.size != null && !item.size.isEmpty()) ? "\n  Size: " + item.size : "";
-                    String modInfo = (item.extraDetails != null && !item.extraDetails.isEmpty()) ? "\n  Mods: " + item.extraDetails : "";
-                    String nameWithDetails = item.productName + sizeInfo + modInfo;
-
-                    String cNote = cartNotes.get(item.productId);
-                    if (cNote != null && !cNote.trim().isEmpty()) {
-                        nameWithDetails += "\n  Note: " + cNote;
-                    }
-
-                    if (item.excludedIngredients != null && !item.excludedIngredients.isEmpty()) {
-                        String[] missingItems = item.excludedIngredients.split(",");
-                        for (String missing : missingItems) {
-                            if (!missing.trim().isEmpty()) {
-                                nameWithDetails += "\n  *** NO " + missing.trim().toUpperCase() + " ***";
-                            }
-                        }
-                    }
-
-                    tv.setText(item.quantity + "x " + nameWithDetails + " - " + String.format(Locale.US, "₱%,.2f", item.getLineTotal()));
-                    tv.setPadding(0, 0, 0, 16);
-                    lvReceiptItems.addView(tv);
-                }
-            }
-
-            if ("Cash".equals(selectedPaymentMethod) || paymentMethod.startsWith("Cash")) {
-                if (layoutChange != null) layoutChange.setVisibility(View.VISIBLE);
-                try {
-                    String cashStr = etCashGiven.getText().toString().trim().replace(",", "");
-                    double cashGiven = cashStr.isEmpty() ? 0 : Double.parseDouble(cashStr);
-                    if (tvReceiptChange != null)
-                        tvReceiptChange.setText(String.format(Locale.US, "₱%,.2f", (cashGiven - finalTotal)));
-                } catch (Exception e) {
-                }
-            } else {
-                if (layoutChange != null) layoutChange.setVisibility(View.GONE);
-            }
-
-            if (btnPrint != null) {
-                if (isBluetoothPrinterConnected()) {
-                    btnPrint.setVisibility(View.VISIBLE);
-                    btnPrint.setOnClickListener(v -> {
-                        ReceiptPrinterManager.printReceipt(sellProduct.this, orderId, receiptText.toString());
-                    });
-                } else {
-                    btnPrint.setVisibility(View.GONE);
-                }
-            }
-
-            if (btnFinalizeSale != null) {
-                btnFinalizeSale.setOnClickListener(v -> {
-                    if (rootLayout != null) saveReceiptAsPdf(rootLayout, orderId);
-                    cartManager.clear();
-                    cartNotes.clear();
-                    receiptDialog.dismiss();
-                    finish();
-                });
-            }
-
-            if (receiptDialog.getWindow() != null) {
-                receiptDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-            }
-
-            receiptDialog.show();
+            if (rootLayout != null) saveReceiptAsPdf(rootLayout, orderId);
+            cartManager.clear();
+            cartNotes.clear();
+            if (receiptDialog != null) receiptDialog.dismiss();
+            Toast.makeText(sellProduct.this, "Transaction Finalized!", Toast.LENGTH_SHORT).show();
+            finish();
         });
     }
 
@@ -1369,7 +1451,7 @@ public class sellProduct extends BaseActivity {
 
         Product material = null;
         for (Product p : cachedInventoryList) {
-            if (p != null && materialName.equalsIgnoreCase(p.getProductName())) {
+            if (p != null && p.getProductName() != null && materialName.trim().equalsIgnoreCase(p.getProductName().trim())) {
                 material = p;
                 break;
             }
@@ -1381,28 +1463,64 @@ public class sellProduct extends BaseActivity {
         String matUnit = material.getUnit() != null ? material.getUnit().toLowerCase().trim() : "pcs";
         String targetUnit = bUnit != null ? bUnit.toLowerCase().trim() : "pcs";
 
+        // Capture the old quantity to see if it crosses the alert threshold
+        double oldQty = material.getQuantity();
+        double finalMQty = oldQty;
+
         try {
-            // 1. Calculate the exact fraction to deduct
             double utilDeductAmt = UnitConverterUtil.calculateDeductionAmount(deductAmt, matUnit, targetUnit, ppu);
-
-            // 2. Subtract from current stock safely
-            double finalMQty = material.getQuantity() - utilDeductAmt;
+            finalMQty = material.getQuantity() - utilDeductAmt;
             if (finalMQty < 0) finalMQty = 0;
+            finalMQty = Math.round(finalMQty * 1000.0) / 1000.0;
 
-            // CRITICAL FIX: We ONLY update the quantity in the database!
-            // We DO NOT recalculate or shrink the Cost Price. The Supplier's Pack Cost must remain constant!
             productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
-
             material.setQuantity(finalMQty);
 
         } catch (Exception e) {
-            double finalMQty = material.getQuantity() - deductAmt;
+            finalMQty = material.getQuantity() - deductAmt;
             if (finalMQty < 0) finalMQty = 0;
+            finalMQty = Math.round(finalMQty * 1000.0) / 1000.0;
 
-            // CRITICAL FIX FOR FALLBACK: Only update the quantity here as well!
             productRepository.updateProductQuantity(material.getProductId(), finalMQty, null);
-
             material.setQuantity(finalMQty);
+        }
+
+        // NEW: Instantly evaluate and fire database alerts!
+        checkAndTriggerStockAlerts(material, oldQty, finalMQty, matUnit);
+    }
+
+    // --- NEW ALERT HELPER METHODS ---
+    private void checkAndTriggerStockAlerts(Product material, double oldQty, double newQty, String unit) {
+        boolean crossedCritical = material.getCriticalLevel() > 0 && oldQty > material.getCriticalLevel() && newQty <= material.getCriticalLevel();
+        boolean crossedReorder = material.getReorderLevel() > 0 && oldQty > material.getReorderLevel() && newQty <= material.getReorderLevel() && newQty > material.getCriticalLevel();
+
+        if (crossedCritical) {
+            NotificationHelper.showNotification(this, "🚨 Critical Stock: " + material.getProductName(), "Only " + newQty + " " + unit + " left!", material.getProductId());
+            logStockAlert(material, "CRITICAL_STOCK");
+        } else if (crossedReorder) {
+            NotificationHelper.showNotification(this, "⚠️ Low Stock: " + material.getProductName(), "Only " + newQty + " " + unit + " left", material.getProductId());
+            logStockAlert(material, "LOW_STOCK");
+        }
+    }
+
+    private void logStockAlert(Product p, String type) {
+        String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
+        if (ownerId == null) return;
+
+        // Push directly to Firebase so StockAlertsActivity automatically picks it up!
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("Alerts").child(ownerId);
+        String id = ref.push().getKey();
+        if (id != null) {
+            Map<String, Object> alert = new HashMap<>();
+            alert.put("id", id);
+            alert.put("productId", p.getProductId());
+            alert.put("message", p.getProductName()); // StockAlertsActivity reads this as the Product Name
+            alert.put("type", type);
+            alert.put("timestamp", System.currentTimeMillis());
+            alert.put("isRead", false);
+            alert.put("ownerAdminId", ownerId);
+            ref.child(id).setValue(alert);
         }
     }
 

@@ -16,7 +16,7 @@
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorPrimary"
         app:title="Create Purchase Order"
-        app:titleTextColor="?attr/colorOnPrimary" />
+        app:titleTextColor="@android:color/white" />
 
 
     <LinearLayout
@@ -48,7 +48,7 @@
                     android:text="1. Select Supplier"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary" />
+                    android:textColor="?android:attr/textColorPrimary" />
 
                 <ImageButton
                     android:id="@+id/btnQuickAddSupplier"
@@ -57,7 +57,7 @@
                     android:src="@android:drawable/ic_menu_add"
                     android:background="@drawable/edite_round"
                     android:backgroundTint="?attr/colorPrimary"
-                    app:tint="?attr/colorOnPrimary"/>
+                    app:tint="@android:color/white"/>
             </LinearLayout>
 
             <EditText
@@ -66,9 +66,10 @@
                 android:layout_height="45dp"
                 android:layout_marginTop="12dp"
                 android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorSurface"
                 android:hint="Search supplier..."
-                android:textColor="?attr/colorOnSurface"
-                android:textColorHint="?attr/colorOnSurface"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorSecondary"
                 android:inputType="text"
                 android:importantForAutofill="no"
                 android:paddingHorizontal="12dp"
@@ -80,6 +81,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="45dp"
                 android:layout_marginTop="8dp"
+                android:backgroundTint="?attr/colorControlHighlight"
                 android:background="@drawable/edite_round" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -107,7 +109,7 @@
                 android:text="2. Select Products"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorPrimary" />
+                android:textColor="?android:attr/textColorPrimary" />
 
             <Button
                 android:id="@+id/btnContactSupplier"
@@ -116,7 +118,7 @@
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="8dp"
                 android:text="📞 Contact Supplier to Check Stock"
-                android:textColor="?attr/colorOnPrimary"
+                android:textColor="@android:color/white"
                 android:backgroundTint="?attr/colorPrimary"
                 android:textSize="12sp"
                 android:visibility="gone" />
@@ -127,9 +129,10 @@
                 android:layout_height="45dp"
                 android:layout_marginTop="12dp"
                 android:background="@drawable/edite_round"
+                android:backgroundTint="?attr/colorSurface"
                 android:hint="Search product..."
-                android:textColor="?attr/colorOnSurface"
-                android:textColorHint="?attr/colorOnSurface"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorSecondary"
                 android:inputType="text"
                 android:importantForAutofill="no"
                 android:paddingHorizontal="12dp"
@@ -141,6 +144,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="45dp"
                 android:layout_marginTop="8dp"
+                android:backgroundTint="?attr/colorControlHighlight"
                 android:background="@drawable/edite_round" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -175,7 +179,7 @@
                 android:id="@+id/tvCartSummary"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?android:attr/textColorPrimary"
                 android:text="0 Items in PO"
                 android:textSize="14sp"/>
             <TextView
@@ -185,7 +189,7 @@
                 android:text="Total: ₱0.00"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"/>
+                android:textColor="?android:attr/textColorPrimary"/>
         </LinearLayout>
 
         <FrameLayout
@@ -201,7 +205,7 @@
                 android:layout_marginTop="6dp"
                 android:layout_marginEnd="8dp"
                 android:backgroundTint="?attr/colorPrimary"
-                android:textColor="?attr/colorOnPrimary"
+                android:textColor="@android:color/white"
                 android:text="CHECKOUT" />
 
             <com.google.android.material.card.MaterialCardView
@@ -209,7 +213,7 @@
                 android:layout_width="26dp"
                 android:layout_height="26dp"
                 android:layout_gravity="top|end"
-                app:cardBackgroundColor="?attr/colorError"
+                app:cardBackgroundColor="@android:color/holo_red_dark"
                 app:cardCornerRadius="13dp"
                 app:cardElevation="6dp"
                 android:visibility="gone">
@@ -220,7 +224,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:text="1"
-                    android:textColor="?attr/colorOnError"
+                    android:textColor="@android:color/white"
                     android:textSize="12sp"
                     android:textStyle="bold"/>
             </com.google.android.material.card.MaterialCardView>

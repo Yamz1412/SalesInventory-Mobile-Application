@@ -87,6 +87,7 @@ public class StockMovementReportActivity extends BaseActivity {
         initializeViews();
         setupFilters();
         loadData();
+        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
     }
 
     private void initializeViews() {
@@ -204,6 +205,8 @@ public class StockMovementReportActivity extends BaseActivity {
         });
     }
 
+    private Map<String, Product> globalProductMap = new HashMap<>();
+
     private void loadData() {
         progressBar.setVisibility(View.VISIBLE);
         Map<String, StockMovementReport> reportMap = new HashMap<>();
@@ -212,8 +215,11 @@ public class StockMovementReportActivity extends BaseActivity {
 
         productRepository.getAllProducts().observe(this, products -> {
             if (products != null) {
+                globalProductMap.clear();
                 for (Product p : products) {
                     if (p != null && p.isActive() && p.getProductId() != null) {
+                        globalProductMap.put(p.getProductId(), p); // Save for later
+
                         StockMovementReport report = new StockMovementReport(
                                 p.getProductId(),
                                 p.getProductName(),
@@ -255,7 +261,6 @@ public class StockMovementReportActivity extends BaseActivity {
                 for (Sales s : sales) {
                     if (s == null || s.getProductId() == null) continue;
 
-                    // CRITICAL FIX: Identify if the sale was refunded or voided
                     boolean isRefunded = s.getPaymentMethod() != null && s.getPaymentMethod().contains("REFUNDED");
                     boolean isVoided = "VOIDED".equals(s.getStatus());
                     if (isRefunded || isVoided) continue;
@@ -263,16 +268,58 @@ public class StockMovementReportActivity extends BaseActivity {
                     Long ts = s.getTimestamp();
                     long saleDate = (ts != null && ts > 0) ? ts : s.getDate();
 
-                    if (reportMap.containsKey(s.getProductId())) {
-                        if (filterStartDate == 0 || (saleDate >= filterStartDate && saleDate <= filterEndDate)) {
+                    if (filterStartDate == 0 || (saleDate >= filterStartDate && saleDate <= filterEndDate)) {
+
+                        // 1. Tally the Finished Product (e.g. The Coffee)
+                        if (reportMap.containsKey(s.getProductId())) {
                             StockMovementReport report = reportMap.get(s.getProductId());
-                            report.addSold((int) s.getQuantity());
+                            report.addSold(s.getQuantity()); // Safe cast
+                        }
+
+                        // 2. CRITICAL FIX: Scan recipes and tally the Raw Materials (e.g. Straws, Powders)
+                        Product soldProduct = globalProductMap.get(s.getProductId());
+                        if (soldProduct != null && soldProduct.getBomList() != null) {
+                            for (Map<String, Object> bomItem : soldProduct.getBomList()) {
+                                String rawName = (String) bomItem.get("materialName");
+                                if (rawName == null) rawName = (String) bomItem.get("rawMaterialName");
+                                if (rawName == null) continue;
+
+                                // Find the raw material in the inventory
+                                Product rawProduct = findProductByName(rawName);
+                                if (rawProduct != null && reportMap.containsKey(rawProduct.getProductId())) {
+
+                                    double reqQty = 0.0;
+                                    try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception ignored) {}
+                                    if (reqQty == 0) {
+                                        try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+                                    }
+
+                                    String reqUnit = (String) bomItem.get("unit");
+                                    int ppu = rawProduct.getPiecesPerUnit() > 0 ? rawProduct.getPiecesPerUnit() : 1;
+                                    String invUnit = rawProduct.getUnit() != null ? rawProduct.getUnit() : "pcs";
+
+                                    double deduction = UnitConverterUtil.calculateDeductionAmount(reqQty, invUnit, reqUnit, ppu);
+                                    double totalDeduction = deduction * s.getQuantity();
+
+                                    // Add the math perfectly to the raw material's sold column!
+                                    reportMap.get(rawProduct.getProductId()).addSold((int) totalDeduction);
+                                }
+                            }
                         }
                     }
                 }
             }
             loadAdjustments(reportMap);
         });
+    }
+
+    private Product findProductByName(String name) {
+        for (Product p : globalProductMap.values()) {
+            if (p.getProductName() != null && p.getProductName().trim().equalsIgnoreCase(name.trim())) {
+                return p;
+            }
+        }
+        return null;
     }
 
     private void loadAdjustments(Map<String, StockMovementReport> reportMap) {
@@ -332,9 +379,12 @@ public class StockMovementReportActivity extends BaseActivity {
 
         for (StockMovementReport report : masterReportList) {
             boolean matchesCategory = selectedCategory.equals("All Categories") || selectedCategory.equals(report.getCategory());
+
+            // Checks if the product actually had any activity
             boolean hasMovement = (report.getReceived() > 0 || report.getSold() > 0 || report.getAdjusted() > 0);
 
-            if (matchesCategory && (filterStartDate == 0 || hasMovement)) {
+            // CRITICAL FIX: Strictly require 'hasMovement' to be true, regardless of the date filter
+            if (matchesCategory && hasMovement) {
                 filteredReportList.add(report);
                 grandTotalReceived += report.getReceived();
                 grandTotalSold += report.getSold();
@@ -366,18 +416,47 @@ public class StockMovementReportActivity extends BaseActivity {
     }
 
     private void exportToPDF() {
-        try {
-            String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
-            ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
-            if (r == null || r.outputStream == null) return;
+        progressBar.setVisibility(View.VISIBLE);
+        btnExportPDF.setEnabled(false);
+        Toast.makeText(this, "Generating Report...", Toast.LENGTH_SHORT).show();
 
-            pdfGenerator.generateStockMovementReportPDF(r.outputStream, filteredReportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
-            exportUtil.shareFileViaEmail(r.file, "Stock Movement Report - " + btnDateFilter.getText().toString());
+        new Thread(() -> {
+            try {
+                String fileName = exportUtil.generateFileName("StockMovement", ReportExportUtil.EXPORT_PDF);
+                ReportExportUtil.ExportResult r = exportUtil.createOutputStreamForFile(fileName, ReportExportUtil.EXPORT_PDF);
 
-        } catch (Exception e) {
-            Toast.makeText(this, "Failed to generate PDF", Toast.LENGTH_SHORT).show();
-        }
+                if (r == null || r.outputStream == null) {
+                    runOnUiThread(() -> {
+                        progressBar.setVisibility(View.GONE);
+                        btnExportPDF.setEnabled(true);
+                    });
+                    return;
+                }
+
+                pdfGenerator.generateStockMovementReportPDF(r.outputStream, filteredReportList, grandTotalReceived, grandTotalSold, grandTotalAdjusted);
+
+                // Ensure stream is closed before sharing
+                r.outputStream.flush();
+                r.outputStream.close();
+
+                runOnUiThread(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    btnExportPDF.setEnabled(true);
+
+                    // RE-USE share logic from ReportExportUtil with the improved permission flags
+                    exportUtil.shareFileViaEmail(r.file, "Stock Movement Report - " + btnDateFilter.getText().toString());
+                });
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    btnExportPDF.setEnabled(true);
+                    Toast.makeText(this, "Export Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
     }
+
 
     public static class AvailableDateValidator implements CalendarConstraints.DateValidator {
         private final HashSet<Long> availableDates;

@@ -74,8 +74,4 @@ public abstract class AppDatabase extends RoomDatabase {
             INSTANCE = null;
         }
     }
-
-    public static void resetInstance() {
-        INSTANCE = null;
-    }
 }

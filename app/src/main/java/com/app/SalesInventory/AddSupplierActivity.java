@@ -9,13 +9,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Spinner;
+
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
@@ -38,6 +40,8 @@ public class AddSupplierActivity extends BaseActivity {
     private TextInputEditText etSupplierName, etSupplierContact, etSupplierEmail, etSupplierAddress;
     private MaterialButton btnSaveSupplier, btnCancelSupplier;
     private DatabaseReference suppliersRef;
+    private String editSupplierId = null;
+    private String originalSupplierName = null;
 
     private ChipGroup chipGroupCategories;
     private Button btnAddCustomCategory;
@@ -48,6 +52,10 @@ public class AddSupplierActivity extends BaseActivity {
     private ProductRepository productRepository;
     private ArrayAdapter<String> measurementAdapter;
     private List<String> measurementList;
+
+    // --- NEW: Smart Dropdown Engine Variables ---
+    private List<Product> existingProducts = new ArrayList<>();
+    private ArrayAdapter<String> productSearchAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,11 +88,156 @@ public class AddSupplierActivity extends BaseActivity {
         btnAddProductRow = findViewById(R.id.btnAddProductRow);
 
         setupAdapters();
+        loadExistingProducts();
+
+        // --- CRITICAL FIX: Catch the Edit Signal from the PO Screen ---
+        if (getIntent().hasExtra("EDIT_SUPPLIER_ID")) {
+            editSupplierId = getIntent().getStringExtra("EDIT_SUPPLIER_ID");
+            btnSaveSupplier.setText("Update Supplier");
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().setTitle("Edit Supplier");
+                getSupportActionBar().setSubtitle("Update vendor details and catalog");
+            }
+            loadSupplierDataForEdit();
+        }
 
         btnAddCustomCategory.setOnClickListener(v -> showCustomCategoryDialog());
         btnAddProductRow.setOnClickListener(v -> addProductRow());
         btnSaveSupplier.setOnClickListener(v -> saveSupplier());
         btnCancelSupplier.setOnClickListener(v -> finish());
+    }
+
+    private void loadSupplierDataForEdit() {
+        suppliersRef.child(editSupplierId).addListenerForSingleValueEvent(new com.google.firebase.database.ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull com.google.firebase.database.DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    originalSupplierName = snapshot.child("name").getValue(String.class);
+                    etSupplierName.setText(originalSupplierName);
+                    etSupplierContact.setText(snapshot.child("contact").getValue(String.class));
+                    etSupplierEmail.setText(snapshot.child("email").getValue(String.class));
+                    etSupplierAddress.setText(snapshot.child("address").getValue(String.class));
+
+                    String cats = snapshot.child("categories").getValue(String.class);
+                    if (cats != null && !cats.isEmpty()) {
+                        chipGroupCategories.removeAllViews(); // Clear default chips
+                        String[] catArray = cats.split(",");
+                        for (String c : catArray) {
+                            addCustomChip(c.trim());
+                        }
+                    }
+
+                    // Once supplier details are loaded, fetch all products tied to them!
+                    if (originalSupplierName != null && !originalSupplierName.isEmpty()) {
+                        loadSupplierProducts(originalSupplierName);
+                    }
+                }
+            }
+            @Override public void onCancelled(@NonNull com.google.firebase.database.DatabaseError error) {}
+        });
+    }
+
+    private void loadSupplierProducts(String supplierName) {
+        String adminId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (adminId == null || adminId.isEmpty()) adminId = AuthManager.getInstance().getCurrentUserId();
+
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("users").document(adminId).collection("products")
+                .whereEqualTo("supplier", supplierName)
+                .whereEqualTo("isActive", true)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
+                        Product p = doc.toObject(Product.class);
+                        if (p != null && !"Menu".equalsIgnoreCase(p.getProductType())) {
+                            addPreFilledProductRow(p);
+                        }
+                    }
+                });
+    }
+
+    private void addPreFilledProductRow(Product p) {
+        View row = LayoutInflater.from(this).inflate(R.layout.item_supplier_product_entry, null);
+
+        AutoCompleteTextView etName = row.findViewById(R.id.etProductNameEntry);
+        Spinner etProductUnit = row.findViewById(R.id.etProductUnit);
+        EditText etPcsPerPack = row.findViewById(R.id.etPcsPerPack);
+        EditText etCost = row.findViewById(R.id.etProductCost);
+        ImageButton btnDelete = row.findViewById(R.id.btnDeleteProductRow);
+
+        etName.setText(p.getProductName());
+
+        if (productSearchAdapter != null) etName.setAdapter(productSearchAdapter);
+        etName.setOnClickListener(v -> etName.showDropDown());
+        etName.setOnFocusChangeListener((v, hasFocus) -> { if (hasFocus) etName.showDropDown(); });
+
+        etProductUnit.setAdapter(measurementAdapter);
+        if (p.getUnit() != null) {
+            for (int i = 0; i < measurementAdapter.getCount(); i++) {
+                if (measurementAdapter.getItem(i).toString().equalsIgnoreCase(p.getUnit())) {
+                    etProductUnit.setSelection(i);
+                    break;
+                }
+            }
+            boolean isBulkUnit = !p.getUnit().equalsIgnoreCase("pcs") &&
+                    !p.getUnit().equalsIgnoreCase("ml") &&
+                    !p.getUnit().equalsIgnoreCase("L") &&
+                    !p.getUnit().equalsIgnoreCase("g") &&
+                    !p.getUnit().equalsIgnoreCase("kg") &&
+                    !p.getUnit().equalsIgnoreCase("Custom...");
+
+            if (isBulkUnit) {
+                etPcsPerPack.setVisibility(View.VISIBLE);
+                if (p.getPiecesPerUnit() > 1) {
+                    etPcsPerPack.setText(String.valueOf(p.getPiecesPerUnit()));
+                }
+            }
+        }
+
+        if (p.getCostPrice() > 0) etCost.setText(String.valueOf(p.getCostPrice()));
+
+        etProductUnit.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedUnit = parent.getItemAtPosition(position).toString();
+                if (selectedUnit.equalsIgnoreCase("Custom...")) {
+                    showCustomUnitDialog(etProductUnit);
+                    return;
+                }
+                boolean isBulkUnit = !selectedUnit.equalsIgnoreCase("pcs") && !selectedUnit.equalsIgnoreCase("ml") && !selectedUnit.equalsIgnoreCase("L") && !selectedUnit.equalsIgnoreCase("g") && !selectedUnit.equalsIgnoreCase("kg");
+                if (isBulkUnit) {
+                    etPcsPerPack.setVisibility(View.VISIBLE);
+                    etPcsPerPack.setHint("Qty per " + selectedUnit);
+                } else {
+                    etPcsPerPack.setVisibility(View.GONE);
+                    etPcsPerPack.setText("");
+                }
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+        btnDelete.setOnClickListener(v -> containerSupplierProducts.removeView(row));
+        containerSupplierProducts.addView(row);
+    }
+
+    // --- NEW: Load products into the dropdown adapter ---
+    private void loadExistingProducts() {
+        productRepository.getAllProducts().observe(this, products -> {
+            if (products != null) {
+                existingProducts.clear();
+                existingProducts.addAll(products);
+
+                List<String> productNames = new ArrayList<>();
+                for (Product p : products) {
+                    if (p.getProductName() != null && !p.getProductName().trim().isEmpty()) {
+                        if (!productNames.contains(p.getProductName())) {
+                            productNames.add(p.getProductName());
+                        }
+                    }
+                }
+                productSearchAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, productNames);
+            }
+        });
     }
 
     private ArrayAdapter<String> getMeasurementAdapter(List<String> items) {
@@ -179,9 +332,10 @@ public class AddSupplierActivity extends BaseActivity {
                 if (customIndex == -1) customIndex = measurementList.size();
                 measurementList.add(customIndex, newUnit);
                 measurementAdapter.notifyDataSetChanged();
+
                 spinner.setSelection(customIndex);
             } else {
-                spinner.setSelection(0);
+                spinner.setSelection(0); // Default to pcs
             }
         });
         builder.setNegativeButton("Cancel", (dialog, which) -> {
@@ -194,19 +348,72 @@ public class AddSupplierActivity extends BaseActivity {
     private void addProductRow() {
         View row = LayoutInflater.from(this).inflate(R.layout.item_supplier_product_entry, null);
 
-        Spinner spinnerMeasurement = row.findViewById(R.id.spinnerMeasurementType);
-        ImageButton btnDelete = row.findViewById(R.id.btnDeleteProductRow);
+        // Bind Views
+        AutoCompleteTextView etName = row.findViewById(R.id.etProductNameEntry);
+        Spinner etProductUnit = row.findViewById(R.id.etProductUnit); // Changed to Spinner
         EditText etPcsPerPack = row.findViewById(R.id.etPcsPerPack);
+        EditText etCost = row.findViewById(R.id.etProductCost);
+        ImageButton btnDelete = row.findViewById(R.id.btnDeleteProductRow);
 
-        spinnerMeasurement.setAdapter(measurementAdapter);
+        if (productSearchAdapter != null) {
+            etName.setAdapter(productSearchAdapter);
+        }
 
-        spinnerMeasurement.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        etName.setOnClickListener(v -> etName.showDropDown());
+        etName.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) etName.showDropDown();
+        });
+
+        // Autofill Logic
+        etName.setOnItemClickListener((parent, view, position, id) -> {
+            String selectedName = parent.getItemAtPosition(position).toString();
+            for (Product p : existingProducts) {
+                if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(selectedName)) {
+
+                    // Autofill Unit dropdown
+                    if (p.getUnit() != null) {
+                        for (int i = 0; i < measurementAdapter.getCount(); i++) {
+                            if (measurementAdapter.getItem(i).toString().equalsIgnoreCase(p.getUnit())) {
+                                etProductUnit.setSelection(i);
+                                break;
+                            }
+                        }
+
+                        boolean isBulkUnit = !p.getUnit().equalsIgnoreCase("pcs") &&
+                                !p.getUnit().equalsIgnoreCase("ml") &&
+                                !p.getUnit().equalsIgnoreCase("L") &&
+                                !p.getUnit().equalsIgnoreCase("g") &&
+                                !p.getUnit().equalsIgnoreCase("kg");
+
+                        if (isBulkUnit) {
+                            etPcsPerPack.setVisibility(View.VISIBLE);
+                            if (p.getPiecesPerUnit() > 1) {
+                                etPcsPerPack.setText(String.valueOf(p.getPiecesPerUnit()));
+                            }
+                        } else {
+                            etPcsPerPack.setVisibility(View.GONE);
+                            etPcsPerPack.setText("");
+                        }
+                    }
+
+                    if (p.getCostPrice() > 0) {
+                        etCost.setText(String.valueOf(p.getCostPrice()));
+                    }
+                    break;
+                }
+            }
+        });
+
+        etProductUnit.setAdapter(measurementAdapter);
+
+        // Spinner Item Selected Listener
+        etProductUnit.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String selectedUnit = parent.getItemAtPosition(position).toString();
 
                 if (selectedUnit.equalsIgnoreCase("Custom...")) {
-                    showCustomUnitDialog(spinnerMeasurement);
+                    showCustomUnitDialog(etProductUnit);
                     return;
                 }
 
@@ -226,9 +433,7 @@ public class AddSupplierActivity extends BaseActivity {
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                etPcsPerPack.setVisibility(View.GONE);
-            }
+            public void onNothingSelected(AdapterView<?> parent) {}
         });
 
         btnDelete.setOnClickListener(v -> containerSupplierProducts.removeView(row));
@@ -270,7 +475,8 @@ public class AddSupplierActivity extends BaseActivity {
         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
 
-        String id = suppliersRef.push().getKey();
+        // CRITICAL FIX: Use the existing ID if we are editing, otherwise generate a new one
+        String id = editSupplierId != null ? editSupplierId : suppliersRef.push().getKey();
         if (id == null) return;
 
         Map<String, Object> supplierData = new HashMap<>();
@@ -281,12 +487,16 @@ public class AddSupplierActivity extends BaseActivity {
         supplierData.put("address", address);
         supplierData.put("categories", categories);
         supplierData.put("ownerAdminId", ownerId);
-        supplierData.put("dateAdded", System.currentTimeMillis());
 
-        suppliersRef.child(id).setValue(supplierData)
+        if (editSupplierId == null) {
+            supplierData.put("dateAdded", System.currentTimeMillis());
+        }
+
+        suppliersRef.child(id).updateChildren(supplierData)
                 .addOnSuccessListener(aVoid -> {
                     processSuppliedProducts(name, categories);
-                    Toast.makeText(AddSupplierActivity.this, "Supplier Saved Successfully", Toast.LENGTH_SHORT).show();
+                    String msg = editSupplierId != null ? "Supplier Updated Successfully" : "Supplier Saved Successfully";
+                    Toast.makeText(AddSupplierActivity.this, msg, Toast.LENGTH_SHORT).show();
                 })
                 .addOnFailureListener(e -> Toast.makeText(AddSupplierActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
@@ -353,6 +563,7 @@ public class AddSupplierActivity extends BaseActivity {
                                     }
                                     @Override public void onError(String error) {}
                                 });
+
                             } else {
                                 Product newProduct = new Product();
                                 String newId = java.util.UUID.randomUUID().toString();
@@ -373,14 +584,10 @@ public class AddSupplierActivity extends BaseActivity {
                                 newProduct.setActive(true);
                                 newProduct.setProductType("raw");
 
-                                // =======================================================================
-                                // CRITICAL FIX: Ensure the product is fully visible and math-ready!
-                                // =======================================================================
                                 newProduct.setCategoryName(inheritedCategory);
-                                newProduct.setProductLine(inheritedCategory); // Forces visibility in dropdowns
-                                newProduct.setPiecesPerUnit(row.pcs);         // Forces PO conversion math to work
+                                newProduct.setProductLine(inheritedCategory);
+                                newProduct.setPiecesPerUnit(row.pcs);
                                 newProduct.setSalesUnit("pcs");
-                                // =======================================================================
 
                                 newProduct.setDateAdded(System.currentTimeMillis());
 
@@ -404,8 +611,8 @@ public class AddSupplierActivity extends BaseActivity {
         for (int i = 0; i < containerSupplierProducts.getChildCount(); i++) {
             View row = containerSupplierProducts.getChildAt(i);
 
-            EditText etName = row.findViewById(R.id.etProductNameEntry);
-            Spinner spinMeasurement = row.findViewById(R.id.spinnerMeasurementType);
+            AutoCompleteTextView etName = row.findViewById(R.id.etProductNameEntry);
+            Spinner etUnit = row.findViewById(R.id.etProductUnit); // Changed to Spinner
             EditText etQty  = row.findViewById(R.id.etProductQty);
             EditText etCost = row.findViewById(R.id.etProductCost);
             EditText etPcsPerPack = row.findViewById(R.id.etPcsPerPack);
@@ -413,8 +620,7 @@ public class AddSupplierActivity extends BaseActivity {
             String baseName = etName.getText().toString().trim();
             if (baseName.isEmpty()) continue;
 
-            String measurement = spinMeasurement.getSelectedItem() != null
-                    ? spinMeasurement.getSelectedItem().toString() : "pcs";
+            String measurement = etUnit.getSelectedItem() != null ? etUnit.getSelectedItem().toString().trim() : "pcs";
 
             String qtyStr  = etQty.getText().toString().trim();
             String costStr = etCost.getText().toString().trim();
@@ -432,8 +638,6 @@ public class AddSupplierActivity extends BaseActivity {
             } catch (NumberFormatException e) { cost = 0.0; }
 
             String finalProductName = baseName;
-
-            // CRITICAL FIX: Track Pieces Per Unit so the delivery checklist math works!
             int pcs = 1;
 
             boolean isBulkUnit = !measurement.equalsIgnoreCase("pcs") &&
@@ -461,7 +665,7 @@ public class AddSupplierActivity extends BaseActivity {
         final int    qty;
         final double cost;
         final String unit;
-        final int    pcs; // CRITICAL FIX: Added pcs tracking
+        final int    pcs;
 
         ProductRow(String name, int qty, double cost, String unit, int pcs) {
             this.name = name;

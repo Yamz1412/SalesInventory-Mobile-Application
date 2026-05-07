@@ -28,6 +28,10 @@ public class FirestoreManager {
         return instance;
     }
 
+    public static synchronized void resetInstance() {
+        instance = null;
+    }
+
     public FirebaseFirestore getDb() {
         return db;
     }

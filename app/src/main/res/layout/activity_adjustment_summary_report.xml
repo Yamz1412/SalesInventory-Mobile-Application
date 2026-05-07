@@ -66,16 +66,28 @@
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
         android:paddingBottom="8dp"
+        android:weightSum="2"
         android:gravity="center_vertical">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDateFilter"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Filter by Date: All Time"
+            android:text="Date: All Time"
             app:icon="@android:drawable/ic_menu_today"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_marginEnd="4dp"
             app:cornerRadius="8dp" />
+
+        <Spinner
+            android:id="@+id/spinnerTypeFilter"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="match_parent"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/edite_round"
+            android:backgroundTint="?attr/colorSurface" />
     </LinearLayout>
 
     <ProgressBar

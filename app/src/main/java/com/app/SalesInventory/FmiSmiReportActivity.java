@@ -174,14 +174,21 @@ public class FmiSmiReportActivity extends BaseActivity {
         String selectedLine = spinnerProductLine.getSelectedItem() != null ? spinnerProductLine.getSelectedItem().toString() : "All Product Lines";
 
         for (Product p : allProducts) {
-            if (!p.isActive() || "Menu".equalsIgnoreCase(p.getProductType())) continue;
+            // CRITICAL FIX: Only include active products that are marked as Sellable (Sales Menu)
+            boolean isSalesMenuProduct = p.isSellable() ||
+                    "finished".equalsIgnoreCase(p.getProductType()) ||
+                    "Menu".equalsIgnoreCase(p.getProductType());
+
+            // If it's a Raw Material or inactive, skip it completely!
+            if (!p.isActive() || !isSalesMenuProduct) continue;
 
             if (!selectedLine.equals("All Product Lines")) {
                 String pLine = p.getProductLine() != null ? p.getProductLine() : "";
                 if (!pLine.equalsIgnoreCase(selectedLine)) continue;
             }
 
-            String pName = p.getProductName();
+            // Clean the product name to perfectly match the sales records (ignores sizes/addons)
+            String pName = cleanProductName(p.getProductName());
             int qtySold = salesCountMap.containsKey(pName) ? salesCountMap.get(pName) : 0;
 
             reportItems.add(new ReportItem(p, qtySold));

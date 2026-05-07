@@ -226,7 +226,7 @@ public class SalesRepository {
         if (ownerId == null) return;
         FirebaseFirestore db = FirestoreManager.getInstance().getDb();
 
-        // 1. Update status (Firebase handles offline caching automatically)
+        // 1. Update status
         db.collection("users").document(ownerId).collection("sales").document(sale.getId()).update("status", "VOIDED");
 
         // 2. Restore Inventory Locally IMMEDIATELY
@@ -235,8 +235,15 @@ public class SalesRepository {
             @Override
             public void onProductFetched(Product p) {
                 if (p != null) {
-                    double newQty = p.getQuantity() + sale.getQuantity();
-                    pr.updateProductQuantity(p.getProductId(), newQty, null);
+                    boolean hasRecipe = (p.getBomList() != null && !p.getBomList().isEmpty()) ||
+                            (p.getUnifiedVariations() != null && !p.getUnifiedVariations().isEmpty());
+
+                    if (!hasRecipe && !"Menu".equalsIgnoreCase(p.getProductType()) && !"finished".equalsIgnoreCase(p.getProductType())) {
+                        double newQty = p.getQuantity() + sale.getQuantity();
+                        pr.updateProductQuantity(p.getProductId(), newQty, null);
+                    } else {
+                        restoreRecipeIngredients(p, sale, pr);
+                    }
                 }
             }
             @Override public void onError(String error) {}
@@ -250,7 +257,6 @@ public class SalesRepository {
         walletUpdates.put("balance", com.google.firebase.firestore.FieldValue.increment(-sale.getTotalPrice()));
         walletRef.set(walletUpdates, com.google.firebase.firestore.SetOptions.merge());
 
-        // 4. INSTANT UI UPDATE
         if (listener != null) listener.onSuccess();
     }
 
@@ -259,8 +265,11 @@ public class SalesRepository {
         if (ownerId == null) return;
         FirebaseFirestore db = FirestoreManager.getInstance().getDb();
 
-        // 1. Mark Sale as REFUNDED
-        db.collection("users").document(ownerId).collection("sales").document(sale.getId()).update("status", "REFUNDED");
+        // 1. Mark Sale as REFUNDED and save the specific reason
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "REFUNDED");
+        updates.put("paymentMethod", sale.getPaymentMethod());
+        db.collection("users").document(ownerId).collection("sales").document(sale.getId()).update(updates);
 
         // 2. Restore Inventory Locally IMMEDIATELY
         if (restockItems) {
@@ -269,8 +278,17 @@ public class SalesRepository {
                 @Override
                 public void onProductFetched(Product p) {
                     if (p != null) {
-                        double newQty = p.getQuantity() + sale.getQuantity();
-                        pr.updateProductQuantity(p.getProductId(), newQty, null);
+                        boolean hasRecipe = (p.getBomList() != null && !p.getBomList().isEmpty()) ||
+                                (p.getUnifiedVariations() != null && !p.getUnifiedVariations().isEmpty());
+
+                        if (!hasRecipe && !"Menu".equalsIgnoreCase(p.getProductType()) && !"finished".equalsIgnoreCase(p.getProductType())) {
+                            // Direct retail product, just restock directly
+                            double newQty = p.getQuantity() + sale.getQuantity();
+                            pr.updateProductQuantity(p.getProductId(), newQty, null);
+                        } else {
+                            // It's a menu item! Restock its raw ingredients based on the recipe
+                            restoreRecipeIngredients(p, sale, pr);
+                        }
                     }
                 }
                 @Override public void onError(String error) {}
@@ -304,8 +322,104 @@ public class SalesRepository {
                     }
                 });
 
-        // 5. INSTANT UI UPDATE
         if (listener != null) listener.onSuccess();
+    }
+
+    // --- NEW HELPER METHODS TO CALCULATE RECIPE RESTOCKING ---
+    private void restoreRecipeIngredients(Product p, Sales sale, ProductRepository pr) {
+        List<Product> inventory = pr.getAllProducts().getValue();
+        if (inventory == null) return;
+
+        // 1. Restock Base Recipe
+        if (p.getBomList() != null && !p.getBomList().isEmpty()) {
+            String excluded = sale.getExcludedIngredients() != null ? sale.getExcludedIngredients() : "";
+            for (Map<String, Object> bomItem : p.getBomList()) {
+                String rawName = (String) bomItem.get("materialName");
+                if (rawName == null) rawName = (String) bomItem.get("rawMaterialName");
+                if (rawName == null) continue;
+
+                if (excluded.contains(rawName)) continue;
+
+                double bQty = 0;
+                try { bQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception ignored) {}
+                if (bQty == 0) {
+                    try { bQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+                }
+
+                // Check Sugar Override
+                String extraDetails = sale.getExtraDetails() != null ? sale.getExtraDetails().toLowerCase() : "";
+                if (extraDetails.contains("0%") || extraDetails.contains("no sugar")) {
+                    if (rawName.toLowerCase().contains("sugar") || rawName.toLowerCase().contains("syrup")) {
+                        bQty = 0;
+                    }
+                }
+
+                String bUnit = (String) bomItem.get("unit");
+                if (bQty > 0) {
+                    restoreSingleMaterial(rawName, bQty * sale.getQuantity(), bUnit, inventory, pr);
+                }
+            }
+        }
+
+        // 2. Restock Cup/Size material
+        if (p.getSizesList() != null && sale.getProductName() != null) {
+            for (Map<String, Object> sizeItem : p.getSizesList()) {
+                String sName = (String) sizeItem.get("name");
+                if (sName != null && sale.getProductName().contains("(" + sName + ")")) {
+                    String linkedMat = (String) sizeItem.get("linkedMaterial");
+                    double deductQty = 0;
+                    try { deductQty = Double.parseDouble(String.valueOf(sizeItem.get("deductQty"))); } catch (Exception ignored) {}
+                    if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
+                        restoreSingleMaterial(linkedMat, deductQty * sale.getQuantity(), "pcs", inventory, pr);
+                    }
+                }
+            }
+        }
+
+        // 3. Restock Add-ons
+        if (p.getAddonsList() != null && sale.getExtraDetails() != null) {
+            for (Map<String, Object> addonItem : p.getAddonsList()) {
+                String aName = (String) addonItem.get("name");
+                if (aName != null && sale.getExtraDetails().contains(aName)) {
+                    String linkedMat = (String) addonItem.get("linkedMaterial");
+                    double deductQty = 0;
+                    try { deductQty = Double.parseDouble(String.valueOf(addonItem.get("deductQty"))); } catch (Exception ignored) {}
+                    String aUnit = (String) addonItem.get("unit");
+                    if (linkedMat != null && !linkedMat.isEmpty() && deductQty > 0) {
+                        restoreSingleMaterial(linkedMat, deductQty * sale.getQuantity(), aUnit != null ? aUnit : "pcs", inventory, pr);
+                    }
+                }
+            }
+        }
+    }
+
+    private void restoreSingleMaterial(String materialName, double restoreAmt, String bUnit, List<Product> inventory, ProductRepository pr) {
+        if (materialName == null || materialName.isEmpty() || restoreAmt <= 0) return;
+
+        Product material = null;
+        for (Product invP : inventory) {
+            if (invP.getProductName() != null && invP.getProductName().trim().equalsIgnoreCase(materialName.trim())) {
+                material = invP;
+                break;
+            }
+        }
+
+        if (material != null) {
+            int ppu = material.getPiecesPerUnit() > 0 ? material.getPiecesPerUnit() : 1;
+            String matUnit = material.getUnit() != null ? material.getUnit().toLowerCase().trim() : "pcs";
+            String targetUnit = bUnit != null ? bUnit.toLowerCase().trim() : "pcs";
+
+            try {
+                double utilRestoreAmt = UnitConverterUtil.calculateDeductionAmount(restoreAmt, matUnit, targetUnit, ppu);
+                double finalMQty = material.getQuantity() + utilRestoreAmt;
+                finalMQty = Math.round(finalMQty * 1000.0) / 1000.0;
+                pr.updateProductQuantity(material.getProductId(), finalMQty, null);
+            } catch (Exception e) {
+                double finalMQty = material.getQuantity() + restoreAmt;
+                finalMQty = Math.round(finalMQty * 1000.0) / 1000.0;
+                pr.updateProductQuantity(material.getProductId(), finalMQty, null);
+            }
+        }
     }
 
     public interface OnSaleAddedListener {
@@ -488,6 +602,7 @@ public class SalesRepository {
 
         if (data.containsKey("id")) sale.setId((String) data.get("id"));
         if (data.containsKey("orderId")) sale.setOrderId((String) data.get("orderId"));
+        if (data.containsKey("status")) sale.setStatus((String) data.get("status"));
         if (data.containsKey("productId")) sale.setProductId((String) data.get("productId"));
         if (data.containsKey("productName")) sale.setProductName((String) data.get("productName"));
         if (data.containsKey("quantity")) { Object qty = data.get("quantity"); if (qty instanceof Number) sale.setQuantity(((Number) qty).intValue()); }

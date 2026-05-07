@@ -34,9 +34,35 @@
             android:id="@+id/tvProductCategory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Category | ₱100.00"
+            android:text="Category"
             android:textColor="?attr/colorOnSurface"
             android:alpha="0.7"
             android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:id="@+id/tvOriginalPrice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="₱100.00"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.5"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvCalculatedPrice"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" ➔ ₱80.00"
+                android:textColor="#4CAF50"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

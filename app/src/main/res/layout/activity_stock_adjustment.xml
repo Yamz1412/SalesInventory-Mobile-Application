@@ -255,7 +255,7 @@
         android:elevation="4dp">
 
         <Button
-            android:id="@+id/btnViewHistory"
+            android:id="@+id/btnCancel"
             android:layout_width="0dp"
             android:layout_height="60dp"
             android:layout_weight="1"

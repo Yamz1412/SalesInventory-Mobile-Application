@@ -210,13 +210,13 @@ public class EditSalesProductActivity extends BaseActivity {
 
     private void updatePricingUI() {
         if (usePercentageMarkup) {
-            sellingPriceET.setEnabled(false);
-            sellingPriceET.setFocusable(false);
-            sellingPriceET.setFocusableInTouchMode(false);
-            sellingPriceET.setLongClickable(false);
-            sellingPriceET.setCursorVisible(false);
+            sellingPriceET.setEnabled(true);
+            sellingPriceET.setFocusable(true);
+            sellingPriceET.setFocusableInTouchMode(true);
+            sellingPriceET.setLongClickable(true);
+            sellingPriceET.setCursorVisible(true);
             sellingPriceET.setHint("Selling (Auto Markup " + defaultMarkupPercent + "%)");
-            sellingPriceET.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.dirtyWhite));
+            sellingPriceET.setBackgroundTintList(null); // Removes the gray locked background
             calculateSellingPrice();
         } else {
             sellingPriceET.setEnabled(true);
@@ -235,19 +235,27 @@ public class EditSalesProductActivity extends BaseActivity {
             String costStr = costPriceET.getText().toString();
             double cost = costStr.isEmpty() ? 0 : Double.parseDouble(costStr);
             double sellingPrice = cost + (cost * (defaultMarkupPercent / 100));
-            sellingPriceET.setText(String.format(Locale.US, "%.2f", sellingPrice));
+            double roundedPrice = Math.round(sellingPrice);
+
+            sellingPriceET.setText(String.format(Locale.US, "%.2f", roundedPrice));
         } catch (Exception e) {
             sellingPriceET.setText("0.00");
         }
     }
 
-    // =========================================================
-    // INVENTORY HELPERS
-    // =========================================================
+    private int getIndexIgnoreCase(List<String> list, String target) {
+        if (target == null) return -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).equalsIgnoreCase(target)) return i;
+        }
+        return -1;
+    }
+
     private void loadInventoryForCalculations() {
         productRepository.getAllProducts().observe(this, products -> {
             inventoryProducts.clear();
-            Set<String> dynamicUnits = new HashSet<>(baseUnitList);
+            Set<String> dynamicUnits = new java.util.LinkedHashSet<>(baseUnitList);
+
             if (products != null) {
                 for (Product p : products) {
                     if (p.getUnit() != null && !p.getUnit().isEmpty()) dynamicUnits.add(p.getUnit());
@@ -274,6 +282,7 @@ public class EditSalesProductActivity extends BaseActivity {
     private void updateMainCostFromBOM() {
         if (savedBOM == null) return;
         double totalCost = 0.0;
+
         for (Map<String, Object> bom : savedBOM) {
             String matName = (String) bom.get("materialName");
             double bQty = 0;
@@ -281,28 +290,55 @@ public class EditSalesProductActivity extends BaseActivity {
             String bUnit = (String) bom.get("unit");
 
             Product mat = findInventoryProduct(matName);
-            if (mat != null && mat.getQuantity() > 0) {
+            if (mat != null) {
                 int ppu = mat.getPiecesPerUnit() > 0 ? mat.getPiecesPerUnit() : 1;
-                String invUnit = mat.getUnit() != null ? mat.getUnit() : "pcs";
+                String invUnit = mat.getUnit() != null ? mat.getUnit().toLowerCase() : "pcs";
+
+                double costPrice = mat.getCostPrice();
+
+                if ((invUnit.equals("ml") || invUnit.equals("g")) && ppu == 1 && costPrice > 50) {
+                    double estimatedBulkVolume = Math.max(1000.0, Math.ceil(mat.getQuantity() / 1000.0) * 1000.0);
+                    costPrice = costPrice / estimatedBulkVolume;
+                }
 
                 Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(mat.getQuantity(), invUnit, bUnit, ppu);
-                double convertedInvQty = (double) conversion[0];
                 String newInvUnit = (String) conversion[1];
-
                 double deductionAmount = UnitConverterUtil.calculateDeductionAmount(bQty, newInvUnit, bUnit, ppu);
-                double unitCost = mat.getCostPrice() / convertedInvQty;
+                double unitCost = UnitConverterUtil.calculateTrueUnitCost(costPrice, newInvUnit, ppu);
                 totalCost += (deductionAmount * unitCost);
             }
         }
+
         if (costPriceET != null) {
             costPriceET.setText(String.format(Locale.US, "%.2f", totalCost));
         }
-        calculateSellingPrice(); // Update selling price automatically if BOM changes cost
+        try { calculateSellingPrice(); } catch (Exception ignored) {}
     }
 
-    // =========================================================
-    // DIALOGS
-    // =========================================================
+    private void autoSelectSubUnit(String materialName, Spinner spinnerUnit) {
+        if (materialName == null || spinnerUnit == null) return;
+        Product mat = findInventoryProduct(materialName);
+        if (mat == null) return;
+
+        String baseUnit = mat.getUnit() != null ? mat.getUnit().toLowerCase() : "pcs";
+        String targetUnit = baseUnit; // Default to the same unit
+
+        // The Auto-Switch Logic
+        if (baseUnit.equals("kg")) targetUnit = "g";
+        else if (baseUnit.equals("l")) targetUnit = "ml";
+        else if (baseUnit.equals("box") || baseUnit.equals("pack") || baseUnit.equals("tub") || baseUnit.equals("can")) {
+            targetUnit = mat.getSalesUnit() != null ? mat.getSalesUnit().toLowerCase() : "pcs";
+        }
+
+        // Apply it safely to the spinner ignoring case
+        for (int i = 0; i < spinnerUnit.getAdapter().getCount(); i++) {
+            if (spinnerUnit.getAdapter().getItem(i).toString().equalsIgnoreCase(targetUnit)) {
+                spinnerUnit.setSelection(i);
+                break;
+            }
+        }
+    }
+
     private void showBOMDialog() {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_bom, null);
         AlertDialog dialog = new AlertDialog.Builder(this).setView(view).setCancelable(false).create();
@@ -330,6 +366,7 @@ public class EditSalesProductActivity extends BaseActivity {
                         showInventorySelectionDialog(itemName -> {
                             ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                             spinnerRawMaterial.setAdapter(tempAdapter);
+                            autoSelectSubUnit(itemName, spinnerUnit);
                         });
                     }
                     return true;
@@ -358,6 +395,7 @@ public class EditSalesProductActivity extends BaseActivity {
                             showInventorySelectionDialog(itemName -> {
                                 ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                                 spinnerRawMaterial.setAdapter(tempAdapter);
+                                autoSelectSubUnit(itemName, spinnerUnit);
                             });
                         }
                         return true;
@@ -368,12 +406,9 @@ public class EditSalesProductActivity extends BaseActivity {
 
                 if (spinnerUnit != null) {
                     spinnerUnit.setAdapter(rowUnitAdapter);
-                    String savedUnit = (String) bom.get("unit");
-                    if (savedUnit != null) {
-                        for (int i = 0; i < currentDialogUnits.size(); i++) {
-                            if (currentDialogUnits.get(i).equalsIgnoreCase(savedUnit)) { spinnerUnit.setSelection(i); break; }
-                        }
-                    }
+                    String savedUnit = bom.containsKey("unit") && bom.get("unit") != null ? String.valueOf(bom.get("unit")).trim() : "";
+                    int unitIndex = getIndexIgnoreCase(currentDialogUnits, savedUnit);
+                    spinnerUnit.post(() -> spinnerUnit.setSelection(Math.max(0, unitIndex)));
                 }
 
                 if (cbIsEssential != null && bom.containsKey("isEssential")) {
@@ -404,14 +439,14 @@ public class EditSalesProductActivity extends BaseActivity {
 
                 String materialName = spinMat != null && spinMat.getSelectedItem() != null ? spinMat.getSelectedItem().toString().trim() : "";
                 String qtyStr  = etQty != null ? etQty.getText().toString().trim() : "";
-                String unitStr = spinUnit != null && spinUnit.getSelectedItem() != null ? spinUnit.getSelectedItem().toString() : "pcs";
+                String unitStr = spinUnit != null && spinUnit.getSelectedItem() != null ? spinUnit.getSelectedItem().toString().trim() : "pcs";
                 boolean isEssential = cbIsEssential == null || cbIsEssential.isChecked();
 
                 if (!materialName.isEmpty() && !materialName.contains("Select Item")) {
                     Map<String, Object> map = new HashMap<>();
                     map.put("materialName", materialName);
                     map.put("quantity", qtyStr.isEmpty() ? 0.0 : Double.parseDouble(qtyStr));
-                    map.put("unit", unitStr);
+                    map.put("unit", unitStr); // Clean string saved to database
                     map.put("isEssential", isEssential);
                     savedBOM.add(map);
                 }
@@ -709,12 +744,9 @@ public class EditSalesProductActivity extends BaseActivity {
 
                 if (spinnerUnit != null) {
                     spinnerUnit.setAdapter(rowUnitAdapter);
-                    if (addon.containsKey("unit")) {
-                        String savedUnit = (String) addon.get("unit");
-                        for (int i = 0; i < currentDialogUnits.size(); i++) {
-                            if (currentDialogUnits.get(i).equalsIgnoreCase(savedUnit)) { spinnerUnit.setSelection(i); break; }
-                        }
-                    }
+                    String savedUnit = addon.containsKey("unit") && addon.get("unit") != null ? String.valueOf(addon.get("unit")).trim() : "";
+                    int unitIndex = getIndexIgnoreCase(currentDialogUnits, savedUnit);
+                    spinnerUnit.post(() -> spinnerUnit.setSelection(Math.max(0, unitIndex)));
                 }
 
                 if (etPrice != null) etPrice.setText(String.valueOf(addon.get("price")));
@@ -740,14 +772,14 @@ public class EditSalesProductActivity extends BaseActivity {
                 String name = spinnerAddonItem != null && spinnerAddonItem.getSelectedItem() != null ? spinnerAddonItem.getSelectedItem().toString().trim() : "";
                 String priceStr = etPrice != null ? etPrice.getText().toString().trim() : "";
                 String qtyStr = etQty != null ? etQty.getText().toString().trim() : "";
-                String unitStr = spinnerUnit != null && spinnerUnit.getSelectedItem() != null ? spinnerUnit.getSelectedItem().toString() : "pcs";
+                String unitStr = spinnerUnit != null && spinnerUnit.getSelectedItem() != null ? spinnerUnit.getSelectedItem().toString().trim() : "pcs";
 
                 if (!name.isEmpty()) {
                     Map<String, Object> map = new HashMap<>();
                     map.put("name", name);
                     map.put("price", priceStr.isEmpty() ? 0.0 : Double.parseDouble(priceStr));
                     map.put("deductQty", qtyStr.isEmpty() ? 0.0 : Double.parseDouble(qtyStr));
-                    map.put("unit", unitStr);
+                    map.put("unit", unitStr); // Clean string saved to database
                     map.put("linkedMaterial", name);
                     savedAddons.add(map);
                 }
@@ -792,11 +824,11 @@ public class EditSalesProductActivity extends BaseActivity {
 
         Runnable applyFilter = () -> {
             String query = etSearch.getText().toString().toLowerCase().trim();
-            String cat   = spinnerFilter.getSelectedItem() != null ? spinnerFilter.getSelectedItem().toString() : "All Categories";
+            String cat = spinnerFilter.getSelectedItem() != null ? spinnerFilter.getSelectedItem().toString() : "All Categories";
             filteredList.clear();
             for (Product p : inventoryProducts) {
                 boolean matchesSearch = p.getProductName().toLowerCase().contains(query);
-                boolean matchesCat    = cat.equals("All Categories") || cat.equals(p.getCategoryName());
+                boolean matchesCat = cat.equals("All Categories") || cat.equals(p.getCategoryName());
 
                 if (matchesSearch && matchesCat && p.getQuantity() > 0) {
                     filteredList.add(p);
@@ -828,8 +860,9 @@ public class EditSalesProductActivity extends BaseActivity {
 
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
         boolean isDark = false;
-        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception ignored) {}
-        int textColor = isDark ? android.graphics.Color.WHITE : android.graphics.Color.BLACK;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        final int textColor = isDark ? Color.WHITE : Color.BLACK;
+        final int bgColor = isDark ? Color.parseColor("#2C2C2C") : Color.WHITE;
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
@@ -843,6 +876,7 @@ public class EditSalesProductActivity extends BaseActivity {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
+                view.setBackgroundColor(bgColor);
                 ((TextView) view).setTextColor(textColor);
                 return view;
             }

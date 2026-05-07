@@ -32,7 +32,7 @@ public class StockAdjustmentActivity extends BaseActivity {
     private Spinner spinnerProduct, spinnerAdjustmentType, spinnerReason;
     private EditText etQuantity, etRemarks;
     private TextView tvCurrentStock, tvNewStock, tvFinancialImpact;
-    private Button btnAdjust, btnViewHistory;
+    private Button btnAdjust, btnCancel;
 
     private List<Product> productList;
     private Product selectedProduct;
@@ -56,7 +56,7 @@ public class StockAdjustmentActivity extends BaseActivity {
         tvNewStock = findViewById(R.id.tvNewStock);
         tvFinancialImpact = findViewById(R.id.tvFinancialImpact);
         btnAdjust = findViewById(R.id.btnAdjust);
-        btnViewHistory = findViewById(R.id.btnViewHistory);
+        btnCancel = findViewById(R.id.btnCancel);
 
         productRepository = SalesInventoryApplication.getProductRepository();
         productList = new ArrayList<>();
@@ -71,13 +71,7 @@ public class StockAdjustmentActivity extends BaseActivity {
         });
 
         btnAdjust.setOnClickListener(v -> performAdjustment());
-
-        if (btnViewHistory != null) {
-            btnViewHistory.setOnClickListener(v -> {
-                // Assuming you have an AdjustmentHistoryActivity
-                // startActivity(new Intent(this, AdjustmentHistoryActivity.class));
-            });
-        }
+        btnCancel.setOnClickListener(v -> finish());
     }
 
     // Adaptive Spinner to prevent invisible text in Dark Mode
@@ -121,6 +115,13 @@ public class StockAdjustmentActivity extends BaseActivity {
         spinnerProduct.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (productList == null || productList.isEmpty()) {
+                    selectedProduct = null;
+                    tvCurrentStock.setText("0.0");
+                    calculateImpact();
+                    return;
+                }
+
                 selectedProduct = productList.get(position);
                 tvCurrentStock.setText(String.valueOf(selectedProduct.getQuantity()));
                 calculateImpact();
@@ -182,7 +183,11 @@ public class StockAdjustmentActivity extends BaseActivity {
             double newStock = isAddition ? (currentStock + adjustmentQty) : (currentStock - adjustmentQty);
             tvNewStock.setText(String.format(Locale.US, "%.2f", newStock));
 
-            double impact = adjustmentQty * selectedProduct.getCostPrice();
+            // CRITICAL FIX: Prevent the bulk multiplication bug by using TrueUnitCost!
+            int ppu = selectedProduct.getPiecesPerUnit() > 0 ? selectedProduct.getPiecesPerUnit() : 1;
+            double trueUnitCost = UnitConverterUtil.calculateTrueUnitCost(selectedProduct.getCostPrice(), selectedProduct.getUnit(), ppu);
+
+            double impact = adjustmentQty * trueUnitCost;
 
             if (isAddition) {
                 tvFinancialImpact.setText(String.format(Locale.US, "+₱%,.2f", impact));
@@ -251,7 +256,13 @@ public class StockAdjustmentActivity extends BaseActivity {
 
     private void executeDatabaseUpdate(double newStock, double adjustmentQty, boolean isAddition, String reason, String remarks) {
         String productId = selectedProduct.getProductId();
-        double impact = adjustmentQty * selectedProduct.getCostPrice();
+
+        // CRITICAL FIX: Prevent the bulk multiplication bug!
+        int ppu = selectedProduct.getPiecesPerUnit() > 0 ? selectedProduct.getPiecesPerUnit() : 1;
+        double trueUnitCost = UnitConverterUtil.calculateTrueUnitCost(selectedProduct.getCostPrice(), selectedProduct.getUnit(), ppu);
+        double impact = adjustmentQty * trueUnitCost;
+
+        double currentStock = selectedProduct.getQuantity(); // NEEDED FOR ADAPTER HISTORY
 
         productRepository.updateProductQuantity(productId, newStock, new ProductRepository.OnProductUpdatedListener() {
                     @Override
@@ -259,7 +270,7 @@ public class StockAdjustmentActivity extends BaseActivity {
                         String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
                         if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
 
-                        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("stock_adjustments").child(ownerId);
+                        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("StockAdjustments");
                         String adjustmentId = ref.push().getKey();
 
                         Map<String, Object> adjustment = new HashMap<>();
@@ -267,14 +278,21 @@ public class StockAdjustmentActivity extends BaseActivity {
                         adjustment.put("productId", productId);
                         adjustment.put("productName", selectedProduct.getProductName());
                         adjustment.put("productLine", selectedProduct.getProductLine() != null ? selectedProduct.getProductLine() : "Uncategorized");
+
+                        // Ensure consistency so reports can read it easily
                         adjustment.put("type", isAddition ? "ADDITION" : "DEDUCTION");
+                        adjustment.put("adjustmentType", isAddition ? "ADDITION" : "DEDUCTION");
+
                         adjustment.put("quantity", adjustmentQty);
+                        adjustment.put("quantityAdjusted", adjustmentQty);
+                        adjustment.put("quantityBefore", currentStock);
+                        adjustment.put("quantityAfter", newStock);
+
                         adjustment.put("reason", reason);
                         adjustment.put("remarks", remarks);
                         adjustment.put("timestamp", System.currentTimeMillis());
                         adjustment.put("financialImpact", isAddition ? impact : -impact);
-                        // Added Unit Cost so Damaged Reports can calculate the loss perfectly!
-                        adjustment.put("unitCost", selectedProduct.getCostPrice());
+                        adjustment.put("unitCost", trueUnitCost); // Save the corrected cost
                         adjustment.put("ownerAdminId", ownerId);
                         adjustment.put("adjustedBy", AuthManager.getInstance().getCurrentUserId());
 
@@ -303,11 +321,22 @@ public class StockAdjustmentActivity extends BaseActivity {
     private void clearForm() {
         etQuantity.setText("");
         etRemarks.setText("");
-        if (spinnerProduct.getAdapter() != null && spinnerProduct.getAdapter().getCount() > 0) spinnerProduct.setSelection(0);
         spinnerAdjustmentType.setSelection(0);
         spinnerReason.setSelection(0);
-        tvCurrentStock.setText("0.0");
+
+        if (spinnerProduct.getAdapter() != null && spinnerProduct.getAdapter().getCount() > 0) {
+            spinnerProduct.setSelection(0);
+            if (productList != null && !productList.isEmpty()) {
+                selectedProduct = productList.get(0);
+                tvCurrentStock.setText(String.valueOf(selectedProduct.getQuantity()));
+            } else {
+                tvCurrentStock.setText("0.0");
+            }
+        } else {
+            tvCurrentStock.setText("0.0");
+        }
+
         tvNewStock.setText("0.0");
         tvFinancialImpact.setText("₱0.00");
-    }
-}
+        tvFinancialImpact.setTextColor(getResources().getColor(R.color.textColorSecondary));
+    }}

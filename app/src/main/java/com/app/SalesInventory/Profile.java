@@ -328,7 +328,6 @@ public class Profile extends BaseActivity {
 
         if (currentUid != null) {
             try {
-                // Try to log attendance and update status, but don't let it crash the logout!
                 SalesInventoryApplication.logAttendance("SHIFT_END");
                 FirebaseDatabase.getInstance().getReference("UsersStatus")
                         .child(currentUid)
@@ -344,7 +343,6 @@ public class Profile extends BaseActivity {
 
     private void executeFinalSignOut() {
         try {
-            // 1. Immediately kill the SyncWorker so it releases the database lock
             androidx.work.WorkManager.getInstance(this).cancelAllWork();
 
             // 2. Tell AuthManager to clean up in the background (but DO NOT WAIT for it)

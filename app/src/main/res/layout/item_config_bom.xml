@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/edite_round"
-    android:backgroundTint="#F8F9FA"
+    android:backgroundTint="?attr/colorSurface"
     android:padding="8dp"
     android:layout_marginBottom="8dp">
 
@@ -22,7 +22,7 @@
             android:layout_height="48dp"
             android:layout_weight="2"
             android:background="@drawable/edite_round"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="?attr/colorSurface"
             android:layout_marginEnd="4dp"/>
 
         <EditText
@@ -34,7 +34,9 @@
             android:textSize="14sp"
             android:inputType="numberDecimal"
             android:background="@drawable/edite_round"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="?attr/colorSurface"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textColorHint="?android:attr/textColorSecondary"
             android:padding="12dp"
             android:layout_marginEnd="4dp"/>
 
@@ -44,7 +46,7 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:background="@drawable/edite_round"
-            android:backgroundTint="#FFFFFF"
+            android:backgroundTint="?attr/colorSurface"
             android:layout_marginEnd="4dp"/>
 
         <ImageButton
@@ -62,8 +64,6 @@
         android:layout_height="wrap_content"
         android:text="Required Ingredient (Blocks sale if out of stock)"
         android:textSize="12sp"
-        android:textColor="#555555"
-        android:checked="true"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="4dp"/>
+        android:textColor="?android:attr/textColorSecondary"
+        android:layout_marginTop="4dp"/>
 </LinearLayout>

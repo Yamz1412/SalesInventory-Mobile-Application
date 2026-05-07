@@ -29,7 +29,7 @@
             android:text="Activity Title"
             android:textSize="14sp"
             android:textStyle="bold"
-            android:textColor="@android:color/black" />
+            android:textColor="?android:attr/textColorPrimary" />
 
         <TextView
             android:id="@+id/tv_activity_description"
@@ -37,7 +37,7 @@
             android:layout_height="wrap_content"
             android:text="Activity Description"
             android:textSize="12sp"
-            android:textColor="@android:color/darker_gray"
+            android:textColor="?android:attr/textColorSecondary"
             android:layout_marginTop="2dp" />
 
     </LinearLayout>
@@ -46,9 +46,9 @@
         android:id="@+id/tv_activity_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Just now"
-        android:textSize="11sp"
-        android:textColor="@android:color/darker_gray"
+        android:text="10 mins ago"
+        android:textSize="12sp"
+        android:textColor="?android:attr/textColorSecondary"
         android:layout_marginStart="8dp" />
 
 </LinearLayout>

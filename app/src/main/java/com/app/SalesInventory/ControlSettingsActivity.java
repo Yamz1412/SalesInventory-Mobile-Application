@@ -43,10 +43,18 @@ public class ControlSettingsActivity extends BaseActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
+        // CRITICAL FIX: Safe ID routing to prevent crashes
         currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
         if (currentUserId == null || currentUserId.isEmpty()) {
             currentUserId = AuthManager.getInstance().getCurrentUserId();
         }
+
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            Toast.makeText(this, "Authentication error. Please login again.", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         systemSettingsRef = FirebaseDatabase.getInstance().getReference("SystemSettings").child(currentUserId);
 
         // Bind Views
@@ -56,59 +64,59 @@ public class ControlSettingsActivity extends BaseActivity {
         btnCreatePromo = findViewById(R.id.btnCreatePromo);
         btnManagePromos = findViewById(R.id.btnManagePromos);
 
-        // Tax Bindings
         etTaxRate = findViewById(R.id.etTaxRate);
         switchEnableTax = findViewById(R.id.switchEnableTax);
         spinnerTaxType = findViewById(R.id.spinnerTaxType);
         btnSaveTax = findViewById(R.id.btnSaveTax);
 
-        etDefaultMarkup.setFilters(new InputFilter[]{ new InputFilter.LengthFilter(3) });
+        if (etDefaultMarkup != null) {
+            etDefaultMarkup.setFilters(new InputFilter[]{ new InputFilter.LengthFilter(3) });
+        }
 
         setupBusinessTierPresets();
         setupTaxSpinner();
         loadCurrentSettings();
 
         if (!AuthManager.getInstance().isCurrentUserAdmin()) {
-
-            // 1. Hide Pricing Section
             if (etDefaultMarkup != null && etDefaultMarkup.getParent() instanceof View) {
-                ((View) etDefaultMarkup.getParent()).setVisibility(View.GONE); // Hides the Input container
+                ((View) etDefaultMarkup.getParent()).setVisibility(View.GONE);
             }
             if (spinnerBusinessType != null) spinnerBusinessType.setVisibility(View.GONE);
             if (btnSavePricing != null) btnSavePricing.setVisibility(View.GONE);
 
-            // 2. Hide Tax Section
             if (etTaxRate != null && etTaxRate.getParent() instanceof View) {
-                ((View) etTaxRate.getParent()).setVisibility(View.GONE); // Hides the Input container
+                ((View) etTaxRate.getParent()).setVisibility(View.GONE);
             }
             if (switchEnableTax != null) switchEnableTax.setVisibility(View.GONE);
             if (spinnerTaxType != null) spinnerTaxType.setVisibility(View.GONE);
             if (btnSaveTax != null) btnSaveTax.setVisibility(View.GONE);
 
-            // 3. Hide Staff Attendance Button
             if (btnViewAttendanceLogs != null) btnViewAttendanceLogs.setVisibility(View.GONE);
         }
 
-        btnSavePricing.setOnClickListener(v -> {
-            if (isPricingLocked) togglePricingLock(false);
-            else savePricingSettings();
-        });
+        if (btnSavePricing != null) {
+            btnSavePricing.setOnClickListener(v -> {
+                if (isPricingLocked) togglePricingLock(false);
+                else savePricingSettings();
+            });
+        }
 
-        btnSaveTax.setOnClickListener(v -> {
-            if (isTaxLocked) {
-                toggleTaxLock(false);
-            } else {
-                saveTaxSettings();
-            }
-        });
+        if (btnSaveTax != null) {
+            btnSaveTax.setOnClickListener(v -> {
+                if (isTaxLocked) toggleTaxLock(false);
+                else saveTaxSettings();
+            });
+        }
 
-        btnViewAttendanceLogs.setOnClickListener(v -> startActivity(new Intent(this, AttendanceLogsActivity.class)));
-        btnCreatePromo.setOnClickListener(v -> startActivity(new Intent(this, CreatePromoActivity.class)));
-        btnManagePromos.setOnClickListener(v -> startActivity(new Intent(this, ManagePromosActivity.class)));
+        if (btnViewAttendanceLogs != null) btnViewAttendanceLogs.setOnClickListener(v -> startActivity(new Intent(this, AttendanceLogsActivity.class)));
+        if (btnCreatePromo != null) btnCreatePromo.setOnClickListener(v -> startActivity(new Intent(this, CreatePromoActivity.class)));
+        if (btnManagePromos != null) btnManagePromos.setOnClickListener(v -> startActivity(new Intent(this, ManagePromosActivity.class)));
     }
 
     private void setupBusinessTierPresets() {
         spinnerBusinessType = findViewById(R.id.spinnerBusinessType);
+        if (spinnerBusinessType == null) return;
+
         String[] businessTypes = {"Custom / Manual", "Street Shop / Kiosk (100%)", "Local Cafe (200%)", "Premium / Mall (350%)"};
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, businessTypes);
         spinnerBusinessType.setAdapter(adapter);
@@ -116,7 +124,7 @@ public class ControlSettingsActivity extends BaseActivity {
         spinnerBusinessType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
-                if (!isPricingLocked) {
+                if (!isPricingLocked && etDefaultMarkup != null) {
                     if (position == 1) etDefaultMarkup.setText("100");
                     else if (position == 2) etDefaultMarkup.setText("200");
                     else if (position == 3) etDefaultMarkup.setText("350");
@@ -127,6 +135,7 @@ public class ControlSettingsActivity extends BaseActivity {
     }
 
     private void setupTaxSpinner() {
+        if (spinnerTaxType == null) return;
         String[] taxTypes = {"Inclusive (Tax is inside the price)", "Exclusive (Tax added on top of price)"};
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, taxTypes);
         spinnerTaxType.setAdapter(adapter);
@@ -134,10 +143,10 @@ public class ControlSettingsActivity extends BaseActivity {
 
     private void toggleTaxLock(boolean lock) {
         isTaxLocked = lock;
-        switchEnableTax.setEnabled(!lock);
-        etTaxRate.setEnabled(!lock);
-        spinnerTaxType.setEnabled(!lock);
-        btnSaveTax.setText(lock ? "Edit Tax Settings" : "Save Tax Settings");
+        if (switchEnableTax != null) switchEnableTax.setEnabled(!lock);
+        if (etTaxRate != null) etTaxRate.setEnabled(!lock);
+        if (spinnerTaxType != null) spinnerTaxType.setEnabled(!lock);
+        if (btnSaveTax != null) btnSaveTax.setText(lock ? "Edit Tax Settings" : "Save Tax Settings");
     }
 
     private void loadCurrentSettings() {
@@ -145,9 +154,8 @@ public class ControlSettingsActivity extends BaseActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
-                    // Load Pricing
                     Double defaultMarkup = snapshot.child("defaultMarkupPercent").getValue(Double.class);
-                    if (defaultMarkup != null) {
+                    if (defaultMarkup != null && etDefaultMarkup != null) {
                         etDefaultMarkup.setText(String.valueOf(defaultMarkup));
                         isPricingLocked = true;
                     }
@@ -161,18 +169,17 @@ public class ControlSettingsActivity extends BaseActivity {
                     }
                     togglePricingLock(isPricingLocked);
 
-                    // Load Tax Settings
                     Boolean isTaxEnabled = snapshot.child("taxEnabled").getValue(Boolean.class);
-                    if (isTaxEnabled != null) switchEnableTax.setChecked(isTaxEnabled);
+                    if (isTaxEnabled != null && switchEnableTax != null) switchEnableTax.setChecked(isTaxEnabled);
 
                     Double taxRate = snapshot.child("taxRate").getValue(Double.class);
-                    if (taxRate != null) {
+                    if (taxRate != null && etTaxRate != null) {
                         etTaxRate.setText(String.valueOf(taxRate));
                         isTaxLocked = true;
                     }
 
                     String taxType = snapshot.child("taxType").getValue(String.class);
-                    if (taxType != null) {
+                    if (taxType != null && spinnerTaxType != null) {
                         if (taxType.equals("Exclusive")) spinnerTaxType.setSelection(1);
                         else spinnerTaxType.setSelection(0);
                     }
@@ -188,7 +195,7 @@ public class ControlSettingsActivity extends BaseActivity {
     }
 
     private void savePricingSettings() {
-        String markupStr = etDefaultMarkup.getText() != null ? etDefaultMarkup.getText().toString() : "0";
+        String markupStr = (etDefaultMarkup != null && etDefaultMarkup.getText() != null) ? etDefaultMarkup.getText().toString() : "0";
         double markupValue = markupStr.isEmpty() ? 0 : Double.parseDouble(markupStr);
 
         Map<String, Object> updates = new HashMap<>();
@@ -207,20 +214,23 @@ public class ControlSettingsActivity extends BaseActivity {
     }
 
     private void saveTaxSettings() {
-        String rateStr = etTaxRate.getText() != null ? etTaxRate.getText().toString() : "0";
+        String rateStr = (etTaxRate != null && etTaxRate.getText() != null) ? etTaxRate.getText().toString() : "0";
         double rateValue = rateStr.isEmpty() ? 0 : Double.parseDouble(rateStr);
 
         Map<String, Object> updates = new HashMap<>();
-        updates.put("taxEnabled", switchEnableTax.isChecked());
+        if (switchEnableTax != null) updates.put("taxEnabled", switchEnableTax.isChecked());
         updates.put("taxRate", rateValue);
 
-        String selectedType = spinnerTaxType.getSelectedItem().toString().contains("Inclusive") ? "Inclusive" : "Exclusive";
+        String selectedType = "Inclusive";
+        if (spinnerTaxType != null && spinnerTaxType.getSelectedItem() != null) {
+            selectedType = spinnerTaxType.getSelectedItem().toString().contains("Inclusive") ? "Inclusive" : "Exclusive";
+        }
         updates.put("taxType", selectedType);
 
         systemSettingsRef.updateChildren(updates).addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 Toast.makeText(this, "Tax Settings Saved!", Toast.LENGTH_SHORT).show();
-                toggleTaxLock(true); // LOCK after success
+                toggleTaxLock(true);
             } else {
                 Toast.makeText(this, "Error saving tax settings", Toast.LENGTH_SHORT).show();
             }
@@ -229,9 +239,9 @@ public class ControlSettingsActivity extends BaseActivity {
 
     private void togglePricingLock(boolean lock) {
         isPricingLocked = lock;
-        etDefaultMarkup.setEnabled(!lock);
-        spinnerBusinessType.setEnabled(!lock);
-        btnSavePricing.setText(lock ? "Edit Pricing Rule" : "Save Pricing Rule");
+        if (etDefaultMarkup != null) etDefaultMarkup.setEnabled(!lock);
+        if (spinnerBusinessType != null) spinnerBusinessType.setEnabled(!lock);
+        if (btnSavePricing != null) btnSavePricing.setText(lock ? "Edit Pricing Rule" : "Save Pricing Rule");
     }
 
     @Override

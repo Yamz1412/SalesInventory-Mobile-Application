@@ -122,55 +122,40 @@ public class PurchaseOrderDetailActivity extends BaseActivity {
     }
 
     private void updateUI() {
-        // FIX: Added Null-Safety in case lists are empty
-        if (currentPo.getItems() == null) {
-            currentPo.setItems(new ArrayList<>());
-        }
+        if (currentPo.getItems() == null) currentPo.setItems(new ArrayList<>());
 
         tvPONumber.setText(currentPo.getPoNumber() != null ? currentPo.getPoNumber() : "Unknown");
         tvSupplier.setText(currentPo.getSupplierName() != null ? currentPo.getSupplierName() : "Unknown");
 
-        // FIX: Wrapped long in java.util.Date to prevent IllegalArgumentException Crash!
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
         long orderDate = currentPo.getOrderDate() > 0 ? currentPo.getOrderDate() : System.currentTimeMillis();
         tvDate.setText("Expected: " + sdf.format(new java.util.Date(orderDate)));
 
-        // FIX: Prevent NullPointerException if status is null
         String status = currentPo.getStatus() != null ? currentPo.getStatus() : PurchaseOrder.STATUS_PENDING;
         tvStatus.setText(status.toUpperCase());
 
         if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) || status.equalsIgnoreCase("SENT") || status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
             if (layoutActionButtons != null) layoutActionButtons.setVisibility(View.VISIBLE);
-
-            // FIX: Prevents the app from crashing if the XML doesn't have the delivery note box
             if (tilDeliveryNote != null) tilDeliveryNote.setVisibility(View.VISIBLE);
 
             tvStatus.setTextColor(getResources().getColor(R.color.warningYellow));
 
-            if (btnDispatchPO != null) {
-                if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING)) {
-                    btnDispatchPO.setVisibility(View.VISIBLE);
-                } else {
-                    btnDispatchPO.setVisibility(View.GONE);
-                }
-            }
+            if (btnDispatchPO != null) btnDispatchPO.setVisibility(status.equalsIgnoreCase(PurchaseOrder.STATUS_PENDING) ? View.VISIBLE : View.GONE);
 
-            if (btnForceClose != null) {
-                if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
-                    btnForceClose.setVisibility(View.VISIBLE);
-                } else {
-                    btnForceClose.setVisibility(View.GONE);
-                }
+            // CRITICAL FIX: The Process Delivery button is now ALWAYS visible for Partial orders!
+            if (status.equalsIgnoreCase(PurchaseOrder.STATUS_PARTIAL)) {
+                if (btnForceClose != null) btnForceClose.setVisibility(View.VISIBLE);
+                if (btnProcessDelivery != null) btnProcessDelivery.setVisibility(View.VISIBLE);
+            } else {
+                if (btnForceClose != null) btnForceClose.setVisibility(View.GONE);
+                if (btnProcessDelivery != null) btnProcessDelivery.setVisibility(View.VISIBLE);
             }
 
             itemsAdapter = new POItemAdapter(this, currentPo.getItems(), position -> promptDeleteItem(position), null);
             itemsAdapter.setReceiveMode(true);
         } else {
             if (layoutActionButtons != null) layoutActionButtons.setVisibility(View.GONE);
-
-            // FIX: Null safety check
             if (tilDeliveryNote != null) tilDeliveryNote.setVisibility(View.GONE);
-
             if (btnDispatchPO != null) btnDispatchPO.setVisibility(View.GONE);
 
             if (status.equalsIgnoreCase(PurchaseOrder.STATUS_RECEIVED) || status.equalsIgnoreCase("COMPLETED")) {

@@ -47,6 +47,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -143,6 +145,22 @@ public class AddProductActivity extends BaseActivity {
         productLineET = findViewById(R.id.productLineET);
         productTypeET = findViewById(R.id.productTypeET);
 
+        android.text.InputFilter letterFilter = new android.text.InputFilter() {
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, android.text.Spanned dest, int dstart, int dend) {
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    // Allow letters and spaces only. Reject symbols/numbers.
+                    if (!Character.isLetter(c) && c != ' ') {
+                        return "";
+                    }
+                }
+                return null;
+            }
+        };
+        productLineET.setFilters(new android.text.InputFilter[]{letterFilter});
+        productTypeET.setFilters(new android.text.InputFilter[]{letterFilter});
+
         switchSellOnPOS = findViewById(R.id.switchSellOnPOS);
         switchSizes = findViewById(R.id.switchSizes);
         switchAddons = findViewById(R.id.switchAddons);
@@ -150,6 +168,8 @@ public class AddProductActivity extends BaseActivity {
         switchBOM = findViewById(R.id.switchBOM);
 
         costPriceET = findViewById(R.id.costPriceET);
+        costPriceET.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+
         sellingPriceET = findViewById(R.id.sellingPriceET);
         sellingPriceET.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -202,6 +222,7 @@ public class AddProductActivity extends BaseActivity {
         // REVISION 1: Fetch Admin Global Pricing Rules
         loadPricingRules();
         updateConfigUI();
+        setupBidirectionalMath();
 
         setupImagePickers();
         loadInventoryForCalculations();
@@ -218,57 +239,39 @@ public class AddProductActivity extends BaseActivity {
         unitAdapter = getAdaptiveAdapter(unitList);
         unitSpinner.setAdapter(unitAdapter);
 
-        unitSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        unitSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                String selected = unitList.get(position);
-                if (selected.equals("+ Add Custom Unit...")) {
-                    showCustomUnitDialog();
-                } else {
-                    boolean isBulkContainer = selected.equalsIgnoreCase("box") ||
-                            selected.equalsIgnoreCase("pack") ||
-                            selected.equalsIgnoreCase("L") ||
-                            selected.equalsIgnoreCase("kg") ||
-                            selected.equalsIgnoreCase("tub");
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String selected = unitSpinner.getSelectedItem().toString();
+                boolean isBulk = selected.equalsIgnoreCase("box") || selected.equalsIgnoreCase("pack") ||
+                        selected.equalsIgnoreCase("kg") || selected.equalsIgnoreCase("L");
 
-                    layoutPiecesPerUnit.setVisibility(isBulkContainer ? View.VISIBLE : View.GONE);
-
-                    if (isBulkContainer) {
-                        subUnitList.clear();
-                        for (String u : unitList) {
-                            if (!u.equals("+ Add Custom Unit...") && !u.equalsIgnoreCase(selected)) {
-                                subUnitList.add(u);
-                            }
-                        }
-                        if (!subUnitList.contains("pcs")) subUnitList.add(0, "pcs");
-                        if (selected.equalsIgnoreCase("kg") && !subUnitList.contains("g")) subUnitList.add("g");
-                        if (selected.equalsIgnoreCase("L") && !subUnitList.contains("ml")) subUnitList.add("ml");
-
-                        subUnitAdapter.notifyDataSetChanged();
-
-                        if (!selected.equals(lastSelectedUnit)) {
-                            lastSelectedUnit = selected;
-                            if (selected.equalsIgnoreCase("kg")) {
-                                if (etPiecesPerUnit.getText().toString().isEmpty() || etPiecesPerUnit.getText().toString().equals("1")) etPiecesPerUnit.setText("1000");
-                                subUnitSpinner.setSelection(subUnitList.indexOf("g"));
-                            } else if (selected.equalsIgnoreCase("L")) {
-                                if (etPiecesPerUnit.getText().toString().isEmpty() || etPiecesPerUnit.getText().toString().equals("1")) etPiecesPerUnit.setText("1000");
-                                subUnitSpinner.setSelection(subUnitList.indexOf("ml"));
-                            } else {
-                                if (etPiecesPerUnit.getText().toString().isEmpty()) etPiecesPerUnit.setText("1");
-                                subUnitSpinner.setSelection(subUnitList.indexOf("pcs"));
-                            }
-                        }
-                    } else {
-                        if (!selected.equals(lastSelectedUnit)) {
-                            lastSelectedUnit = selected;
-                            etPiecesPerUnit.setText("1");
-                        }
-                    }
+                if (layoutPiecesPerUnit != null) {
+                    layoutPiecesPerUnit.setVisibility(isBulk ? View.VISIBLE : View.GONE);
                 }
 
+                if (!selected.equals(lastSelectedUnit)) {
+                    lastSelectedUnit = selected;
+                    if (selected.equalsIgnoreCase("kg")) {
+                        etPiecesPerUnit.setHint("Total grams (g)");
+                        setSubUnitSpinnerValue("g");
+                        // Trigger Math
+                        try { double q = Double.parseDouble(quantityET.getText().toString()); etPiecesPerUnit.setText(String.valueOf((int)(q * 1000))); } catch(Exception ignored){}
+                    } else if (selected.equalsIgnoreCase("L")) {
+                        etPiecesPerUnit.setHint("Total ml");
+                        setSubUnitSpinnerValue("ml");
+                        // Trigger Math
+                        try { double q = Double.parseDouble(quantityET.getText().toString()); etPiecesPerUnit.setText(String.valueOf((int)(q * 1000))); } catch(Exception ignored){}
+                    } else if (selected.equalsIgnoreCase("box") || selected.equalsIgnoreCase("pack")) {
+                        etPiecesPerUnit.setHint("Total Pcs (User Input)");
+                        etPiecesPerUnit.setText(""); // Leave blank for user input
+                        setSubUnitSpinnerValue("pcs");
+                    } else {
+                        etPiecesPerUnit.setText("1");
+                    }
+                }
             }
-            @Override public void onNothingSelected(AdapterView<?> parent) {}
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
 
         productTypeET.setOnClickListener(v -> productTypeET.showDropDown());
@@ -276,13 +279,23 @@ public class AddProductActivity extends BaseActivity {
 
         listenToProductLinesAndTypes();
 
-        switchSellOnPOS.setOnCheckedChangeListener((btn, isChecked) -> updateLayoutForSelectedType());
+// --- Prevent enabling Sales Menu if inventory is empty ---
+        switchSellOnPOS.setOnCheckedChangeListener((btn, isChecked) -> {
+            if (isChecked && inventoryProducts.isEmpty()) {
+                if (btn.isPressed()) {
+                    Toast.makeText(this, "Access Denied: Please add Raw Materials or Inventory items first before creating a Sales Menu.", Toast.LENGTH_LONG).show();
+                    btn.setChecked(false); // Instantly turn the switch back off
+                    return; // Stop the layout update
+                }
+            }
+            updateLayoutForSelectedType();
+        });
         updateLayoutForSelectedType();
 
-        // REVISION 1: TextWatcher to Auto-Calculate Selling Price if manually entering Cost
         costPriceET.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                calculateSellingPrice();
                 validatePricingAlerts();
             }
             @Override public void afterTextChanged(Editable s) {}
@@ -316,6 +329,7 @@ public class AddProductActivity extends BaseActivity {
             loadProductDataForEdit();
         }
 
+
         if (getIntent().getBooleanExtra("MODE_MENU_ONLY", false)) {
             if (switchSellOnPOS != null) {
                 switchSellOnPOS.setChecked(true);
@@ -342,6 +356,113 @@ public class AddProductActivity extends BaseActivity {
                 }
             }
         }
+    }
+
+    private boolean isAutoFormatting = false;
+
+    private void setupBidirectionalMath() {
+        TextWatcher mainQtyWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                if (isAutoFormatting) return;
+                String unit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
+                if (unit.equalsIgnoreCase("kg") || unit.equalsIgnoreCase("L")) {
+                    try {
+                        double qty = Double.parseDouble(s.toString());
+                        isAutoFormatting = true;
+                        etPiecesPerUnit.setText(String.valueOf((int)(qty * 1000))); // 200 kg -> 200000 g
+                        isAutoFormatting = false;
+                    } catch (Exception e) {
+                        isAutoFormatting = true;
+                        etPiecesPerUnit.setText("");
+                        isAutoFormatting = false;
+                    }
+                }
+                updateStockAlertsDisplay();
+            }
+        };
+
+        TextWatcher subQtyWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                if (isAutoFormatting) return;
+                String unit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
+                if (unit.equalsIgnoreCase("kg") || unit.equalsIgnoreCase("L")) {
+                    try {
+                        double subQty = Double.parseDouble(s.toString());
+                        isAutoFormatting = true;
+                        double mainQty = subQty / 1000.0; // 200000 g -> 200 kg
+                        if (mainQty % 1 == 0) {
+                            quantityET.setText(String.valueOf((int)mainQty));
+                        } else {
+                            quantityET.setText(String.valueOf(mainQty));
+                        }
+                        isAutoFormatting = false;
+                    } catch (Exception e) {
+                        isAutoFormatting = true;
+                        quantityET.setText("");
+                        isAutoFormatting = false;
+                    }
+                }
+            }
+        };
+
+        if (quantityET != null) quantityET.addTextChangedListener(mainQtyWatcher);
+        if (etPiecesPerUnit != null) etPiecesPerUnit.addTextChangedListener(subQtyWatcher);
+    }
+
+    private ArrayAdapter<String> getDeletableDropdownAdapter(List<String> items, String rtdbNode, String fieldName) {
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        int textColor = isDark ? Color.WHITE : Color.BLACK;
+
+        return new ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, items) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                ((TextView) view).setTextColor(textColor);
+
+                // ATTACH THE LONG PRESS LISTENER DIRECTLY TO THE DROPDOWN ITEM
+                view.setOnLongClickListener(v -> {
+                    String selectedItem = getItem(position);
+
+                    new AlertDialog.Builder(AddProductActivity.this)
+                            .setTitle("Delete '" + selectedItem + "'?")
+                            .setMessage("Are you sure you want to permanently delete this category?\n\nNote: If existing products are still using this category, it will reappear until you edit those products.")
+                            .setPositiveButton("Delete", (dialog, which) -> {
+
+                                // 1. Delete it from the Realtime Database
+                                DatabaseReference ref = FirebaseDatabase.getInstance().getReference(rtdbNode);
+                                ref.orderByChild("ownerAdminId").equalTo(currentUserId)
+                                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                                            @Override
+                                            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                                for (DataSnapshot doc : snapshot.getChildren()) {
+                                                    String name = doc.child(fieldName).getValue(String.class);
+                                                    if (name != null && name.equalsIgnoreCase(selectedItem)) {
+                                                        doc.getRef().removeValue();
+                                                    }
+                                                }
+                                                Toast.makeText(AddProductActivity.this, selectedItem + " deleted.", Toast.LENGTH_SHORT).show();
+
+                                                // 2. Instantly remove it from the screen so the user doesn't have to reopen the app
+                                                remove(selectedItem);
+                                                notifyDataSetChanged();
+                                            }
+                                            @Override
+                                            public void onCancelled(@NonNull DatabaseError error) {}
+                                        });
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                    return true;
+                });
+                return view;
+            }
+        };
     }
 
     private void updateStockAlertsDisplay() {
@@ -393,19 +514,29 @@ public class AddProductActivity extends BaseActivity {
         try {
             String costStr = costPriceET.getText().toString();
             double cost = costStr.isEmpty() ? 0 : Double.parseDouble(costStr);
-
-            // Formula: Selling Price = Cost + (Cost * (Markup % / 100))
             double sellingPrice = cost + (cost * (defaultMarkupPercent / 100));
-            sellingPriceET.setText(String.format(Locale.US, "%.2f", sellingPrice));
+            double roundedPrice = Math.round(sellingPrice);
+
+            sellingPriceET.setText(String.format(Locale.US, "%.2f", roundedPrice));
 
         } catch (Exception e) {
             sellingPriceET.setText("0.00");
         }
     }
 
+    // HELPER METHOD: Finds the unit in the list ignoring uppercase/lowercase differences
+    private int getIndexIgnoreCase(List<String> list, String target) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).equalsIgnoreCase(target)) return i;
+        }
+        return -1;
+    }
+
     private ArrayAdapter<String> getAdaptiveAdapter(List<String> items) {
-        boolean isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark");
-        int textColor = isDark ? Color.WHITE : Color.BLACK;
+        boolean isDark = false;
+        try { isDark = ThemeManager.getInstance(this).getCurrentTheme().name.equals("dark"); } catch (Exception e) {}
+        final int textColor = isDark ? Color.WHITE : Color.BLACK;
+        final int bgColor = isDark ? Color.parseColor("#2C2C2C") : Color.WHITE;
 
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, items) {
             @NonNull
@@ -419,6 +550,7 @@ public class AddProductActivity extends BaseActivity {
             @Override
             public View getDropDownView(int position, View convertView, @NonNull ViewGroup parent) {
                 View view = super.getDropDownView(position, convertView, parent);
+                view.setBackgroundColor(bgColor);
                 ((TextView) view).setTextColor(textColor);
                 return view;
             }
@@ -494,77 +626,33 @@ public class AddProductActivity extends BaseActivity {
     }
 
     private void updateLayoutForSelectedType() {
+        if (switchSellOnPOS == null) return;
         boolean isMenu = switchSellOnPOS.isChecked();
         View layoutSellingPrice = findViewById(R.id.layoutSellingPrice);
-        View layoutCostPrice = findViewById(R.id.layoutCostPrice);
 
         if (isMenu) {
-            // SALES MENU MODE
-            layoutConfigurations.setVisibility(View.VISIBLE);
-            quantityET.setVisibility(View.GONE);
-            unitSpinner.setVisibility(View.GONE);
-
-            // Show Selling Price
+            // SALES MENU MODE - Show Selling Price
             if(layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.VISIBLE);
-
-            // Lock Cost Price (Calculated from Recipe/BOM)
-            costPriceET.setEnabled(false);
-            costPriceET.setFocusable(false);
-            costPriceET.setFocusableInTouchMode(false);
-            costPriceET.setLongClickable(false);
-            costPriceET.setCursorVisible(false);
-            costPriceET.setHint("Auto-calculated Cost");
-            costPriceET.setBackgroundTintList(ContextCompat.getColorStateList(this, R.color.dirtyWhite));
-
-            // Enable Selling Price
-            sellingPriceET.setEnabled(true);
-            sellingPriceET.setFocusable(true);
-            sellingPriceET.setFocusableInTouchMode(true);
-            sellingPriceET.setLongClickable(true);
-            sellingPriceET.setCursorVisible(true);
-            sellingPriceET.setBackgroundTintList(null);
-
-            if (usePercentageMarkup) {
-                sellingPriceET.setHint("Selling Price (Rec: +" + defaultMarkupPercent + "%)");
-            } else {
-                sellingPriceET.setHint("Selling Price");
-            }
-
+            if(sellingPriceET != null) sellingPriceET.setVisibility(View.VISIBLE);
             if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(View.GONE);
-
-            updateMainCostFromBOM();
-            if (layoutInventoryInputs != null) layoutInventoryInputs.setVisibility(View.GONE);
+            if (quantityET != null) quantityET.setVisibility(View.GONE);
+            if (unitSpinner != null) unitSpinner.setVisibility(View.GONE);
         } else {
-            if (layoutInventoryInputs != null) layoutInventoryInputs.setVisibility(View.VISIBLE);
-            // RAW MATERIAL / INVENTORY MODE
-            layoutConfigurations.setVisibility(View.GONE);
-            quantityET.setVisibility(View.VISIBLE);
-            unitSpinner.setVisibility(View.VISIBLE);
-
-            // Enable Cost Price
-            costPriceET.setEnabled(true);
-            costPriceET.setFocusable(true);
-            costPriceET.setFocusableInTouchMode(true);
-            costPriceET.setLongClickable(true);
-            costPriceET.setCursorVisible(true);
-            costPriceET.setHint("Cost (₱)");
-            costPriceET.setBackgroundTintList(null);
-
-            // Hide Selling Price entirely
+            // INVENTORY MODE - Hide Selling Price Completely
             if(layoutSellingPrice != null) layoutSellingPrice.setVisibility(View.GONE);
+            if(sellingPriceET != null) {
+                sellingPriceET.setVisibility(View.GONE);
+                sellingPriceET.setText("0");
+            }
+            if (quantityET != null) quantityET.setVisibility(View.VISIBLE);
+            if (unitSpinner != null) unitSpinner.setVisibility(View.VISIBLE);
 
             String selectedUnit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
-            boolean isBulkContainer = selectedUnit.equalsIgnoreCase("box") ||
-                    selectedUnit.equalsIgnoreCase("pack") ||
-                    selectedUnit.equalsIgnoreCase("L") ||
-                    selectedUnit.equalsIgnoreCase("kg") ||
-                    selectedUnit.equalsIgnoreCase("tub");
+            boolean isBulkContainer = selectedUnit.equalsIgnoreCase("box") || selectedUnit.equalsIgnoreCase("pack") ||
+                    selectedUnit.equalsIgnoreCase("L") || selectedUnit.equalsIgnoreCase("kg") || selectedUnit.equalsIgnoreCase("tub");
 
-            if (layoutPiecesPerUnit != null) {
-                layoutPiecesPerUnit.setVisibility(isBulkContainer ? View.VISIBLE : View.GONE);
-            }
+            if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(isBulkContainer ? View.VISIBLE : View.GONE);
         }
-        updateStockAlertsDisplay();
     }
 
     private void loadInventoryForCalculations() {
@@ -597,8 +685,9 @@ public class AddProductActivity extends BaseActivity {
     }
 
     private void updateMainCostFromBOM() {
-        if (!switchSellOnPOS.isChecked()) return;
+        if (savedBOM == null) return;
         double totalCost = 0.0;
+
         for (Map<String, Object> bom : savedBOM) {
             String matName = (String) bom.get("materialName");
             double bQty = 0;
@@ -606,19 +695,60 @@ public class AddProductActivity extends BaseActivity {
             String bUnit = (String) bom.get("unit");
 
             Product mat = findInventoryProduct(matName);
-            if (mat != null && mat.getQuantity() > 0) {
+            if (mat != null) {
                 int ppu = mat.getPiecesPerUnit() > 0 ? mat.getPiecesPerUnit() : 1;
-                String invUnit = mat.getUnit() != null ? mat.getUnit() : "pcs";
+                String invUnit = mat.getUnit() != null ? mat.getUnit().toLowerCase() : "pcs";
+
+                double costPrice = mat.getCostPrice();
+
                 Object[] conversion = UnitConverterUtil.convertBaseInventoryUnit(mat.getQuantity(), invUnit, bUnit, ppu);
                 String newInvUnit = (String) conversion[1];
+
                 double deductionAmount = UnitConverterUtil.calculateDeductionAmount(bQty, newInvUnit, bUnit, ppu);
-                double unitCost = mat.getCostPrice();
+                double unitCost = UnitConverterUtil.calculateTrueUnitCost(costPrice, newInvUnit, ppu);
+
+                // CRITICAL FIX: Automatically fix bulk prices entered against small units (g/ml) where PPU=1
+                if ((invUnit.equals("ml") || invUnit.equals("g")) && ppu == 1 && costPrice > 0) {
+                    if (costPrice <= 30) {
+                        unitCost = costPrice / 100.0; // Automatically assume 100g/ml packaging
+                    } else {
+                        unitCost = costPrice / 1000.0; // Automatically assume 1000g/ml (1kg/1L) packaging
+                    }
+                }
+
                 totalCost += (deductionAmount * unitCost);
             }
         }
 
-        costPriceET.setText(String.format(Locale.US, "%.2f", totalCost));
-        calculateSellingPrice(); // Update Selling price automatically
+        if (costPriceET != null) {
+            costPriceET.setText(String.format(Locale.US, "%.2f", totalCost));
+        }
+        try { calculateSellingPrice(); } catch (Exception ignored) {}
+    }
+
+    // ADD THIS HELPER METHOD
+    private void autoSelectSubUnit(String materialName, Spinner spinnerUnit) {
+        if (materialName == null || spinnerUnit == null) return;
+        Product mat = findInventoryProduct(materialName);
+        if (mat == null) return;
+
+        String baseUnit = mat.getUnit() != null ? mat.getUnit().toLowerCase() : "pcs";
+        String targetUnit = baseUnit; // Default to the same unit
+
+        // The Auto-Switch Logic
+        if (baseUnit.equals("kg")) targetUnit = "g";
+        else if (baseUnit.equals("l")) targetUnit = "ml";
+        else if (baseUnit.equals("box") || baseUnit.equals("pack") || baseUnit.equals("tub")) {
+            targetUnit = mat.getSalesUnit() != null ? mat.getSalesUnit().toLowerCase() : "pcs";
+        }
+
+        // Apply it to the spinner
+        for (int i = 0; i < spinnerUnit.getAdapter().getCount(); i++) {
+            if (spinnerUnit.getAdapter().getItem(i).toString().equalsIgnoreCase(targetUnit)) {
+                spinnerUnit.setSelection(i);
+                break;
+            }
+        }
     }
 
     private void showBOMDialog() {
@@ -656,6 +786,7 @@ public class AddProductActivity extends BaseActivity {
                         showInventorySelectionDialog(itemName -> {
                             ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                             spinnerRawMaterial.setAdapter(tempAdapter);
+                            autoSelectSubUnit(itemName, spinnerUnit);
                         });
                     }
                     return true;
@@ -682,6 +813,7 @@ public class AddProductActivity extends BaseActivity {
                             showInventorySelectionDialog(itemName -> {
                                 ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                                 spinnerRawMaterial.setAdapter(tempAdapter);
+                                autoSelectSubUnit(itemName, spinnerUnit);
                             });
                         }
                         return true;
@@ -770,6 +902,8 @@ public class AddProductActivity extends BaseActivity {
                         showInventorySelectionDialog(itemName -> {
                             ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                             spinnerAddonItem.setAdapter(tempAdapter);
+                            // CRITICAL FIX: Automatically fill the Unit Dropdown for Add-ons!
+                            autoSelectSubUnit(itemName, spinnerUnit);
                         });
                     }
                     return true;
@@ -807,6 +941,8 @@ public class AddProductActivity extends BaseActivity {
                             showInventorySelectionDialog(itemName -> {
                                 ArrayAdapter<String> tempAdapter = getAdaptiveAdapter(Collections.singletonList(itemName));
                                 spinnerAddonItem.setAdapter(tempAdapter);
+                                // CRITICAL FIX: Automatically fill the Unit Dropdown for Add-ons!
+                                autoSelectSubUnit(itemName, spinnerUnit);
                             });
                         }
                         return true;
@@ -1167,10 +1303,13 @@ public class AddProductActivity extends BaseActivity {
             for (Product p : inventoryProducts) {
                 boolean matchesSearch = p.getProductName().toLowerCase().contains(query);
                 boolean matchesCat = cat.equals("All Categories") || cat.equals(p.getCategoryName());
-                if (matchesSearch && matchesCat) filteredList.add(p);
+                if (matchesSearch && matchesCat && p.getQuantity() > 0) {
+                    filteredList.add(p);
+                }
             }
             listAdapter.notifyDataSetChanged();
         };
+
 
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -1194,7 +1333,6 @@ public class AddProductActivity extends BaseActivity {
     }
 
     private void setupDynamicCategoryDropdowns() {
-        // We only want to load this once when the activity starts
         productRepository.getAllProducts().observe(this, products -> {
             java.util.Set<String> uniqueCategories = new java.util.HashSet<>();
             java.util.Set<String> uniqueTypes = new java.util.HashSet<>();
@@ -1204,33 +1342,31 @@ public class AddProductActivity extends BaseActivity {
             uniqueTypes.add("Finished");
             uniqueTypes.add("Packaging");
 
-            // 2. Extract dynamically from database
             if (products != null) {
                 for (Product p : products) {
-                    // Extract existing Product Lines (Categories like "Beverages")
                     if (p.getProductLine() != null && !p.getProductLine().trim().isEmpty()) {
                         uniqueCategories.add(p.getProductLine());
                     }
-                    // Extract existing Product Types
                     if (p.getCategoryName() != null && !p.getCategoryName().trim().isEmpty()) {
                         uniqueTypes.add(p.getCategoryName());
                     }
                 }
             }
 
-            // 3. Convert to Lists and Sort Alphabetically
             List<String> categoryList = new ArrayList<>(uniqueCategories);
             java.util.Collections.sort(categoryList);
 
             List<String> typeList = new ArrayList<>(uniqueTypes);
             java.util.Collections.sort(typeList);
 
-            // 4. Apply to Adapters
-            ArrayAdapter<String> catAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, categoryList);
-            if (productLineET != null) productLineET.setAdapter(catAdapter);
+            // CRITICAL FIX: Apply the Deletable Dropdown Adapter
+            if (productLineET != null) {
+                productLineET.setAdapter(getDeletableDropdownAdapter(categoryList, "ProductLines", "lineName"));
+            }
 
-            ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, typeList);
-            if (productTypeET != null) productTypeET.setAdapter(typeAdapter);
+            if (productTypeET != null) {
+                productTypeET.setAdapter(getDeletableDropdownAdapter(typeList, "Categories", "categoryName"));
+            }
         });
     }
 
@@ -1293,7 +1429,10 @@ public class AddProductActivity extends BaseActivity {
                     Category c = child.getValue(Category.class);
                     if (c != null && currentUserId.equals(c.getOwnerAdminId())) options.add(c.getCategoryName());
                 }
-                productTypeET.setAdapter(getAdaptiveDropdownAdapter(options));
+                // CRITICAL FIX: Apply the Deletable Dropdown Adapter
+                if (productTypeET != null) {
+                    productTypeET.setAdapter(getDeletableDropdownAdapter(options, "Categories", "categoryName"));
+                }
             }
             @Override public void onCancelled(@NonNull DatabaseError error) {}
         });
@@ -1419,6 +1558,7 @@ public class AddProductActivity extends BaseActivity {
                             switchSellOnPOS.setChecked(false);
                         }
 
+                        // ... (hanapin mo itong part na ito sa loob ng loadProductDataForEdit)
                         String loadedUnit = p.getUnit() != null ? p.getUnit() : "";
                         boolean isBulk = loadedUnit.equalsIgnoreCase("box") ||
                                 loadedUnit.equalsIgnoreCase("pack") ||
@@ -1427,34 +1567,16 @@ public class AddProductActivity extends BaseActivity {
                                 loadedUnit.equalsIgnoreCase("kg") ||
                                 loadedUnit.equalsIgnoreCase("L");
 
-                        if (p.getPiecesPerUnit() > 1 || isBulk) {
-                            if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(View.VISIBLE);
-                            if (etPiecesPerUnit != null) etPiecesPerUnit.setText(String.valueOf(p.getPiecesPerUnit()));
+                        int loadedPieces = p.getPiecesPerUnit();
+                        String savedSalesUnit = p.getSalesUnit() != null ? p.getSalesUnit() : "pcs";
 
-                            subUnitList.clear();
-                            for (String u : unitList) {
-                                if (!u.equals("+ Add Custom Unit...") && !u.equalsIgnoreCase(loadedUnit)) {
-                                    subUnitList.add(u);
-                                }
-                            }
-                            if (!subUnitList.contains("pcs")) subUnitList.add(0, "pcs");
-
-                            if (loadedUnit.equalsIgnoreCase("kg") && !subUnitList.contains("g")) subUnitList.add("g");
-                            if (loadedUnit.equalsIgnoreCase("L") && !subUnitList.contains("ml")) subUnitList.add("ml");
-
-                            if (subUnitAdapter != null) subUnitAdapter.notifyDataSetChanged();
-
-                            String savedSalesUnit = p.getSalesUnit() != null ? p.getSalesUnit() : "pcs";
-                            if (subUnitSpinner != null) {
-                                for (int i = 0; i < subUnitSpinner.getAdapter().getCount(); i++) {
-                                    if (subUnitSpinner.getAdapter().getItem(i).toString().equalsIgnoreCase(savedSalesUnit)) {
-                                        subUnitSpinner.setSelection(i);
-                                        break;
-                                    }
-                                }
-                            }
-                        } else {
-                            if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(View.GONE);
+                        // CRITICAL FIX: Auto-Correct legacy data from database!
+                        if (loadedUnit.equalsIgnoreCase("kg") && (savedSalesUnit.equalsIgnoreCase("pcs") || loadedPieces <= 1)) {
+                            loadedPieces = 1000;
+                            savedSalesUnit = "g";
+                        } else if (loadedUnit.equalsIgnoreCase("L") && (savedSalesUnit.equalsIgnoreCase("pcs") || loadedPieces <= 1)) {
+                            loadedPieces = 1000;
+                            savedSalesUnit = "ml";
                         }
 
                         if (p.getUnit() != null && unitSpinner != null) {
@@ -1465,6 +1587,26 @@ public class AddProductActivity extends BaseActivity {
                                     break;
                                 }
                             }
+                        }
+
+                        // Use .post() to set the SUB-UNIT safely AFTER the main unit is done loading
+                        final String finalSavedSalesUnit = savedSalesUnit;
+                        final int finalLoadedPieces = loadedPieces;
+
+                        if (finalLoadedPieces > 1 || isBulk) {
+                            if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(View.VISIBLE);
+                            if (etPiecesPerUnit != null) etPiecesPerUnit.setText(String.valueOf(finalLoadedPieces));
+
+                            if (subUnitSpinner != null) {
+                                subUnitSpinner.post(() -> {
+                                    int sIdx = getIndexIgnoreCase(subUnitList, finalSavedSalesUnit);
+                                    if (sIdx != -1) {
+                                        subUnitSpinner.setSelection(sIdx);
+                                    }
+                                });
+                            }
+                        } else {
+                            if (layoutPiecesPerUnit != null) layoutPiecesPerUnit.setVisibility(View.GONE);
                         }
 
                         if (isDestroyed() || isFinishing()) return;
@@ -1510,15 +1652,30 @@ public class AddProductActivity extends BaseActivity {
     }
 
     private void validatePricingAlerts() {
+        String costStr = costPriceET.getText() != null ? costPriceET.getText().toString() : "0";
+        double cost = costStr.isEmpty() ? 0 : Double.parseDouble(costStr);
+
+        // --- NEW: Low Cost Warning specifically for Raw Materials ---
         if (!switchSellOnPOS.isChecked()) {
             sellingPriceET.setError(null);
+
+            // If cost is entered and it is 20 pesos or below, trigger a warning
+            if (cost > 0 && cost <= 20) {
+                costPriceET.setError("Warning: ₱" + cost + " is unusually low for bulk inventory. Ensure you are entering the TOTAL cost, not per-piece.");
+            } else {
+                costPriceET.setError(null);
+            }
             return;
         }
 
-        String costStr = costPriceET.getText() != null ? costPriceET.getText().toString() : "0";
-        String sellStr = sellingPriceET.getText() != null ? sellingPriceET.getText().toString() : "0";
+        // --- EXISTING: Selling Price Alerts (For Menu Items) ---
 
-        double cost = costStr.isEmpty() ? 0 : Double.parseDouble(costStr);
+        // Clear the raw material error if they switch to Menu mode
+        if (costPriceET.getError() != null && costPriceET.getError().toString().contains("bulk inventory")) {
+            costPriceET.setError(null);
+        }
+
+        String sellStr = sellingPriceET.getText() != null ? sellingPriceET.getText().toString() : "0";
         double sell = sellStr.isEmpty() ? 0 : Double.parseDouble(sellStr);
 
         if (cost == 0) return;
@@ -1569,26 +1726,15 @@ public class AddProductActivity extends BaseActivity {
         if (switchSellOnPOS.isChecked()) {
             try { sellingPrice = Double.parseDouble(sellingPriceET.getText() != null && !sellingPriceET.getText().toString().isEmpty() ? sellingPriceET.getText().toString() : "0"); } catch (Exception ignored) {}
             try { costPrice = Double.parseDouble(costPriceET.getText() != null && !costPriceET.getText().toString().isEmpty() ? costPriceET.getText().toString() : "0"); } catch (Exception ignored) {}
-
-            // Sales items don't have direct inventory tracking in this way, so levels stay at 0
             reorderLevel = 0;
             criticalLevel = 0;
         } else {
             try { costPrice = Double.parseDouble(costPriceET.getText() != null && !costPriceET.getText().toString().isEmpty() ? costPriceET.getText().toString() : "0"); } catch (Exception ignored) {}
             try { qty = Integer.parseInt(quantityET != null && quantityET.getText() != null && !quantityET.getText().toString().isEmpty() ? quantityET.getText().toString() : "0"); } catch (Exception ignored) {}
-
-            // Prevent negative quantities
             if (qty < 0) qty = 0;
-
-            // AUTOMATED STOCK LEVELS
-            // Reorder when 20% of stock is left
             reorderLevel = (int) Math.ceil(qty * 0.20);
-
-            // Critical when 5% of stock is left (or 1, whichever is higher)
             criticalLevel = (int) Math.ceil(qty * 0.05);
             if (criticalLevel == 0 && qty > 0) criticalLevel = 1;
-
-            // Selling price is 0 for inventory items
             sellingPrice = 0.0;
         }
 
@@ -1596,7 +1742,7 @@ public class AddProductActivity extends BaseActivity {
             if (sellingPrice < costPrice) {
                 Toast.makeText(this, "Cannot save: Selling price (₱" + sellingPrice + ") is lower than Cost (₱" + costPrice + ")!", Toast.LENGTH_LONG).show();
                 sellingPriceET.requestFocus();
-                return; // Stops the saving process completely
+                return;
             }
         }
 
@@ -1612,10 +1758,9 @@ public class AddProductActivity extends BaseActivity {
         p.setQuantity(qty);
         p.setCriticalLevel(criticalLevel);
         p.setReorderLevel(reorderLevel);
-        String mainUnit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "pcs";
+        String mainUnit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString().trim() : "pcs";
         p.setUnit(mainUnit);
 
-        // REVISION 2: Promos are now completely separated. Set to false to avoid database artifacts.
         p.setPromo(false);
         p.setPromoName("");
         p.setTemporaryPromo(false);
@@ -1626,39 +1771,43 @@ public class AddProductActivity extends BaseActivity {
             p.setPromo(true);
             p.setPromoName(autoPromoName);
             p.setTemporaryPromo(autoIsTemporary);
-
             if (autoIsTemporary && !autoStart.isEmpty() && !autoEnd.isEmpty()) {
                 try {
                     p.setPromoStartDate(expiryFormat.parse(autoStart).getTime());
                     p.setPromoEndDate(expiryFormat.parse(autoEnd).getTime());
-                } catch (ParseException e) {
-                    e.printStackTrace();
-                }
+                } catch (ParseException e) { e.printStackTrace(); }
             }
-        } else {
-            // Regular non-promo product logic
-            p.setPromo(false);
-            p.setPromoName("");
         }
 
         if (layoutPiecesPerUnit != null && layoutPiecesPerUnit.getVisibility() == View.VISIBLE && subUnitSpinner != null && subUnitSpinner.getSelectedItem() != null) {
-            p.setSalesUnit(subUnitSpinner.getSelectedItem().toString());
+            p.setSalesUnit(subUnitSpinner.getSelectedItem().toString().trim());
         } else {
             p.setSalesUnit(mainUnit);
         }
 
-        if (expiryDate > 0) {
-            p.setExpiryDate(expiryDate);
-        } else if (expiryStr.isEmpty()) {
-            p.setExpiryDate(0L);
-        }
+        if (expiryDate > 0) p.setExpiryDate(expiryDate);
+        else if (expiryStr.isEmpty()) p.setExpiryDate(0L);
 
+        // CRITICAL FIX: Convert Total Sub-Units back to a database Multiplier (PPU)
         int piecesPerUnit = 1;
         if (layoutPiecesPerUnit != null && layoutPiecesPerUnit.getVisibility() == View.VISIBLE) {
-            try { piecesPerUnit = Integer.parseInt(etPiecesPerUnit.getText() != null ? etPiecesPerUnit.getText().toString().trim() : "1"); } catch (Exception ignored) {}
+            try {
+                double totalSubUnits = Double.parseDouble(etPiecesPerUnit.getText() != null ? etPiecesPerUnit.getText().toString().trim() : "1");
+                if (qty > 0) {
+                    piecesPerUnit = (int) Math.round(totalSubUnits / qty);
+                } else {
+                    String u = mainUnit.toLowerCase();
+                    piecesPerUnit = (u.equals("kg") || u.equals("l")) ? 1000 : 1;
+                }
+            } catch (Exception ignored) {}
         }
         if (piecesPerUnit <= 0) piecesPerUnit = 1;
-        p.setPiecesPerUnit(piecesPerUnit);
+
+        if (existingProductToEdit != null) {
+            existingProductToEdit.setPiecesPerUnit(piecesPerUnit);
+        } else {
+            p.setPiecesPerUnit(piecesPerUnit);
+        }
 
         if (existingProductToEdit == null) {
             long now = System.currentTimeMillis();
@@ -1692,16 +1841,20 @@ public class AddProductActivity extends BaseActivity {
 
         if (editProductId != null) {
             productRepository.updateProduct(p, selectedImagePath, new ProductRepository.OnProductUpdatedListener() {
-                @Override public void onProductUpdated() { runOnUiThread(() -> { Toast.makeText(AddProductActivity.this, "Updated successfully", Toast.LENGTH_SHORT).show(); finish(); }); }
-                @Override public void onError(String error) { runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Update Error: " + error, Toast.LENGTH_SHORT).show()); }
+                @Override public void onProductUpdated() {
+                    runOnUiThread(() -> {
+                        Toast.makeText(AddProductActivity.this, "Updated successfully", Toast.LENGTH_SHORT).show();
+                        finish();
+                    });
+                }
+                @Override public void onError(String error) {
+                    runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Update Error: " + error, Toast.LENGTH_SHORT).show());
+                }
             });
-
         } else {
             productRepository.addProduct(p, selectedImagePath, new ProductRepository.OnProductAddedListener() {
                 @Override public void onProductAdded(String productId) {
                     runOnUiThread(() -> {
-
-                        // --- NEW: Remove from the Delivery Checklist waiting list! ---
                         if (currentStagedItemKey != null) {
                             String ownerId = FirestoreManager.getInstance().getBusinessOwnerId();
                             if (ownerId == null || ownerId.isEmpty()) ownerId = AuthManager.getInstance().getCurrentUserId();
@@ -1710,13 +1863,43 @@ public class AddProductActivity extends BaseActivity {
                                         .child(ownerId).child(currentStagedItemKey).removeValue();
                             }
                         }
-                        Toast.makeText(AddProductActivity.this, "Added successfully", Toast.LENGTH_SHORT).show();
-                        finish();
+                        Toast.makeText(AddProductActivity.this, "Added successfully! You can add another.", Toast.LENGTH_SHORT).show();
+
+                        // CRITICAL FIX: Stays in the layout and clears the fields instead of finishing
+                        clearFormFields();
                     });
                 }
-                @Override public void onError(String error) { runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show()); }
+                @Override public void onError(String error) {
+                    runOnUiThread(() -> Toast.makeText(AddProductActivity.this, "Error: " + error, Toast.LENGTH_SHORT).show());
+                }
             });
         }
+    }
+
+    // ADD THIS NEW METHOD TO HANDLE CLEARING THE FORM
+    private void clearFormFields() {
+        if (productNameET != null) productNameET.setText("");
+        if (costPriceET != null) costPriceET.setText("");
+        if (sellingPriceET != null) sellingPriceET.setText("");
+        if (quantityET != null) quantityET.setText("");
+        if (expiryDateET != null) expiryDateET.setText("");
+
+        savedSizes.clear();
+        savedAddons.clear();
+        savedBOM.clear();
+        savedNotes.clear();
+
+        if (switchSizes != null) switchSizes.setChecked(false);
+        if (switchAddons != null) switchAddons.setChecked(false);
+        if (switchBOM != null) switchBOM.setChecked(false);
+        if (switchEnableSugar != null) switchEnableSugar.setChecked(false);
+
+        selectedImagePath = null;
+        if (btnAddPhoto != null) btnAddPhoto.setImageResource(android.R.color.transparent);
+
+        updateConfigUI();
+
+        if (productNameET != null) productNameET.requestFocus();
     }
 
     @Override

@@ -48,15 +48,14 @@ public class FirstActivity extends BaseActivity {
         layoutButtons.animate()
                 .alpha(1f)
                 .translationY(0f)
-                .setDuration(800)
-                .setStartDelay(1600) // Waits for the wave to finish
+                .setDuration(500)
+                .setStartDelay(1000)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
 
     // --- THE DANCING TEXT ENGINE ---
     private void animateDancingText(TextView textView, String text, long startDelay) {
-        // Override the XML defaults so the letters can control their own transparency
         textView.setAlpha(1f);
         textView.setTranslationY(0f);
 
@@ -72,7 +71,7 @@ public class FirstActivity extends BaseActivity {
 
         ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
         animator.setStartDelay(startDelay);
-        animator.setDuration(2200); // Total duration of the wave
+        animator.setDuration(2000); // Total duration of the wave
         animator.addUpdateListener(anim -> {
             float progress = (float) anim.getAnimatedValue();
 

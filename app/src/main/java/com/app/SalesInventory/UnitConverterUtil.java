@@ -24,6 +24,27 @@ public class UnitConverterUtil {
         return new Object[]{currentInventoryQty, standardizeUnit(inventoryUnit), false};
     }
 
+    // NEW METHOD: Safely calculate the true cost per unit if the user entered a bulk price but named it a "piece"
+    public static double calculateTrueUnitCost(double costPrice, String invUnit, int piecesPerUnit) {
+        invUnit = standardizeUnit(invUnit);
+
+        // If piecesPerUnit > 1, the user bought a bulk pack (e.g. 30 eggs for ₱250).
+        if (piecesPerUnit > 1) {
+            // If they lazily named their inventory unit as "pcs" or "ml" instead of "tray" or "box",
+            // it means the ₱250 is still the BULK price, so we must divide it to get the true per-piece price.
+            boolean isSmallUnit = invUnit.equals("pcs") || invUnit.equals("pc")
+                    || invUnit.equals("piece") || invUnit.equals("pieces")
+                    || invUnit.equals("ml") || invUnit.equals("g") || invUnit.equals("oz");
+
+            if (isSmallUnit) {
+                return costPrice / piecesPerUnit;
+            }
+        }
+
+        // Otherwise, the cost price is perfectly fine as is!
+        return costPrice;
+    }
+
     public static double calculateDeductionAmount(double salesQuantity, String invUnit, String salesUnit, int piecesPerUnit) {
         invUnit = standardizeUnit(invUnit);
         salesUnit = standardizeUnit(salesUnit);
@@ -33,14 +54,12 @@ public class UnitConverterUtil {
             return finalDeduction;
         }
 
-        // Upwards conversions (Inventory unit is LARGER, sales unit is SMALLER)
-        // e.g., Inventory: L, Sales: ml.  Sold 500ml -> 500 / 1000 = 0.5 L deducted.
         if (invUnit.equals("l") && salesUnit.equals("ml")) {
-            finalDeduction /= 1000.0;
+            finalDeduction = salesQuantity / 1000.0;
         } else if (invUnit.equals("kg") && salesUnit.equals("g")) {
-            finalDeduction /= 1000.0;
+            finalDeduction = salesQuantity / 1000.0;
         }
-        // Downwards conversions (Inventory unit is SMALLER, sales unit is LARGER)
+
         else if (invUnit.equals("ml") && salesUnit.equals("l")) {
             finalDeduction *= 1000.0;
         } else if (invUnit.equals("g") && salesUnit.equals("kg")) {
@@ -58,7 +77,7 @@ public class UnitConverterUtil {
             finalDeduction *= 33.814;
         }
         else if (piecesPerUnit > 1 && !isStandardConversion(invUnit, salesUnit)) {
-            finalDeduction /= piecesPerUnit;
+            finalDeduction = salesQuantity / piecesPerUnit;
         }
 
         return finalDeduction;

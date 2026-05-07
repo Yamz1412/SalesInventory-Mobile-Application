@@ -52,6 +52,7 @@ public class ManagePromosActivity extends BaseActivity {
     private Map<String, Product> productLookupMap = new HashMap<>();
 
     private CollectionReference promosRef;
+    private String promoFilterStatus = "All";
     private String currentUserId;
 
     @Override
@@ -65,8 +66,10 @@ public class ManagePromosActivity extends BaseActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        currentUserId = AuthManager.getInstance().getCurrentUserId();
-        if (currentUserId == null) currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
+        currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = AuthManager.getInstance().getCurrentUserId();
+        }
 
         promosRef = FirebaseFirestore.getInstance().collection("users").document(currentUserId).collection("promos");
 
@@ -80,16 +83,20 @@ public class ManagePromosActivity extends BaseActivity {
         tvNoPromos = findViewById(R.id.tvNoPromos);
         etSearchPromos = findViewById(R.id.etSearchPromos);
         fabAddPromo = findViewById(R.id.fabAddPromo);
-
-        // SAFEGUARD: Only setup the filter button if you actually add it to your XML later
         btnFilterPromos = findViewById(R.id.btnFilterPromos);
+
         if (btnFilterPromos != null) {
             btnFilterPromos.setOnClickListener(v -> {
-                Toast.makeText(this, "Filter options coming soon", Toast.LENGTH_SHORT).show();
+                String[] options = {"All", "Active Only", "Hidden Only"};
+                new AlertDialog.Builder(this)
+                        .setTitle("Filter Promos")
+                        .setItems(options, (dialog, which) -> {
+                            promoFilterStatus = options[which];
+                            filterPromos(etSearchPromos.getText().toString());
+                        }).show();
             });
         }
 
-        // SAFEGUARD: Prevent crashes if these IDs are missing or named differently in XML
         if (fabAddPromo != null) {
             fabAddPromo.setOnClickListener(v -> {
                 startActivity(new Intent(ManagePromosActivity.this, CreatePromoActivity.class));
@@ -154,7 +161,13 @@ public class ManagePromosActivity extends BaseActivity {
         String lowerQuery = query.toLowerCase(Locale.getDefault());
 
         for (PromoModel promo : allPromos) {
-            if (promo.promoName != null && promo.promoName.toLowerCase(Locale.getDefault()).contains(lowerQuery)) {
+            boolean matchesSearch = promo.promoName != null && promo.promoName.toLowerCase(Locale.getDefault()).contains(lowerQuery);
+            boolean matchesFilter = true;
+
+            if (promoFilterStatus.equals("Active Only") && !promo.isActive) matchesFilter = false;
+            if (promoFilterStatus.equals("Hidden Only") && promo.isActive) matchesFilter = false;
+
+            if (matchesSearch && matchesFilter) {
                 filteredPromos.add(promo);
             }
         }
@@ -247,16 +260,28 @@ public class ManagePromosActivity extends BaseActivity {
 
                         tvRowName.setText("• " + product.getProductName());
 
-                        double finalPrice = product.getSellingPrice();
-                        if ("Percentage (%)".equals(promo.discountType)) {
-                            finalPrice = finalPrice - (finalPrice * (promo.discountValue / 100.0));
-                        } else if ("Fixed Amount (₱)".equals(promo.discountType)) {
-                            finalPrice = Math.max(0, finalPrice - promo.discountValue);
-                        } else if ("Override Price (₱)".equals(promo.discountType)) {
-                            finalPrice = promo.discountValue;
+                        double originalPrice = product.getSellingPrice();
+                        double finalPrice = originalPrice;
+
+                        if (promo.discountType != null) {
+                            if (promo.discountType.contains("Percentage")) {
+                                finalPrice = originalPrice - (originalPrice * (promo.discountValue / 100.0));
+                            } else if (promo.discountType.contains("Fixed Amount")) {
+                                finalPrice = Math.max(0, originalPrice - promo.discountValue);
+                            } else if (promo.discountType.contains("Override Price")) {
+                                finalPrice = promo.discountValue;
+                            }
+                            finalPrice = Math.round(finalPrice);
                         }
 
-                        tvRowPrice.setText(String.format(Locale.US, "₱%.2f", finalPrice));
+                        // VISUAL UPGRADE: Show the original price turning into the discounted price!
+                        if (finalPrice < originalPrice) {
+                            tvRowPrice.setText(String.format(Locale.US, "₱%.2f ➔ ₱%.2f", originalPrice, finalPrice));
+                            tvRowPrice.setTextColor(android.graphics.Color.parseColor("#FF9800")); // Orange text for discounts
+                        } else {
+                            tvRowPrice.setText(String.format(Locale.US, "₱%.2f", originalPrice));
+                            tvRowPrice.setTextColor(android.graphics.Color.GRAY);
+                        }
                         holder.containerPromoProducts.addView(rowView);
                     }
                 }
@@ -274,7 +299,9 @@ public class ManagePromosActivity extends BaseActivity {
 
                 popup.setOnMenuItemClickListener(item -> {
                     if (item.getItemId() == 1) {
-                        Toast.makeText(ManagePromosActivity.this, "Edit Promo feature coming soon!", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(ManagePromosActivity.this, CreatePromoActivity.class);
+                        intent.putExtra("EDIT_PROMO_ID", promo.promoId);
+                        startActivity(intent);
                         return true;
                     } else if (item.getItemId() == 2) {
                         showDeleteConfirmation(promo);

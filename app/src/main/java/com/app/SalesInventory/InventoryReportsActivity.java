@@ -38,7 +38,7 @@ public class InventoryReportsActivity extends BaseActivity  {
     private static final int PERMISSION_REQUEST_CODE = 300;
     private final ExecutorService exportExecutor = Executors.newSingleThreadExecutor();
 
-    private String currentOwnerId; // NEW: Track the owner ID for safe filtering
+    private String currentOwnerId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,7 +93,6 @@ public class InventoryReportsActivity extends BaseActivity  {
             );
         }
 
-        // 2. Mix Receiving & Deliveries into a single Chooser Dialog
         if (btnReceivingReport != null) {
             btnReceivingReport.setOnClickListener(v -> {
                 String[] options = {"📦 Receiving Report (From Suppliers)", "🚚 Delivery Report (To Customers)"};
@@ -115,44 +114,89 @@ public class InventoryReportsActivity extends BaseActivity  {
     private void exportAllReportsPdf() {
         Toast.makeText(this, "Preparing combined PDF...", Toast.LENGTH_SHORT).show();
 
-        // 1. Organize Sales Data
-        Map<String, Integer> soldMap = new HashMap<>();
-        final int[] totalSoldHolder = new int[1];
+        // CRITICAL FIX: Extract raw materials from Menu sales for accurate reports
+        Map<String, Double> soldMap = new HashMap<>();
+        final double[] totalSoldHolder = new double[1];
 
         for (Sales s : cachedSales) {
-            String pid = s.getProductId();
+            if (s.getStatus() != null && s.getStatus().contains("VOID")) continue;
+
             double q = s.getQuantity();
-            if (pid != null) {
-                soldMap.put(pid, soldMap.getOrDefault(pid, 0) + (int) q);
-                totalSoldHolder[0] += q;
+
+            Product soldProduct = null;
+            for (Product p : cachedProducts) {
+                if (p.getProductId() != null && p.getProductId().equals(s.getProductId())) {
+                    soldProduct = p;
+                    break;
+                }
+            }
+
+            if (soldProduct != null && "Menu".equalsIgnoreCase(soldProduct.getProductType()) && soldProduct.getBomList() != null) {
+                for (Map<String, Object> bomItem : soldProduct.getBomList()) {
+                    String rawName = (String) bomItem.get("materialName");
+                    if (rawName == null) rawName = (String) bomItem.get("rawMaterialName");
+                    if (rawName == null) continue;
+
+                    double reqQty = 0;
+                    try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantityRequired"))); } catch (Exception ignored) {}
+                    if (reqQty == 0) {
+                        try { reqQty = Double.parseDouble(String.valueOf(bomItem.get("quantity"))); } catch (Exception ignored) {}
+                    }
+                    String reqUnit = (String) bomItem.get("unit");
+
+                    Product rawMat = null;
+                    for (Product p : cachedProducts) {
+                        if (p.getProductName() != null && p.getProductName().equalsIgnoreCase(rawName)) {
+                            rawMat = p;
+                            break;
+                        }
+                    }
+
+                    if (rawMat != null) {
+                        int ppu = rawMat.getPiecesPerUnit() > 0 ? rawMat.getPiecesPerUnit() : 1;
+                        String invUnit = rawMat.getUnit() != null ? rawMat.getUnit() : "pcs";
+                        double deduction = UnitConverterUtil.calculateDeductionAmount(reqQty, invUnit, reqUnit, ppu);
+
+                        double totalDeducted = deduction * q;
+                        soldMap.put(rawMat.getProductId(), soldMap.getOrDefault(rawMat.getProductId(), 0.0) + totalDeducted);
+                        totalSoldHolder[0] += totalDeducted;
+                    }
+                }
+            } else {
+                String pid = s.getProductId();
+                if (pid != null) {
+                    soldMap.put(pid, soldMap.getOrDefault(pid, 0.0) + q);
+                    totalSoldHolder[0] += q;
+                }
             }
         }
 
-        // 2. Fetch Adjustments & Generate PDF safely using the currentOwnerId
         adjustmentRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot adjSnapshot) {
-                Map<String, Integer> receivedMap = new HashMap<>();
-                Map<String, Integer> adjustedMap = new HashMap<>();
-                final int[] totalReceivedHolder = new int[1];
-                final int[] totalAdjustedHolder = new int[1];
+                Map<String, Double> receivedMap = new HashMap<>();
+                Map<String, Double> adjustedMap = new HashMap<>();
+                final double[] totalReceivedHolder = new double[1];
+                final double[] totalAdjustedHolder = new double[1];
 
                 for (DataSnapshot ads : adjSnapshot.getChildren()) {
                     StockAdjustment a = ads.getValue(StockAdjustment.class);
                     if (a == null || a.getProductId() == null) continue;
 
-                    // FIXED: Ensures you are only exporting YOUR business's adjustments
                     String owner = ads.child("ownerAdminId").getValue(String.class);
                     if (owner != null && !owner.equals(currentOwnerId)) continue;
 
                     String pid = a.getProductId();
-                    double qty = a.getQuantityAdjusted();
+                    double qty = Math.abs(a.getQuantityAdjusted());
+                    String type = a.getAdjustmentType() != null ? a.getAdjustmentType().toUpperCase() : "";
+                    String rawType = ads.child("type").getValue(String.class);
+                    String dbType = rawType != null ? rawType.toUpperCase() : "";
 
-                    if ("Add Stock".equals(a.getAdjustmentType())) {
-                        receivedMap.put(pid, receivedMap.getOrDefault(pid, 0) + (int)qty);
+                    if (type.contains("ADD") || dbType.contains("ADD")) {
+                        receivedMap.put(pid, receivedMap.getOrDefault(pid, 0.0) + qty);
                         totalReceivedHolder[0] += qty;
-                    } else {
-                        adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0) + (int)qty);
+                    } else if (type.contains("DEDUCT") || dbType.contains("DEDUCT") || type.contains("REMOVE")) {
+                        adjustedMap.put(pid, adjustedMap.getOrDefault(pid, 0.0) + qty);
                         totalAdjustedHolder[0] += qty;
                     }
                 }
@@ -174,9 +218,9 @@ public class InventoryReportsActivity extends BaseActivity  {
                         );
                         valueReports.add(vr);
 
-                        int rec = receivedMap.getOrDefault(p.getProductId(), 0);
-                        int sold = soldMap.getOrDefault(p.getProductId(), 0);
-                        int adj = adjustedMap.getOrDefault(p.getProductId(), 0);
+                        int rec = (int) Math.round(receivedMap.getOrDefault(p.getProductId(), 0.0));
+                        int sold = (int) Math.round(soldMap.getOrDefault(p.getProductId(), 0.0));
+                        int adj = (int) Math.round(adjustedMap.getOrDefault(p.getProductId(), 0.0));
 
                         StockMovementReport mr = new StockMovementReport(
                                 p.getProductId(), p.getProductName(), p.getCategoryName(),
@@ -200,7 +244,7 @@ public class InventoryReportsActivity extends BaseActivity  {
                     exportExecutor.execute(() -> {
                         try {
                             PDFGenerator generator = new PDFGenerator(InventoryReportsActivity.this);
-                            generator.generateCombinedInventoryReportPDF(res.outputStream, valueReports, movementReports, adjustmentSummaries, totalReceivedHolder[0], totalSoldHolder[0], totalAdjustedHolder[0]);
+                            generator.generateCombinedInventoryReportPDF(res.outputStream, valueReports, movementReports, adjustmentSummaries, (int)totalReceivedHolder[0], (int)totalSoldHolder[0], (int)totalAdjustedHolder[0]);
                             try { res.outputStream.close(); } catch (Exception ignored) {}
                             runOnUiThread(() -> exportUtil.showExportSuccess(res.displayPath));
                         } catch (Exception e) {

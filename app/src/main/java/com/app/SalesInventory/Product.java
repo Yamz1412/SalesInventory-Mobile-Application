@@ -64,6 +64,7 @@ public class Product {
     private String promoName;
     private boolean isTemporaryPromo = false;
     private double promoPrice = 0.0;
+    private double promoDiscountPercentage = 0.0;
 
     @com.google.firebase.firestore.Exclude
     private String cartNote = "";
@@ -288,13 +289,18 @@ public class Product {
     public void setPromoPrice(double promoPrice) { this.promoPrice = promoPrice; }
     public long getPromoStartDate() { return promoStartDate; }
     public void setPromoStartDate(long promoStartDate) { this.promoStartDate = promoStartDate; }
-
     public long getPromoEndDate() {
         return promoEndDate;
     }
-
     public void setPromoEndDate(long promoEndDate) {
         this.promoEndDate = promoEndDate;
+    }
+    public double getPromoDiscountPercentage() {
+        return promoDiscountPercentage;
+    }
+
+    public void setPromoDiscountPercentage(double promoDiscountPercentage) {
+        this.promoDiscountPercentage = promoDiscountPercentage;
     }
     @Exclude public boolean isCriticalStock() { return criticalLevel > 0 && quantity <= criticalLevel; }
     @Exclude public boolean isLowStock()      { return quantity > criticalLevel && reorderLevel > 0 && quantity <= reorderLevel; }
@@ -526,4 +532,33 @@ public class Product {
         return false;
     }
 
-}
+    @com.google.firebase.firestore.Exclude
+    public double getActiveSellingPrice() {
+        double currentPrice = sellingPrice;
+
+        if (isPromo) {
+            boolean isValidPromo = false;
+
+            if (isTemporaryPromo) {
+                long now = System.currentTimeMillis();
+                if (now >= promoStartDate && now <= promoEndDate) {
+                    isValidPromo = true;
+                }
+            } else {
+                isValidPromo = true; // Permanent promos are always valid
+            }
+
+            if (isValidPromo) {
+                // If a percentage is set (e.g., 10.0 for 10%), calculate it!
+                if (promoDiscountPercentage > 0) {
+                    double discountAmount = sellingPrice * (promoDiscountPercentage / 100.0);
+                    currentPrice = sellingPrice - discountAmount;
+                }
+                // Fallback to flat promo price if no percentage is set
+                else if (promoPrice > 0) {
+                    currentPrice = promoPrice;
+                }
+            }
+        }
+        return currentPrice;
+    }}

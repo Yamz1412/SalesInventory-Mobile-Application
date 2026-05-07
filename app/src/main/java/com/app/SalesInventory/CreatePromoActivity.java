@@ -95,9 +95,11 @@ public class CreatePromoActivity extends BaseActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        // Initialize User/Database
         currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
-        if (currentUserId == null) currentUserId = FirestoreManager.getInstance().getBusinessOwnerId();
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            currentUserId = AuthManager.getInstance().getCurrentUserId();
+        }
+
         productRepository = SalesInventoryApplication.getProductRepository();
 
         dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
@@ -113,7 +115,7 @@ public class CreatePromoActivity extends BaseActivity {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedCategory = categoryOptions.get(position);
-                filterProducts(); // Trigger the filter whenever category changes
+                filterProducts();
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {}
@@ -221,6 +223,17 @@ public class CreatePromoActivity extends BaseActivity {
 
         btnCancelPromo.setOnClickListener(v -> finish());
         btnSavePromo.setOnClickListener(v -> attemptSavePromo());
+
+        etPromoValue.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                // Refresh the list to calculate the new prices
+                if (productAdapter != null) {
+                    productAdapter.notifyDataSetChanged();
+                }
+            }
+        });
     }
 
     private void setupRecyclerView() {
@@ -379,6 +392,7 @@ public class CreatePromoActivity extends BaseActivity {
             productUpdates.put("isTemporaryPromo", isTemporary);
             productUpdates.put("promoPrice", newPromoPrice);
 
+
             if (isTemporary) {
                 try {
                     productUpdates.put("promoStartDate", dateFormat.parse(startDate).getTime());
@@ -424,8 +438,6 @@ public class CreatePromoActivity extends BaseActivity {
 
             holder.tvProductName.setText(product.getProductName());
             String cat = product.getCategoryName() != null ? product.getCategoryName() : "Uncategorized";
-            holder.tvProductCategory.setText(cat + " | ₱" + String.format(Locale.US, "%.2f", product.getSellingPrice()));
-
             holder.cbSelectProduct.setOnCheckedChangeListener(null);
             holder.cbSelectProduct.setChecked(selectedProductIds.contains(productId));
 
@@ -437,6 +449,43 @@ public class CreatePromoActivity extends BaseActivity {
             holder.itemView.setOnClickListener(v -> {
                 holder.cbSelectProduct.setChecked(!holder.cbSelectProduct.isChecked());
             });
+
+            // Inside onBindViewHolder(...)
+            holder.tvProductCategory.setText(cat);
+
+            // 1. Set Original Price
+            double originalPrice = product.getSellingPrice();
+            holder.tvOriginalPrice.setText(String.format(Locale.US, "₱%.2f", originalPrice));
+            holder.tvOriginalPrice.setPaintFlags(holder.tvOriginalPrice.getPaintFlags() & (~android.graphics.Paint.STRIKE_THRU_TEXT_FLAG)); // Remove strike by default
+
+            // 2. Grab current inputs from the UI
+            String discountType = actvPromoType.getText().toString().trim();
+            String discountValStr = etPromoValue.getText() != null ? etPromoValue.getText().toString().trim() : "";
+            double discountVal = 0.0;
+            try { discountVal = Double.parseDouble(discountValStr); } catch (NumberFormatException ignored) {}
+
+            // 3. Calculate dynamic price if an input exists
+            if (!discountValStr.isEmpty() && discountVal > 0) {
+                double newPrice = originalPrice;
+
+                if (discountType.equals("Percentage (%)")) {
+                    newPrice = originalPrice - (originalPrice * (discountVal / 100.0));
+                } else if (discountType.equals("Fixed Amount (₱)")) {
+                    newPrice = Math.max(0, originalPrice - discountVal);
+                } else if (discountType.equals("Override Price (₱)")) {
+                    newPrice = discountVal;
+                }
+
+
+                // Show calculated price and cross out the original price
+                holder.tvCalculatedPrice.setText(String.format(Locale.US, " ➔ ₱%.2f", newPrice));
+                holder.tvCalculatedPrice.setTextColor(android.graphics.Color.parseColor("#FF9800"));
+                holder.tvCalculatedPrice.setVisibility(View.VISIBLE);
+                holder.tvOriginalPrice.setPaintFlags(holder.tvOriginalPrice.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+            } else {
+                // Hide if no discount is typed yet
+                holder.tvCalculatedPrice.setVisibility(View.GONE);
+            }
         }
 
         @Override
@@ -447,12 +496,15 @@ public class CreatePromoActivity extends BaseActivity {
         class ProductViewHolder extends RecyclerView.ViewHolder {
             CheckBox cbSelectProduct;
             TextView tvProductName, tvProductCategory;
+            TextView tvOriginalPrice, tvCalculatedPrice;
 
             ProductViewHolder(@NonNull View itemView) {
                 super(itemView);
                 cbSelectProduct = itemView.findViewById(R.id.cbSelectProduct);
                 tvProductName = itemView.findViewById(R.id.tvProductName);
                 tvProductCategory = itemView.findViewById(R.id.tvProductCategory);
+                tvOriginalPrice = itemView.findViewById(R.id.tvOriginalPrice);
+                tvCalculatedPrice = itemView.findViewById(R.id.tvCalculatedPrice);
             }
         }
     }

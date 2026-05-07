@@ -1,5 +1,7 @@
 package com.app.SalesInventory;
 
+import static android.content.Intent.getIntent;
+
 import android.Manifest;
 import android.app.DatePickerDialog;
 import android.content.Intent;
@@ -33,6 +35,10 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.google.android.material.button.MaterialButton;
@@ -45,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,6 +79,9 @@ public class EditProduct extends BaseActivity {
     private String editProductId;
     private Product existingProductToEdit;
     private String lastSelectedUnit = "";
+    private SwitchMaterial switchSellOnPOS;
+    private TextView tvTotalCalculatedStock;
+    private TextInputEditText sellingPriceET;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,7 +119,7 @@ public class EditProduct extends BaseActivity {
         unitSpinner = findViewById(R.id.unitSpinner);
         subUnitSpinner = findViewById(R.id.subUnitSpinner);
         layoutPiecesPerUnit = findViewById(R.id.layoutPiecesPerUnit);
-        etPiecesPerUnit = findViewById(R.id.etPiecesPerUnit); // Now mapped as TextInputEditText
+        etPiecesPerUnit = findViewById(R.id.etPiecesPerUnit);
         expiryDateET = findViewById(R.id.expiryDateET);
         updateBtn = findViewById(R.id.updateBtn);
         cancelBtn = findViewById(R.id.cancelBtn);
@@ -117,6 +127,7 @@ public class EditProduct extends BaseActivity {
         setupImagePickers();
         loadInventoryForCalculations();
         setupDynamicCategoryDropdowns();
+        setupBidirectionalMath();
 
         // Setup Spinners
         String[] units = {"pcs", "ml", "L", "oz", "g", "kg", "box", "pack"};
@@ -136,14 +147,37 @@ public class EditProduct extends BaseActivity {
 
                 if (!selected.equals(lastSelectedUnit)) {
                     lastSelectedUnit = selected;
-                    if (selected.equalsIgnoreCase("kg") || selected.equalsIgnoreCase("L")) {
-                        etPiecesPerUnit.setText("1000");
-                    } else if (!isBulk) {
+                    if (selected.equalsIgnoreCase("kg")) {
+                        etPiecesPerUnit.setHint("Total grams (g)");
+                        setSubUnitSpinnerValue("g");
+                        // Trigger Math
+                        try { double q = Double.parseDouble(quantityET.getText().toString()); etPiecesPerUnit.setText(String.valueOf((int)(q * 1000))); } catch(Exception ignored){}
+                    } else if (selected.equalsIgnoreCase("L")) {
+                        etPiecesPerUnit.setHint("Total ml");
+                        setSubUnitSpinnerValue("ml");
+                        // Trigger Math
+                        try { double q = Double.parseDouble(quantityET.getText().toString()); etPiecesPerUnit.setText(String.valueOf((int)(q * 1000))); } catch(Exception ignored){}
+                    } else if (selected.equalsIgnoreCase("box") || selected.equalsIgnoreCase("pack")) {
+                        etPiecesPerUnit.setHint("Total Pcs (User Input)");
+                        etPiecesPerUnit.setText(""); // Leave blank for user input
+                        setSubUnitSpinnerValue("pcs");
+                    } else {
                         etPiecesPerUnit.setText("1");
                     }
                 }
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+
+
+        productTypeET.setOnLongClickListener(v -> {
+            showDeleteMetadataDialog("Delete Category", "Categories", "categoryName");
+            return true;
+        });
+
+        productLineET.setOnLongClickListener(v -> {
+            showDeleteMetadataDialog("Delete Product Line", "ProductLines", "lineName");
+            return true;
         });
 
         // Listeners
@@ -164,6 +198,72 @@ public class EditProduct extends BaseActivity {
         });
 
         loadProductData();
+    }
+
+    private boolean isAutoFormatting = false;
+
+    private void setupBidirectionalMath() {
+        TextWatcher mainQtyWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                if (isAutoFormatting) return;
+                String unit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
+                if (unit.equalsIgnoreCase("kg") || unit.equalsIgnoreCase("L")) {
+                    try {
+                        double qty = Double.parseDouble(s.toString());
+                        isAutoFormatting = true;
+                        etPiecesPerUnit.setText(String.valueOf((int)(qty * 1000))); // 200 kg -> 200000 g
+                        isAutoFormatting = false;
+                    } catch (Exception e) {
+                        isAutoFormatting = true;
+                        etPiecesPerUnit.setText("");
+                        isAutoFormatting = false;
+                    }
+                }
+                updateStockAlertsDisplay();
+            }
+        };
+
+        TextWatcher subQtyWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                if (isAutoFormatting) return;
+                String unit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString() : "";
+                if (unit.equalsIgnoreCase("kg") || unit.equalsIgnoreCase("L")) {
+                    try {
+                        double subQty = Double.parseDouble(s.toString());
+                        isAutoFormatting = true;
+                        double mainQty = subQty / 1000.0; // 200000 g -> 200 kg
+                        if (mainQty % 1 == 0) {
+                            quantityET.setText(String.valueOf((int)mainQty));
+                        } else {
+                            quantityET.setText(String.valueOf(mainQty));
+                        }
+                        isAutoFormatting = false;
+                    } catch (Exception e) {
+                        isAutoFormatting = true;
+                        quantityET.setText("");
+                        isAutoFormatting = false;
+                    }
+                }
+            }
+        };
+
+        if (quantityET != null) quantityET.addTextChangedListener(mainQtyWatcher);
+        if (etPiecesPerUnit != null) etPiecesPerUnit.addTextChangedListener(subQtyWatcher);
+    }
+
+    private void setSubUnitSpinnerValue(String targetUnit) {
+        if (subUnitSpinner != null && subUnitSpinner.getAdapter() != null) {
+            for (int i = 0; i < subUnitSpinner.getAdapter().getCount(); i++) {
+                if (subUnitSpinner.getAdapter().getItem(i).toString().equalsIgnoreCase(targetUnit)) {
+                    subUnitSpinner.setSelection(i);
+                    break;
+                }
+            }
+        }
     }
 
     private void updateStockAlertsDisplay() {
@@ -215,10 +315,23 @@ public class EditProduct extends BaseActivity {
 
                         etPiecesPerUnit.setText(String.valueOf(p.getPiecesPerUnit()));
 
-                        // Set Spinner selection
+                        // Set Main Unit Spinner selection
                         ArrayAdapter adapter = (ArrayAdapter) unitSpinner.getAdapter();
-                        int pos = adapter.getPosition(p.getUnit());
+                        String savedUnit = p.getUnit() != null ? p.getUnit().trim() : "pcs";
+                        int pos = adapter.getPosition(savedUnit);
                         if (pos >= 0) unitSpinner.setSelection(pos);
+
+                        // CRITICAL FIX: Safely load the Sub-Unit using .post() to prevent UI wipe
+                        String savedSubUnit = p.getSalesUnit() != null ? p.getSalesUnit().trim() : "pcs";
+                        if (subUnitSpinner != null) {
+                            subUnitSpinner.post(() -> {
+                                ArrayAdapter subAdapter = (ArrayAdapter) subUnitSpinner.getAdapter();
+                                if (subAdapter != null) {
+                                    int subPos = subAdapter.getPosition(savedSubUnit);
+                                    if (subPos >= 0) subUnitSpinner.setSelection(subPos);
+                                }
+                            });
+                        }
 
                         // Load Image
                         selectedImagePath = (p.getImagePath() != null && !p.getImagePath().isEmpty()) ? p.getImagePath() : p.getImageUrl();
@@ -237,6 +350,52 @@ public class EditProduct extends BaseActivity {
                 runOnUiThread(() -> Toast.makeText(EditProduct.this, "Error: " + error, Toast.LENGTH_SHORT).show());
             }
         });
+    }
+
+    private void showDeleteMetadataDialog(String title, String collection, String fieldName) {
+        FirebaseFirestore.getInstance().collection(collection)
+                .whereEqualTo("ownerAdminId", currentUserId)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<String> items = new ArrayList<>();
+                    Map<String, String> docMap = new HashMap<>();
+
+                    for (DocumentSnapshot doc : queryDocumentSnapshots) {
+                        String name = doc.getString(fieldName);
+                        if (name != null) {
+                            items.add(name);
+                            docMap.put(name, doc.getId());
+                        }
+                    }
+
+                    if (items.isEmpty()) {
+                        Toast.makeText(this, "No custom items to delete.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    new AlertDialog.Builder(this)
+                            .setTitle(title)
+                            .setItems(items.toArray(new String[0]), (dialog, which) -> {
+                                String selectedName = items.get(which);
+                                String docId = docMap.get(selectedName);
+
+                                new AlertDialog.Builder(this)
+                                        .setTitle("Confirm Delete")
+                                        .setMessage("Are you sure you want to delete '" + selectedName + "'? This cannot be undone.")
+                                        .setPositiveButton("Delete", (d, w) -> {
+                                            FirebaseFirestore.getInstance().collection(collection).document(docId)
+                                                    .delete()
+                                                    .addOnSuccessListener(aVoid -> {
+                                                        Toast.makeText(this, "Deleted successfully", Toast.LENGTH_SHORT).show();
+                                                        setupDynamicCategoryDropdowns(); // Refresh the dropdown list
+                                                    });
+                                        })
+                                        .setNegativeButton("Cancel", null)
+                                        .show();
+                            })
+                            .setNegativeButton("Close", null)
+                            .show();
+                });
     }
 
     private void attemptEdit() {
@@ -270,8 +429,15 @@ public class EditProduct extends BaseActivity {
             existingProductToEdit.setCriticalLevel(criticalLevel);
             existingProductToEdit.setPiecesPerUnit(ppu > 0 ? ppu : 1);
 
-            String mainUnit = unitSpinner.getSelectedItem().toString();
+            // Added .trim() to clean the main unit
+            String mainUnit = unitSpinner.getSelectedItem() != null ? unitSpinner.getSelectedItem().toString().trim() : "pcs";
             existingProductToEdit.setUnit(mainUnit);
+
+            if (layoutPiecesPerUnit != null && layoutPiecesPerUnit.getVisibility() == View.VISIBLE && subUnitSpinner != null && subUnitSpinner.getSelectedItem() != null) {
+                existingProductToEdit.setSalesUnit(subUnitSpinner.getSelectedItem().toString().trim());
+            } else {
+                existingProductToEdit.setSalesUnit(mainUnit);
+            }
 
             String expiryStr = expiryDateET.getText().toString().trim();
             if (!expiryStr.isEmpty()) {

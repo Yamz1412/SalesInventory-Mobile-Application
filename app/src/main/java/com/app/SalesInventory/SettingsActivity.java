@@ -84,24 +84,43 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void checkUserRoleForPermissions() {
-        authManager.refreshCurrentUserStatus(success -> {
-            runOnUiThread(() -> {
-                if (authManager.isCurrentUserAdmin()) {
-                    if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.VISIBLE);
-                    if (cardAdmin != null) cardAdmin.setVisibility(View.VISIBLE);
-                } else {
-                    if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.GONE);
-                    if (cardAdmin != null) cardAdmin.setVisibility(View.GONE);
+        // CRITICAL FIX: Instant detection using local cache for offline-first performance
+        boolean isManager = authManager.hasManagerAccess();
+        boolean isAdmin = authManager.isCurrentUserAdmin();
 
-                    // CRITICAL FIX: Explicitly hide administration tools from Staff/Sub-Admins!
-                    if (btnBackup != null) btnBackup.setVisibility(View.GONE);
-                    if (btnRestore != null) btnRestore.setVisibility(View.GONE);
-                    if (btnClearCache != null) btnClearCache.setVisibility(View.GONE);
-                    if (switchAutoBackup != null) switchAutoBackup.setVisibility(View.GONE);
-                }
-            });
+        // Sub-Admins and Admins should both see the system controls immediately
+        if (isManager || isAdmin) {
+            if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.VISIBLE);
+            if (cardAdmin != null) cardAdmin.setVisibility(View.VISIBLE);
+
+            // Ensure all tools are visible for managers/admins
+            if (btnBackup != null) btnBackup.setVisibility(View.VISIBLE);
+            if (btnRestore != null) btnRestore.setVisibility(View.VISIBLE);
+            if (btnClearCache != null) btnClearCache.setVisibility(View.VISIBLE);
+            if (switchAutoBackup != null) switchAutoBackup.setVisibility(View.VISIBLE);
+        } else {
+            // Instant hide for standard Staff accounts
+            if (tvAdminTitle != null) tvAdminTitle.setVisibility(View.GONE);
+            if (cardAdmin != null) cardAdmin.setVisibility(View.GONE);
+
+            if (btnBackup != null) btnBackup.setVisibility(View.GONE);
+            if (btnRestore != null) btnRestore.setVisibility(View.GONE);
+            if (btnClearCache != null) btnClearCache.setVisibility(View.GONE);
+            if (switchAutoBackup != null) switchAutoBackup.setVisibility(View.GONE);
+        }
+
+        authManager.refreshCurrentUserStatus(success -> {
+            if (success) {
+                runOnUiThread(() -> {
+                    boolean latestManager = authManager.hasManagerAccess();
+                    if (cardAdmin != null) {
+                        cardAdmin.setVisibility(latestManager ? View.VISIBLE : View.GONE);
+                    }
+                });
+            }
         });
     }
+
     private void loadSavedPreferences() {
         ThemeManager.Theme currentTheme = ThemeManager.getInstance(this).getCurrentTheme();
         if ("dark".equalsIgnoreCase(currentTheme.name)) {

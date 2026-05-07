@@ -27,32 +27,34 @@
         android:orientation="vertical"
         android:padding="16dp"
         android:background="?attr/colorSurface"
-        android:elevation="4dp"
-        android:visibility="gone">
+        android:elevation="4dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Filter Records"
             android:textStyle="bold"
-            android:textColor="?attr/colorOnSurface"
+            android:textColor="?android:attr/textColorPrimary"
             android:layout_marginBottom="8dp"/>
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2">
+            android:layout_height="48dp"
+            android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btnFilterDate"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDateFilter"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="Select Date"
                 android:layout_marginEnd="4dp"
-                app:icon="@android:drawable/ic_menu_today"/>
+                android:text="Select Date"
+                android:textColor="?android:attr/textColorPrimary"
+                app:backgroundTint="?attr/colorSurface"
+                app:strokeColor="?android:attr/textColorSecondary"
+                app:icon="@android:drawable/ic_menu_today"
+                app:iconTint="?android:attr/textColorPrimary"/>
 
             <Spinner
                 android:id="@+id/spinnerStaffFilter"
@@ -60,7 +62,8 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:background="@drawable/spinner_background" />
+                android:background="@drawable/spinner_background"
+                android:backgroundTint="?attr/colorSurface" />
         </LinearLayout>
     </LinearLayout>
 
@@ -74,7 +77,7 @@
             android:layout_height="match_parent"
             android:text="No attendance records found."
             android:gravity="center"
-            android:textColor="?attr/colorOnBackground"
+            android:textColor="?android:attr/textColorSecondary"
             android:alpha="0.6"
             android:visibility="gone"/>
 

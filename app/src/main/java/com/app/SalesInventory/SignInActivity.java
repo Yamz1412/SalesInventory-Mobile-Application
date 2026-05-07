@@ -58,6 +58,14 @@ public class SignInActivity extends BaseActivity {
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         checkRememberedUser();
+
+        if (fAuth.getCurrentUser() == null) {
+            java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+                try {
+                    AppDatabase.getInstance(getApplicationContext()).clearAllTables();
+                } catch (Exception ignored) {}
+            });
+        }
     }
 
     private void checkRememberedUser() {
